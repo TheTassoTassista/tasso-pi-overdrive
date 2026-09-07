@@ -1,0 +1,42 @@
+{
+  "installMode": "auto",
+  "warmup": true,
+  "servers": {
+    "vtsls": {
+      "install": {
+        "type": "system",
+        "command": [
+          "vtsls",
+          "--stdio"
+        ]
+      }
+    },
+    "pyright": {
+      "install": {
+        "type": "system",
+        "command": [
+          "pyright-langserver",
+          "--stdio"
+        ]
+      }
+    },
+    "yamlls": {
+      "install": {
+        "type": "system",
+        "command": [
+          "yaml-language-server",
+          "--stdio"
+        ]
+      }
+    },
+    "jsonls": {
+      "install": {
+        "type": "system",
+        "command": [
+          "vscode-json-language-server",
+          "--stdio"
+        ]
+      }
+    }
+  }
+}

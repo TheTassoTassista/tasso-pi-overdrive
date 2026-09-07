@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "preset": "minimal",
+  "segments": {
+    "modelThink": true,
+    "runtime": false,
+    "pwd": false,
+    "git": false,
+    "contextUsage": true,
+    "contextProgress": true,
+    "contextPercentage": true,
+    "contextNumbers": false,
+    "tokens": false,
+    "tps": false,
+    "cost": true
+  },
+  "contextZones": {
+    "expert": 70,
+    "warning": 85
+  }
+}

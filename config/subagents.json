@@ -1,0 +1,37 @@
+{
+  "toolDescriptionMode": "compact",
+  "inlineToolDisplay": "summary",
+  "mainWindowRenderer": {
+    "horizontalSpacing": 0,
+    "compactResultMaxLines": 4
+  },
+  "asyncByDefault": false,
+  "defaultSubagentContext": "fresh",
+  "waitTool": {
+    "enabled": true,
+    "defaultTimeoutMs": 120000
+  },
+  "timeoutMs": 3600000,
+  "toolTimeoutMs": 600000,
+  "globalConcurrencyLimit": 3,
+  "maxSubagentSpawnsPerSession": 24,
+  "maxSubagentSpawnsPerRun": 8,
+  "maxActiveAsyncRunsPerSession": 3,
+  "parallel": {
+    "maxTasks": 4,
+    "concurrency": 3
+  },
+  "maxSubagentDepth": 1,
+  "worktree": false,
+  "worktreeBaseDir": "~/.local/share/pi-overdrive/worktrees",
+  "worktreeProvider": "native",
+  "worktreeBranchPrefix": "pi-overdrive/",
+  "scheduledRuns": {
+    "enabled": false,
+    "maxPending": 8
+  },
+  "intercomBridge": {
+    "mode": "always",
+    "resultDelivery": false
+  }
+}

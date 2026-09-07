@@ -1,0 +1,67 @@
+{
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-terra",
+  "defaultThinkingLevel": "medium",
+  "enabledModels": [
+    "openai-codex/gpt-5.6-luna",
+    "openai-codex/gpt-5.6-terra",
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-6-astra"
+  ],
+  "showCacheMissNotices": true,
+  "enableSkillCommands": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 16000
+  },
+  "subagents": {
+    "defaultModel": "openai-codex/gpt-5.6-terra",
+    "defaultProvider": "openai-codex",
+    "defaultThinking": "medium",
+    "maxThinking": "max",
+    "modelScope": {
+      "enforce": true,
+      "strict": true,
+      "allow": [
+        "inherit",
+        "openai-codex/gpt-5.6-*",
+        "openai-codex/gpt-6-*"
+      ]
+    },
+    "agentOverrides": {
+      "scout": {
+        "model": "openai-codex/gpt-5.6-luna",
+        "thinking": "low"
+      },
+      "planner": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high"
+      },
+      "oracle": {
+        "model": "openai-codex/gpt-6-astra",
+        "thinking": "high"
+      },
+      "worker": {
+        "model": "openai-codex/gpt-5.6-terra",
+        "thinking": "high"
+      },
+      "tester": {
+        "model": "openai-codex/gpt-5.6-luna",
+        "thinking": "medium"
+      },
+      "correctness-reviewer": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high"
+      },
+      "security-reviewer": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high"
+      },
+      "simplicity-reviewer": {
+        "model": "openai-codex/gpt-5.6-luna",
+        "thinking": "medium"
+      }
+    }
+  }
+}

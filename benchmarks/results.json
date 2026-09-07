@@ -1,0 +1,48 @@
+{
+  "recordedAt": "2026-09-07",
+  "piVersion": "0.85.1",
+  "runs": [
+    {
+      "task": "tool-output-optimizer",
+      "model": null,
+      "success": true,
+      "latencyMeanMs": 9.511,
+      "inputChars": 164450,
+      "outputChars": 4743,
+      "reductionPercent": 97.12,
+      "iterations": 100,
+      "diagnosticsRetained": true,
+      "cost": 0
+    },
+    {
+      "task": "local-repository-navigation-and-worktree",
+      "model": null,
+      "success": true,
+      "checks": 14,
+      "cost": 0
+    },
+    {
+      "task": "integrated-multi-agent-smoke",
+      "model": "openai-codex/gpt-5.6-luna supervisor with configured role routing",
+      "success": true,
+      "checks": 11,
+      "temporaryRepositoryRemoved": true
+    },
+    {
+      "task": "rpc-handoff-smoke",
+      "model": "openai-codex/gpt-5.6-luna",
+      "success": true,
+      "checks": 5,
+      "newSessionMessageCount": 0
+    },
+    {
+      "task": "resource-catalog-and-web-fetch",
+      "model": "openai-codex/gpt-5.6-luna for web fetch only",
+      "success": true,
+      "customPromptsLoaded": 12,
+      "customSkillsLoaded": 15,
+      "webFetchWithoutCredential": true
+    }
+  ],
+  "note": "The six model task definitions are reusable but are not bulk-run automatically; this avoids unapproved paid evaluation traffic. Add API-reported token/cache/cost fields only when exposed."
+}

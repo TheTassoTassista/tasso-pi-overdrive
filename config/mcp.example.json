@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "directTools": false,
+    "hostConfigDiscovery": "off",
+    "notifyOnStartupConnect": false,
+    "mcpFooterStatus": "compact",
+    "outputGuard": true,
+    "approveTools": true,
+    "sampling": false,
+    "elicitation": true,
+    "trace": {
+      "enabled": true,
+      "maxBytes": 262144,
+      "maxEvents": 10000
+    }
+  },
+  "mcpServers": {}
+}

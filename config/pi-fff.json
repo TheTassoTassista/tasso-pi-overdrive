@@ -1,0 +1,7 @@
+{
+  "mode": "tools-only",
+  "enableFsRootScanning": false,
+  "enableHomeDirScanning": false,
+  "warnOnHomeDirScan": true,
+  "followSymlinks": false
+}

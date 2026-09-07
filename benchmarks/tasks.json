@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "policy": {
+    "defaultMode": "dry-run",
+    "paidRunsRequireExplicitApproval": true,
+    "record": ["date", "piVersion", "model", "thinking", "task", "success", "latencyMs", "inputTokens", "outputTokens", "cachedTokens", "cacheWrites", "cost", "retries", "notes"]
+  },
+  "tasks": [
+    {"id": "navigation", "tier": "fast", "goal": "Find the implementation and tests for one named behavior", "success": "Correct entry point, callers, tests, and bounded line references"},
+    {"id": "bug-fix", "tier": "balanced", "goal": "Repair one planted arithmetic edge case", "success": "Targeted failing test becomes green with a minimal diff"},
+    {"id": "refactor", "tier": "balanced", "goal": "Extract duplicated pure logic without behavior change", "success": "Tests stay green and duplication decreases"},
+    {"id": "reasoning", "tier": "frontier", "goal": "Choose between two migration designs under explicit invariants", "success": "Decision addresses rollback, compatibility, and failure modes"},
+    {"id": "test-diagnosis", "tier": "fast", "goal": "Explain a deterministic test failure before editing", "success": "Root cause and smallest confirming experiment are correct"},
+    {"id": "review", "tier": "frontier", "goal": "Adversarially review a planted boundary bug", "success": "Bug, impact, evidence, and minimal fix are identified"}
+  ]
+}

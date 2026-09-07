@@ -1,0 +1,54 @@
+{
+  "name": "tasso-pi-overdrive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tasso's reproducible, context-efficient Pi coding harness configuration",
+  "license": "UNLICENSED",
+  "keywords": [
+    "pi-package"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "node scripts/typecheck.mjs",
+    "check": "npm test && npm run typecheck && node scripts/validate-package.mjs",
+    "benchmark": "node benchmarks/output-optimizer.mjs",
+    "verify": "node scripts/verify-project.mjs --quick",
+    "smoke:local": "node scripts/local-smoke.mjs",
+    "smoke:e2e": "node scripts/e2e-smoke.mjs",
+    "smoke:handoff": "node scripts/handoff-smoke.mjs"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/orchestrator.ts",
+      "./extensions/safety.ts",
+      "./extensions/output-optimizer.ts",
+      "./extensions/notebook.ts",
+      "./extensions/handoff.ts",
+      "./extensions/verification-gate.ts",
+      "./extensions/context-monitor.ts",
+      "./extensions/metadata-trace.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "subagents": {
+      "agents": [
+        "./agents"
+      ]
+    }
+  }
+}
