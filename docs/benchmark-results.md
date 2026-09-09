@@ -1,6 +1,6 @@
 # Benchmark and smoke results
 
-Recorded on 2026-09-09 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the failed authenticated post-expansion E2E is explicitly not counted as a pass.
+Recorded on 2026-09-09 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; failed authenticated post-expansion E2E runs are explicitly not counted as passes.
 
 ## Current regression evidence
 
@@ -23,7 +23,7 @@ Recorded on 2026-09-09 with official Pi 0.85.1. A PASS below is backed by the cu
 | Bootstrap | PASS | `npm run smoke:bootstrap`: clean temporary HOME, exact packages/runtimes, all presets/council routes, private policy/backup, no auth created |
 | Restore | PASS | `npm run smoke:restore`: original settings restored byte-for-byte; SHA-256 `08288b6b68fad66fa8797adbf8855d8029042b2970edf326d5415bcf22c194cb` |
 | Output optimizer | PASS | `npm run benchmark`: 164,450 to 4,836 characters (97.06%); critical diagnostics retained; 16.074 ms mean over 100 runs |
-| Trace privacy | PASS | `npm run smoke:trace`: 212 files / 1,123 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
+| Trace privacy | PASS | `npm run smoke:trace`: 228 files / 1,179 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
 | Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 12 at measurement time |
 
@@ -71,4 +71,10 @@ The last fully passing pre-expansion workflow evidence is run `0789657a-a21f-461
 
 The post-expansion run `c8e1d5ac-4f17-4fd4-a4fa-336de3c0fad9` correctly ended FAIL before Scout admission. Both real Scout child executions completed on `openai-codex/gpt-5.6-luna:low`, but the controller expected `openai-codex/gpt-5.6-luna` plus a separate `low` field and rejected both responses. The run wrote FAIL evidence and cleaned its runtime; it did not become a false positive.
 
-The controller now accepts the canonical model form or the exact `:thinking` suffix Pi-subagents emits, canonicalizes it, stores a launch-contract digest, and records every terminal attempt durably. Targeted route/receipt/state tests and the full 77-test suite pass. A single post-fix authenticated rerun was requested but the execution safety reviewer rejected it as an additional paid E2E. Therefore the final integrated authenticated result remains **PARTIAL**, not PASS, until the user explicitly authorizes one additional run.
+The controller now accepts the canonical model form or the exact `:thinking` suffix Pi-subagents emits, canonicalizes it, stores a launch-contract digest, and records every terminal attempt durably. Targeted route/receipt/state tests and the full 77-test suite pass.
+
+The explicitly authorized single post-fix run `179bb6f7-414c-4529-baa2-709630b9bac9` nevertheless ended **FAIL**. Scout, Planner, and Oracle completed on the configured `openai-codex/gpt-5.6-luna:low`, `openai-codex/gpt-5.6-sol:high`, and `openai-codex/gpt-6-astra:high` routes. The high-risk council then failed closed before Worker: `gpt-5.4` was rejected by Codex as unsupported with a ChatGPT account; council-1 and the first council-2 attempt were rejected by the child runtime for making no edits even though these are deliberately read-only advisory roles; the second council-2 attempt omitted its required structured-output call. Each council member had two controller-level delegation attempts. Worker, Tester, verification, reviewers, correction, and Judge were therefore not run.
+
+The durable child sessions record 21 provider calls, 47,081 input tokens, 14,080 output tokens, 37,248 cache-read tokens, 10,030 reasoning tokens, 98,409 total reported tokens, and USD 0.7057564. The outer Luna coordinator made two additional calls; its token and cost data were not persisted by the no-session RPC harness. Total model-call count is therefore 23, while the reported token/cost total covers 21 of those calls only. Runtime/worktree/port/process cleanup passed and the temporary repository was removed.
+
+The E2E evidence validator also has a separate false-negative: it compares canonical stored model IDs to hardcoded IDs containing `:thinking`, so it incorrectly labels the three successfully routed roles as unintended. This does not explain the controller stop—the council failures do—but it makes the final validator unreliable until corrected. No rerun was performed.
