@@ -1,0 +1,13 @@
+{
+  "name": "tasso-pi-overdrive-mcp-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned runtime for the audited Pi MCP adapter",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "pi-mcp-adapter": "https://codeload.github.com/nicobailon/pi-mcp-adapter/tar.gz/8243eba3421e301c88c047444f34ab7d5d57163e"
+  },
+  "overrides": {
+    "hono": "4.13.5"
+  }
+}

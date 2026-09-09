@@ -9,9 +9,19 @@
     "npm:@juicesharp/rpiv-ask-user-question@2.9.0",
     "npm:pi-observability@1.3.2"
   ],
+  "trackedRuntimes": {
+    "pi-mcp-adapter": {
+      "version": "2.32.1",
+      "source": "https://codeload.github.com/nicobailon/pi-mcp-adapter/tar.gz/8243eba3421e301c88c047444f34ab7d5d57163e",
+      "reason": "The immutable upstream commit adds official Pi 0.85 peer compatibility after the npm release; it is isolated behind one proxy tool and a two-tool Context7 allowlist."
+    },
+    "@modelcontextprotocol/sdk": {
+      "version": "1.30.0",
+      "reason": "Pinned only for the deterministic local MCP policy fixture."
+    }
+  },
   "rejected": {
     "pi-lsp-adapter@0.1.3": "Runtime fixture returned no diagnostics and its definition/reference tools were unreliable; replaced by the pinned TypeScript LanguageService extension.",
-    "pi-mcp-adapter@2.32.1": "Its @earendil-works/pi-ai peer range is ^0.84.1, which excludes the installed 0.85.1 runtime.",
     "pi-rtk-optimizer@0.9.0": "Its declared Pi peer ranges stop before 0.85.x.",
     "context-mode@1.0.169": "Large overlapping MCP architecture and a restrictive license add risk without reducing this setup's tool surface.",
     "pi-agenticoding@0.5.0": "Duplicates subagent orchestration and recommends disabling native compaction.",

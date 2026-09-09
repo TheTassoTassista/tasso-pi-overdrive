@@ -11,11 +11,11 @@ All selected npm sources are exact pins. Their manifests, engines, Pi peer range
 | `pi-agent-browser-native@0.6.6` | DOM/console/browser verification | Accepted with upstream agent-browser 0.36.0 and isolated Chromium |
 | `@juicesharp/rpiv-ask-user-question@2.9.0` | Structured material clarifications | Accepted for the supervisor and read-only Planner |
 | `pi-observability@1.3.2` | One unobtrusive token/context/tool dashboard | Accepted with the minimal preset |
+| `pi-mcp-adapter@2.32.1` at `8243eba3421e301c88c047444f34ab7d5d57163e` | One lazy MCP proxy | Accepted from immutable upstream HTTPS commit; Pi 0.85 peer fix audited, Context7-only allowlist, direct tools off, Hono 4.13.5 security override, isolated locked runtime |
 | `tasso-pi-overdrive` | Personal workflow, safety, TypeScript semantic navigation, notebook, handoff, verification, skills/prompts | Git-tracked stable local package; source remains editable and third-party code is not copied into it |
 
 ## Intentionally rejected
 
-- `pi-mcp-adapter@2.32.1`: its declared `@earendil-works/pi-ai ^0.84.1` peer range excludes Pi 0.85.1. MCP remains inactive with a hardened empty reference config.
 - `pi-lsp-adapter@0.1.3`: runtime diagnostics were empty and definition/reference support was unreliable. It was removed and replaced by the local pinned TypeScript LanguageService 6.0.3 tools.
 - `pi-rtk-optimizer@0.9.0`: declared Pi peer ranges stop before 0.85.x and it adds a lifecycle script. A small local output transformer is measured and easier to audit.
 - `context-mode@1.0.169`: large overlapping MCP/context surface and restrictive license without a measured advantage here.

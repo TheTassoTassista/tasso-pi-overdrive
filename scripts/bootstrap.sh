@@ -35,6 +35,8 @@ fi
 if [[ "$check_only" == true ]]; then
   node "$package_root/scripts/validate-package.mjs"
   "$pi_bin" list
+  "$npm_bin" list --prefix "$package_root/runtime/mcp" --depth=0 \
+    pi-mcp-adapter@2.32.1 @modelcontextprotocol/sdk@1.30.0
   "$npm_bin" list --prefix "$HOME/.local/share/pi-overdrive/lsp-node" --depth=0 \
     typescript@6.0.3 pyright@1.1.410 @ast-grep/cli@0.45.3
   command -v agent-browser >/dev/null 2>&1 && agent-browser --version
@@ -68,6 +70,8 @@ backup_file "$agent_dir/observability/settings" "$backup_dir/pi-original/agent/o
 backup_file "$install_manifest" "$backup_dir/pi-original/agent/tasso-pi-overdrive-install.json"
 backup_file "$HOME/.pi/config/pi-agent-browser-native/config.json" "$backup_dir/pi-original/config/pi-agent-browser-native/config.json"
 echo "Backup: $backup_dir"
+
+"$npm_bin" ci --prefix "$package_root/runtime/mcp" --omit=dev --ignore-scripts --no-audit --no-fund
 
 install -d -m 700 "$agent_dir"
 node "$package_root/scripts/settings-tool.mjs" snapshot "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"

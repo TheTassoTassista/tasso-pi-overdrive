@@ -5,6 +5,7 @@ export const CORE_TOOLS = Object.freeze([
   "edit",
   "write",
   "secure_coding_workflow",
+  "mcp",
   "task_notebook",
   "verification_gate",
 ]);

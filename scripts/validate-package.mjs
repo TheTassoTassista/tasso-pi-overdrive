@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -24,6 +24,23 @@ for (const source of packagePolicy.selected) {
 const settingsPatch = JSON.parse(await readFile(path.join(root, 'config/settings-patch.json'), 'utf8'));
 if (JSON.stringify(settingsPatch.defaultTools) !== JSON.stringify(['read', 'edit', 'write'])) failures.push('defaultTools must contain only the intended built-in editor core');
 if (!pkg.pi.extensions.includes('./extensions/tool-surface.ts')) failures.push('initial custom-tool surface limiter is missing');
+if (!pkg.pi.extensions.includes('./extensions/mcp.ts')) failures.push('compact MCP proxy extension is missing');
+
+const mcpConfig = JSON.parse(await readFile(path.join(root, 'config/mcp.json'), 'utf8'));
+if (mcpConfig.settings?.directTools !== false || mcpConfig.settings?.scriptMode !== false) failures.push('MCP must expose one proxy only (no direct tools or script surface)');
+if (mcpConfig.settings?.approveTools !== true || mcpConfig.settings?.sampling !== false || mcpConfig.settings?.elicitation !== false) failures.push('MCP global mutation/sampling/elicitation policy is not fail-closed');
+if (Object.keys(mcpConfig.mcpServers ?? {}).length !== 1 || !mcpConfig.mcpServers?.context7) failures.push('only the audited Context7 MCP server may be configured');
+const context7 = mcpConfig.mcpServers?.context7 ?? {};
+if (context7.lifecycle !== 'lazy' || context7.directTools !== false || context7.exposeResources !== false) failures.push('Context7 MCP lifecycle/surface is not lazy and bounded');
+if (JSON.stringify(context7.includeTools) !== JSON.stringify(['resolve-library-id', 'query-docs'])) failures.push('Context7 MCP allowlist changed');
+const mcpRuntime = JSON.parse(await readFile(path.join(root, 'runtime/mcp/package.json'), 'utf8'));
+const expectedMcpSource = 'https://codeload.github.com/nicobailon/pi-mcp-adapter/tar.gz/8243eba3421e301c88c047444f34ab7d5d57163e';
+if (mcpRuntime.dependencies?.['pi-mcp-adapter'] !== expectedMcpSource) failures.push('MCP adapter commit is not pinned to the audited HTTPS revision');
+if (packagePolicy.trackedRuntimes?.['pi-mcp-adapter']?.source !== expectedMcpSource) failures.push('MCP runtime audit policy does not match the installed source');
+if (mcpRuntime.overrides?.hono !== '4.13.5') failures.push('MCP runtime Hono security override is missing');
+const mcpLock = JSON.parse(await readFile(path.join(root, 'runtime/mcp/package-lock.json'), 'utf8'));
+if (mcpLock.packages?.['node_modules/pi-mcp-adapter']?.version !== '2.32.1' || mcpLock.packages?.['node_modules/pi-mcp-adapter']?.resolved !== expectedMcpSource) failures.push('MCP lockfile does not resolve the audited adapter commit');
+if (mcpLock.packages?.['node_modules/hono']?.version !== '4.13.5') failures.push('MCP lockfile does not enforce the audited Hono version');
 
 const subagents = JSON.parse(await readFile(path.join(root, 'config/subagents.json'), 'utf8'));
 if (subagents.globalConcurrencyLimit !== 3 || subagents.parallel?.concurrency !== 3 || subagents.parallel?.maxTasks !== 3) failures.push('subagent concurrency is not hard-configured to 3');

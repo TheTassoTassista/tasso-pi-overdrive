@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { CORE_TOOLS } from "../extensions/tool-surface.ts";
 
 const pi = process.env.PI_BIN || "pi";
 const model = process.env.PI_SMOKE_MODEL || "openai-codex/gpt-5.6-luna";
@@ -80,7 +81,7 @@ try {
   report = {
     status: measurements.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL",
     model,
-    configuredDefaultToolCount: 6,
+    configuredDefaultToolCount: CORE_TOOLS.length,
     measurements,
     measuredToolSchemaDeltaTokens: Number.isFinite(defaultSurface.inputTokens) && Number.isFinite(noTools.inputTokens) ? defaultSurface.inputTokens - noTools.inputTokens : null,
   };

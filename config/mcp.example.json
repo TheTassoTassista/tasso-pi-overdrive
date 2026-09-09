@@ -4,10 +4,16 @@
     "hostConfigDiscovery": "off",
     "notifyOnStartupConnect": false,
     "mcpFooterStatus": "compact",
-    "outputGuard": true,
+    "outputGuard": {
+      "maxBytes": 65536,
+      "maxLines": 800,
+      "detailsMaxBytes": 8192
+    },
     "approveTools": true,
     "sampling": false,
-    "elicitation": true,
+    "elicitation": false,
+    "scriptMode": false,
+    "autoAuth": false,
     "trace": {
       "enabled": true,
       "maxBytes": 262144,

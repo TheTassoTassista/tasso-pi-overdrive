@@ -1,0 +1,39 @@
+{
+  "settings": {
+    "directTools": false,
+    "hostConfigDiscovery": "off",
+    "notifyOnStartupConnect": false,
+    "mcpFooterStatus": "compact",
+    "outputGuard": {
+      "maxBytes": 65536,
+      "maxLines": 800,
+      "detailsMaxBytes": 8192
+    },
+    "approveTools": true,
+    "sampling": false,
+    "elicitation": false,
+    "scriptMode": false,
+    "autoAuth": false,
+    "trace": {
+      "enabled": true,
+      "maxBytes": 262144,
+      "maxEvents": 10000
+    }
+  },
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "lifecycle": "lazy",
+      "idleTimeout": 5,
+      "requestTimeoutMs": 30000,
+      "exposeResources": false,
+      "directTools": false,
+      "includeTools": [
+        "resolve-library-id",
+        "query-docs"
+      ],
+      "approveTools": false,
+      "trace": true
+    }
+  }
+}

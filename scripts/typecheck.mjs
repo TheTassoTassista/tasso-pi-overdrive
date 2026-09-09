@@ -18,6 +18,7 @@ const project = path.join(temp, 'project');
 try {
   mkdirSync(project, { recursive: true });
   for (const item of ['extensions', 'lib', 'package.json', 'tsconfig.json']) cpSync(path.join(root, item), path.join(project, item), { recursive: true });
+  symlinkSync(path.join(root, 'runtime'), path.join(project, 'runtime'), 'dir');
   const modules = path.join(project, 'node_modules');
   mkdirSync(path.join(modules, '@earendil-works'), { recursive: true });
   symlinkSync(piRoot, path.join(modules, '@earendil-works', 'pi-coding-agent'), 'dir');

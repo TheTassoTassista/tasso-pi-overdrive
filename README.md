@@ -1,6 +1,6 @@
 # Tasso Pi Overdrive
 
-A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, compact search and output, TypeScript semantic navigation, AST tools, browser automation, web fetch, verification, observability, and reusable project templates.
+A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, one compact lazy MCP proxy, compact search and output, TypeScript semantic navigation, AST tools, browser automation, web fetch, verification, observability, and reusable project templates.
 
 ## What changes
 
@@ -60,6 +60,7 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/context-health` | Show context pressure and next action |
 | `/output-stats` | Show shell-output reductions this session |
 | `/trace-path` | Show the current metadata-only JSONL trace |
+| `mcp` | Lazy proxy for the two read-only Context7 documentation tools |
 | `ts_diagnostics`, `ts_definition`, `ts_references` | Pinned TypeScript 6.0.3 semantic navigation |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
@@ -73,7 +74,7 @@ Prompt templates are available for bug, feature, refactor, review, security, per
 
 - `web_fetch` works without credentials. `web_search` fails clearly until you export a provider variable such as `BRAVE_SEARCH_API_KEY` or configure `/web-tools`.
 - Browser work uses an isolated Chromium by default. Do not attach a personal profile unless the task explicitly needs signed-in state and you accept that visible page data becomes model-visible.
-- MCP is intentionally not active: the current adapter's declared Pi peer range excludes 0.85.1. A hardened empty reference config is in `config/mcp.example.json`; revisit only after a compatible release is vetted.
+- MCP uses the audited upstream adapter commit that adds Pi 0.85 compatibility. It exposes one lazy proxy and only two read-only Context7 documentation operations; direct tools, resources, script mode, sampling, elicitation, and host-config discovery are disabled. See [mcp.md](docs/mcp.md).
 - `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, credential-file, Git-metadata, system-config, and network isolation. It has no network-enabled mode. See [sandbox.md](docs/sandbox.md).
 - GitHub CLI, `tree`, and `zip` could not be installed because this host requires an interactive sudo password. Their absence does not block the core setup; the exact optional command is recorded in [operations.md](docs/operations.md).
 
