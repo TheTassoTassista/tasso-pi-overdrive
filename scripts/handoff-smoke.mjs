@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const pi = process.env.PI_BIN || 'pi';
-const model = process.env.PI_SMOKE_MODEL || 'openai-codex/gpt-5.6-luna';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const providerExtension = path.join(root, 'tests', 'fixtures', 'deterministic-handoff-provider.ts');
+const model = 'pi-overdrive-handoff-audit/handoff-driver';
 const marker = 'HANDOFF_MARKER_927';
-const child = spawn(pi, ['--offline', '--approve', '--no-session', '--mode', 'rpc', '--model', model, '--thinking', 'low'], {
+const child = spawn(pi, ['--offline', '--approve', '--no-session', '--mode', 'rpc', '--extension', providerExtension, '--provider', 'pi-overdrive-handoff-audit', '--model', 'handoff-driver', '--api-key', 'audit-only', '--tools', 'task_notebook'], {
   cwd: process.cwd(),
-  env: process.env,
+  env: { ...process.env, PI_OVERDRIVE_HANDOFF_AUDIT_KEY: 'audit-only', PI_OVERDRIVE_HANDOFF_MARKER: marker },
   stdio: ['pipe', 'pipe', 'pipe'],
 });
 
@@ -69,10 +73,13 @@ function check(name, condition, detail) {
 
 try {
   let cursor = events.length;
-  send({ id: 'seed', type: 'prompt', message: `Remember this verified task state exactly: ${marker}. Reply briefly.` });
+  send({ id: 'seed', type: 'prompt', message: `Record this verified task state in the canonical notebook: ${marker}.` });
   const accepted = await waitFor((event) => event.type === 'response' && event.id === 'seed', cursor, 'seed acceptance');
   check('seed-accepted', accepted.success === true, 'initial RPC prompt accepted');
   await waitFor((event) => event.type === 'agent_settled', cursor, 'seed agent settlement', 180000);
+  const notebookEnd = events.slice(cursor).find((event) => event.type === 'tool_execution_end' && event.toolName === 'task_notebook');
+  check('notebook-tool-executed', notebookEnd?.isError === false, notebookEnd?.result?.details);
+  check('notebook-state-recorded', notebookEnd?.result?.details?.state?.goal === marker, notebookEnd?.result?.details?.state);
 
   cursor = events.length;
   send({ id: 'handoff', type: 'prompt', message: `/handoff Continue by verifying ${marker} in a clean session` });
@@ -99,6 +106,6 @@ try {
   });
 }
 
-const status = results.length >= 5 && results.every((item) => item.status === 'PASS') ? 'PASS' : 'FAIL';
+const status = results.length >= 7 && results.every((item) => item.status === 'PASS') ? 'PASS' : 'FAIL';
 process.stdout.write(`${JSON.stringify({ status, model, results }, null, 2)}\n`);
 process.exit(status === 'PASS' ? 0 : 1);

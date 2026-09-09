@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "collector": "scripts/collect-observability.mjs",
+  "sources": [
+    "application *.log files",
+    "JUnit/XML and TAP test reports",
+    "browser-console*.txt",
+    "network-failures*.txt",
+    "CI *.log files"
+  ],
+  "limits": {
+    "files": 100,
+    "bytesPerFile": 262144,
+    "criticalTailPerFile": 10
+  },
+  "rawSecrets": false
+}

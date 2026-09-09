@@ -21,6 +21,6 @@ npm run smoke:local
 ./scripts/sandbox-run.sh . -- node --test tests/*.test.mjs
 ```
 
-The deterministic harness creates and removes its own temporary Git repository/worktree. It does not access credentials or call a model.
+The unit/static harness and evaluator create and remove their own temporary repositories and do not call a model. `npm run smoke:e2e` does call the configured routed models.
 
-`npm run smoke:e2e` and `npm run smoke:handoff` make small authenticated model calls and therefore are never part of `npm run check`. The former plants a bug in a temporary repository, requires scout/planner/reviewer/worker/tester evidence, verifies the fix and guardrail, then deletes the repository. The latter drives the official RPC extension-UI protocol and proves `/handoff` starts an empty session with an editable distilled prompt.
+`npm run smoke:e2e` is deliberately outside `npm run check`: it plants a failing percentage bug plus a machine-readable security blocker, requires the full routed state machine, forces correction/re-verification, writes immutable execution evidence, destroys the worktree/runtime, then writes and validates the cleanup-aware receipt. It also runs a controller negative control whose verification always fails and must end FAIL. `npm run smoke:handoff` uses a deterministic local provider, drives the official RPC extension-UI protocol, and proves `/handoff` starts an empty session with an editable distilled prompt.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { merge, removeSelectedPackages, restoreFields, shouldPreserveSnapshot, snapshotFields } from '../lib/settings.mjs';
+import { merge, removeSelectedPackages, replaceLocalPackageRoot, restoreFields, shouldPreserveSnapshot, snapshotFields } from '../lib/settings.mjs';
 
 test('enable/disable is reversible, preserves later user changes, and keeps the first snapshot', () => {
   const settingsPath = '/tmp/pi-overdrive-settings/agent/settings.json';
@@ -28,4 +28,13 @@ test('enable/disable is reversible, preserves later user changes, and keeps the 
   assert.equal(enabled.defaultProvider, 'before');
   assert.equal(enabled.defaultModel, 'later-user-choice');
   assert.deepEqual(enabled.packages, ['npm:user-owned@1.0.0']);
+});
+
+test('stable package migration removes old and duplicate local roots only', () => {
+  const settingsPath = '/home/user/.pi/agent/settings.json';
+  const oldRoot = '/home/user/dated/output/tasso-pi-overdrive';
+  const stableRoot = '/home/user/Projects/tasso-pi-overdrive';
+  const settings = { packages: [oldRoot, 'npm:fixed@1.2.3', stableRoot, { source: '../other-local' }] };
+  replaceLocalPackageRoot(settings, settingsPath, oldRoot, stableRoot);
+  assert.deepEqual(settings.packages, ['npm:fixed@1.2.3', { source: '../other-local' }, stableRoot]);
 });

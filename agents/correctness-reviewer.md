@@ -1,8 +1,8 @@
 ---
 name: correctness-reviewer
 description: Adversarial read-only review that tries to disprove behavioral correctness.
-tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, lsp_definition, lsp_references, lsp_diagnostics
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/pi-lsp-adapter/src/index.ts
+tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, ts_definition, ts_references, ts_diagnostics
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ../extensions/typescript-navigation.ts
 defaultContext: fresh
 acceptanceRole: read-only
 inheritGlobalContext: false

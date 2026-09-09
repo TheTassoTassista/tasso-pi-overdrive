@@ -18,7 +18,7 @@
   "maxSubagentSpawnsPerRun": 8,
   "maxActiveAsyncRunsPerSession": 3,
   "parallel": {
-    "maxTasks": 4,
+    "maxTasks": 3,
     "concurrency": 3
   },
   "maxSubagentDepth": 1,
@@ -30,8 +30,19 @@
     "enabled": false,
     "maxPending": 8
   },
+  "missions": {
+    "enabled": false,
+    "globalIndex": false,
+    "retainTerminal": 25
+  },
+  "permissions": {
+    "rules": {
+      "edit": "deny",
+      "write": "deny"
+    }
+  },
   "intercomBridge": {
-    "mode": "always",
+    "mode": "off",
     "resultDelivery": false
   }
 }

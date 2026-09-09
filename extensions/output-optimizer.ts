@@ -11,7 +11,7 @@ export default function (pi: ExtensionAPI) {
   const stats: OptimizerStats = { calls: 0, inputLines: 0, outputLines: 0 };
 
   pi.on("tool_result", async (event) => {
-    if (event.isError || event.toolName !== "bash") return undefined;
+    if (event.isError || !["safe_exec", "bash"].includes(event.toolName)) return undefined;
     let changed = false;
     const content = event.content.map((block) => {
       if (block.type !== "text") return block;

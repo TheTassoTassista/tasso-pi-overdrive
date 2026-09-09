@@ -1,4 +1,10 @@
 {
+  "defaultProjectTrust": "ask",
+  "defaultTools": [
+    "read",
+    "edit",
+    "write"
+  ],
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "medium",

@@ -2,7 +2,6 @@
   "piVersion": "0.85.1",
   "selected": [
     "npm:@ff-labs/pi-fff@0.10.6",
-    "npm:pi-lsp-adapter@0.1.3",
     "npm:@juvio15/pi-ast-grep@0.4.2",
     "npm:pi-subagents@0.66.0",
     "npm:@juicesharp/rpiv-web-tools@2.9.0",
@@ -11,6 +10,7 @@
     "npm:pi-observability@1.3.2"
   ],
   "rejected": {
+    "pi-lsp-adapter@0.1.3": "Runtime fixture returned no diagnostics and its definition/reference tools were unreliable; replaced by the pinned TypeScript LanguageService extension.",
     "pi-mcp-adapter@2.32.1": "Its @earendil-works/pi-ai peer range is ^0.84.1, which excludes the installed 0.85.1 runtime.",
     "pi-rtk-optimizer@0.9.0": "Its declared Pi peer ranges stop before 0.85.x.",
     "context-mode@1.0.169": "Large overlapping MCP architecture and a restrictive license add risk without reducing this setup's tool surface.",

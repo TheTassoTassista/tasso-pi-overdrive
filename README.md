@@ -1,15 +1,15 @@
 # Tasso Pi Overdrive
 
-A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds guarded orchestration, specialized agents, compact search and output, LSP/AST tools, browser automation, live web fetch/search, verification, observability, and reusable project templates.
+A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, compact search and output, TypeScript semantic navigation, AST tools, browser automation, web fetch, verification, observability, and reusable project templates.
 
 ## What changes
 
 - Default interactive model: `openai-codex/gpt-5.6-terra`, medium thinking.
 - Role routing: Luna for reconnaissance/testing, Terra for implementation, Sol for planning/review, Astra only for the hardest advisory pass.
 - Native compaction remains enabled. A session notebook stores only durable task state; `/handoff <next phase>` distills a clean-session prompt at 85% context.
-- Eight agents run with fresh context and explicit tool allowlists. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled.
+- Eight agents run with fresh context and enforced tool allowlists. `secure_coding_workflow` owns the isolated worktree and enforces Scout → Planner → Worker → Tester → verification → three reviewers → bounded correction. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Version-4 workflow journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
 - Successful oversized shell output is compacted deterministically; failures remain intact.
-- Tool-call guardrails block likely secret reads and protected writes, and require confirmation for dangerous commands or writes outside the workspace.
+- Tool-call guardrails block secret reads, symlink/hard-link escapes, protected writes, all free-form shell, and caller overrides of isolation limits. Autonomous commands use an argument-vector allowlist inside Bubblewrap.
 - Traces contain only timestamps, model/tool names, input key names, durations, statuses, and context counts—never prompts, argument values, outputs, URLs, or credentials.
 
 ## Install or reproduce
@@ -26,7 +26,6 @@ Restart Pi after installation. Then check:
 
 ```text
 /doctor
-/lsp
 /subagents-models
 /context-health
 ```
@@ -37,7 +36,7 @@ Shell-level status is available with `./scripts/status.sh`.
 
 1. Start Pi in a Git checkout, not in the home directory.
 2. For a new repository run `./scripts/project-init.sh /absolute/repo/path`; existing files are never overwritten.
-3. Use the task directly for trivial work. For substantial work use `scout`, `planner`, `worker`, `tester`, then one or more adversarial reviewers.
+3. Use the task directly for trivial work. For substantial or autonomous work call `secure_coding_workflow`; its stage order, worktree, models, reviewer loop, and limits cannot be changed by tool input.
 4. Use `task_notebook` after a material decision or verified discovery—not after every turn.
 5. Use `verification_gate` before a completion claim. Use full mode for release/build/e2e work.
 6. At 85% context, finish the phase, update the notebook, and run `/handoff <next phase goal>`.
@@ -61,11 +60,12 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/context-health` | Show context pressure and next action |
 | `/output-stats` | Show shell-output reductions this session |
 | `/trace-path` | Show the current metadata-only JSONL trace |
-| `/lsp` | Inspect language-server health |
+| `ts_diagnostics`, `ts_definition`, `ts_references` | Pinned TypeScript 6.0.3 semantic navigation |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
 | `/web-tools` | Opt into a web-search provider; keys are not preconfigured |
 | `verification_gate` | Run adaptive repository checks |
+| `npm run smoke:recovery` | Prove SIGKILL detection, fail-closed interruption, and deterministic resume |
 
 Prompt templates are available for bug, feature, refactor, review, security, performance, research, migration, release, and documentation work.
 
@@ -74,7 +74,7 @@ Prompt templates are available for bug, feature, refactor, review, security, per
 - `web_fetch` works without credentials. `web_search` fails clearly until you export a provider variable such as `BRAVE_SEARCH_API_KEY` or configure `/web-tools`.
 - Browser work uses an isolated Chromium by default. Do not attach a personal profile unless the task explicitly needs signed-in state and you accept that visible page data becomes model-visible.
 - MCP is intentionally not active: the current adapter's declared Pi peer range excludes 0.85.1. A hardened empty reference config is in `config/mcp.example.json`; revisit only after a compatible release is vetted.
-- `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, and network isolation. Add `--network` only when the task explicitly needs outbound access. See [sandbox.md](docs/sandbox.md).
+- `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, credential-file, Git-metadata, system-config, and network isolation. It has no network-enabled mode. See [sandbox.md](docs/sandbox.md).
 - GitHub CLI, `tree`, and `zip` could not be installed because this host requires an interactive sudo password. Their absence does not block the core setup; the exact optional command is recorded in [operations.md](docs/operations.md).
 
 ## Disable and recovery
@@ -100,9 +100,9 @@ The audit, accepted/rejected package rationale, and residual limitations are in 
 
 1. Start `pi` from a trusted Git checkout.
 2. Use `/feature <goal>` or `/bug <symptom>` for disciplined work.
-3. Ask `scout` to map unfamiliar code before reading large files.
-4. Ask `planner` for a spec when scope or acceptance criteria are non-trivial.
-5. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` for an isolated writer.
+3. Use `secure_coding_workflow` for substantial autonomous changes; it launches the appropriate roles itself.
+4. Ask `scout` or `planner` directly only for read-only exploratory work.
+5. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` only for a manual isolated experiment.
 6. Use `task_notebook` after a durable decision or verified discovery.
 7. Run `verification_gate` before any completion claim.
 8. Run `/context-health`; at 85% use `/handoff <next goal>`.

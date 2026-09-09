@@ -13,14 +13,15 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "verification_gate",
     label: "Verification gate",
-    description: "Detect and run repository-appropriate tests, typechecks, lint, build, and git diff checks. Returns real PASS/FAIL evidence; never invent skipped checks.",
+    description: "Detect and run repository-appropriate checks in Bubblewrap. PASS requires at least one real check and every command exiting zero; NO_CHECKS is an unresolved error.",
     parameters: Params,
     async execute(_id, params, signal, _update, ctx) {
       const args = [script, "--json", params.mode === "full" ? "--full" : "--quick", "--cwd", ctx.cwd];
       if (params.listOnly) args.push("--list");
       const result = await pi.exec(process.execPath, args, { cwd: ctx.cwd, ...(signal ? { signal } : {}), timeout: 16 * 60 * 1000 });
       const text = `${result.stdout}${result.stderr}`.trim() || `verification process exited ${result.code}`;
-      return { content: [{ type: "text", text }], details: { exitCode: result.code }, isError: result.code !== 0 };
+      if (result.code !== 0) throw new Error(text);
+      return { content: [{ type: "text", text }], details: { exitCode: result.code } };
     },
   });
 

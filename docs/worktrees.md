@@ -1,6 +1,6 @@
 # Worktrees and parallelism
 
-Use managed `pi-subagents` worktrees for concurrent writers or a substantial experiment that should not disturb the main checkout. The default is off; request `worktree: true` per launch so isolation is deliberate. Native Git allocation is used because Worktrunk is not installed.
+Use `secure_coding_workflow` for autonomous writes. Its trusted controller creates a native Git worktree and branch plus a checked free port, private state directory, isolated browser profile/session, and unique database/schema identifiers. These values are injected into Bubblewrap and browser calls; they are not prompt-only suggestions. The generic subagent default stays off because the secure controller owns the shared workflow worktree, while direct Worker/Tester launches without `worktree: true` are rejected.
 
 For a manual worktree:
 
@@ -8,6 +8,6 @@ For a manual worktree:
 ./scripts/worktree-new.sh feature/example HEAD
 ```
 
-The helper validates the branch, refuses an existing target, creates a sibling worktree, and prints a deterministic suggested port, database name, and browser-profile path. Treat those suggestions as per-worktree namespaces. Never share a writable SQLite file, development database, fixed port, build cache with unsafe concurrent writes, or browser profile between active workers.
+The manual helper validates the branch and refuses an existing target. Runtime isolation for autonomous work is provided by `scripts/worktree-runtime.mjs allocate`; it reserves metadata atomically, checks port availability, and prints the complete allocation. `release` frees the port while retaining reviewable code; controller cleanup removes only a matching managed allocation/worktree/branch.
 
 Before integrating, inspect the child diff, run its verification in that worktree, and merge/cherry-pick from the primary checkout only after review. Use ordinary `git worktree list` and `git worktree remove /exact/path`; never delete worktree directories directly.

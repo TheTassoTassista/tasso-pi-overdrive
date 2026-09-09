@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
 
 const argv = new Set(process.argv.slice(2));
 const mode = argv.has("--full") ? "full" : "quick";
@@ -9,6 +11,8 @@ const listOnly = argv.has("--list");
 const asJson = argv.has("--json");
 const cwdIndex = process.argv.indexOf("--cwd");
 const cwd = path.resolve(cwdIndex >= 0 && process.argv[cwdIndex + 1] ? process.argv[cwdIndex + 1] : process.cwd());
+const sandbox = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "sandbox-run.sh");
+const allocation = findRuntimeAllocation(cwd);
 const checks = [];
 
 function add(name, command, args, reason) {
@@ -16,7 +20,7 @@ function add(name, command, args, reason) {
 }
 
 function commandExists(command) {
-  return spawnSync("sh", ["-c", "command -v -- \"$1\" >/dev/null 2>&1", "sh", command], { cwd }).status === 0;
+  return spawnSync("which", [command], { cwd, stdio: "ignore" }).status === 0;
 }
 
 function loadJson(file) {
@@ -56,16 +60,28 @@ if (existsSync(path.join(cwd, "CMakeLists.txt")) && existsSync(path.join(cwd, "b
   if (commandExists("ctest")) add("ctest", "ctest", ["--test-dir", "build", "--output-on-failure"], "CMake tests");
 }
 
-if (existsSync(path.join(cwd, ".git")) && commandExists("git")) add("git-diff-check", "git", ["diff", "--check"], "Whitespace/conflict-marker check");
+if ((existsSync(path.join(cwd, ".git")) || spawnSync("git", ["-C", cwd, "rev-parse", "--git-dir"], { stdio: "ignore" }).status === 0) && commandExists("git")) {
+  add("git-diff-check", "git", ["diff", "--check"], "Whitespace/conflict-marker check");
+}
 
 if (listOnly) {
-  process.stdout.write(`${JSON.stringify({ cwd, mode, checks }, null, asJson ? 0 : 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ cwd, mode, sandboxed: true, allocationId: allocation?.allocationId ?? null, checks }, null, asJson ? 0 : 2)}\n`);
   process.exit(0);
 }
 
 const results = checks.map((check) => {
   const started = Date.now();
-  const run = spawnSync(check.command, check.args, { cwd, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, NO_COLOR: "1", CI: "1" } });
+  const runtimeArgs = allocation ? [
+    "--runtime-state", allocation.stateDir,
+    "--browser-profile", allocation.browserProfile,
+    "--port", String(allocation.port),
+    "--database", allocation.database,
+    "--schema", allocation.schema,
+  ] : [];
+  const directGitRead = check.name === "git-diff-check";
+  const run = directGitRead
+    ? spawnSync(check.command, check.args, { cwd, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, NO_COLOR: "1", CI: "1" } })
+    : spawnSync(sandbox, [...runtimeArgs, cwd, "--cwd", ".", "--", check.command, ...check.args], { cwd, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
   const combined = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim();
   const output = combined.length > 5000 ? `[output truncated]\n${combined.slice(-5000)}` : combined;
   return {
@@ -73,6 +89,7 @@ const results = checks.map((check) => {
     status: run.status === 0 ? "PASS" : run.error?.code === "ETIMEDOUT" ? "TIMEOUT" : "FAIL",
     exitCode: run.status,
     durationMs: Date.now() - started,
+    sandboxed: !directGitRead,
     output,
   };
 });
@@ -80,6 +97,8 @@ const results = checks.map((check) => {
 const summary = {
   cwd,
   mode,
+  sandboxed: true,
+  allocationId: allocation?.allocationId ?? null,
   status: results.length === 0 ? "NO_CHECKS" : results.every((item) => item.status === "PASS") ? "PASS" : "FAIL",
   results,
 };
@@ -88,4 +107,4 @@ else {
   for (const result of results) process.stdout.write(`${result.name}: ${result.status} (${result.durationMs} ms)\n`);
   process.stdout.write(`Overall: ${summary.status}\n`);
 }
-process.exit(summary.status === "FAIL" ? 1 : 0);
+process.exit(summary.status === "PASS" ? 0 : summary.status === "NO_CHECKS" ? 2 : 1);

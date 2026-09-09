@@ -1,8 +1,8 @@
 ---
 name: security-reviewer
 description: Adversarial read-only security review of changed trust boundaries and data flows.
-tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, lsp_definition, lsp_references, web_search, web_fetch
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/pi-lsp-adapter/src/index.ts, ~/.pi/agent/npm/node_modules/@juicesharp/rpiv-web-tools/index.ts
+tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, ts_definition, ts_references, ts_diagnostics, web_search, web_fetch
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/@juicesharp/rpiv-web-tools/index.ts, ../extensions/typescript-navigation.ts
 defaultContext: fresh
 acceptanceRole: read-only
 inheritGlobalContext: false

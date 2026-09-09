@@ -1,0 +1,453 @@
+import { createHash, randomUUID } from "node:crypto";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { cleanupRuntimeResources, createRuntimeWorktree, recoverStaleRuntimeAllocations, releaseRuntimeResources, resumeRuntimeResources } from "../lib/runtime-isolation.mjs";
+import { runEnforcedWorkflow, WORKFLOW_VERSION } from "../lib/workflow-state.mjs";
+import { localReviewPolicy } from "../lib/review-policy.mjs";
+import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, initialWorkflowJournal, openEvidenceRun, readEvidenceExecution, readWorkflowJournal, recoverInterruptedWorkflowRuns, snapshotWorktree, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
+import { redactMissionValue } from "../lib/mission-privacy.mjs";
+import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
+
+const REQUEST_EVENT = "prompt-template:subagent:request";
+const RESPONSE_EVENT = "prompt-template:subagent:response";
+const CANCEL_EVENT = "prompt-template:subagent:cancel";
+const MAX_DELEGATION_ATTEMPTS = 2;
+const verifyScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
+
+const Params = Type.Object({
+  task: Type.String({ minLength: 1, maxLength: 16000 }),
+  includeOracle: Type.Optional(Type.Boolean({ default: false })),
+  includeSecurity: Type.Optional(Type.Boolean({ default: true })),
+});
+
+interface DelegationInput {
+  agent: string;
+  task: string;
+  cwd: string;
+  result: Record<string, unknown>;
+  round?: number;
+  iteration?: number;
+}
+
+class WorkflowFailure extends Error {
+  receiptWritten: boolean;
+  constructor(message: string, receiptWritten = false) {
+    super(message);
+    this.name = "WorkflowFailure";
+    this.receiptWritten = receiptWritten;
+  }
+}
+
+function sanitizeState(state: any) {
+  const evidence = state?.evidence ?? {};
+  return {
+    workflowVersion: state?.workflowVersion ?? WORKFLOW_VERSION,
+    status: state?.status ?? "FAIL",
+    currentPhase: state?.currentPhase ?? "UNKNOWN",
+    round: state?.round ?? 0,
+    workerStatus: state?.workerStatus ?? "NOT_RUN",
+    testerStatus: state?.testerStatus ?? "NOT_RUN",
+    verificationStatus: state?.verificationStatus ?? "NOT_RUN",
+    reviewStatus: state?.reviewStatus ?? "NOT_RUN",
+    blockingFindingsCount: state?.blockingFindingsCount ?? 0,
+    correctionPerformed: state?.correctionPerformed ?? false,
+    finalVerificationStatus: state?.finalVerificationStatus ?? "NOT_RUN",
+    cleanupStatus: state?.cleanupStatus ?? "NOT_RUN",
+    evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
+    timestamps: state?.timestamps,
+    ownerRunId: state?.ownerRunId,
+    hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
+    allocation: state?.allocation,
+    evidence: {
+      roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
+      receipts: Array.isArray(evidence.receipts) ? evidence.receipts.map((item: any) => ({ agent: item.agent, round: item.round, iteration: item.iteration, executionId: item.executionId, sequence: item.sequence, sha256: item.sha256 })) : [],
+      transitions: Array.isArray(evidence.transitions) ? evidence.transitions : [],
+      verifications: Array.isArray(evidence.verifications) ? evidence.verifications.map((item: any) => ({
+        status: item.status,
+        processExitCode: item.processExitCode,
+        results: Array.isArray(item.results) ? item.results.map((entry: any) => ({ name: entry.name, status: entry.status, exitCode: entry.exitCode, sandboxed: entry.sandboxed })) : [],
+      })) : [],
+      reviews: Array.isArray(evidence.reviews) ? evidence.reviews.map((round: any) => ({
+        round: round.round,
+        complete: round.complete === true,
+        reviews: Array.isArray(round.reviews) ? round.reviews.map((review: any) => ({
+          role: review.role,
+          runId: review.runId,
+          nodeId: review.nodeId,
+          ownerRunId: review.ownerRunId,
+          blocking: review.blocking,
+          verdict: review.verdict,
+          findingSeverities: Array.isArray(review.findings) ? review.findings.map((finding: any) => finding.severity) : [],
+        })) : [],
+      })) : [],
+    },
+  };
+}
+
+function finalVerdict(execution: any, cleanupStatus: string, evidenceStatus: string) {
+  const roles = execution.evidence.roles;
+  const transitions = execution.evidence.transitions;
+  const verifications = execution.evidence.verifications;
+  const reviewRounds = execution.evidence.reviews;
+  const finalReviews = reviewRounds.at(-1)?.reviews ?? [];
+  const latestRole = (agent: string) => roles.filter((entry: any) => entry.agent === agent).at(-1)?.status ?? "NOT_RUN";
+  const corrections = transitions.filter((entry: any) => entry.state === "CORRECTION_REQUIRED" && entry.phase === "enforced").length;
+  const blockingCount = finalReviews.filter((review: any) => review.blocking || review.verdict === "BLOCKING").length;
+  const blockingFindingsCount = finalReviews.reduce((count: number, review: any) => count + (Array.isArray(review.findingSeverities) ? review.findingSeverities.filter((severity: string) => severity === "BLOCKING").length : (review.blocking ? 1 : 0)), 0);
+  const verificationStatus = verifications.at(-1)?.status ?? "NOT_RUN";
+  const status = execution.status === "PASS" && ["PASS", "RELEASED"].includes(cleanupStatus) && evidenceStatus === "PASS" ? "PASS" : "FAIL";
+  return {
+    run_id: execution.runId,
+    task_id: execution.taskDigest,
+    workflow_version: execution.workflowVersion,
+    status,
+    round_count: Math.max(verifications.length, reviewRounds.length),
+    worker_status: latestRole("worker"),
+    tester_status: latestRole("tester"),
+    verification_status: verificationStatus,
+    review_status: reviewRounds.length === 0 ? "NOT_RUN" : blockingCount > 0 ? "BLOCKING" : "PASS",
+    blocking_count: blockingCount,
+    blocking_findings_count: blockingFindingsCount,
+    correction_performed: corrections > 0,
+    final_verification_status: verificationStatus,
+    cleanup_status: cleanupStatus,
+    evidence_status: evidenceStatus,
+  };
+}
+
+function journalUpdate(state: any, lifecycleStatus = "RUNNING", terminal = false) {
+  return {
+    status: lifecycleStatus,
+    workflow_status: state?.status ?? "RUNNING",
+    current_phase: state?.currentPhase ?? "INITIALIZING",
+    round: state?.round ?? 0,
+    worker_status: state?.workerStatus ?? "NOT_RUN",
+    tester_status: state?.testerStatus ?? "NOT_RUN",
+    verification_status: state?.verificationStatus ?? "NOT_RUN",
+    review_status: state?.reviewStatus ?? "NOT_RUN",
+    blocking_findings_count: state?.blockingFindingsCount ?? 0,
+    correction_performed: state?.correctionPerformed ?? false,
+    final_verification_status: state?.finalVerificationStatus ?? "NOT_RUN",
+    cleanup_status: state?.cleanupStatus ?? "NOT_RUN",
+    evidence_status: state?.evidenceStatus ?? "NOT_RUN",
+    workflow_state: terminal ? sanitizeState(state) : redactMissionValue(state),
+  };
+}
+
+export default function (pi: ExtensionAPI) {
+  let running = false;
+  pi.registerTool({
+    name: "secure_coding_workflow",
+    label: "Enforced coding workflow",
+    description: "Run Scout → Planner → Worker → Tester → sandboxed verification → structured reviewers, with bounded mandatory correction in an isolated worktree. Concurrency/depth/model routing are not caller-configurable.",
+    parameters: Params,
+    executionMode: "sequential",
+    async execute(toolCallId, params, signal, _update, ctx) {
+      if (running) throw new WorkflowFailure("Another secure workflow is already active.");
+      running = true;
+      let allocation: Record<string, any> | undefined;
+      let ownerRunId = `secure-${toolCallId}-${randomUUID()}`.slice(0, 240);
+      const digest = taskDigest(params.task);
+      let evidenceRun: ReturnType<typeof createEvidenceRun> | undefined;
+      let latestState: any;
+      let repositoryEvidence: any;
+      let workflowError: unknown;
+      let finalReceipt: any;
+      let journal: any;
+      let priorExecution: any;
+      let priorExecutionSha256: string | undefined;
+      let recovery: any;
+      let sequence = 0;
+      let receiptSequence = 0;
+      let protocolNonce = taskDigest(randomUUID());
+      let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
+      const admittedExecutionIds = new Set<string>();
+      const delegationAudit: Array<Record<string, unknown>> = [];
+      const delegateOnce = ({ agent, task, cwd, result, round = 0, iteration = 0 }: DelegationInput, attempt: number): Promise<Record<string, any>> => new Promise((resolve, reject) => {
+        const requestId = randomUUID();
+        const executionId = requestId;
+        const assignedReceiptSequence = receiptSequence++;
+        const nodeId = `${String(sequence += 1).padStart(2, "0")}-${agent}`;
+        let settled = false;
+        const finish = (callback: (value: any) => void, value: any) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          unsubscribe();
+          signal?.removeEventListener("abort", abort);
+          callback(value);
+        };
+        const unsubscribe = pi.events.on(RESPONSE_EVENT, (data) => {
+          const response = data as Record<string, unknown>;
+          if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
+            try {
+              if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response });
+              const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              const normalized = { ...response, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
+              delegationAudit.push({ agent, attempt, status: receipt.status, model: response.model, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              finish(resolve, normalized);
+            } catch (error) {
+              finish(reject, error);
+            }
+          }
+        });
+        const failWithReceipt = (status: string, message: string) => {
+          try {
+            if (evidenceRun && roleReceiptStore) {
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message } });
+              const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              delegationAudit.push({ agent, attempt, status, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
+            }
+          } catch {}
+          finish(reject, new Error(message));
+        };
+        const abort = () => {
+          pi.events.emit(CANCEL_EVENT, { requestId, ownerRunId, nodeId });
+          failWithReceipt("cancelled", `${agent} delegation cancelled`);
+        };
+        const timer = setTimeout(() => {
+          pi.events.emit(CANCEL_EVENT, { requestId, ownerRunId, nodeId });
+          failWithReceipt("timed_out", `${agent} delegation timed out`);
+        }, 20 * 60 * 1000);
+        signal?.addEventListener("abort", abort, { once: true });
+        pi.events.emit(REQUEST_EVENT, {
+          requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
+          timeoutMs: 18 * 60 * 1000,
+          toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
+          artifacts: false,
+          result,
+        });
+      });
+      const delegate = async (input: DelegationInput): Promise<Record<string, any>> => {
+        let lastResponse: Record<string, any> | undefined;
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= MAX_DELEGATION_ATTEMPTS; attempt += 1) {
+          if (signal?.aborted) throw new Error(`${input.agent} delegation cancelled`);
+          let beforeMutation: any;
+          if (input.agent === "worker") {
+            try { beforeMutation = snapshotWorktree(input.cwd); } catch {}
+          }
+          try {
+            lastResponse = await delegateOnce(input, attempt);
+            if (lastResponse?.status === "completed") return lastResponse;
+            if (input.agent === "worker" && beforeMutation) {
+              try {
+                const afterMutation = snapshotWorktree(input.cwd);
+                if (afterMutation.diffSha256 !== beforeMutation.diffSha256 || JSON.stringify(afterMutation.changedFiles) !== JSON.stringify(beforeMutation.changedFiles)) return lastResponse;
+              } catch { return lastResponse; }
+            }
+          } catch (error) {
+            lastError = error;
+            delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed" });
+          }
+        }
+        if (lastError) throw lastError;
+        return lastResponse ?? { status: "failed" };
+      };
+      try {
+        const sourceRepository = fs.realpathSync(ctx.cwd);
+        recovery = {
+          workflows: recoverInterruptedWorkflowRuns(),
+          runtime: recoverStaleRuntimeAllocations(),
+        };
+        let resumable: ReturnType<typeof findResumableWorkflow> | undefined;
+        const explicitRunId = process.env.PI_OVERDRIVE_EVIDENCE_RUN_ID;
+        if (explicitRunId) {
+          try {
+            const explicitRun = openEvidenceRun({ runId: explicitRunId });
+            const explicitJournal = readWorkflowJournal(explicitRun);
+            if (explicitJournal.status === "INTERRUPTED" && explicitJournal.task_id === digest && explicitJournal.source_repository === sourceRepository && !fs.existsSync(explicitRun.receiptFile)) resumable = { run: explicitRun, journal: explicitJournal, updated: Date.parse(explicitJournal.timestamps?.updated_at ?? "") || 0 };
+          } catch {}
+        }
+        resumable ??= findResumableWorkflow({ taskDigest: digest, sourceRepository });
+        if (resumable) {
+          evidenceRun = resumable.run;
+          journal = resumable.journal;
+          ownerRunId = journal.owner_run_id;
+          protocolNonce = journal.protocol_nonce;
+          if (!/^[0-9a-f]{64}$/u.test(protocolNonce ?? "")) throw new Error("interrupted workflow has no valid role-receipt protocol nonce");
+          roleReceiptStore = openRoleReceiptStore(evidenceRun);
+          const priorRoleReceipts = listRoleReceipts(roleReceiptStore);
+          receiptSequence = priorRoleReceipts.length === 0 ? 0 : Math.max(...priorRoleReceipts.map((entry: any) => entry.receipt.sequence)) + 1;
+          latestState = journal.workflow_state;
+          if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
+          sequence = Math.max(0, ...((latestState.evidence?.roles ?? []).map((entry: any) => Number.parseInt(String(entry.nodeId ?? "0").split("-")[0] ?? "0", 10)).filter(Number.isFinite)));
+          if (fs.existsSync(evidenceRun.executionFile)) {
+            const loaded = readEvidenceExecution(evidenceRun, digest);
+            priorExecution = loaded.execution;
+            priorExecutionSha256 = loaded.sha256;
+            allocation = priorExecution.allocation;
+            latestState = priorExecution;
+          } else if (["PASS", "FAIL"].includes(latestState.status) && latestState.evidence?.transitions?.some((entry: any) => entry.state === "FINAL")) {
+            allocation = latestState.allocation;
+          } else {
+            allocation = await resumeRuntimeResources(journal.allocation_id);
+            latestState.allocation = allocation;
+          }
+          journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), allocation_id: allocation?.allocationId ?? journal.allocation_id });
+        } else {
+          evidenceRun = createEvidenceRun();
+          roleReceiptStore = openRoleReceiptStore(evidenceRun);
+          journal = initialWorkflowJournal(evidenceRun, { taskDigest: digest, protocolNonce, workflowVersion: WORKFLOW_VERSION, sourceRepository, ownerRunId });
+          writeWorkflowJournal(evidenceRun, journal);
+          allocation = await createRuntimeWorktree(ctx.cwd, { evidenceRunId: evidenceRun.runId, ownerRunId });
+          journal = checkpointWorkflowJournal(evidenceRun, journal, { allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
+        }
+        const verify = async ({ cwd }: { cwd: string }) => {
+          const result = await pi.exec(process.execPath, [verifyScript, "--json", "--full", "--cwd", cwd], { cwd, ...(signal ? { signal } : {}), timeout: 16 * 60 * 1000 });
+          let parsed;
+          try { parsed = JSON.parse(result.stdout.trim()); } catch { parsed = { status: "FAIL", parseError: true, exitCode: result.code, stderr: result.stderr.slice(-4000) }; }
+          if (result.code !== 0 && parsed.status === "PASS") parsed = { ...parsed, status: "FAIL", exitMismatch: true };
+          return { ...parsed, processExitCode: result.code };
+        };
+        if (!priorExecution) {
+          if (!(["PASS", "FAIL"].includes(latestState?.status) && latestState?.evidence?.transitions?.some((entry: any) => entry.state === "FINAL"))) {
+            const state: any = await runEnforcedWorkflow({
+              task: params.task,
+              allocation,
+              delegate,
+              verify,
+              includeOracle: params.includeOracle ?? false,
+              includeSecurity: params.includeSecurity ?? true,
+              ownerRunId,
+              runId: evidenceRun.runId,
+              taskId: digest,
+              receiptVerifier: (response: any, expected: any) => {
+                if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);
+                return admitRoleReceipt(roleReceiptStore, response.workflowReceipt, {
+                  run_id: evidenceRun!.runId,
+                  task_id: digest,
+                  protocol_nonce: protocolNonce,
+                  execution_id: response.workflowReceipt.executionId,
+                  sequence: response.workflowReceipt.sequence,
+                  role: expected.agent,
+                  round: expected.round,
+                  iteration: expected.iteration,
+                  owner_run_id: ownerRunId,
+                  node_id: response.nodeId,
+                  status: "completed",
+                }, admittedExecutionIds);
+              },
+              resumeState: resumable ? latestState : undefined,
+              policyReview: ({ cwd }: { cwd: string }) => localReviewPolicy(cwd),
+              onCheckpoint: (checkpoint: any) => {
+                latestState = checkpoint;
+                journal = checkpointWorkflowJournal(evidenceRun!, journal, journalUpdate(checkpoint));
+              },
+            });
+            latestState = state;
+          }
+          if (allocation?.worktree && fs.existsSync(allocation.worktree)) repositoryEvidence = snapshotWorktree(allocation.worktree);
+          if (latestState.status !== "PASS") workflowError = new Error("Enforced workflow exhausted its correction budget without a passing final state.");
+        }
+      } catch (error) {
+        workflowError = error;
+        if (error && typeof error === "object" && "workflowState" in error) latestState = (error as any).workflowState;
+        if (allocation?.worktree && fs.existsSync(allocation.worktree)) {
+          try { repositoryEvidence = snapshotWorktree(allocation.worktree); } catch {}
+        }
+      } finally {
+        let execution: any = priorExecution;
+        let executionSha256: string | undefined = priorExecutionSha256;
+        let evidenceStatus = priorExecution ? "PASS" : "FAIL";
+        if (evidenceRun) {
+          try {
+            if (!execution) {
+              latestState ??= { workflowVersion: WORKFLOW_VERSION, status: "FAIL", ownerRunId, allocation };
+              latestState.evidenceStatus = "RUNNING";
+              if (journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
+              const safeState = sanitizeState(latestState);
+              if (workflowError) safeState.status = "FAIL";
+              execution = {
+                runId: evidenceRun.runId,
+                taskDigest: digest,
+                ...safeState,
+                repositoryEvidence,
+                delegationAttempts: delegationAudit,
+                recovery,
+                failure: workflowError ? { type: workflowError instanceof Error ? workflowError.name : "UnknownError", digest: taskDigest(workflowError instanceof Error ? workflowError.message : String(workflowError)) } : undefined,
+              };
+              writeEvidenceExecution(evidenceRun, execution);
+              executionSha256 = createHash("sha256").update(fs.readFileSync(evidenceRun.executionFile)).digest("hex");
+              evidenceStatus = "PASS";
+              latestState.evidenceStatus = "EXECUTION_WRITTEN";
+              if (journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
+            }
+          } catch (error) {
+            workflowError ??= error;
+          }
+        }
+
+        let cleanup = { status: "NOT_ALLOCATED", mode: "none", resourcesAbsent: false };
+        if (allocation?.allocationId) {
+          try {
+            if (latestState) {
+              latestState.cleanupStatus = "RUNNING";
+              if (evidenceRun && journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "CLEANUP" });
+            }
+            if (process.env.PI_OVERDRIVE_CLEANUP_WORKFLOW === "1") {
+              const allocationRoot = path.dirname(allocation.stateDir);
+              const alreadyAbsent = !fs.existsSync(allocation.worktree) && !fs.existsSync(allocationRoot) && !fs.existsSync(allocation.portReservation);
+              if (!alreadyAbsent) cleanupRuntimeResources(allocation.allocationId);
+              const resourcesAbsent = !fs.existsSync(allocation.worktree) && !fs.existsSync(allocationRoot) && !fs.existsSync(allocation.portReservation);
+              cleanup = { status: resourcesAbsent ? "PASS" : "FAIL", mode: alreadyAbsent ? "already-destroyed" : "destroy", resourcesAbsent };
+            } else {
+              releaseRuntimeResources(allocation.allocationId);
+              cleanup = { status: "RELEASED", mode: "retain-worktree", resourcesAbsent: !fs.existsSync(allocation.portReservation) };
+            }
+            if (latestState) latestState.cleanupStatus = cleanup.status;
+            if (evidenceRun && journal && latestState) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "CLEANUP" });
+          } catch (error) {
+            cleanup = { status: "FAIL", mode: process.env.PI_OVERDRIVE_CLEANUP_WORKFLOW === "1" ? "destroy" : "retain-worktree", resourcesAbsent: false };
+            workflowError ??= error;
+            if (latestState) latestState.cleanupStatus = "FAIL";
+          }
+        }
+
+        if (evidenceRun && execution && executionSha256) {
+          try {
+            const verdict = finalVerdict(execution, cleanup.status, evidenceStatus);
+            finalReceipt = {
+              ...execution,
+              executionStatus: execution.status,
+              status: verdict.status,
+              currentPhase: "FINALIZED",
+              cleanupStatus: cleanup.status,
+              evidenceStatus: "PASS",
+              executionSha256,
+              cleanup,
+              finalVerdict: verdict,
+            };
+            writeEvidenceReceipt(evidenceRun, finalReceipt);
+            if (latestState && journal) {
+              latestState.cleanupStatus = cleanup.status;
+              latestState.evidenceStatus = "PASS";
+              journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState, finalReceipt.status === "PASS" ? "COMPLETED" : "FAILED", true), current_phase: "FINALIZED" });
+            }
+          } catch (error) {
+            workflowError ??= error;
+            finalReceipt = undefined;
+            if (latestState && journal && evidenceRun) {
+              try {
+                latestState.evidenceStatus = "FAIL";
+                journal = checkpointWorkflowJournal(evidenceRun, journal, journalUpdate(latestState, "FAILED", true));
+              } catch {}
+            }
+          }
+        }
+        running = false;
+      }
+
+      if (!finalReceipt) throw new WorkflowFailure(JSON.stringify({ status: "FAIL", runId: evidenceRun?.runId, error: "workflow evidence finalization failed" }), false);
+      if (workflowError || finalReceipt.status !== "PASS" || finalReceipt.cleanup.status === "FAIL") {
+        throw new WorkflowFailure(JSON.stringify({ status: "FAIL", runId: finalReceipt.runId, finalVerdict: finalReceipt.finalVerdict }), true);
+      }
+      const publicState = { ...finalReceipt, evidence: finalReceipt.evidence };
+      return { content: [{ type: "text", text: JSON.stringify(publicState) }], details: publicState };
+    },
+  });
+}

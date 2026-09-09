@@ -1,10 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
 import {
   classifyCommand,
+  inspectWorkspaceConstraint,
+  inspectWorkspacePath,
   isAlwaysProtectedWritePath,
-  isInside,
   isSecretPath,
-  resolveToolPath,
+  validateSubagentCall,
+  validateAllocatedBrowserCall,
 } from "../lib/safety.mjs";
 
 function inputPath(input: Record<string, unknown>): string | undefined {
@@ -16,32 +19,57 @@ function inputPath(input: Record<string, unknown>): string | undefined {
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
-    const candidate = inputPath(event.input);
+    const input = event.input as Record<string, unknown>;
+    const candidate = inputPath(input);
 
-    if ((event.toolName === "read" || event.toolName === "grep") && candidate && isSecretPath(candidate)) {
-      return { block: true, reason: `Protected secret path cannot be read: ${candidate}` };
+    if (["ffgrep", "fffind"].includes(event.toolName) && candidate) {
+      const inspected = inspectWorkspaceConstraint(ctx.cwd, candidate);
+      if (!inspected.allowed) return { block: true, reason: `FFF workspace constraint denied (${"reason" in inspected ? inspected.reason : "policy"}): ${candidate}` };
     }
 
-    if ((event.toolName === "write" || event.toolName === "edit") && candidate) {
-      const resolved = resolveToolPath(ctx.cwd, candidate);
+    if ([
+      "read", "grep", "find", "ls",
+      "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
+      "ts_definition", "ts_references", "ts_diagnostics",
+    ].includes(event.toolName) && candidate) {
+      if (isSecretPath(candidate)) return { block: true, reason: `Protected secret path cannot be read: ${candidate}` };
+      const inspected = inspectWorkspacePath(ctx.cwd, candidate, { mustExist: true });
+      if (!inspected.allowed) return { block: true, reason: `Workspace read denied (${"reason" in inspected ? inspected.reason : "policy"}): ${candidate}` };
+      if (!("canonical" in inspected)) return { block: true, reason: `Workspace read denied: ${candidate}` };
+      if (isSecretPath(inspected.canonical)) return { block: true, reason: `Protected canonical path cannot be read: ${candidate}` };
+    }
+
+    if (["ast_grep_scan", "ast_grep_debug_query"].includes(event.toolName) && typeof input.rule_file === "string") {
+      const rule = inspectWorkspacePath(ctx.cwd, input.rule_file, { mustExist: true });
+      if (!rule.allowed) return { block: true, reason: `AST rule file denied (${"reason" in rule ? rule.reason : "policy"})` };
+    }
+
+    if ((event.toolName === "write" || event.toolName === "edit" || event.toolName === "ast_grep_rewrite") && candidate) {
       if (isAlwaysProtectedWritePath(candidate)) {
         return { block: true, reason: `Protected path cannot be modified: ${candidate}` };
       }
-      if (resolved && !isInside(ctx.cwd, resolved)) {
-        if (!ctx.hasUI) return { block: true, reason: `Write outside the active workspace blocked: ${candidate}` };
-        const approved = await ctx.ui.confirm("Write outside workspace?", `${resolved}\n\nAllow this one operation?`);
-        if (!approved) return { block: true, reason: "Write outside workspace declined" };
-      }
+      const inspected = inspectWorkspacePath(ctx.cwd, candidate, { mustExist: event.toolName === "edit", forWrite: true });
+      if (!inspected.allowed) return { block: true, reason: `Workspace write denied (${"reason" in inspected ? inspected.reason : "policy"}): ${candidate}` };
+      if (!("canonical" in inspected)) return { block: true, reason: `Workspace write denied: ${candidate}` };
+      if (isAlwaysProtectedWritePath(inspected.canonical)) return { block: true, reason: `Protected canonical path cannot be modified: ${candidate}` };
     }
 
     if (event.toolName === "bash") {
       const command = typeof event.input.command === "string" ? event.input.command : "";
       const finding = classifyCommand(command);
       if (!finding) return undefined;
-      if (finding.level === "block") return { block: true, reason: finding.reason };
-      if (!ctx.hasUI) return { block: true, reason: `${finding.reason} blocked without interactive confirmation` };
-      const approved = await ctx.ui.confirm("Potentially destructive command", `${finding.reason}\n\n${command}\n\nAllow this one command?`);
-      if (!approved) return { block: true, reason: `${finding.reason} declined` };
+      return { block: true, reason: finding.reason };
+    }
+
+    if (event.toolName === "subagent") {
+      const input = event.input as Record<string, unknown>;
+      const policy = validateSubagentCall(input);
+      if (!policy.allowed) return { block: true, reason: `${"reason" in policy ? policy.reason : "subagent policy denied"}; use secure_coding_workflow` };
+    }
+
+    if (event.toolName === "agent_browser") {
+      const policy = validateAllocatedBrowserCall(event.input, findRuntimeAllocation(ctx.cwd));
+      if (!policy.allowed) return { block: true, reason: `Browser runtime isolation denied: ${"reason" in policy ? policy.reason : "policy"}` };
     }
 
     return undefined;

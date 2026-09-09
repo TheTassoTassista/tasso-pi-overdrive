@@ -1,4 +1,5 @@
-import { appendFile, mkdir } from "node:fs/promises";
+import { constants } from "node:fs";
+import { chmod, lstat, mkdir, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -20,12 +21,23 @@ export default function (pi: ExtensionAPI) {
 
   const record = async (row: Omit<TraceRow, "timestamp">) => {
     if (!traceFile) return;
-    await appendFile(traceFile, `${JSON.stringify({ timestamp: new Date().toISOString(), ...row })}\n`, { encoding: "utf8", mode: 0o600 });
+    const handle = await open(traceFile, constants.O_APPEND | constants.O_CREAT | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+    try {
+      await handle.chmod(0o600);
+      await handle.writeFile(`${JSON.stringify({ timestamp: new Date().toISOString(), ...row })}\n`, "utf8");
+      await handle.sync();
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
   };
 
   pi.on("session_start", async (_event, ctx) => {
     const root = path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "pi-overdrive", "traces");
     await mkdir(root, { recursive: true, mode: 0o700 });
+    const rootStat = await lstat(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error("trace root must be a real directory");
+    await chmod(root, 0o700);
     traceFile = path.join(root, `${safeSessionName(ctx.sessionManager.getSessionFile())}.jsonl`);
     await record({ event: "session_start", cwd: ctx.cwd, model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined });
   });

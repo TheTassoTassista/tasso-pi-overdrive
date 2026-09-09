@@ -2,6 +2,23 @@
 set -euo pipefail
 
 package_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+install_system=false
+install_pi=false
+check_only=false
+skip_browser=false
+for argument in "$@"; do
+  case "$argument" in
+    --install-system) install_system=true ;;
+    --install-pi) install_pi=true ;;
+    --check-only) check_only=true ;;
+    --skip-browser) skip_browser=true ;;
+    *) echo "unknown bootstrap option: $argument" >&2; exit 2 ;;
+  esac
+done
+prerequisite_args=()
+[[ "$install_system" == true ]] && prerequisite_args+=(--install-system)
+[[ "$install_pi" == true ]] && prerequisite_args+=(--install-pi)
+"$package_root/scripts/prerequisites.sh" "${prerequisite_args[@]}"
 pi_bin=${PI_BIN:-$(command -v pi || true)}
 npm_bin=${NPM_BIN:-$(command -v npm || true)}
 agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}
@@ -9,23 +26,35 @@ settings_file="$agent_dir/settings.json"
 install_manifest="$agent_dir/tasso-pi-overdrive-install.json"
 required_pi=0.85.1
 
-if [[ -z "$pi_bin" || -z "$npm_bin" ]]; then
-  echo "Pi and npm must already be available on PATH." >&2
-  exit 1
-fi
 installed_pi=$($pi_bin --version | tr -d '[:space:]')
 if [[ "$installed_pi" != "$required_pi" ]]; then
   echo "Refusing an unreviewed Pi version: expected $required_pi, found $installed_pi." >&2
   exit 1
 fi
 
+if [[ "$check_only" == true ]]; then
+  node "$package_root/scripts/validate-package.mjs"
+  "$pi_bin" list
+  "$npm_bin" list --prefix "$HOME/.local/share/pi-overdrive/lsp-node" --depth=0 \
+    typescript@6.0.3 pyright@1.1.410 @ast-grep/cli@0.45.3
+  command -v agent-browser >/dev/null 2>&1 && agent-browser --version
+  echo "Bootstrap validation: PASS (configuration only; authentication intentionally not inspected)."
+  exit 0
+fi
+
 timestamp=$(date -u +%Y%m%d-%H%M%S)
-backup_root=${PI_OVERDRIVE_BACKUP_ROOT:-"$HOME/Documents/Codex/pi-overdrive-backups"}
-backup_dir="$backup_root/$timestamp"
-install -d -m 700 "$backup_root" "$backup_dir" "$backup_dir/pi-original" "$backup_dir/pi-original/agent" "$backup_dir/pi-original/config"
+backup_root=${PI_OVERDRIVE_BACKUP_ROOT:-"${XDG_STATE_HOME:-$HOME/.local/state}/pi-overdrive/backups"}
+install -d -m 700 "$backup_root"
+backup_dir=$(mktemp -d "$backup_root/${timestamp}-XXXXXX")
+chmod 700 "$backup_dir"
+install -d -m 700 "$backup_dir/pi-original" "$backup_dir/pi-original/agent" "$backup_dir/pi-original/config"
 backup_file() {
   local source=$1
   local destination=$2
+  if [[ -L "$source" ]]; then
+    echo "Refusing symlinked Pi configuration during backup: $source" >&2
+    exit 1
+  fi
   if [[ -f "$source" ]]; then
     install -d -m 700 -- "$(dirname -- "$destination")"
     cp -a -- "$source" "$destination"
@@ -50,7 +79,6 @@ done < <(node -e 'const p=require(process.argv[1]); for(const x of p.selected) c
 "$pi_bin" install "$package_root"
 
 install -m 600 "$package_root/config/pi-fff.json" "$agent_dir/pi-fff.json"
-install -m 600 "$package_root/config/lsp.json" "$agent_dir/lsp.json"
 install -d -m 700 "$agent_dir/extensions/subagent" "$agent_dir/observability" "$HOME/.pi/config/pi-agent-browser-native"
 install -m 600 "$package_root/config/subagents.json" "$agent_dir/extensions/subagent/config.json"
 install -m 600 "$package_root/config/observability-settings" "$agent_dir/observability/settings"
@@ -60,11 +88,9 @@ node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
 install -d -m 700 "$tool_root" "$HOME/.local/bin"
 "$npm_bin" install --prefix "$tool_root" --no-audit --no-fund \
-  @vtsls/language-server@0.3.0 typescript@6.0.3 pyright@1.1.410 \
-  yaml-language-server@1.23.0 vscode-langservers-extracted@4.10.0 \
-  bash-language-server@5.6.0 @ast-grep/cli@0.45.3
+  typescript@6.0.3 pyright@1.1.410 @ast-grep/cli@0.45.3
 
-for tool in ast-grep sg vtsls pyright pyright-langserver yaml-language-server bash-language-server vscode-css-language-server vscode-html-language-server vscode-json-language-server; do
+for tool in ast-grep sg pyright pyright-langserver; do
   source_path="$tool_root/node_modules/.bin/$tool"
   target_path="$HOME/.local/bin/$tool"
   if [[ -x "$source_path" && ! -e "$target_path" && ! -L "$target_path" ]]; then
@@ -72,5 +98,7 @@ for tool in ast-grep sg vtsls pyright pyright-langserver yaml-language-server ba
   fi
 done
 
-"$package_root/scripts/install-agent-browser.sh"
-echo "Pi Overdrive installed. Restart Pi, then run /doctor, /lsp, and /subagents-models."
+if [[ "$skip_browser" != true ]]; then "$package_root/scripts/install-agent-browser.sh"; fi
+node "$package_root/scripts/validate-package.mjs"
+"$pi_bin" list
+echo "Pi Overdrive installed. Restart Pi, then run /doctor, /subagents-models, and /notebook."

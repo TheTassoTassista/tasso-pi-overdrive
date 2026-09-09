@@ -12,7 +12,7 @@
 
 Present and verified: Git 2.55.0, ripgrep 15.2.0, fd 10.4.2, jq 1.8.2, curl 8.21.0, wget 1.25.0, unzip, Python 3.14.7, GCC 16.2.1, Clang/clangd 22.1.8, Rust/Cargo 1.98.0, Node/npm, pnpm, and Bubblewrap 0.12.0. The home filesystem had 17 GB free after installation.
 
-Installed user-locally by this setup: ast-grep 0.45.3, VTSLS 0.3.0 with TypeScript 6.0.3, Pyright 1.1.410, YAML Language Server 1.23.0, vscode-langservers-extracted 4.10.0, Bash Language Server 5.6.0, agent-browser 0.36.0, and isolated Chrome for Testing 152.0.7977.82.
+Installed user-locally by this setup: ast-grep 0.45.3, TypeScript 6.0.3, Pyright 1.1.410, agent-browser 0.36.0, and isolated Chrome for Testing 152.0.7977.82. The active Pi semantic tools use the pinned TypeScript LanguageService directly; the failed `pi-lsp-adapter` integration and its config were removed. Other language-server binaries already on the machine are not claimed as Pi-integrated.
 
 Not present: Docker, Podman, Bun, GitHub CLI, `tree`, or `zip`. GitHub CLI authentication therefore could not be checked. The optional Arch install was attempted non-interactively and stopped at the host's sudo password prompt; no password was requested or captured. Zen is installed but is Firefox-based, so the browser integration uses its own Chromium profile.
 
