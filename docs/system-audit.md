@@ -5,7 +5,7 @@
 - CachyOS/Arch-compatible Linux, kernel 7.2.2, x86_64; login shell is Fish.
 - Official Pi Coding Agent 0.85.1 at `~/.local/share/pi-node/node-v22.23.2-linux-x64/bin/pi`, installed with its dedicated Node 22.23.2/npm 10.9.8 runtime.
 - Existing provider: `openai-codex`. Authentication values were never displayed and are unchanged.
-- Available routed models: GPT-5.6 Luna, Terra, Sol, and GPT-6 Astra. Other catalog entries remain untouched.
+- Available authenticated `openai-codex` models: GPT-5.3 Codex Spark, GPT-5.4, GPT-5.4 Mini, GPT-5.5, GPT-5.6 Luna/Sol/Terra, and GPT-6 Astra. Other provider entries remain unauthenticated and untouched.
 - Before this work there were no selected Pi packages, extensions, skills, prompts, or project context files in the audited workspace. Native compaction was enabled.
 
 ## Development tools

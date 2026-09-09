@@ -3,9 +3,12 @@ import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const pi = process.env.PI_BIN || "pi";
-const model = process.env.PI_SMOKE_MODEL || "openai-codex/gpt-5.6-luna";
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const providerExtension = path.join(packageRoot, "tests", "fixtures", "deterministic-runtime-provider.ts");
+const model = "pi-overdrive-runtime-audit/runtime-driver";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-runtime-"));
 const repo = path.join(root, "repo");
 const results = [];
@@ -20,9 +23,9 @@ function toolText(event) {
 
 async function runPi() {
   const tools = ["fffind", "ffgrep", "ast_grep_run", "semantic_nav", "web_fetch"];
-  const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--model", model, "--thinking", "low", "--tools", tools.join(",")], {
+  const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", providerExtension, "--provider", "pi-overdrive-runtime-audit", "--model", "runtime-driver", "--api-key", "audit-only", "--tools", tools.join(",")], {
     cwd: repo,
-    env: { ...process.env, XDG_STATE_HOME: path.join(root, "state") },
+    env: { ...process.env, PI_OVERDRIVE_RUNTIME_AUDIT_KEY: "audit-only", XDG_STATE_HOME: path.join(root, "state") },
     stdio: ["pipe", "pipe", "pipe"],
   });
   const events = [];
@@ -59,17 +62,7 @@ async function runPi() {
       waiters.add(waiter);
     });
   };
-  const prompt = [
-    "This is a deterministic tool integration audit. Call every named tool exactly once, in this exact order, using exactly these inputs; never simulate a result and do not use another tool:",
-    "1. fffind {\"pattern\":\"defs\",\"path\":\"src/**\",\"limit\":10}",
-    "2. ffgrep {\"pattern\":\"function add\",\"path\":\"src/\",\"limit\":10}",
-    "3. ast_grep_run {\"pattern\":\"add($$$ARGS)\",\"lang\":\"typescript\",\"path\":\"src\",\"max_results\":10}",
-    "4. semantic_nav {\"operation\":\"diagnostics\",\"path\":\"src/use.ts\"}",
-    "5. semantic_nav {\"operation\":\"definition\",\"path\":\"src/use.ts\",\"line\":1,\"character\":10}",
-    "6. semantic_nav {\"operation\":\"references\",\"path\":\"src/use.ts\",\"line\":2,\"character\":21}",
-    "7. web_fetch {\"url\":\"https://example.com/\",\"raw\":false}",
-    "After all seven tools finish, answer only AUDIT_DONE.",
-  ].join("\n");
+  const prompt = "Run the deterministic capability audit supplied by the local audit provider.";
   child.stdin.write(`${JSON.stringify({ id: "audit", type: "prompt", message: prompt })}\n`);
   const accepted = await waitFor((event) => event.type === "response" && event.id === "audit", "prompt acceptance", 30000);
   await waitFor((event) => event.type === "agent_settled", "agent settlement", 12 * 60 * 1000);
@@ -120,5 +113,5 @@ try {
 }
 
 const status = results.length >= 9 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
-process.stdout.write(`${JSON.stringify({ status, model, results }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ status, model, paidModelCalls: 0, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

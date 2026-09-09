@@ -5,12 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pi = process.env.PI_BIN || "pi";
+const provider = path.join(root, "tests", "fixtures", "deterministic-single-tool-provider.ts");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
 function runPi(message) {
   return new Promise((resolve) => {
-    const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "openai-codex", "--model", "gpt-5.6-luna", "--no-tools"], { cwd: root, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--no-tools"], { cwd: root, env: { ...process.env, PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only" }, stdio: ["pipe", "pipe", "pipe"] });
     const events = [];
     let buffer = "";
     let stderr = "";
@@ -43,7 +44,11 @@ function runPi(message) {
 try {
   const catalogRun = await runPi({ id: "council-catalog", type: "get_commands" });
   const commands = catalogRun.events.find((event) => event.type === "response" && event.id === "council-catalog")?.data?.commands ?? [];
-  check("pi-council-commands-registered", catalogRun.code === 0 && commands.some((entry) => entry.name === "council") && commands.some((entry) => entry.name === "council-status"), commands.filter((entry) => entry.name.includes("council")).map((entry) => ({ name: entry.name, source: entry.source })));
+  check("pi-council-commands-registered", catalogRun.code === 0 && commands.some((entry) => entry.name === "council" && entry.source === "extension") && commands.some((entry) => entry.name === "council-status" && entry.source === "extension"), commands.filter((entry) => entry.name.includes("council")).map((entry) => ({ name: entry.name, source: entry.source })));
+
+  const precedenceRun = await runPi({ id: "council-precedence", type: "prompt", message: "/council" });
+  const precedenceText = precedenceRun.events.filter((event) => event.type === "extension_ui_request" && event.method === "notify").map((event) => event.message).join("\n");
+  check("protected-council-command-shadows-upstream-prompt", precedenceRun.code === 0 && precedenceText.includes("usage: /council TASK") && !precedenceRun.events.some((event) => event.type === "agent_start"), precedenceText || precedenceRun.stderr);
 
   const statusRun = await runPi({ id: "council-status", type: "prompt", message: "/council-status" });
   const statusText = statusRun.events.filter((event) => event.type === "extension_ui_request" && event.method === "notify").map((event) => event.message).join("\n");
@@ -57,6 +62,6 @@ try {
   check("council-smoke-harness", false, error instanceof Error ? error.message : String(error));
 }
 
-const status = results.length === 3 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 4 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, liveProvidersUsed: ["openai-codex"], crossProviderExecution: "BLOCKED_BY_CREDENTIAL", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

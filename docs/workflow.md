@@ -12,7 +12,7 @@ The normal substantial path is the `secure_coding_workflow` state machine: Scout
 
 ## Council escalation
 
-Council is not part of trivial or ordinary successful work. The controller invokes it for an explicitly high-risk run (`includeOracle: true`), a material split between mandatory reviewer verdicts, or the second correction after repeated failure (with Oracle root-cause evidence). The installed pi-subagents `/council` prompt remains discoverable for interactive advisory work; `/council-status` is the authoritative read-only view of Overdrive routes and limits.
+Council is not part of trivial or ordinary successful work. The controller invokes it for an explicitly high-risk run (`includeOracle: true`), a material split between mandatory reviewer verdicts, or the second correction after repeated failure (with Oracle root-cause evidence). `/council TASK` is an Overdrive extension command that enters this same enforced controller path; it has tested precedence over the raw pi-subagents prompt with the same name. `/council-status` is the authoritative read-only view of routes and limits.
 
 Exactly three profiles run concurrently: `council-1` checks behavioral correctness, `council-2` checks security/failure containment, and `council-3` checks simplicity/operations. Each receives the same bounded evidence packet in a fresh context, has no mutation/delegation/web tool, and cannot see a peer's first answer. Each must return a structured conclusion, recommendation, evidence, confidence, risks, and blocking concerns. The controller waits for all three valid, receipt-backed results; a missing or malformed member fails the workflow before synthesis.
 

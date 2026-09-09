@@ -10,7 +10,7 @@ import { localReviewPolicy } from "../lib/review-policy.mjs";
 import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, initialWorkflowJournal, openEvidenceRun, readEvidenceExecution, readWorkflowJournal, recoverInterruptedWorkflowRuns, snapshotWorktree, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
-import { AGENT_TO_ROLE, assertModelRoute, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
+import { AGENT_TO_ROLE, canonicalExecutedRoute, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
@@ -199,26 +199,45 @@ export default function (pi: ExtensionAPI) {
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
             try {
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
-              assertModelRoute(route, response);
-              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response });
+              let canonicalResponse: Record<string, unknown>;
+              try {
+                canonicalResponse = canonicalExecutedRoute(route, response);
+              } catch (error) {
+                canonicalResponse = {
+                  ...response,
+                  status: "protocol_rejected",
+                  error: `model route attestation rejected: ${error instanceof Error ? error.message : "unknown error"}`,
+                };
+              }
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
-              const normalized = { ...response, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, model: response.model, thinking: response.thinking, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
-              finish(resolve, normalized);
+              const normalized = { ...canonicalResponse, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
+              delegationAudit.push({ agent, attempt, status: receipt.status, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              if (receipt.status === "completed") {
+                finish(resolve, normalized);
+              } else {
+                const failure = new Error(`${agent} delegation ended with ${receipt.status}`);
+                (failure as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded = true;
+                finish(reject, failure);
+              }
             } catch (error) {
               finish(reject, error);
             }
           }
         });
         const failWithReceipt = (status: string, message: string) => {
+          let receiptRecorded = false;
           try {
             if (evidenceRun && roleReceiptStore) {
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message } });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
               delegationAudit.push({ agent, attempt, status, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
+              receiptRecorded = true;
             }
           } catch {}
-          finish(reject, new Error(message));
+          const failure = new Error(message);
+          (failure as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded = receiptRecorded;
+          finish(reject, failure);
         };
         const abort = () => {
           pi.events.emit(CANCEL_EVENT, { requestId, ownerRunId, nodeId });
@@ -259,7 +278,9 @@ export default function (pi: ExtensionAPI) {
             }
           } catch (error) {
             lastError = error;
-            delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed" });
+            if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
+              delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed" });
+            }
           }
         }
         if (lastError) throw lastError;

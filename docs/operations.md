@@ -13,7 +13,7 @@
 - Workflow journals and immutable receipts: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/`.
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
-- Subagent mission artifacts: `${XDG_STATE_HOME:-~/.local/state}/pi-subagents/missions/` (owner-only, redacted, terminal retention 25).
+- Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 
 ## Recovery after interruption or power loss
 

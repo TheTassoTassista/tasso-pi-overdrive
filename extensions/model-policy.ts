@@ -80,6 +80,20 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
       catch (error) { notifyError(ctx, error); }
     },
   });
+  pi.registerCommand("council", {
+    description: "Run a user-requested task through the enforced workflow with council escalation",
+    handler: async (args, ctx) => {
+      try {
+        const task = args.trim();
+        if (!task) throw new Error("usage: /council TASK");
+        pi.sendUserMessage([
+          "Call secure_coding_workflow exactly once with exactly this JSON input:",
+          JSON.stringify({ task, includeOracle: true, includeSecurity: true }),
+          "Do not call the raw subagent council workflow or any other tool. Report only the controller's structured final status.",
+        ].join("\n"), { expandPromptTemplates: false });
+      } catch (error) { notifyError(ctx, error); }
+    },
+  });
   pi.registerCommand("model-role", {
     description: "List roles or set one role: /model-role ROLE PROVIDER/MODEL[:THINKING]",
     handler: async (args, ctx) => {
@@ -99,13 +113,19 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
     },
   });
   pi.registerCommand("model-preset", {
-    description: "List, show, or select budget/efficient/balanced/max-quality/custom",
+    description: "List, show, preview, or select budget/efficient/balanced/max-quality/custom",
     handler: async (args, ctx) => {
       try {
         const action = args.trim() || "list";
         if (action === "list") { ctx.ui.notify(MODEL_PRESETS.join("\n"), "info"); return; }
         const models = ctx.modelRegistry.getAvailable();
         if (action === "show") { ctx.ui.notify(renderRouting(resolveModelPolicy(models, readModelPolicy())), "info"); return; }
+        if (action.startsWith("preview ")) {
+          const preview = action.slice("preview ".length).trim();
+          if (!MODEL_PRESETS.includes(preview as any) || preview === "custom") throw new Error("preview_requires_concrete_preset");
+          ctx.ui.notify(`${renderRouting(resolveModelPolicy(models, policyWithPreset(readModelPolicy(), preview)))}\nPreview only; persistent policy unchanged.`, "info");
+          return;
+        }
         if (!MODEL_PRESETS.includes(action as any)) throw new Error("unknown_model_preset");
         const stored = policyWithPreset(readModelPolicy(), action);
         writeModelPolicy(modelPolicyPath(), stored);

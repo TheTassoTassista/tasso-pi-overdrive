@@ -69,6 +69,7 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/models` | List real available models and credential-free provider status |
 | `/model-routing` | Show the active role map and policy receipt |
 | `/model-role` / `/model-preset` | Persist a role override or select/reset a preset |
+| `/council <task>` | Run the existing enforced workflow with high-risk council escalation |
 | `/council-status` | Show council routes, escalation policy, independence, and hard limits |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
@@ -100,7 +101,7 @@ The script restores a setting only when it still equals the applied Overdrive va
 ## Maintenance
 
 - Review release notes and peer ranges before changing Pi or package pins.
-- Run `npm run check`, `npm run benchmark`, the local smoke harness, and one low-cost Pi smoke after an upgrade.
+- Run `npm run check`, `npm run benchmark`, `npm run benchmark:context`, the local smoke harness, and one explicitly approved authenticated Pi smoke after an upgrade. Context measurement is deterministic and free by default; `npm run benchmark:context -- --live` intentionally makes seven provider calls.
 - Preview metadata-trace cleanup with `./scripts/cleanup-traces.sh`; deletion requires `--apply`.
 - Never run `pi update --all` blindly: exact npm pins are deliberate compatibility boundaries.
 

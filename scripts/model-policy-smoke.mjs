@@ -92,6 +92,12 @@ try {
   const routingText = messages(routing);
   check("pi-effective-routing-command", routing.code === 0 && routingText.includes("Preset: efficient") && MODEL_ROLES.every((role) => routingText.includes(`${role}:`)), routingText.slice(0, 3000) || routing.stderr || routing.events.slice(-10));
 
+  const livePolicyBeforePreview = fileMetadata(process.env.PI_OVERDRIVE_MODEL_POLICY ?? path.join(os.homedir(), ".config", "pi-overdrive", "model-policy.json"));
+  const preview = await runCommand("/model-preset preview budget", { expected: /Preview only; persistent policy unchanged\./u });
+  const livePolicyAfterPreview = fileMetadata(process.env.PI_OVERDRIVE_MODEL_POLICY ?? path.join(os.homedir(), ".config", "pi-overdrive", "model-policy.json"));
+  const previewText = messages(preview);
+  check("pi-preset-preview-is-read-only", preview.code === 0 && previewText.includes("Preset: budget") && MODEL_ROLES.every((role) => previewText.includes(`${role}:`)) && JSON.stringify(livePolicyBeforePreview) === JSON.stringify(livePolicyAfterPreview), { output: previewText.slice(0, 3000), before: livePolicyBeforePreview, after: livePolicyAfterPreview });
+
   const presetList = await runCommand("/model-preset list", { isolated: true, expected: /max-quality/u });
   const presetListText = messages(presetList);
   check("pi-preset-list-command", presetList.code === 0 && ["budget", "efficient", "balanced", "max-quality", "custom"].every((name) => presetListText.split("\n").includes(name)), presetListText || presetList.stderr);
@@ -156,6 +162,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 11 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 12 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, persistentWritesTestedOnlyInIsolatedHome: true, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

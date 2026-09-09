@@ -77,6 +77,18 @@ test("valid durable role receipt is accepted exactly once", () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test("launch contract digest and executed route survive immutable receipt storage", () => {
+  const { root, run, store } = fixture();
+  try {
+    const launchContractDigest = taskDigest("launch contract");
+    const value = receipt(run, { response: { status: "completed", agent: "scout", nodeId: "01-scout", ownerRunId: "controller-owner", runId: randomUUID(), model: "local/test", thinking: "low", launchContractDigest, result: { kind: "text", text: "ok" } } });
+    const reference = writeRoleReceipt(store, value);
+    const loaded = admitRoleReceipt(store, reference, { ...expected(value), model: "local/test", thinking: "low", launch_contract_digest: launchContractDigest }, new Set());
+    assert.equal(loaded.receipt.launch_contract_digest, launchContractDigest);
+    assert.throws(() => writeRoleReceipt(store, { ...value, execution_id: randomUUID(), sequence: 1, launch_contract_digest: "invalid" }), /launch contract digest/u);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test("wrong run, task, role, round, and stale nonce are rejected", () => {
   const { root, run, store } = fixture();
   try {

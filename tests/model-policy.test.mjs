@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { MODEL_PRESETS, MODEL_ROLES, assertModelRoute, parseModelSelection, policyWithPreset, policyWithRole, readModelPolicy, resolveModelPolicy, settingsAgentOverrides, writeModelPolicy } from "../lib/model-policy.mjs";
+import { MODEL_PRESETS, MODEL_ROLES, assertModelRoute, canonicalExecutedRoute, parseModelSelection, policyWithPreset, policyWithRole, readModelPolicy, resolveModelPolicy, settingsAgentOverrides, validateResolvedModelPolicy, writeModelPolicy } from "../lib/model-policy.mjs";
 
 const catalog = ["gpt-5.3-codex-spark", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"].map((id) => ({ provider: "openai-codex", id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, contextWindow: id === "gpt-5.3-codex-spark" ? 131072 : 278528, maxTokens: 131072, input: ["text"] }));
 
@@ -49,8 +49,24 @@ test("budget uses real catalog cost metadata and unsupported thinking fails clos
 test("actual response model and thinking are bound to the configured route", () => {
   const route = { model: "openai-codex/gpt-5.6-terra", thinking: "high" };
   assert.equal(assertModelRoute(route, { model: route.model, thinking: route.thinking }), true);
+  assert.equal(assertModelRoute(route, { model: `${route.model}:high`, thinking: route.thinking }), true, "pi-subagents appends the separately reported thinking level to its model reference");
+  assert.deepEqual(canonicalExecutedRoute(route, { model: `${route.model}:high`, thinking: "high", launchContractDigest: "a".repeat(64) }), { model: route.model, thinking: "high", launchContractDigest: "a".repeat(64) });
   assert.throws(() => assertModelRoute(route, { model: "openai-codex/gpt-5.5", thinking: "high" }), /route_mismatch/u);
   assert.throws(() => assertModelRoute(route, { model: route.model, thinking: "low" }), /route_mismatch/u);
+  assert.throws(() => assertModelRoute(route, { model: `${route.model}:low`, thinking: "high" }), /route_mismatch/u);
+});
+
+test("persisted resolved policy resumes exactly and rejects route or digest tampering", () => {
+  const resolved = resolveModelPolicy(catalog, { version: 1, preset: "balanced", basePreset: "balanced", overrides: {} });
+  const resumed = validateResolvedModelPolicy(catalog, structuredClone(resolved));
+  assert.deepEqual(resumed.roles, resolved.roles);
+  assert.equal(resumed.digest, resolved.digest);
+  const changedRoute = structuredClone(resolved);
+  changedRoute.roles.worker = { model: "openai-codex/gpt-5.6-luna", thinking: "medium" };
+  assert.throws(() => validateResolvedModelPolicy(catalog, changedRoute), /digest_mismatch/u);
+  assert.throws(() => validateResolvedModelPolicy(catalog, { ...structuredClone(resolved), digest: "0".repeat(64) }), /digest_mismatch/u);
+  assert.throws(() => validateResolvedModelPolicy(catalog, { ...structuredClone(resolved), preset: "corrupt" }), /preset_invalid/u);
+  assert.throws(() => validateResolvedModelPolicy(catalog, { ...structuredClone(resolved), basePreset: "custom" }), /preset_invalid/u);
 });
 
 test("private policy persistence is atomic, owner-only, and rejects symlink targets", () => {
