@@ -10,6 +10,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-bootstrap-"));
 const testHome = path.join(root, "home");
 const agentDir = path.join(testHome, ".pi", "agent");
 const stateDir = path.join(root, "state");
+const configDir = path.join(root, "config");
 const backupDir = path.join(root, "backups");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
@@ -17,7 +18,7 @@ const check = (name, condition, detail) => results.push({ name, status: conditio
 function run(args) {
   return spawnSync(path.join(packageRoot, "scripts", "bootstrap.sh"), args, {
     cwd: packageRoot,
-    env: { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_STATE_HOME: stateDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir },
+    env: { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_STATE_HOME: stateDir, XDG_CONFIG_HOME: configDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir },
     encoding: "utf8",
     timeout: 20 * 60 * 1000,
     maxBuffer: 16 * 1024 * 1024,
@@ -40,6 +41,9 @@ try {
   const attachmentMarker = [".codex", "attachments"].join("/");
   check("bootstrap-no-dated-codex-reference", !serialized.includes(legacyTaskMarker) && !serialized.includes(attachmentMarker), packages);
   check("bootstrap-does-not-create-auth", !fs.existsSync(path.join(agentDir, "auth.json")), "authentication is external and untouched");
+  const webConfigFile = path.join(configDir, "rpiv-web-tools", "config.json");
+  const webConfig = fs.existsSync(webConfigFile) ? JSON.parse(fs.readFileSync(webConfigFile, "utf8")) : {};
+  check("bootstrap-installs-secret-free-web-routing", webConfig.provider === "brave" && webConfig.overdriveRouting?.secondaryProvider === "perplexity" && !Object.hasOwn(webConfig, "apiKeys"), webConfig);
   const toolRoot = path.join(testHome, ".local", "share", "pi-overdrive", "lsp-node", "node_modules");
   check("bootstrap-pinned-tools-present", ["typescript", "pyright", "@ast-grep/cli"].every((name) => fs.existsSync(path.join(toolRoot, name))), toolRoot);
   const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir) : [];
@@ -50,6 +54,6 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-const status = results.length >= 7 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length >= 8 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, packageRoot, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

@@ -7,7 +7,7 @@ All selected npm sources are exact pins. Their manifests, engines, Pi peer range
 | `@ff-labs/pi-fff@0.10.6` | Compact fuzzy repository discovery | Accepted; local tools-only configuration, no filesystem-root/home scan, no symlink following |
 | `@juvio15/pi-ast-grep@0.4.2` | Structural search and guarded rewrite | Accepted with ast-grep CLI 0.45.3; Pi and Node requirements satisfied |
 | `pi-subagents@0.66.0` | Fresh-context agents, model routing, limits, worktrees | Accepted; explicit tools, depth one, concurrency three, schedules disabled |
-| `@juicesharp/rpiv-web-tools@2.9.0` | Bounded page fetch and opt-in search | Accepted; fetch needs no key and includes SSRF/output controls |
+| `@juicesharp/rpiv-web-tools@2.9.0` | Provider contracts and compatibility web tools | Accepted; its source/precedence/API contracts were audited, while the local routed client mirrors its Brave/Perplexity endpoints behind DNS pinning and bounded JSON to close dynamic-import and network-safety gaps without another package |
 | `pi-agent-browser-native@0.6.6` | DOM/console/browser verification | Accepted with upstream agent-browser 0.36.0 and isolated Chromium |
 | `@juicesharp/rpiv-ask-user-question@2.9.0` | Structured material clarifications | Accepted for the supervisor and read-only Planner |
 | `pi-observability@1.3.2` | One unobtrusive token/context/tool dashboard | Accepted with the minimal preset |

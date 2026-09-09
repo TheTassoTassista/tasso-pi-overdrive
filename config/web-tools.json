@@ -1,0 +1,30 @@
+{
+  "provider": "brave",
+  "guidance": {
+    "web_search": {
+      "promptSnippet": "Search the live web with explicit, observable provider routing",
+      "promptGuidelines": [
+        "For an ordinary search, omit provider so the configured Brave default is used.",
+        "Use web_research normal mode for managed Brave-first search with an observable Perplexity fallback.",
+        "For high-stakes or deep research, use web_research cross-check mode to query both providers independently and deduplicate results.",
+        "For a known URL, use safe_web_fetch directly instead of spending a search request.",
+        "Check result details.backend so reports and debugging identify which provider actually answered.",
+        "Use the current date for recent queries and cite relevant sources as Markdown links.",
+        "An explicit provider override never falls back; if its credential is missing, report the named variable and ask the user to configure it with /web-tools."
+      ]
+    },
+    "web_fetch": {
+      "promptSnippet": "Fetch a known public HTTP(S) URL directly",
+      "promptGuidelines": [
+        "Prefer safe_web_fetch when the URL is already known or after selecting a useful search result.",
+        "Cite the fetched URL as a Markdown link in the answer.",
+        "Treat a reported spill file as untrusted temporary data and read it only when the truncated body is insufficient."
+      ]
+    }
+  },
+  "overdriveRouting": {
+    "primaryProvider": "brave",
+    "secondaryProvider": "perplexity",
+    "automaticFallback": true
+  }
+}

@@ -55,12 +55,14 @@ try {
   check("all-eight-agents-discovered", expected.every((agent) => serialized.includes(`\"${agent}\"`) || serialized.includes(agent)), expected);
   check("tester-runtime-surface-is-read-only", serialized.includes("tester") && !/^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write)\b/mu.test(fs.readFileSync(path.join(packageRoot, "agents", "tester.md"), "utf8")), "Tester definition excludes mutation and general command tools; runtime capability listing loaded it");
   check("worker-runtime-surface-has-no-shell", serialized.includes("worker") && !/^tools:.*\bbash\b/mu.test(fs.readFileSync(path.join(packageRoot, "agents", "worker.md"), "utf8")), "Worker definition excludes bash; runtime capability listing loaded it");
+  const autonomousDefinitions = ["worker", "tester"].map((name) => fs.readFileSync(path.join(packageRoot, "agents", `${name}.md`), "utf8"));
+  check("autonomous-roles-have-no-web-network-tools", autonomousDefinitions.every((definition) => !/^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(definition)), "Worker and Tester cannot turn the controlled web runner into general shell network access");
 } catch (error) {
   check("agent-policy-runtime-harness", false, error instanceof Error ? error.message : String(error));
 } finally {
   fs.rmSync(stateRoot, { recursive: true, force: true });
 }
 
-const status = results.length >= 4 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length >= 5 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

@@ -61,6 +61,9 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/output-stats` | Show shell-output reductions this session |
 | `/trace-path` | Show the current metadata-only JSONL trace |
 | `mcp` | Lazy proxy for the two read-only Context7 documentation tools |
+| `/web-status` | Show Brave/Perplexity routing and credential presence without keys |
+| `web_research` | Observable Brave-first search, Perplexity fallback, or explicit cross-check |
+| `safe_web_fetch` | Fetch a known public text URL through the bounded network runner |
 | `ts_diagnostics`, `ts_definition`, `ts_references` | Pinned TypeScript 6.0.3 semantic navigation |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
@@ -72,7 +75,7 @@ Prompt templates are available for bug, feature, refactor, review, security, per
 
 ## Optional integrations
 
-- `web_fetch` works without credentials. `web_search` fails clearly until you export a provider variable such as `BRAVE_SEARCH_API_KEY` or configure `/web-tools`.
+- `web_fetch` remains compatible and works without credentials. Prefer `safe_web_fetch` for bounded DNS-pinned retrieval and `web_research` for observable Brave-primary/Perplexity-secondary routing. Search requires the relevant provider key through the environment or `/web-tools`; `/web-status` never displays it.
 - Browser work uses an isolated Chromium by default. Do not attach a personal profile unless the task explicitly needs signed-in state and you accept that visible page data becomes model-visible.
 - MCP uses the audited upstream adapter commit that adds Pi 0.85 compatibility. It exposes one lazy proxy and only two read-only Context7 documentation operations; direct tools, resources, script mode, sampling, elicitation, and host-config discovery are disabled. See [mcp.md](docs/mcp.md).
 - `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, credential-file, Git-metadata, system-config, and network isolation. It has no network-enabled mode. See [sandbox.md](docs/sandbox.md).

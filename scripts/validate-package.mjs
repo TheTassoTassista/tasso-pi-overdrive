@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -25,6 +25,7 @@ const settingsPatch = JSON.parse(await readFile(path.join(root, 'config/settings
 if (JSON.stringify(settingsPatch.defaultTools) !== JSON.stringify(['read', 'edit', 'write'])) failures.push('defaultTools must contain only the intended built-in editor core');
 if (!pkg.pi.extensions.includes('./extensions/tool-surface.ts')) failures.push('initial custom-tool surface limiter is missing');
 if (!pkg.pi.extensions.includes('./extensions/mcp.ts')) failures.push('compact MCP proxy extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/web-policy.ts')) failures.push('bounded dual-provider web policy extension is missing');
 
 const mcpConfig = JSON.parse(await readFile(path.join(root, 'config/mcp.json'), 'utf8'));
 if (mcpConfig.settings?.directTools !== false || mcpConfig.settings?.scriptMode !== false) failures.push('MCP must expose one proxy only (no direct tools or script surface)');
@@ -42,6 +43,10 @@ const mcpLock = JSON.parse(await readFile(path.join(root, 'runtime/mcp/package-l
 if (mcpLock.packages?.['node_modules/pi-mcp-adapter']?.version !== '2.32.1' || mcpLock.packages?.['node_modules/pi-mcp-adapter']?.resolved !== expectedMcpSource) failures.push('MCP lockfile does not resolve the audited adapter commit');
 if (mcpLock.packages?.['node_modules/hono']?.version !== '4.13.5') failures.push('MCP lockfile does not enforce the audited Hono version');
 
+const webConfig = JSON.parse(await readFile(path.join(root, 'config/web-tools.json'), 'utf8'));
+if (webConfig.provider !== 'brave' || webConfig.overdriveRouting?.primaryProvider !== 'brave' || webConfig.overdriveRouting?.secondaryProvider !== 'perplexity' || webConfig.overdriveRouting?.automaticFallback !== true) failures.push('web routing must be explicit Brave primary / observable Perplexity fallback');
+if (Object.hasOwn(webConfig, 'apiKeys') || Object.hasOwn(webConfig, 'apiKey')) failures.push('tracked web policy must never contain credential slots or values');
+
 const subagents = JSON.parse(await readFile(path.join(root, 'config/subagents.json'), 'utf8'));
 if (subagents.globalConcurrencyLimit !== 3 || subagents.parallel?.concurrency !== 3 || subagents.parallel?.maxTasks !== 3) failures.push('subagent concurrency is not hard-configured to 3');
 if (subagents.maxSubagentDepth !== 1) failures.push('subagent depth is not configured to 1');
@@ -56,6 +61,7 @@ for (const name of expectedAgents) {
   if (!text) failures.push(`missing agent ${name}`);
   if (name === 'tester' && /^tools:.*\b(?:bash|safe_exec|edit|write)\b/mu.test(text)) failures.push('Tester has mutation or general command capability');
   if (name === 'worker' && /^tools:.*\bbash\b/mu.test(text)) failures.push('Worker has free-shell capability');
+  if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
 }
 

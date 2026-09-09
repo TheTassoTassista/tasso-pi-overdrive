@@ -24,6 +24,9 @@ npm_bin=${NPM_BIN:-$(command -v npm || true)}
 agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}
 settings_file="$agent_dir/settings.json"
 install_manifest="$agent_dir/tasso-pi-overdrive-install.json"
+web_config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
+web_config="$web_config_root/rpiv-web-tools/config.json"
+web_manifest="$agent_dir/tasso-pi-overdrive-web-install.json"
 required_pi=0.85.1
 
 installed_pi=$($pi_bin --version | tr -d '[:space:]')
@@ -68,6 +71,7 @@ backup_file "$agent_dir/lsp.json" "$backup_dir/pi-original/agent/lsp.json"
 backup_file "$agent_dir/extensions/subagent/config.json" "$backup_dir/pi-original/agent/extensions/subagent/config.json"
 backup_file "$agent_dir/observability/settings" "$backup_dir/pi-original/agent/observability/settings"
 backup_file "$install_manifest" "$backup_dir/pi-original/agent/tasso-pi-overdrive-install.json"
+backup_file "$web_config" "$backup_dir/pi-original/config/rpiv-web-tools/config.json"
 backup_file "$HOME/.pi/config/pi-agent-browser-native/config.json" "$backup_dir/pi-original/config/pi-agent-browser-native/config.json"
 echo "Backup: $backup_dir"
 
@@ -75,6 +79,7 @@ echo "Backup: $backup_dir"
 
 install -d -m 700 "$agent_dir"
 node "$package_root/scripts/settings-tool.mjs" snapshot "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
+node "$package_root/scripts/config-policy-tool.mjs" snapshot "$web_config" "$package_root/config/web-tools.json" "$web_manifest"
 node "$package_root/scripts/update-manifest.mjs" "$install_manifest" "$package_root/config/packages.json"
 
 while IFS= read -r source; do
@@ -87,6 +92,7 @@ install -d -m 700 "$agent_dir/extensions/subagent" "$agent_dir/observability" "$
 install -m 600 "$package_root/config/subagents.json" "$agent_dir/extensions/subagent/config.json"
 install -m 600 "$package_root/config/observability-settings" "$agent_dir/observability/settings"
 install -m 600 "$package_root/config/browser.json" "$HOME/.pi/config/pi-agent-browser-native/config.json"
+node "$package_root/scripts/config-policy-tool.mjs" enable "$web_config" "$package_root/config/web-tools.json" "$web_manifest"
 node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
 
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
