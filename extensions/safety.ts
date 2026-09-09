@@ -30,7 +30,7 @@ export default function (pi: ExtensionAPI) {
     if ([
       "read", "grep", "find", "ls",
       "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
-      "ts_definition", "ts_references", "ts_diagnostics",
+      "semantic_nav",
     ].includes(event.toolName) && candidate) {
       if (isSecretPath(candidate)) return { block: true, reason: `Protected secret path cannot be read: ${candidate}` };
       const inspected = inspectWorkspacePath(ctx.cwd, candidate, { mustExist: true });

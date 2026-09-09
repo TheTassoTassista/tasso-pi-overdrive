@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmRoot = path.resolve(path.dirname(process.execPath), '..', 'lib', 'node_modules');
 const piRoot = process.env.PI_PACKAGE_ROOT || path.join(npmRoot, '@earendil-works', 'pi-coding-agent');
 const piModules = path.join(piRoot, 'node_modules');
-const tsc = process.env.PI_OVERDRIVE_TSC || path.join(homedir(), '.local', 'share', 'pi-overdrive', 'lsp-node', 'node_modules', '.bin', 'tsc');
+const tsc = process.env.PI_OVERDRIVE_TSC || path.join(root, 'runtime', 'lsp', 'node_modules', '.bin', 'tsc');
 for (const required of [piRoot, piModules, tsc]) {
   if (!existsSync(required)) throw new Error(`typecheck dependency missing: ${required}`);
 }

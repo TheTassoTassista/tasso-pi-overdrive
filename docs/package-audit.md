@@ -12,11 +12,14 @@ All selected npm sources are exact pins. Their manifests, engines, Pi peer range
 | `@juicesharp/rpiv-ask-user-question@2.9.0` | Structured material clarifications | Accepted for the supervisor and read-only Planner |
 | `pi-observability@1.3.2` | One unobtrusive token/context/tool dashboard | Accepted with the minimal preset |
 | `pi-mcp-adapter@2.32.1` at `8243eba3421e301c88c047444f34ab7d5d57163e` | One lazy MCP proxy | Accepted from immutable upstream HTTPS commit; Pi 0.85 peer fix audited, Context7-only allowlist, direct tools off, Hono 4.13.5 security override, isolated locked runtime |
-| `tasso-pi-overdrive` | Personal workflow, safety, TypeScript semantic navigation, notebook, handoff, verification, skills/prompts | Git-tracked stable local package; source remains editable and third-party code is not copied into it |
+| pinned LSP runtime | VTSLS 0.3.0, TypeScript 6.0.3, Pyright 1.1.410, VS Code language servers 4.10.0, YAML 1.23.0, Bash 5.6.0 | Accepted in `runtime/lsp/package-lock.json`; exact direct pins, `minimatch@10.2.6` security override, zero npm-audit findings, lazy read-only/no-network Bubblewrap execution |
+| `tasso-pi-overdrive` | Personal workflow, safety, generalized semantic navigation, notebook, handoff, verification, skills/prompts | Git-tracked stable local package; source remains editable and third-party code is installed from lockfiles, not copied into it |
 
 ## Intentionally rejected
 
-- `pi-lsp-adapter@0.1.3`: runtime diagnostics were empty and definition/reference support was unreliable. It was removed and replaced by the local pinned TypeScript LanguageService 6.0.3 tools.
+- `pi-lsp-adapter@0.1.3`: runtime diagnostics were empty and definition/reference support was unreliable.
+- `@narumitw/pi-lsp@0.49.6`: diagnostics/fix focus does not supply the requested definition/reference surface.
+- broad `pi-lsp-extension` variants: expose overlapping formatter, AST, shell, or per-language tools. The local implementation keeps one semantic schema and an audited registry.
 - `pi-rtk-optimizer@0.9.0`: declared Pi peer ranges stop before 0.85.x and it adds a lifecycle script. A small local output transformer is measured and easier to audit.
 - `context-mode@1.0.169`: large overlapping MCP/context surface and restrictive license without a measured advantage here.
 - `pi-agenticoding@0.5.0`: overlaps notebook/subagents and recommends disabling native compaction.

@@ -40,8 +40,12 @@ if [[ "$check_only" == true ]]; then
   "$pi_bin" list
   "$npm_bin" list --prefix "$package_root/runtime/mcp" --depth=0 \
     pi-mcp-adapter@2.32.1 @modelcontextprotocol/sdk@1.30.0
+  "$npm_bin" list --prefix "$package_root/runtime/lsp" --depth=0 \
+    @vtsls/language-server@0.3.0 pyright@1.1.410 typescript@6.0.3 \
+    vscode-langservers-extracted@4.10.0 yaml-language-server@1.23.0 \
+    bash-language-server@5.6.0 vscode-jsonrpc@9.0.2
   "$npm_bin" list --prefix "$HOME/.local/share/pi-overdrive/lsp-node" --depth=0 \
-    typescript@6.0.3 pyright@1.1.410 @ast-grep/cli@0.45.3
+    @ast-grep/cli@0.45.3
   command -v agent-browser >/dev/null 2>&1 && agent-browser --version
   echo "Bootstrap validation: PASS (configuration only; authentication intentionally not inspected)."
   exit 0
@@ -76,6 +80,7 @@ backup_file "$HOME/.pi/config/pi-agent-browser-native/config.json" "$backup_dir/
 echo "Backup: $backup_dir"
 
 "$npm_bin" ci --prefix "$package_root/runtime/mcp" --omit=dev --ignore-scripts --no-audit --no-fund
+"$npm_bin" ci --prefix "$package_root/runtime/lsp" --omit=dev --ignore-scripts --no-audit --no-fund
 
 install -d -m 700 "$agent_dir"
 node "$package_root/scripts/settings-tool.mjs" snapshot "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
@@ -98,9 +103,9 @@ node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
 install -d -m 700 "$tool_root" "$HOME/.local/bin"
 "$npm_bin" install --prefix "$tool_root" --no-audit --no-fund \
-  typescript@6.0.3 pyright@1.1.410 @ast-grep/cli@0.45.3
+  --save-exact @ast-grep/cli@0.45.3
 
-for tool in ast-grep sg pyright pyright-langserver; do
+for tool in ast-grep sg; do
   source_path="$tool_root/node_modules/.bin/$tool"
   target_path="$HOME/.local/bin/$tool"
   if [[ -x "$source_path" && ! -e "$target_path" && ! -L "$target_path" ]]; then

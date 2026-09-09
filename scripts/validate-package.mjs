@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -26,6 +26,17 @@ if (JSON.stringify(settingsPatch.defaultTools) !== JSON.stringify(['read', 'edit
 if (!pkg.pi.extensions.includes('./extensions/tool-surface.ts')) failures.push('initial custom-tool surface limiter is missing');
 if (!pkg.pi.extensions.includes('./extensions/mcp.ts')) failures.push('compact MCP proxy extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/web-policy.ts')) failures.push('bounded dual-provider web policy extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.includes('./extensions/typescript-navigation.ts')) failures.push('generalized one-tool LSP extension must replace the legacy TypeScript extension hook');
+
+const lspRuntime = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package.json'), 'utf8'));
+const expectedLsp = {
+  '@vtsls/language-server': '0.3.0', 'bash-language-server': '5.6.0', pyright: '1.1.410', typescript: '6.0.3',
+  'vscode-jsonrpc': '9.0.2', 'vscode-langservers-extracted': '4.10.0', 'yaml-language-server': '1.23.0',
+};
+if (JSON.stringify(lspRuntime.dependencies) !== JSON.stringify(expectedLsp)) failures.push('LSP dependencies are not the exact reviewed set and versions');
+const lspLock = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package-lock.json'), 'utf8'));
+for (const [name, version] of Object.entries(expectedLsp)) if (lspLock.packages?.[`node_modules/${name}`]?.version !== version) failures.push(`LSP lock mismatch: ${name}@${version}`);
+if (lspRuntime.overrides?.minimatch !== '10.2.6' || lspLock.packages?.['node_modules/minimatch']?.version !== '10.2.6') failures.push('LSP minimatch security override is missing or not locked');
 
 const mcpConfig = JSON.parse(await readFile(path.join(root, 'config/mcp.json'), 'utf8'));
 if (mcpConfig.settings?.directTools !== false || mcpConfig.settings?.scriptMode !== false) failures.push('MCP must expose one proxy only (no direct tools or script surface)');

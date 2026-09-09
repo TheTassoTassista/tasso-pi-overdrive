@@ -1,7 +1,7 @@
 # Troubleshooting
 
 - Pi package missing: run `scripts/status.sh`, confirm Pi is exactly 0.85.1, then rerun `scripts/bootstrap.sh`. Do not relax version or package pins.
-- TypeScript navigation unavailable: run `ts_diagnostics` on a `.ts` fixture, confirm `~/.local/share/pi-overdrive/lsp-node/node_modules/typescript` is version 6.0.3, then run `npm run smoke:runtime`. There is no `/lsp` command or active adapter config.
+- Semantic navigation unavailable: run `/lsp-status`, then `npm run smoke:lsp`. The lockfile-backed runtime is `runtime/lsp/`; never bypass a missing server by running it outside the sandbox. Rust/Go/Java/Lua/Ruby intentionally report `PARTIAL` until a reviewed server is pinned.
 - Browser unavailable: run `agent-browser doctor`; do not point it at a personal profile as a shortcut.
 - Search is too broad: start with FFF, AST, or LSP and add a directory/symbol constraint before reading files.
 - Large output hid a needed line: rerun the failing command with a narrower filter. Failed commands are not compacted.

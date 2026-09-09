@@ -18,6 +18,30 @@
     "@modelcontextprotocol/sdk": {
       "version": "1.30.0",
       "reason": "Pinned only for the deterministic local MCP policy fixture."
+    },
+    "@vtsls/language-server": {
+      "version": "0.3.0",
+      "reason": "Pinned lazy TypeScript/JavaScript LSP backend in the read-only no-network runtime."
+    },
+    "typescript": {
+      "version": "6.0.3",
+      "reason": "Pinned VTSLS SDK and constrained import-alias definition resolver."
+    },
+    "pyright": {
+      "version": "1.1.410",
+      "reason": "Pinned Python LSP backend."
+    },
+    "vscode-langservers-extracted": {
+      "version": "4.10.0",
+      "reason": "Pinned HTML/CSS/JSON LSP backends."
+    },
+    "yaml-language-server": {
+      "version": "1.23.0",
+      "reason": "Pinned YAML LSP backend."
+    },
+    "bash-language-server": {
+      "version": "5.6.0",
+      "reason": "Pinned Bash LSP backend with minimatch 10.2.6 security override."
     }
   },
   "rejected": {

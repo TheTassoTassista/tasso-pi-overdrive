@@ -4,7 +4,8 @@
 
 - Package: this directory.
 - Pi settings: `~/.pi/agent/settings.json`.
-- TypeScript semantic runtime: `~/.local/share/pi-overdrive/lsp-node/node_modules/typescript` (no active `lsp.json`).
+- Semantic runtime: `runtime/lsp/` inside the stable Git repository; installed strictly from its lockfile.
+- ast-grep CLI runtime: `~/.local/share/pi-overdrive/lsp-node/` (owner-local compatibility path).
 - Subagent config: `~/.pi/agent/extensions/subagent/config.json`.
 - Browser config: `~/.pi/config/pi-agent-browser-native/config.json`.
 - User-local tools: `~/.local/share/pi-overdrive/` with selected links in `~/.local/bin/`.
@@ -34,7 +35,7 @@ Temporary test repositories are disposable by design. If a real reboot removes a
 2. Read current official Pi package/settings/security docs and release notes.
 3. Query exact package manifests, dates, engines, peer ranges, repository, license, dependencies, and lifecycle scripts.
 4. Download tarballs and inspect manifest plus critical execution/config/security code.
-5. Update one pin, run package checks, launch Pi offline, run a low-cost smoke, then verify browser/TypeScript semantics/subagents.
+5. Update one pin, run package checks and npm audit, launch Pi offline, run a low-cost smoke, then verify browser/multi-language semantics/subagents.
 6. Record evidence and limitations. Keep the old backup until several real tasks succeed.
 
 ## Optional system packages

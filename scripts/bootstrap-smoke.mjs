@@ -45,7 +45,8 @@ try {
   const webConfig = fs.existsSync(webConfigFile) ? JSON.parse(fs.readFileSync(webConfigFile, "utf8")) : {};
   check("bootstrap-installs-secret-free-web-routing", webConfig.provider === "brave" && webConfig.overdriveRouting?.secondaryProvider === "perplexity" && !Object.hasOwn(webConfig, "apiKeys"), webConfig);
   const toolRoot = path.join(testHome, ".local", "share", "pi-overdrive", "lsp-node", "node_modules");
-  check("bootstrap-pinned-tools-present", ["typescript", "pyright", "@ast-grep/cli"].every((name) => fs.existsSync(path.join(toolRoot, name))), toolRoot);
+  const lspRoot = path.join(packageRoot, "runtime", "lsp", "node_modules");
+  check("bootstrap-pinned-tools-present", fs.existsSync(path.join(toolRoot, "@ast-grep", "cli")) && ["typescript", "pyright", "@vtsls/language-server"].every((name) => fs.existsSync(path.join(lspRoot, name))), { toolRoot, lspRoot });
   const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir) : [];
   check("bootstrap-created-private-backup", backups.length === 1 && (fs.statSync(path.join(backupDir, backups[0])).mode & 0o077) === 0, backups);
 } catch (error) {

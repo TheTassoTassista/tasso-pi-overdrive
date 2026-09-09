@@ -1,8 +1,8 @@
 ---
 name: simplicity-reviewer
 description: Read-only review for overengineering, duplication, and unnecessary abstractions.
-tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, ts_references, ts_diagnostics
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ../extensions/typescript-navigation.ts
+tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, semantic_nav
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ../extensions/lsp.ts
 defaultContext: fresh
 acceptanceRole: read-only
 inheritGlobalContext: false

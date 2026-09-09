@@ -1,8 +1,8 @@
 ---
 name: tester
 description: Test runner and failure analyst that reports reproducible evidence without editing product code.
-tools: read, grep, find, ls, ts_diagnostics, verification_gate, agent_browser
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/pi-agent-browser-native/dist/extensions/agent-browser/index.js, ../extensions/safety.ts, ../extensions/typescript-navigation.ts, ../extensions/output-optimizer.ts, ../extensions/verification-gate.ts
+tools: read, grep, find, ls, semantic_nav, verification_gate, agent_browser
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/pi-agent-browser-native/dist/extensions/agent-browser/index.js, ../extensions/safety.ts, ../extensions/lsp.ts, ../extensions/output-optimizer.ts, ../extensions/verification-gate.ts
 defaultContext: fresh
 acceptanceRole: read-only
 completionGuard: false
