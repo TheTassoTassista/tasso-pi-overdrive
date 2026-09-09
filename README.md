@@ -66,6 +66,9 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `safe_web_fetch` | Fetch a known public text URL through the bounded network runner |
 | `semantic_nav` | Lazy project-aware diagnostics, definition, references, hover, symbols, and read-only rename preview |
 | `/lsp-status` | Show server availability, pins, process cap, and isolation policy |
+| `/models` | List real available models and credential-free provider status |
+| `/model-routing` | Show the active role map and policy receipt |
+| `/model-role` / `/model-preset` | Persist a role override or select/reset a preset |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
 | `/web-tools` | Opt into a web-search provider; keys are not preconfigured |

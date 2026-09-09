@@ -44,6 +44,9 @@ try {
   const webConfigFile = path.join(configDir, "rpiv-web-tools", "config.json");
   const webConfig = fs.existsSync(webConfigFile) ? JSON.parse(fs.readFileSync(webConfigFile, "utf8")) : {};
   check("bootstrap-installs-secret-free-web-routing", webConfig.provider === "brave" && webConfig.overdriveRouting?.secondaryProvider === "perplexity" && !Object.hasOwn(webConfig, "apiKeys"), webConfig);
+  const modelPolicyFile = path.join(configDir, "pi-overdrive", "model-policy.json");
+  const modelPolicy = fs.existsSync(modelPolicyFile) ? JSON.parse(fs.readFileSync(modelPolicyFile, "utf8")) : {};
+  check("bootstrap-installs-private-user-owned-model-policy", modelPolicy.preset === "efficient" && modelPolicy.version === 1 && (fs.statSync(modelPolicyFile).mode & 0o077) === 0, { preset: modelPolicy.preset, mode: fs.existsSync(modelPolicyFile) ? fs.statSync(modelPolicyFile).mode & 0o777 : null });
   const toolRoot = path.join(testHome, ".local", "share", "pi-overdrive", "lsp-node", "node_modules");
   const lspRoot = path.join(packageRoot, "runtime", "lsp", "node_modules");
   check("bootstrap-pinned-tools-present", fs.existsSync(path.join(toolRoot, "@ast-grep", "cli")) && ["typescript", "pyright", "@vtsls/language-server"].every((name) => fs.existsSync(path.join(lspRoot, name))), { toolRoot, lspRoot });
@@ -55,6 +58,6 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-const status = results.length >= 8 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length >= 9 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, packageRoot, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

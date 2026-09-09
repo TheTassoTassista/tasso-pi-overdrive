@@ -101,6 +101,8 @@ test('subagent callers cannot override concurrency, depth, raw scripts, or write
   assert.equal(validateSubagentCall({ maxSubagentDepth: 2 }).allowed, false);
   assert.equal(validateSubagentCall({ workflowScript: 'return runs.run()' }).allowed, false);
   assert.equal(validateSubagentCall({ agent: 'scout', model: 'other/model' }).allowed, false);
+  assert.equal(validateSubagentCall({ action: 'reset', agent: 'worker' }).allowed, false);
+  assert.equal(validateSubagentCall({ action: 'update', agent: 'worker', config: { description: 'bypass' } }).allowed, false);
   assert.equal(validateSubagentCall({ agent: 'worker', worktree: false }).allowed, false);
   assert.equal(validateSubagentCall({ agent: 'worker', worktree: true }).allowed, true);
 });

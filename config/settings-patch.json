@@ -9,6 +9,10 @@
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "medium",
   "enabledModels": [
+    "openai-codex/gpt-5.3-codex-spark",
+    "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.4-mini",
+    "openai-codex/gpt-5.5",
     "openai-codex/gpt-5.6-luna",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-5.6-sol",
@@ -31,8 +35,14 @@
       "strict": true,
       "allow": [
         "inherit",
-        "openai-codex/gpt-5.6-*",
-        "openai-codex/gpt-6-*"
+        "openai-codex/gpt-5.3-codex-spark",
+        "openai-codex/gpt-5.4",
+        "openai-codex/gpt-5.4-mini",
+        "openai-codex/gpt-5.5",
+        "openai-codex/gpt-5.6-luna",
+        "openai-codex/gpt-5.6-sol",
+        "openai-codex/gpt-5.6-terra",
+        "openai-codex/gpt-6-astra"
       ]
     },
     "agentOverrides": {
@@ -67,6 +77,22 @@
       "simplicity-reviewer": {
         "model": "openai-codex/gpt-5.6-luna",
         "thinking": "medium"
+      },
+      "council-1": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high"
+      },
+      "council-2": {
+        "model": "openai-codex/gpt-5.5",
+        "thinking": "high"
+      },
+      "council-3": {
+        "model": "openai-codex/gpt-5.4",
+        "thinking": "high"
+      },
+      "council-judge": {
+        "model": "openai-codex/gpt-6-astra",
+        "thinking": "high"
       }
     }
   }

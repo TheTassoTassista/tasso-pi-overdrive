@@ -10,6 +10,7 @@ import { localReviewPolicy } from "../lib/review-policy.mjs";
 import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, initialWorkflowJournal, openEvidenceRun, readEvidenceExecution, readWorkflowJournal, recoverInterruptedWorkflowRuns, snapshotWorktree, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
+import { AGENT_TO_ROLE, assertModelRoute, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
@@ -57,6 +58,7 @@ function sanitizeState(state: any) {
     finalVerificationStatus: state?.finalVerificationStatus ?? "NOT_RUN",
     cleanupStatus: state?.cleanupStatus ?? "NOT_RUN",
     evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
+    modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, roles: state.modelPolicy.roles, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
     hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
@@ -164,9 +166,14 @@ export default function (pi: ExtensionAPI) {
       let receiptSequence = 0;
       let protocolNonce = taskDigest(randomUUID());
       let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
+      const availableModels = ctx.modelRegistry.getAvailable();
+      let activeModelPolicy = resolveModelPolicy(availableModels, readModelPolicy());
       const admittedExecutionIds = new Set<string>();
       const delegationAudit: Array<Record<string, unknown>> = [];
       const delegateOnce = ({ agent, task, cwd, result, round = 0, iteration = 0 }: DelegationInput, attempt: number): Promise<Record<string, any>> => new Promise((resolve, reject) => {
+        const policyRole = AGENT_TO_ROLE[agent as keyof typeof AGENT_TO_ROLE];
+        const route = policyRole ? activeModelPolicy.roles[policyRole] : undefined;
+        if (!route) { reject(new Error(`No model route is configured for ${agent}.`)); return; }
         const requestId = randomUUID();
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
@@ -185,10 +192,11 @@ export default function (pi: ExtensionAPI) {
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
             try {
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
+              assertModelRoute(route, response);
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
               const normalized = { ...response, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, model: response.model, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              delegationAudit.push({ agent, attempt, status: receipt.status, model: response.model, thinking: response.thinking, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               finish(resolve, normalized);
             } catch (error) {
               finish(reject, error);
@@ -216,6 +224,8 @@ export default function (pi: ExtensionAPI) {
         signal?.addEventListener("abort", abort, { once: true });
         pi.events.emit(REQUEST_EVENT, {
           requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
+          model: route.model,
+          thinking: route.thinking,
           timeoutMs: 18 * 60 * 1000,
           toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
           artifacts: false,
@@ -316,8 +326,12 @@ export default function (pi: ExtensionAPI) {
               ownerRunId,
               runId: evidenceRun.runId,
               taskId: digest,
+              modelPolicy: activeModelPolicy,
               receiptVerifier: (response: any, expected: any) => {
                 if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);
+                const policyRole = AGENT_TO_ROLE[expected.agent as keyof typeof AGENT_TO_ROLE];
+                const expectedRoute = policyRole ? activeModelPolicy.roles[policyRole] : undefined;
+                if (!expectedRoute) throw new Error(`${expected.agent} has no active receipt route`);
                 return admitRoleReceipt(roleReceiptStore, response.workflowReceipt, {
                   run_id: evidenceRun!.runId,
                   task_id: digest,
@@ -330,6 +344,8 @@ export default function (pi: ExtensionAPI) {
                   owner_run_id: ownerRunId,
                   node_id: response.nodeId,
                   status: "completed",
+                  model: expectedRoute.model,
+                  thinking: expectedRoute.thinking,
                 }, admittedExecutionIds);
               },
               resumeState: resumable ? latestState : undefined,
