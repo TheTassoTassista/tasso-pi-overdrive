@@ -28,6 +28,13 @@ let negativeControl;
 let reviewerFailureControl;
 let interruptionControl;
 let malformedJournalControl;
+const controllerTestPolicy = { digest: "e2e-controller-test-policy", roles: {} };
+
+function deterministicStructuredValue(agent) {
+  if (agent.startsWith("council-") && agent !== "council-judge") return { conclusion: "failure is real", recommendation: "keep failing closed", confidence: "HIGH", evidence: ["negative control"], risks: [], blockingConcerns: ["verification failed"] };
+  if (agent === "council-judge") return { decision: "keep failing closed", decisionBasis: "all independent evidence confirms failure", confidence: "HIGH", agreements: ["failure is real"], disagreements: [], requiredActions: [] };
+  return { verdict: "PASS", summary: "control", findings: [] };
+}
 
 function check(name, condition, detail) {
   results.push({ name, status: condition ? "PASS" : "FAIL", detail: typeof detail === "string" ? detail.slice(0, 1000) : detail });
@@ -62,7 +69,7 @@ async function runNegativeControllerControl() {
   const ownerRunId = "negative-control-owner";
   const delegate = async ({ agent, result }) => {
     const response = { status: "completed", agent, model: "negative-control-model", runId: `negative-run-${identity}`, nodeId: `negative-node-${identity++}`, ownerRunId };
-    if (result.kind === "structured") return { ...response, result: { kind: "structured", value: { verdict: "PASS", summary: "control", findings: [] } } };
+    if (result.kind === "structured") return { ...response, result: { kind: "structured", value: deterministicStructuredValue(agent) } };
     return { ...response, result: { kind: "text", text: "control" } };
   };
   const allocation = { worktree: repo, port: 39999, stateDir: path.join(root, "negative-state"), browserProfile: path.join(root, "negative-browser"), browserSession: "negative-session", database: "negative_db", schema: "negative_schema" };
@@ -72,6 +79,7 @@ async function runNegativeControllerControl() {
     delegate,
     verify: async () => ({ status: "FAIL", processExitCode: 7, results: [{ name: "intentional-failure", status: "FAIL", exitCode: 7, sandboxed: true }] }),
     ownerRunId,
+    modelPolicy: controllerTestPolicy,
   });
   return {
     status: state.status,
@@ -88,12 +96,12 @@ async function runReviewerFailureControl() {
     if (agent === "security-reviewer") return { status: "failed", agent };
     const response = { status: "completed", agent, model: "negative-control-model", runId: `missing-review-run-${identity}`, nodeId: `missing-review-node-${identity++}`, ownerRunId };
     return result.kind === "structured"
-      ? { ...response, result: { kind: "structured", value: { verdict: "PASS", summary: "control", findings: [] } } }
+      ? { ...response, result: { kind: "structured", value: deterministicStructuredValue(agent) } }
       : { ...response, result: { kind: "text", text: "control" } };
   };
   const allocation = { worktree: repo, port: 39998, stateDir: path.join(root, "missing-review-state"), browserProfile: path.join(root, "missing-review-browser"), browserSession: "missing-review-session", database: "missing_review_db", schema: "missing_review_schema" };
   try {
-    await runEnforcedWorkflow({ task: "Intentional negative control: a mandatory reviewer is absent.", allocation, delegate, verify: async () => ({ status: "PASS", processExitCode: 0 }), ownerRunId });
+    await runEnforcedWorkflow({ task: "Intentional negative control: a mandatory reviewer is absent.", allocation, delegate, verify: async () => ({ status: "PASS", processExitCode: 0 }), ownerRunId, modelPolicy: controllerTestPolicy });
     return { status: "UNEXPECTED_PASS" };
   } catch (error) {
     return { status: error.workflowState?.status, finalTransition: error.workflowState?.evidence?.transitions?.at(-1), failedReviewer: error.workflowState?.evidence?.roles?.some((entry) => entry.agent === "security-reviewer" && entry.status === "failed") === true };

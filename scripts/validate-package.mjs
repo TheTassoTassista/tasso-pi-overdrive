@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -27,6 +27,7 @@ if (!pkg.pi.extensions.includes('./extensions/tool-surface.ts')) failures.push('
 if (!pkg.pi.extensions.includes('./extensions/mcp.ts')) failures.push('compact MCP proxy extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/web-policy.ts')) failures.push('bounded dual-provider web policy extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.includes('./extensions/typescript-navigation.ts')) failures.push('generalized one-tool LSP extension must replace the legacy TypeScript extension hook');
+if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
 
 const lspRuntime = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package.json'), 'utf8'));
 const expectedLsp = {
@@ -66,7 +67,7 @@ if (subagents.scheduledRuns?.enabled !== false) failures.push('scheduled runs mu
 if (subagents.missions?.enabled !== false || subagents.missions?.globalIndex !== false) failures.push('automatic/global mission persistence must remain disabled');
 if (subagents.intercomBridge?.mode !== 'off' || subagents.intercomBridge?.resultDelivery !== false) failures.push('intercom bridge must stay off because the enforced synchronous controller owns role coordination');
 
-const expectedAgents = ['scout', 'planner', 'oracle', 'worker', 'tester', 'correctness-reviewer', 'security-reviewer', 'simplicity-reviewer'];
+const expectedAgents = ['scout', 'planner', 'oracle', 'worker', 'tester', 'correctness-reviewer', 'security-reviewer', 'simplicity-reviewer', 'council-1', 'council-2', 'council-3', 'council-judge'];
 for (const name of expectedAgents) {
   const text = await readFile(path.join(root, 'agents', `${name}.md`), 'utf8').catch(() => '');
   if (!text) failures.push(`missing agent ${name}`);
@@ -74,7 +75,11 @@ for (const name of expectedAgents) {
   if (name === 'worker' && /^tools:.*\bbash\b/mu.test(text)) failures.push('Worker has free-shell capability');
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
+  if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);
 }
+
+const modelPolicy = JSON.parse(await readFile(path.join(root, 'config/model-policy.json'), 'utf8'));
+if (modelPolicy.version !== 1 || modelPolicy.preset !== 'efficient' || modelPolicy.basePreset !== 'efficient' || Object.keys(modelPolicy.overrides ?? {}).length !== 0) failures.push('tracked model policy default is not minimal efficient/user-owned state');
 
 async function checkSymlinks(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

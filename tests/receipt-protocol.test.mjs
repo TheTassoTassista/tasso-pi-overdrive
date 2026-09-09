@@ -198,6 +198,7 @@ test("actual controller admits Planner after a durable Scout receipt in 100 of 1
         ownerRunId,
         runId: run.runId,
         taskId,
+        modelPolicy: { digest: "receipt-test-policy", roles: {} },
         receiptVerifier: (response, expectedRole) => admitRoleReceipt(store, response.workflowReceipt, {
           run_id: run.runId, task_id: taskId, protocol_nonce: protocolNonce,
           execution_id: response.workflowReceipt.executionId, sequence: response.workflowReceipt.sequence,

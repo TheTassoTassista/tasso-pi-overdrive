@@ -10,6 +10,7 @@ import { runEnforcedWorkflow, WORKFLOW_VERSION } from "../lib/workflow-state.mjs
 import { checkpointWorkflowJournal, openEvidenceRun, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeEvidenceExecution, writeEvidenceReceipt } from "../lib/workflow-evidence.mjs";
 
 const child = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "workflow-interrupt-child.mjs");
+const modelPolicy = { digest: "recovery-test-policy", roles: {} };
 
 test("SIGKILL recovery marks RUNNING as INTERRUPTED and resumes from the last complete stage", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-recovery-"));
@@ -49,6 +50,7 @@ test("SIGKILL recovery marks RUNNING as INTERRUPTED and resumes from the last co
       runId,
       taskId: digest,
       resumeState: journal.workflow_state,
+      modelPolicy,
       onCheckpoint: (checkpoint) => {
         journal = checkpointWorkflowJournal(run, journal, { status: "RUNNING", workflow_status: checkpoint.status, current_phase: checkpoint.currentPhase, round: checkpoint.round, worker_status: checkpoint.workerStatus, tester_status: checkpoint.testerStatus, verification_status: checkpoint.verificationStatus, review_status: checkpoint.reviewStatus, blocking_findings_count: checkpoint.blockingFindingsCount, correction_performed: checkpoint.correctionPerformed, final_verification_status: checkpoint.finalVerificationStatus, workflow_state: checkpoint });
       },

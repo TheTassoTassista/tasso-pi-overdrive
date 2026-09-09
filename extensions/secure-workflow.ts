@@ -85,6 +85,13 @@ function sanitizeState(state: any) {
           findingSeverities: Array.isArray(review.findings) ? review.findings.map((finding: any) => finding.severity) : [],
         })) : [],
       })) : [],
+      councils: Array.isArray(evidence.councils) ? evidence.councils.map((council: any) => ({
+        purpose: council.purpose,
+        iteration: council.iteration,
+        complete: council.complete === true,
+        members: Array.isArray(council.members) ? council.members.map((member: any) => ({ role: member.role, model: member.model, runId: member.runId, nodeId: member.nodeId, ownerRunId: member.ownerRunId, confidence: member.confidence })) : [],
+        judge: council.judge ? { confidence: council.judge.confidence, agreementCount: Array.isArray(council.judge.agreements) ? council.judge.agreements.length : 0, disagreementCount: Array.isArray(council.judge.disagreements) ? council.judge.disagreements.length : 0, requiredActionCount: Array.isArray(council.judge.requiredActions) ? council.judge.requiredActions.length : 0 } : undefined,
+      })) : [],
     },
   };
 }
@@ -285,6 +292,7 @@ export default function (pi: ExtensionAPI) {
           receiptSequence = priorRoleReceipts.length === 0 ? 0 : Math.max(...priorRoleReceipts.map((entry: any) => entry.receipt.sequence)) + 1;
           latestState = journal.workflow_state;
           if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
+          activeModelPolicy = validateResolvedModelPolicy(availableModels, latestState.modelPolicy);
           sequence = Math.max(0, ...((latestState.evidence?.roles ?? []).map((entry: any) => Number.parseInt(String(entry.nodeId ?? "0").split("-")[0] ?? "0", 10)).filter(Number.isFinite)));
           if (fs.existsSync(evidenceRun.executionFile)) {
             const loaded = readEvidenceExecution(evidenceRun, digest);

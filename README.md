@@ -7,7 +7,7 @@ A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux
 - Default interactive model: `openai-codex/gpt-5.6-terra`, medium thinking.
 - Role routing: Luna for reconnaissance/testing, Terra for implementation, Sol for planning/review, Astra only for the hardest advisory pass.
 - Native compaction remains enabled. A session notebook stores only durable task state; `/handoff <next phase>` distills a clean-session prompt at 85% context.
-- Eight agents run with fresh context and enforced tool allowlists. `secure_coding_workflow` owns the isolated worktree and enforces Scout → Planner → Worker → Tester → verification → three reviewers → bounded correction. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Version-4 workflow journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
+- Twelve role profiles run with fresh context and enforced tool allowlists: the original eight workflow roles plus three independent council members and a judge. `secure_coding_workflow` owns the isolated worktree and enforces Scout → Planner → Worker → Tester → verification → three reviewers → bounded correction. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Version-4 workflow journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
 - Successful oversized shell output is compacted deterministically; failures remain intact.
 - Tool-call guardrails block secret reads, symlink/hard-link escapes, protected writes, all free-form shell, and caller overrides of isolation limits. Autonomous commands use an argument-vector allowlist inside Bubblewrap.
 - Traces contain only timestamps, model/tool names, input key names, durations, statuses, and context counts—never prompts, argument values, outputs, URLs, or credentials.
@@ -45,7 +45,7 @@ See [workflow.md](docs/workflow.md), [model-routing.md](docs/model-routing.md), 
 
 ## Component inventory
 
-The eight agents are `scout`, `planner`, `oracle`, `worker`, `tester`, `correctness-reviewer`, `security-reviewer`, and `simplicity-reviewer`. The 15 progressively disclosed skills cover Python, C++, TypeScript/JavaScript, frontend UI, Electron, Linux, debugging, performance, security, database migrations, tests, code review, research, dependency upgrades, and Git/release work.
+The core agents are `scout`, `planner`, `oracle`, `worker`, `tester`, `correctness-reviewer`, `security-reviewer`, and `simplicity-reviewer`; difficult/high-risk escalation adds `council-1`, `council-2`, `council-3`, and `council-judge`. The 15 progressively disclosed skills cover Python, C++, TypeScript/JavaScript, frontend UI, Electron, Linux, debugging, performance, security, database migrations, tests, code review, research, dependency upgrades, and Git/release work.
 
 Prompt commands are `/bug`, `/feature`, `/refactor`, `/review`, `/security`, `/perf`, `/research`, `/migrate`, `/release`, `/docs`, `/doc-garden`, and `/code-gc`. The last two are read-only maintenance reports; nothing is scheduled in the background.
 
@@ -69,6 +69,7 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/models` | List real available models and credential-free provider status |
 | `/model-routing` | Show the active role map and policy receipt |
 | `/model-role` / `/model-preset` | Persist a role override or select/reset a preset |
+| `/council-status` | Show council routes, escalation policy, independence, and hard limits |
 | `/subagents-models` | Confirm live role-to-model routing |
 | `/obs` | Open the observability dashboard |
 | `/web-tools` | Opt into a web-search provider; keys are not preconfigured |

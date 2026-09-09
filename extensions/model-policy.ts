@@ -17,6 +17,18 @@ function renderRouting(resolved: any): string {
   ].join("\n");
 }
 
+function renderCouncilStatus(resolved: any): string {
+  const councilRoles = ["council-1", "council-2", "council-3", "council-judge"];
+  return [
+    `Preset: ${resolved.preset}`,
+    ...councilRoles.map((role) => `${role}: ${resolved.roles[role].model}:${resolved.roles[role].thinking}`),
+    "Escalation: explicit /council; high-risk workflow (includeOracle); material reviewer disagreement; second correction after repeated failure",
+    "Independence: three fresh read-only contexts, synchronized fanout, Judge only after all three structured results",
+    "Hard limits: concurrency=3, depth=1, correction rounds=2, nested council=disabled",
+    `Provider diversity currently resolved: ${resolved.diversity.providers}; model identities: ${new Set(councilRoles.map((role) => resolved.roles[role].model)).size}`,
+  ].join("\n");
+}
+
 function publicInventory(ctx: ExtensionContext): object {
   const available = ctx.modelRegistry.getAvailable();
   const availableByProvider = new Map<string, number>();
@@ -58,6 +70,13 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
     description: "Show the effective persistent role routing and policy receipt",
     handler: async (_args, ctx) => {
       try { ctx.ui.notify(renderRouting(resolveModelPolicy(ctx.modelRegistry.getAvailable(), readModelPolicy())), "info"); }
+      catch (error) { notifyError(ctx, error); }
+    },
+  });
+  pi.registerCommand("council-status", {
+    description: "Show council routes, escalation policy, independence, and hard limits",
+    handler: async (_args, ctx) => {
+      try { ctx.ui.notify(renderCouncilStatus(resolveModelPolicy(ctx.modelRegistry.getAvailable(), readModelPolicy())), "info"); }
       catch (error) { notifyError(ctx, error); }
     },
   });
