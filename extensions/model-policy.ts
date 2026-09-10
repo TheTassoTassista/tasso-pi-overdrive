@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MODEL_PRESETS, MODEL_ROLES, modelPolicyPath, parseModelSelection, policyWithPreset, policyWithRole, publicModelCatalog, readModelPolicy, resolveModelPolicy, settingsAgentOverrides, writeModelPolicy, writePrivateJsonAtomic } from "../lib/model-policy.mjs";
+import { calculateRequiredSpawnBudget, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -20,12 +21,15 @@ function renderRouting(resolved: any): string {
 
 function renderCouncilStatus(resolved: any): string {
   const councilRoles = ["council-1", "council-2", "council-3", "council-judge"];
+  const spawnBudget = calculateRequiredSpawnBudget();
+  const configuredSpawnLimit = readConfiguredSpawnLimit();
   return [
     `Preset: ${resolved.preset}`,
     ...councilRoles.map((role) => `${role}: ${resolved.roles[role].model}:${resolved.roles[role].thinking}`),
     "Escalation: explicit /council; high-risk workflow (includeOracle); material reviewer disagreement; second correction after repeated failure",
     "Independence: three fresh read-only contexts, synchronized fanout, Judge only after all three structured results",
     "Hard limits: concurrency=3, depth=1, correction rounds=2, nested council=disabled",
+    `Spawn budget: base=${spawnBudget.requiredBaseSpawns}, retry reserve=${spawnBudget.retryReserve}, required total=${spawnBudget.requiredTotalSpawns}, configured=${configuredSpawnLimit}`,
     `Provider diversity currently resolved: ${resolved.diversity.providers}; model identities: ${new Set(councilRoles.map((role) => resolved.roles[role].model)).size}`,
   ].join("\n");
 }

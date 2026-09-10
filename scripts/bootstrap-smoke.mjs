@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MODEL_PRESETS, MODEL_ROLES, policyWithPreset, policyWithRole, readModelPolicy, resolveModelPolicy, writeModelPolicy } from "../lib/model-policy.mjs";
+import { calculateRequiredSpawnBudget } from "../lib/workflow-spawn-budget.mjs";
 import { webCredentialStatus } from "../lib/web-routing.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +46,14 @@ try {
   const attachmentMarker = [".codex", "attachments"].join("/");
   check("bootstrap-no-dated-codex-reference", !serialized.includes(legacyTaskMarker) && !serialized.includes(attachmentMarker), packages);
   check("bootstrap-does-not-create-auth", !fs.existsSync(path.join(agentDir, "auth.json")), "authentication is external and untouched");
+  const installedSubagentConfigFile = path.join(agentDir, "extensions", "subagent", "config.json");
+  const installedSubagentConfig = fs.existsSync(installedSubagentConfigFile) ? JSON.parse(fs.readFileSync(installedSubagentConfigFile, "utf8")) : {};
+  const requiredSpawnBudget = calculateRequiredSpawnBudget();
+  check(
+    "bootstrap-installs-derived-spawn-budget",
+    installedSubagentConfig.maxSubagentSpawnsPerSession === requiredSpawnBudget.requiredTotalSpawns,
+    { configured: installedSubagentConfig.maxSubagentSpawnsPerSession ?? null, required: requiredSpawnBudget.requiredTotalSpawns },
+  );
   const webConfigFile = path.join(configDir, "rpiv-web-tools", "config.json");
   const webConfig = fs.existsSync(webConfigFile) ? JSON.parse(fs.readFileSync(webConfigFile, "utf8")) : {};
   check("bootstrap-installs-secret-free-web-routing", webConfig.provider === "brave" && webConfig.overdriveRouting?.secondaryProvider === "perplexity" && !Object.hasOwn(webConfig, "apiKeys"), webConfig);

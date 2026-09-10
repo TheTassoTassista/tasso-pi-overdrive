@@ -20,13 +20,30 @@ Only then does `council-judge` receive the three reports in its own fresh read-o
 
 Council uses the same compile-time limits as the workflow: concurrency three, subagent depth one, and two correction rounds. These fields are absent from its caller-facing path; recursive model/tool attempts to set model, provider, thinking, workflow scripts, nesting, or larger fan-out are blocked before pi-subagents executes them. Council profiles do not contain the `subagent` tool, so a nested council is impossible through their runtime surface.
 
+## Spawn budget
+
+`lib/workflow-spawn-budget.mjs` is the single source of truth for the delegation budget. Under the current 3/1/2 workflow policy, the worst valid no-retry path is 39 spawns:
+
+- core Scout + Planner + initial Worker: `3`
+- optional high-risk Oracle + Council members + Judge: `5`
+- three Tester/reviewer rounds: `3 × (1 + 3) = 12`
+- two correction Workers: `2`
+- worst-case reviewer-disagreement Council + Judge in all three rounds: `3 × 4 = 12`
+- second-correction repeated-failure Oracle + Council + Judge: `5`
+
+The supported transient retry policy is one retry per delegation, bounded globally to three retries per workflow. Its separate reserve is therefore `min(39 × 1, 3) = 3`; required total is `39 + 3 = 42`. The static pi-subagents session limit is 42. Package validation and clean-HOME bootstrap both fail if the configured limit drops below the derived total or a future policy change outgrows it.
+
+`secure_coding_workflow` reads the active regular, non-symlinked subagent config and performs this preflight before runtime allocation, Scout, or any model call. Insufficient configuration fails with `INSUFFICIENT_SUBAGENT_SPAWN_BUDGET` and non-sensitive configured/required/policy metadata, consuming zero delegations and zero model calls. Council member-plus-Judge blocks and reviewer fanouts reserve their remaining base slots atomically; a block that cannot fit is rejected before its first child. Retry claims cannot consume an active atomic reservation. Durable resume restores both used-spawn and retry counters and rejects missing or inconsistent pre-fix accounting.
+
+The controller's guard accounts for the current enforced workflow. Pi-subagents owns the authoritative session-wide counter. Its installed API does not expose that live counter to another extension, so unrelated manual subagent calls already made in the same Pi session cannot be subtracted during the initial controller preflight; the upstream limit still rejects such a collision before provider launch, and the corrected diagnostic remains `RESOURCE_LIMIT` / `SUBAGENT_SPAWN_BUDGET_EXHAUSTED` with `modelCalls=0`. Start a fresh Pi session before a maximum-path autonomous run if the same session has already used manual subagents.
+
 The current catalog has one authenticated provider (`openai-codex`) and four runtime-callable council identities under the efficient preset: Sol, 5.5, Luna, and Astra as judge. The rejected `gpt-5.4` route is skipped before fan-out with an explicit reason. This is model-identity diversity, not cross-provider diversity.
 
 The controller is workflow version 4. Before the first role starts it writes an owner-only, atomically replaced journal under `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/<run-id>/state.json`. Every phase boundary is fsynced. The journal records the task/repository identity, a per-workflow protocol nonce, a controller-owned monotonic checkpoint sequence, process boot identity, current phase and round, completed roles, review and verification outcomes, blocker counts, correction status, cleanup/evidence state, and timestamps. Role prose retained for resumption is secret-redacted; terminal journals retain bounded metadata.
 
 Every terminal role attempt first writes an owner-only immutable receipt under the run's `role-receipts/` directory. A receipt binds a UUID execution ID and deterministic sequence number to exactly one run, task, nonce, role, round, iteration, attempt, node, owner, terminal status, exit code, provider/model, thinking level, and result/error digest. Creation uses a private temporary file, file sync, atomic no-replace publication, and parent-directory sync; identical duplicate bytes are idempotent and conflicts fail closed. The controller reopens and validates that durable receipt, including the active policy's model and thinking route, before admitting the role transition. Missing, malformed, truncated, stale, cross-run, cross-task, wrong-role/round/model/thinking, duplicate-conflicting, or out-of-order receipts cannot advance the state machine.
 
-Delegation failures are classified as `TRANSIENT`, `DETERMINISTIC`, `POLICY`, `AUTH`, `UNSUPPORTED_MODEL`, or `STRUCTURED_OUTPUT` in audit evidence. Only plausibly transient transport/timeout/rate-limit failures may use the single bounded retry; all other categories terminate that role immediately.
+Delegation failures are classified as `TRANSIENT`, `DETERMINISTIC`, `POLICY`, `RESOURCE_LIMIT`, `AUTH`, `UNSUPPORTED_MODEL`, or `STRUCTURED_OUTPUT` in audit evidence. Only plausibly transient transport/timeout/rate-limit failures may use the single per-delegation retry, and the workflow-wide reserve permits at most three such retry spawns. All other categories terminate that role immediately. Route attestation runs only when a child/provider execution exists; a pre-launch spawn rejection preserves its original redacted error, records provider/model/thinking/launch digest as absent, and cannot be misreported as a route mismatch.
 
 On every invocation the controller scans for stale `RUNNING` journals. A dead process, changed Linux boot ID, or reused PID changes the state to `INTERRUPTED`; it is never inferred to be successful. A call with the same canonical repository and task digest resumes the earliest safe structured checkpoint. An explicit prior run ID may also be supplied. Missing, truncated, malformed, stale-task, wrong-run, or digest-mismatched evidence fails closed. A crash after the immutable execution snapshot or cleanup can be finalized without rerunning completed work, but only after independently revalidating the snapshot, resource absence, receipt digest, and final journal.
 

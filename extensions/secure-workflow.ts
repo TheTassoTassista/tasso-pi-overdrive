@@ -10,13 +10,15 @@ import { localReviewPolicy } from "../lib/review-policy.mjs";
 import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, initialWorkflowJournal, openEvidenceRun, readEvidenceExecution, readWorkflowJournal, recoverInterruptedWorkflowRuns, snapshotWorktree, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
-import { AGENT_TO_ROLE, canonicalExecutedRoute, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
+import { AGENT_TO_ROLE, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
 import { classifyDelegationFailure, retryableDelegationFailure } from "../lib/delegation-failure.mjs";
+import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
+import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, MAX_TRANSIENT_RETRIES_PER_DELEGATION, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
 const CANCEL_EVENT = "prompt-template:subagent:cancel";
-const MAX_DELEGATION_ATTEMPTS = 2;
+const MAX_DELEGATION_ATTEMPTS = MAX_TRANSIENT_RETRIES_PER_DELEGATION + 1;
 const verifyScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
 
 const Params = Type.Object({
@@ -63,6 +65,7 @@ function sanitizeState(state: any) {
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
     hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
+    spawnBudget: state?.spawnBudget,
     allocation: state?.allocation,
     evidence: {
       roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, thinking: item.thinking, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
@@ -157,6 +160,17 @@ export default function (pi: ExtensionAPI) {
     executionMode: "sequential",
     async execute(toolCallId, params, signal, _update, ctx) {
       if (running) throw new WorkflowFailure("Another secure workflow is already active.");
+      const spawnBudgetPlan = workflowSpawnBudgetForRequest({ includeOracle: params.includeOracle ?? false, includeSecurity: params.includeSecurity ?? true });
+      const configuredSpawnLimit = readConfiguredSpawnLimit();
+      assertConfiguredSpawnBudget(configuredSpawnLimit, spawnBudgetPlan, {
+        workflowVersion: WORKFLOW_VERSION,
+        maxCorrections: spawnBudgetPlan.workflowPolicy.maxCorrectionRounds,
+        retryPolicy: {
+          maxPerDelegation: spawnBudgetPlan.workflowPolicy.maxTransientRetriesPerDelegation,
+          maxPerWorkflow: spawnBudgetPlan.workflowPolicy.maxTransientRetriesPerWorkflow,
+        },
+      });
+      let spawnBudgetGuard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit, plan: spawnBudgetPlan });
       running = true;
       let allocation: Record<string, any> | undefined;
       let ownerRunId = `secure-${toolCallId}-${randomUUID()}`.slice(0, 240);
@@ -184,6 +198,7 @@ export default function (pi: ExtensionAPI) {
         const policyRole = AGENT_TO_ROLE[agent as keyof typeof AGENT_TO_ROLE];
         const route = policyRole ? activeModelPolicy.roles[policyRole] : undefined;
         if (!route) { reject(new Error(`No model route is configured for ${agent}.`)); return; }
+        spawnBudgetGuard.claimSpawn(agent, { retry: attempt > 1 });
         const requestId = randomUUID();
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
@@ -202,21 +217,11 @@ export default function (pi: ExtensionAPI) {
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
             try {
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
-              let canonicalResponse: Record<string, unknown>;
-              try {
-                canonicalResponse = canonicalExecutedRoute(route, response);
-              } catch (error) {
-                canonicalResponse = {
-                  ...response,
-                  status: "protocol_rejected",
-                  error: `model route attestation rejected: ${error instanceof Error ? error.message : "unknown error"}`,
-                };
-              }
-              if (canonicalResponse.status !== "completed") canonicalResponse.failureCategory = classifyDelegationFailure(canonicalResponse);
+              const canonicalResponse = canonicalizeDelegationResponse(route, response);
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
               const normalized = { ...canonicalResponse, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
                 finish(resolve, normalized);
               } else {
@@ -285,7 +290,14 @@ export default function (pi: ExtensionAPI) {
             lastError = error;
             const failureCategory = (error as any)?.failureCategory ?? classifyDelegationFailure(error);
             if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
-              delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed", failureCategory });
+              const prelaunchResourceLimit = failureCategory === "RESOURCE_LIMIT";
+              delegationAudit.push({
+                agent: input.agent,
+                attempt,
+                status: prelaunchResourceLimit ? "prelaunch-rejected" : "transport-failed",
+                failureCategory,
+                ...(prelaunchResourceLimit ? { failureReason: "SUBAGENT_SPAWN_BUDGET_EXHAUSTED", launchStatus: "not_launched", modelCalls: 0 } : {}),
+              });
             }
             if (!retryableDelegationFailure({ status: (error as any)?.delegationStatus, error: error instanceof Error ? error.message : String(error) })) throw error;
           }
@@ -343,6 +355,11 @@ export default function (pi: ExtensionAPI) {
           allocation = await createRuntimeWorktree(ctx.cwd, { evidenceRunId: evidenceRun.runId, ownerRunId });
           journal = checkpointWorkflowJournal(evidenceRun, journal, { allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
         }
+        if (resumable) {
+          const priorBudget = latestState?.spawnBudget;
+          if (!Number.isSafeInteger(priorBudget?.used) || !Number.isSafeInteger(priorBudget?.retriesUsed)) throw new Error("interrupted workflow has no valid spawn budget state");
+          spawnBudgetGuard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit, plan: spawnBudgetPlan, initialUsed: priorBudget.used, initialRetriesUsed: priorBudget.retriesUsed });
+        }
         const verify = async ({ cwd }: { cwd: string }) => {
           const result = await pi.exec(process.execPath, [verifyScript, "--json", "--full", "--cwd", cwd], { cwd, ...(signal ? { signal } : {}), timeout: 16 * 60 * 1000 });
           let parsed;
@@ -363,6 +380,7 @@ export default function (pi: ExtensionAPI) {
               runId: evidenceRun.runId,
               taskId: digest,
               modelPolicy: activeModelPolicy,
+              spawnBudgetGuard,
               receiptVerifier: (response: any, expected: any) => {
                 if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);
                 const policyRole = AGENT_TO_ROLE[expected.agent as keyof typeof AGENT_TO_ROLE];

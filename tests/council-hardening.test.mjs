@@ -49,6 +49,7 @@ test("only transient delegation failures are retryable", () => {
     [{ status: "failed", error: "unsupported model" }, "UNSUPPORTED_MODEL", false],
     [{ status: "failed", error: "401 unauthorized" }, "AUTH", false],
     [{ status: "protocol_rejected", error: "role mismatch" }, "POLICY", false],
+    [{ status: "failed", error: "Subagent spawn limit reached for this session (24/24 used, 1 requested)." }, "RESOURCE_LIMIT", false],
     [{ status: "structured_output_failed", error: "missing structured output" }, "STRUCTURED_OUTPUT", false],
     [{ status: "failed", error: "deterministic test failure" }, "DETERMINISTIC", false],
   ];

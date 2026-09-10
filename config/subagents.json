@@ -14,7 +14,7 @@
   "timeoutMs": 3600000,
   "toolTimeoutMs": 600000,
   "globalConcurrencyLimit": 3,
-  "maxSubagentSpawnsPerSession": 24,
+  "maxSubagentSpawnsPerSession": 42,
   "maxSubagentSpawnsPerRun": 8,
   "maxActiveAsyncRunsPerSession": 3,
   "parallel": {

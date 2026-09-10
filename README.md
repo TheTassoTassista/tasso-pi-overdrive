@@ -113,11 +113,12 @@ The audit, accepted/rejected package rationale, and residual limitations are in 
 2. Use `/feature <goal>` or `/bug <symptom>` for disciplined work.
 3. Use `secure_coding_workflow` for substantial autonomous changes; it launches the appropriate roles itself.
 4. Ask `scout` or `planner` directly only for read-only exploratory work.
-5. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` only for a manual isolated experiment.
-6. Use `task_notebook` after a durable decision or verified discovery.
-7. Run `verification_gate` before any completion claim.
-8. Run `/context-health`; at 85% use `/handoff <next goal>`.
-9. Use `/obs`, `/output-stats`, and `/trace-path` for cost/latency/tool evidence.
-10. Run `scripts/status.sh` after upgrades; follow [operations.md](docs/operations.md) rather than updating pins blindly.
+5. Before any delegated model call, the enforced workflow verifies the derived spawn budget (39 base + 3 bounded retry reserve = configured limit 42); `/council-status` displays all three values.
+6. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` only for a manual isolated experiment.
+7. Use `task_notebook` after a durable decision or verified discovery.
+8. Run `verification_gate` before any completion claim.
+9. Run `/context-health`; at 85% use `/handoff <next goal>`.
+10. Use `/obs`, `/output-stats`, and `/trace-path` for cost/latency/tool evidence.
+11. Run `scripts/status.sh` after upgrades; follow [operations.md](docs/operations.md) rather than updating pins blindly.
 
 For problems, see [troubleshooting.md](docs/troubleshooting.md). Test and benchmark evidence is in [benchmark-results.md](docs/benchmark-results.md).

@@ -1,6 +1,6 @@
 # Final adversarial audit
 
-Audit date: 2026-09-10. Earlier completion reports were treated as untrusted. PASS requires current filesystem implementation plus repeatable static/runtime proof. The last authenticated run remains FAIL and is not credited as a pass.
+Audit date: 2026-09-11. Earlier completion reports were treated as untrusted. PASS requires current filesystem implementation plus repeatable static/runtime proof. The latest authenticated run remains FAIL and is not credited as an end-to-end pass; the spawn-budget repair has only zero-paid local proof.
 
 ## Original phases
 
@@ -28,7 +28,7 @@ Audit date: 2026-09-10. Earlier completion reports were treated as untrusted. PA
 | 19 — Adversarial review | PASS | correctness/security/simplicity required; blocking review forces Worker correction and re-review; prior full v4 E2E corroborates controller tests |
 | 20 — Application observability | PASS | collector returns actual sources/counts/bytes and legitimate zeros, never constants |
 | 21 — Agent observability | PASS | `pi-observability@1.3.2`; `/obs` registered and available runtime metadata collected |
-| 22 — Tracing | PASS | 254 files / 1,289 rows: owner-only, zero malformed/forbidden/secret-like content |
+| 22 — Tracing | PASS | current `npm run smoke:trace`: owner-only metadata corpus, zero malformed/truncated/insecure/forbidden/secret-like records |
 | 23 — Memory | PASS | docs/skills/notebook/session/handoff hierarchy; no ambient automatic-recall plugin |
 | 24 — Skills | PASS | all 15 package skills dynamically discovered and validated |
 | 25 — Prompt templates | PASS | all 12 package prompts dynamically registered |
@@ -37,9 +37,9 @@ Audit date: 2026-09-10. Earlier completion reports were treated as untrusted. PA
 | 28 — Self-improvement | PASS | bounded/redacted findings store; no automatic config rewriting |
 | 29 — Gardener/GC | PASS | optional read-only, unscheduled prompt commands are registered |
 | 30 — Personal package | PASS | permanent Git package `/home/tasso/Documents/Codex/tasso-pi-overdrive`; active Pi source points only there |
-| 31 — Default workflow | PARTIAL | the deterministic zero-paid full workflow including Council, Judge, planted reviewer correction and final verification passes, but the repaired integrated path has not yet had a newly authorized authenticated E2E |
+| 31 — Default workflow | PARTIAL | the installed pi-subagents bridge/accounting reaches the 31-delegation, two-correction path and final PASS with a local provider, but the spawn-budget repair has not had an authorized authenticated E2E |
 | 32 — Cost/time optimization | PASS | default core set unchanged by model/council; lazy MCP/LSP; deterministic context estimator makes routine measurement cost zero |
-| 33 — Complete-system test | FAIL | authorized post-fix run `179bb6f7-414c-4529-baa2-709630b9bac9` failed before Worker after all three council members failed; final verification was NOT_RUN. Cleanup and fail-closed evidence publication passed |
+| 33 — Complete-system test | FAIL | latest authorized run `957f5169-5dc6-45f4-a19e-0b15ad77e6f5` completed two Councils, two Workers, two Testers, two verification PASS and two reviews, then failed when the static session cap 24 rejected third-Council member 3 at slot 25. Cleanup/evidence remained fail-closed; post-budget-fix authenticated E2E is NOT RUN |
 | 34 — Documentation | PASS | README and docs now describe current MCP/LSP/model/council/benchmark/E2E truth without stale pass claims |
 | 35 — Reproducibility | PASS | clean-HOME bootstrap installs exact packages/runtimes, policy, presets, council and secret-free web slots; no auth is created |
 
@@ -56,9 +56,9 @@ Original-phase totals: **31 PASS, 4 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. 
 | 5 | PASS | `npm run smoke:runtime`; `@juvio15/pi-ast-grep@0.4.2` |
 | 6 | PASS | `npm run smoke:catalog`: all 15 skills loaded from repository paths |
 | 7 | PASS | `npm run smoke:catalog`: 12 prompts and 14 local extension commands registered; total Pi catalog 83 |
-| 8 | PARTIAL | `npm run smoke:agents` discovers all twelve profiles and local contract tests prove Council advisory completion; a post-repair authenticated call of every Council role was intentionally not run |
+| 8 | PASS | `npm run smoke:agents` discovers all twelve profiles; authenticated run `957f…` completed two full Council/Judge sets plus Worker/Tester roles before the later session-budget failure |
 | 9 | PASS | `npm run smoke:agents`, `npm run smoke:guardrails`: Tester/council mutation absent; Worker shell absent; runtime denials exercised |
-| 10 | PASS | `tests/workflow-state.test.mjs`, `tests/tool-surface.test.mjs`: concurrency 3/depth 1 constants and recursive override rejection |
+| 10 | PASS | workflow/tool-surface tests enforce concurrency 3/depth 1; the derived budget test fixes corrections at 2 and configures 39 base + 3 retry reserve = 42 without caller override fields |
 | 11 | PASS | routes require cached runtime-callable evidence; `gpt-5.4` is rejected before fan-out, efficient Council uses Sol/5.5/Luna plus Astra Judge, and canonical model/thinking plus forged-receipt controls pass |
 | 12 | PASS | `npm run smoke:handoff`: clean session message count 0 |
 | 13 | PASS | same smoke: notebook marker survived the handoff workflow |
@@ -77,17 +77,17 @@ Original-phase totals: **31 PASS, 4 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. 
 | 26 | PASS | `npm run smoke:web` and runtime smoke fetch Example Domain through real Pi |
 | 27 | PARTIAL | search status accurately reports missing Brave/Perplexity keys and fails clearly; search itself is unavailable |
 | 28 | PASS | `npm run smoke:restore`: byte-exact pre-Overdrive settings hash |
-| 29 | PASS | `npm run smoke:bootstrap`: full clean-HOME reproduction without secrets/auth |
+| 29 | PASS | `npm run smoke:bootstrap`: full clean-HOME reproduction without secrets/auth, including installed derived spawn limit 42 |
 | 30 | PASS | `node scripts/validate-package.mjs`: no dated temporary Codex source path |
 | 31 | PASS | `find -L . -type l` returns none; package validator rejects unsafe links |
 | 32 | PASS | active Pi catalog source is the stable repository; no package source points to a disposable workspace |
 | 33 | PASS | exact versions in `config/packages.json`, MCP/LSP lockfiles, validator, and npm audits |
 | 34 | PASS | one controller/optimizer/trace/safety hook; protected `/council` deterministically shadows, rather than competes with, the upstream prompt |
 | 35 | PASS | package validator, trace/mission audits and Git inspection find no secret values |
-| 36 | PASS | final `npm run check`: 85/85 plus syntax/types/package validation |
-| 37 | FAIL | the one authorized post-fix fresh-repository run failed before Worker; no code change, verification, reviewers, correction, or final validator PASS occurred. Cleanup did pass |
+| 36 | PASS | final `npm run check`: 93/93 plus syntax/types/package validation |
+| 37 | FAIL | latest authorized fresh-repository run reached slot 24 after two Worker/Tester/verification/review rounds, then genuinely failed before launching third-Council member 3 at slot 25. The spawn-budget fix has a 31-slot real-bridge local regression but no authorized authenticated rerun |
 
-Requested-check totals: **33 PASS, 3 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **89.2% (33/37)**.
+Requested-check totals: **34 PASS, 2 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **91.9% (34/37)**.
 
 ## Model/council expansion audit
 
@@ -99,22 +99,22 @@ Requested-check totals: **33 PASS, 3 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**.
 | User-owned immutable policy boundary | PASS | mode 0600 atomic file; no model tool mutates it; nested route override rejected |
 | Model/thinking receipt binding | PASS | exact/suffixed route tests, resume tamper tests, launch-contract digest, durable protocol rejection |
 | Protected explicit council command | PASS | `/council` extension precedence and `/council-status` runtime proof |
-| Independent member contexts | PARTIAL | profiles are runtime-discovered as fresh/read-only/non-delegating with `completionGuard: false`; local zero-edit Council passes, but authenticated post-repair completion was not rerun |
+| Independent member contexts | PASS | profiles are runtime-discovered as fresh/read-only/non-delegating with `completionGuard: false`; local zero-edit Council passes and run `957f…` completed two authenticated three-member Council/Judge executions |
 | Judge sequencing and disagreement | PASS | all three structured results required before Judge; missing/malformed/early cases fail; disagreement retained |
 | Escalation policy | PASS | explicit, high-risk, reviewer disagreement and repeated-failure paths tested |
-| Hard limits/no nesting | PASS | constants 3/1/2 and recursive input attacks tested |
+| Hard limits/no nesting | PASS | constants 3/1/2 and recursive input attacks tested; derived 39+3 budget and static 42 cap validated at package/bootstrap time |
 | Bootstrap/reproducibility | PASS | clean HOME includes presets, policy and council routes without auth |
 | Context overhead | PASS | real Pi metadata estimate, zero paid calls; no model/council default tool added |
 | Real cross-provider execution | PARTIAL | only `openai-codex` authenticated; model-identity diversity exists, provider-family diversity does not |
-| Post-fix authenticated integrated E2E | FAIL | authorized run failed at council fanout; Worker and later phases were NOT_RUN; no rerun was made |
+| Post-fix authenticated integrated E2E | FAIL | latest authorized run `957f…` failed at the third Council because the then-static cap 24 rejected slot 25; the 42-slot remediation has not been authenticated |
 | Heterogeneous quality benchmark | INTENTIONALLY OMITTED | precondition—two authenticated provider families—was absent; fabricating it would be invalid |
 | Four-preset live review benchmark | INTENTIONALLY OMITTED | four extra paid calls were not authorized after the first E2E attempt |
 
-Expansion totals: **11 PASS, 2 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
+Expansion totals: **12 PASS, 1 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
 
 ## Critical gaps
 
-- The last authenticated model-routed Council → Worker → Tester → verification → reviewer/correction run is still FAIL. All exposed deterministic causes are repaired locally, but autonomous reliance still requires a newly authorized authenticated E2E.
+- The latest authenticated model-routed Council → Worker → Tester → verification → reviewer/correction run is still FAIL. The slot-25 resource-limit and false route-mismatch diagnosis are repaired locally, but autonomous reliance still requires a newly authorized authenticated E2E.
 - Rust and Go semantic navigation are unavailable until reviewed, pinned servers are installed. This is critical only for autonomous work in those languages.
 
 ## Non-critical gaps
@@ -136,10 +136,11 @@ Expansion totals: **11 PASS, 2 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
 - Database/schema values are isolated identifiers only; the harness does not provision a database.
 - A reboot cannot reconstruct a source repository that lived only under `/tmp`; real work must start in a durable Git checkout.
 - Manual `subagent` use is not the guaranteed workflow. Only `secure_coding_workflow` or protected `/council TASK` guarantees receipts, review, correction, verification and cleanup policy.
+- The controller can verify the configured session limit and its own durable workflow usage, but pi-subagents exposes no public live counter to sibling extensions. Prior unrelated manual subagent use in the same Pi session can reduce actual remaining capacity; upstream still rejects before provider launch with the corrected resource-limit diagnostic. Use a fresh session for a maximum-path run.
 - Mission artifacts retain bounded redacted summaries for resume; ordinary non-secret paths/code prose may remain until terminal compaction/retention.
 
 ## Before autonomous reliance
 
-All four deterministic blockers are repaired and the local corrected Council passed 100/100; the complete zero-paid workflow with a planted correction reached final PASS. Before autonomous reliance, obtain explicit authorization for exactly one authenticated E2E and require it to pass without weakening policy. Continue to use durable clean Git repositories; invoke only the enforced workflow entry points; inspect retained worktree diffs before merge; keep deploy/publish/account mutations human-approved; use a VM/container for hostile code; add Rust/Go servers only when needed; configure web-search credentials only if live discovery matters.
+All currently identified deterministic blockers are repaired locally. The corrected Council passed 100/100, and the installed real pi-subagents bridge/accounting path crossed slot 25 and reached final PASS at 31 delegations with zero paid calls. Before autonomous reliance, obtain explicit authorization for exactly one authenticated E2E and require it to pass without weakening policy. Continue to use durable clean Git repositories; invoke only the enforced workflow entry points; start maximum-path runs in a fresh Pi session; inspect retained worktree diffs before merge; keep deploy/publish/account mutations human-approved; use a VM/container for hostile code; add Rust/Go servers only when needed; configure web-search credentials only if live discovery matters.
 
 Do not replace the official Pi installation/auth, loosen route/receipt/verification limits, enable network in autonomous command sandboxes, stack another controller/optimizer/trace hook, or add automatic ambient memory. FFF, AST, TS/Python/C++ LSP, notebook/handoff, metadata trace, observability, browser profile isolation, safe fetch, native worktrees, verification exit propagation, package pins, bootstrap and backup/restore are working well.

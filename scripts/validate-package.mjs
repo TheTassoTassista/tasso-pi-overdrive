@@ -2,6 +2,7 @@
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
@@ -60,8 +61,10 @@ if (webConfig.provider !== 'brave' || webConfig.overdriveRouting?.primaryProvide
 if (Object.hasOwn(webConfig, 'apiKeys') || Object.hasOwn(webConfig, 'apiKey')) failures.push('tracked web policy must never contain credential slots or values');
 
 const subagents = JSON.parse(await readFile(path.join(root, 'config/subagents.json'), 'utf8'));
+const spawnBudget = calculateRequiredSpawnBudget();
 if (subagents.globalConcurrencyLimit !== 3 || subagents.parallel?.concurrency !== 3 || subagents.parallel?.maxTasks !== 3) failures.push('subagent concurrency is not hard-configured to 3');
 if (subagents.maxSubagentDepth !== 1) failures.push('subagent depth is not configured to 1');
+if (!Number.isSafeInteger(subagents.maxSubagentSpawnsPerSession) || subagents.maxSubagentSpawnsPerSession < spawnBudget.requiredTotalSpawns) failures.push(`subagent session spawn limit must cover derived workflow budget ${spawnBudget.requiredBaseSpawns}+${spawnBudget.retryReserve}=${spawnBudget.requiredTotalSpawns}`);
 if (subagents.worktree !== false) failures.push('pi-subagents global worktree must stay false because secure_coding_workflow supplies one shared enforced worktree');
 if (subagents.scheduledRuns?.enabled !== false) failures.push('scheduled runs must remain disabled');
 if (subagents.missions?.enabled !== false || subagents.missions?.globalIndex !== false) failures.push('automatic/global mission persistence must remain disabled');
