@@ -51,6 +51,9 @@ try {
   const modelPolicyFile = path.join(configDir, "pi-overdrive", "model-policy.json");
   const modelPolicy = fs.existsSync(modelPolicyFile) ? JSON.parse(fs.readFileSync(modelPolicyFile, "utf8")) : {};
   check("bootstrap-installs-private-user-owned-model-policy", modelPolicy.preset === "efficient" && modelPolicy.version === 1 && (fs.statSync(modelPolicyFile).mode & 0o077) === 0, { preset: modelPolicy.preset, mode: fs.existsSync(modelPolicyFile) ? fs.statSync(modelPolicyFile).mode & 0o777 : null });
+  const callabilityFile = path.join(configDir, "pi-overdrive", "model-callability.json");
+  const callability = fs.existsSync(callabilityFile) ? JSON.parse(fs.readFileSync(callabilityFile, "utf8")) : {};
+  check("bootstrap-installs-secret-free-callability-cache", callability.version === 1 && callability.entries?.["openai-codex/gpt-5.4"]?.runtimeStatus === "RUNTIME_REJECTED" && (fs.statSync(callabilityFile).mode & 0o077) === 0 && !/token|apiKey|credential/iu.test(JSON.stringify(callability)), { version: callability.version, entries: Object.keys(callability.entries ?? {}).length });
   const allowedModels = settings.subagents?.modelScope?.allow?.filter((entry) => entry !== "inherit") ?? [];
   const catalog = allowedModels.map((identity, index) => {
     const separator = identity.indexOf("/");
@@ -58,14 +61,14 @@ try {
   });
   const concretePresets = MODEL_PRESETS.filter((name) => name !== "custom");
   check("bootstrap-all-presets-resolve-every-role", concretePresets.every((preset) => {
-    const resolved = resolveModelPolicy(catalog, policyWithPreset(modelPolicy, preset));
+    const resolved = resolveModelPolicy(catalog, policyWithPreset(modelPolicy, preset), { callability });
     return MODEL_ROLES.every((role) => allowedModels.includes(resolved.roles[role]?.model));
   }), { presets: concretePresets, roles: MODEL_ROLES.length });
-  const alternateWorker = allowedModels.find((identity) => identity !== settings.subagents?.agentOverrides?.worker?.model);
+  const alternateWorker = allowedModels.find((identity) => callability.entries?.[identity]?.runtimeStatus === "RUNTIME_CALLABLE" && identity !== settings.subagents?.agentOverrides?.worker?.model);
   const customPolicy = policyWithRole(readModelPolicy(modelPolicyFile), "worker", { model: alternateWorker, thinking: "high" });
   writeModelPolicy(modelPolicyFile, customPolicy);
   const reloadedCustom = readModelPolicy(modelPolicyFile);
-  check("bootstrap-custom-policy-reloads", reloadedCustom.preset === "custom" && reloadedCustom.overrides.worker?.model === alternateWorker && resolveModelPolicy(catalog, reloadedCustom).roles.worker.model === alternateWorker, { preset: reloadedCustom.preset, worker: reloadedCustom.overrides.worker?.model });
+  check("bootstrap-custom-policy-reloads", reloadedCustom.preset === "custom" && reloadedCustom.overrides.worker?.model === alternateWorker && resolveModelPolicy(catalog, reloadedCustom, { callability }).roles.worker.model === alternateWorker, { preset: reloadedCustom.preset, worker: reloadedCustom.overrides.worker?.model });
   const councilAgents = ["council-1", "council-2", "council-3", "council-judge"];
   check("bootstrap-council-routes-load", councilAgents.every((name) => allowedModels.includes(settings.subagents?.agentOverrides?.[name]?.model)), Object.fromEntries(councilAgents.map((name) => [name, settings.subagents?.agentOverrides?.[name] ?? null])));
   check("bootstrap-credential-slots-are-cleanly-missing", Object.values(webCredentialStatus(webConfig, {})).every((entry) => entry.configured === false && entry.source === "missing"), webCredentialStatus(webConfig, {}));

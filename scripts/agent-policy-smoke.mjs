@@ -58,7 +58,7 @@ try {
   const autonomousDefinitions = ["worker", "tester"].map((name) => fs.readFileSync(path.join(packageRoot, "agents", `${name}.md`), "utf8"));
   check("autonomous-roles-have-no-web-network-tools", autonomousDefinitions.every((definition) => !/^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(definition)), "Worker and Tester cannot turn the controlled web runner into general shell network access");
   const councilDefinitions = ["council-1", "council-2", "council-3", "council-judge"].map((name) => fs.readFileSync(path.join(packageRoot, "agents", `${name}.md`), "utf8"));
-  check("council-runtime-surfaces-are-read-only-and-non-delegating", councilDefinitions.every((definition) => !/^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write|subagent)\b/mu.test(definition)), "All four council roles are runtime-discovered without mutation or delegation tools");
+  check("council-runtime-surfaces-are-read-only-and-non-delegating", councilDefinitions.every((definition) => /^completionGuard: false$/mu.test(definition) && !/^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write|subagent)\b/mu.test(definition)), "All four runtime-discovered council roles are read-only and use advisory rather than implementation-mutation completion semantics");
 } catch (error) {
   check("agent-policy-runtime-harness", false, error instanceof Error ? error.message : String(error));
 } finally {

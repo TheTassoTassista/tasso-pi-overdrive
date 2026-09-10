@@ -5,6 +5,7 @@ tools: read, grep, find, ls, semantic_nav
 subagentOnlyExtensions: ../extensions/lsp.ts
 defaultContext: fresh
 acceptanceRole: read-only
+completionGuard: false
 inheritGlobalContext: false
 inheritProjectContext: true
 inheritSkills: false

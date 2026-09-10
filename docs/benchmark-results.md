@@ -1,18 +1,19 @@
 # Benchmark and smoke results
 
-Recorded on 2026-09-09 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; failed authenticated post-expansion E2E runs are explicitly not counted as passes.
+Recorded on 2026-09-10 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the failed authenticated post-expansion E2E remains a FAIL and was not rerun.
 
 ## Current regression evidence
 
 | Check | Result | Runtime evidence |
 |---|---|---|
-| Unit/static package | PASS | `npm run check`: 77/77 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Unit/static package | PASS | `npm run check`: 85/85 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
 | Deterministic evaluator | PASS | `npm run benchmark:suite`: 6/6 task categories, zero paid calls |
-| Model preset evaluator | PASS | `npm run benchmark:models`: four presets, all twelve routes present and in the live authenticated catalog, zero paid calls |
+| Model preset evaluator | PASS | `npm run benchmark:models`: four presets, all twelve routes backed by cached runtime-callable evidence, zero paid calls |
 | Real Pi capability path | PASS | `npm run smoke:runtime`: FFF filename/content, two AST matches, TS diagnostics/definition/four references, and real public `web_fetch`, driven sequentially by a local deterministic provider |
 | Real model commands | PASS | `npm run smoke:models`: live catalog, authentication metadata unchanged, override/persistence/reload/reset, invalid-ID rejection, all concrete presets, custom preservation |
-| Council surface/policy | PASS | `npm run smoke:council`: protected `/council` command wins over the upstream prompt, `/council-status` is key-free, all four roles are fresh/read-only/non-delegating |
-| MCP | PASS | `npm run smoke:mcp -- --online`: lazy Context7 connection and real read, mutation approval denial, allowlist, no side effect, metadata-only MCP trace |
+| Council surface/policy | PASS | `npm run smoke:council`: protected `/council` command wins; all four roles are fresh/read-only/non-delegating with advisory completion semantics |
+| Local Council/workflow | PASS | `npm run smoke:council-local`: corrected valid Council 100/100; full zero-paid Scout→Council→Worker→Tester→review→correction→final verification reached PASS; all negative controls failed closed |
+| MCP | PASS | `npm run smoke:mcp`: mutation approval denial, allowlist, no side effect, metadata-only MCP trace; prior online Context7 read remains documented separately |
 | General LSP | PASS/PARTIAL | `npm run smoke:lsp`: real TS and Python definition/references/diagnostics and C++ diagnostic pass in read-only no-network Bubblewrap; missing Rust and Go servers report `PARTIAL` |
 | Web | PASS/PARTIAL | `npm run smoke:web`: `web_fetch` and DNS-pinned `safe_web_fetch` work; unsafe schemes/private targets fail; Brave and Perplexity search fail explicitly because both credentials are absent |
 | Browser | PASS | `npm run smoke:browser`: three actual Chromium calls with assigned profile/session, DOM marker inspection, profile materialization, and close |
@@ -22,12 +23,12 @@ Recorded on 2026-09-09 with official Pi 0.85.1. A PASS below is backed by the cu
 | Notebook/handoff | PASS | `npm run smoke:handoff`: durable marker preserved, editable handoff produced, new session message count zero |
 | Bootstrap | PASS | `npm run smoke:bootstrap`: clean temporary HOME, exact packages/runtimes, all presets/council routes, private policy/backup, no auth created |
 | Restore | PASS | `npm run smoke:restore`: original settings restored byte-for-byte; SHA-256 `08288b6b68fad66fa8797adbf8855d8029042b2970edf326d5415bcf22c194cb` |
-| Output optimizer | PASS | `npm run benchmark`: 164,450 to 4,836 characters (97.06%); critical diagnostics retained; 16.074 ms mean over 100 runs |
-| Trace privacy | PASS | `npm run smoke:trace`: 228 files / 1,179 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
+| Output optimizer | PASS | `npm run benchmark`: 164,450 to 4,836 characters (97.06%); critical diagnostics retained; 16.668 ms mean over 100 runs |
+| Trace privacy | PASS | `npm run smoke:trace`: 254 files / 1,289 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
 | Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 12 at measurement time |
 
-The first deterministic evaluator attempt inside Codex's own nested sandbox could not spawn `rg`; the host-context rerun passed 6/6. Likewise, nested-sandbox LSP/Bubblewrap failures are not product failures; the required host-context suite passed 77/77.
+The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 85/85; this environmental limitation is not counted as a product pass or failure.
 
 ## Preset comparison
 
@@ -36,9 +37,9 @@ The first deterministic evaluator attempt inside Codex's own nested sandbox coul
 | Preset | Deterministic status | Normal path rate | Added high-risk/council rate | Models | Providers | Live review |
 |---|---|---:|---:|---:|---:|---|
 | Budget | PASS | 9.8 | 7.0 | 1 | 1 | NOT RUN |
-| Efficient | PASS | 123.2 | 207.5 | 6 | 1 | NOT RUN |
-| Balanced | PASS | 105.7 | 207.5 | 6 | 1 | NOT RUN |
-| Max quality | PASS | 210.5 | 207.5 | 5 | 1 | NOT RUN |
+| Efficient | PASS | 123.2 | 191.4 | 5 | 1 | NOT RUN |
+| Balanced | PASS | 89.6 | 191.4 | 5 | 1 | NOT RUN |
+| Max quality | PASS | 194.4 | 191.4 | 5 | 1 | NOT RUN |
 
 Efficient remains the default: Luna handles cheap reconnaissance/testing, Terra implementation, Sol planning/review, and Astra only Oracle/Judge. This is a routing/cost rationale, not evidence that heterogeneous councils improve quality. The `--live` four-review benchmark was not run because it would add paid calls after an authenticated E2E had already been attempted. A cross-provider quality comparison was impossible with one authenticated provider.
 
@@ -77,4 +78,4 @@ The explicitly authorized single post-fix run `179bb6f7-414c-4529-baa2-709630b9b
 
 The durable child sessions record 21 provider calls, 47,081 input tokens, 14,080 output tokens, 37,248 cache-read tokens, 10,030 reasoning tokens, 98,409 total reported tokens, and USD 0.7057564. The outer Luna coordinator made two additional calls; its token and cost data were not persisted by the no-session RPC harness. Total model-call count is therefore 23, while the reported token/cost total covers 21 of those calls only. Runtime/worktree/port/process cleanup passed and the temporary repository was removed.
 
-The E2E evidence validator also has a separate false-negative: it compares canonical stored model IDs to hardcoded IDs containing `:thinking`, so it incorrectly labels the three successfully routed roles as unintended. This does not explain the controller stop—the council failures do—but it makes the final validator unreliable until corrected. No rerun was performed.
+The deterministic defects exposed by that run are now repaired: a three-state callability cache excludes `gpt-5.4` and records the Luna fallback; Council profiles use read-only advisory completion semantics; native per-request schemas plus exact controller/receipt validation fail closed; provider/model/thinking are canonicalized separately; and only transient delegation failures retry. The local Council path passed 100/100 and the complete planted-correction workflow reached `FINAL` PASS. The authenticated run is still FAIL because no further authenticated E2E was authorized or performed.

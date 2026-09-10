@@ -13,6 +13,7 @@ const extension = path.join(root, "extensions", "model-policy.ts");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-model-policy-"));
 const isolatedAgentDir = path.join(temporary, "agent");
 const isolatedPolicy = path.join(temporary, "config", "pi-overdrive", "model-policy.json");
+const isolatedCallability = path.join(temporary, "config", "pi-overdrive", "model-callability.json");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
@@ -25,6 +26,7 @@ function runCommand(message, { isolated = false, expected } = {}) {
     if (isolated) {
       environment.PI_CODING_AGENT_DIR = isolatedAgentDir;
       environment.PI_OVERDRIVE_MODEL_POLICY = isolatedPolicy;
+      environment.PI_OVERDRIVE_MODEL_CALLABILITY = isolatedCallability;
       environment.PI_OVERDRIVE_TOOL_AUDIT_KEY = "audit-only";
     }
     const child = spawn(pi, args, { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] });
@@ -80,6 +82,11 @@ function authMetadata() {
 try {
   fs.mkdirSync(isolatedAgentDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(isolatedAgentDir, "settings.json"), "{}\n", { mode: 0o600 });
+  fs.mkdirSync(path.dirname(isolatedCallability), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(isolatedCallability, `${JSON.stringify({ version: 1, entries: {
+    "pi-overdrive-tool-audit/single-tool-driver": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
+    "pi-overdrive-tool-audit/single-tool-driver-alt": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
+  } }, null, 2)}\n`, { mode: 0o600 });
 
   const authBefore = authMetadata();
   const catalog = await runCommand("/models", { expected: /openai-codex\//u });
@@ -130,7 +137,7 @@ try {
       { provider: "pi-overdrive-tool-audit", id: "single-tool-driver" },
       { provider: "pi-overdrive-tool-audit", id: "single-tool-driver-alt" },
     ];
-    const resolved = resolveModelPolicy(models, stored);
+    const resolved = resolveModelPolicy(models, stored, { callability: JSON.parse(fs.readFileSync(isolatedCallability, "utf8")) });
     const valid = selected.code === 0 && stored.preset === name && MODEL_ROLES.every((role) => resolved.roles[role]?.model?.startsWith("pi-overdrive-tool-audit/"));
     allPresetsValid &&= valid;
     presetEvidence[name] = { valid, digest: resolved.digest.slice(0, 16), models: resolved.diversity.models };

@@ -29,6 +29,7 @@ web_config="$web_config_root/rpiv-web-tools/config.json"
 web_manifest="$agent_dir/tasso-pi-overdrive-web-install.json"
 model_policy_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 model_policy="$model_policy_root/pi-overdrive/model-policy.json"
+model_callability="$model_policy_root/pi-overdrive/model-callability.json"
 required_pi=0.85.1
 
 installed_pi=$($pi_bin --version | tr -d '[:space:]')
@@ -49,6 +50,7 @@ if [[ "$check_only" == true ]]; then
   "$npm_bin" list --prefix "$HOME/.local/share/pi-overdrive/lsp-node" --depth=0 \
     @ast-grep/cli@0.45.3
   node "$package_root/scripts/model-policy-tool.mjs" check "$model_policy"
+  node "$package_root/scripts/model-callability-tool.mjs" check "$model_callability"
   command -v agent-browser >/dev/null 2>&1 && agent-browser --version
   echo "Bootstrap validation: PASS (configuration only; authentication intentionally not inspected)."
   exit 0
@@ -103,6 +105,7 @@ install -m 600 "$package_root/config/browser.json" "$HOME/.pi/config/pi-agent-br
 node "$package_root/scripts/config-policy-tool.mjs" enable "$web_config" "$package_root/config/web-tools.json" "$web_manifest"
 node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
 node "$package_root/scripts/model-policy-tool.mjs" initialize "$model_policy" "$package_root/config/model-policy.json"
+node "$package_root/scripts/model-callability-tool.mjs" initialize "$model_callability" "$package_root/config/model-callability.json"
 
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
 install -d -m 700 "$tool_root" "$HOME/.local/bin"

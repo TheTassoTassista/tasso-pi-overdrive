@@ -14,6 +14,7 @@ function renderRouting(resolved: any): string {
     ...MODEL_ROLES.map((role) => `${role}: ${resolved.roles[role].model}:${resolved.roles[role].thinking}`),
     `Diversity: ${resolved.diversity.models} model identities / ${resolved.diversity.providers} provider(s)`,
     `Policy receipt: ${resolved.digest.slice(0, 16)}`,
+    ...(resolved.routingDecisions ?? []).map((decision: any) => `Fallback ${decision.purpose}: ${decision.selected}; skipped ${decision.skipped.map((item: any) => `${item.model} (${item.reason})`).join(", ")}`),
   ].join("\n");
 }
 
@@ -31,6 +32,7 @@ function renderCouncilStatus(resolved: any): string {
 
 function publicInventory(ctx: ExtensionContext): object {
   const available = ctx.modelRegistry.getAvailable();
+  const registered = ctx.modelRegistry.getAll();
   const availableByProvider = new Map<string, number>();
   for (const model of available) availableByProvider.set(model.provider, (availableByProvider.get(model.provider) ?? 0) + 1);
   const providers = [...new Set([...ctx.modelRegistry.getRegisteredProviderIds(), ...ctx.modelRegistry.getAll().map((model) => model.provider)])].sort().map((provider) => ({
@@ -38,7 +40,11 @@ function publicInventory(ctx: ExtensionContext): object {
     configured: ctx.modelRegistry.getProviderAuthStatus(provider).configured,
     availableModels: availableByProvider.get(provider) ?? 0,
   }));
-  return { availableModels: publicModelCatalog(available), providers };
+  return { availableModels: publicModelCatalog(registered, available), providers };
+}
+
+function resolveForContext(ctx: ExtensionContext, stored = readModelPolicy()): any {
+  return resolveModelPolicy(ctx.modelRegistry.getAvailable(), stored, { registeredModels: ctx.modelRegistry.getAll() });
 }
 
 function syncUserSubagentSettings(resolved: any): void {
@@ -69,14 +75,14 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
   pi.registerCommand("model-routing", {
     description: "Show the effective persistent role routing and policy receipt",
     handler: async (_args, ctx) => {
-      try { ctx.ui.notify(renderRouting(resolveModelPolicy(ctx.modelRegistry.getAvailable(), readModelPolicy())), "info"); }
+      try { ctx.ui.notify(renderRouting(resolveForContext(ctx)), "info"); }
       catch (error) { notifyError(ctx, error); }
     },
   });
   pi.registerCommand("council-status", {
     description: "Show council routes, escalation policy, independence, and hard limits",
     handler: async (_args, ctx) => {
-      try { ctx.ui.notify(renderCouncilStatus(resolveModelPolicy(ctx.modelRegistry.getAvailable(), readModelPolicy())), "info"); }
+      try { ctx.ui.notify(renderCouncilStatus(resolveForContext(ctx)), "info"); }
       catch (error) { notifyError(ctx, error); }
     },
   });
@@ -102,9 +108,10 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
         if (!role || role === "list") { ctx.ui.notify(MODEL_ROLES.join("\n"), "info"); return; }
         if (!MODEL_ROLES.includes(role as any) || selectionParts.length !== 1) throw new Error("usage: /model-role ROLE PROVIDER/MODEL[:THINKING]");
         const models = ctx.modelRegistry.getAvailable();
-        const stored = policyWithRole(readModelPolicy(), role, parseModelSelection(selectionParts[0], models));
+        const options = { registeredModels: ctx.modelRegistry.getAll() };
+        const stored = policyWithRole(readModelPolicy(), role, parseModelSelection(selectionParts[0], models, options));
         writeModelPolicy(modelPolicyPath(), stored);
-        const resolved = resolveModelPolicy(models, stored);
+        const resolved = resolveModelPolicy(models, stored, options);
         syncUserSubagentSettings(resolved);
         const selected = resolved.roles[role];
         if (!selected) throw new Error("resolved_model_role_missing");
@@ -119,17 +126,18 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
         const action = args.trim() || "list";
         if (action === "list") { ctx.ui.notify(MODEL_PRESETS.join("\n"), "info"); return; }
         const models = ctx.modelRegistry.getAvailable();
-        if (action === "show") { ctx.ui.notify(renderRouting(resolveModelPolicy(models, readModelPolicy())), "info"); return; }
+        const options = { registeredModels: ctx.modelRegistry.getAll() };
+        if (action === "show") { ctx.ui.notify(renderRouting(resolveModelPolicy(models, readModelPolicy(), options)), "info"); return; }
         if (action.startsWith("preview ")) {
           const preview = action.slice("preview ".length).trim();
           if (!MODEL_PRESETS.includes(preview as any) || preview === "custom") throw new Error("preview_requires_concrete_preset");
-          ctx.ui.notify(`${renderRouting(resolveModelPolicy(models, policyWithPreset(readModelPolicy(), preview)))}\nPreview only; persistent policy unchanged.`, "info");
+          ctx.ui.notify(`${renderRouting(resolveModelPolicy(models, policyWithPreset(readModelPolicy(), preview), options))}\nPreview only; persistent policy unchanged.`, "info");
           return;
         }
         if (!MODEL_PRESETS.includes(action as any)) throw new Error("unknown_model_preset");
         const stored = policyWithPreset(readModelPolicy(), action);
         writeModelPolicy(modelPolicyPath(), stored);
-        const resolved = resolveModelPolicy(models, stored);
+        const resolved = resolveModelPolicy(models, stored, options);
         syncUserSubagentSettings(resolved);
         ctx.ui.notify(`${renderRouting(resolved)}\nPersistent policy updated. Reload Pi before direct subagent calls; secure_coding_workflow uses it immediately.`, "info");
       } catch (error) { notifyError(ctx, error); }

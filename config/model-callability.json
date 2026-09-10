@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "provider": "openai-codex",
+  "updatedAt": "2026-09-09T18:42:32.799Z",
+  "source": "authenticated-workflow-receipts",
+  "entries": {
+    "openai-codex/gpt-5.5": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "COMPLETED_OR_REACHED_ROLE_ACCEPTANCE",
+      "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    },
+    "openai-codex/gpt-5.6-luna": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "COMPLETED",
+      "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    },
+    "openai-codex/gpt-5.6-sol": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "COMPLETED",
+      "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    },
+    "openai-codex/gpt-5.6-terra": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "COMPLETED",
+      "evidenceRunId": "0789657a-a21f-4614-8919-ad88089050b8"
+    },
+    "openai-codex/gpt-6-astra": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "COMPLETED",
+      "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    },
+    "openai-codex/gpt-5.4": {
+      "runtimeStatus": "RUNTIME_REJECTED",
+      "reasonCode": "CHATGPT_ACCOUNT_UNSUPPORTED_MODEL",
+      "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    }
+  }
+}

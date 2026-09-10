@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -76,10 +76,14 @@ for (const name of expectedAgents) {
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
   if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);
+  if (name.startsWith('council-') && !/^completionGuard: false$/mu.test(text)) failures.push(`${name} council role must disable implementation-mutation completion semantics`);
 }
 
 const modelPolicy = JSON.parse(await readFile(path.join(root, 'config/model-policy.json'), 'utf8'));
 if (modelPolicy.version !== 1 || modelPolicy.preset !== 'efficient' || modelPolicy.basePreset !== 'efficient' || Object.keys(modelPolicy.overrides ?? {}).length !== 0) failures.push('tracked model policy default is not minimal efficient/user-owned state');
+const callability = JSON.parse(await readFile(path.join(root, 'config/model-callability.json'), 'utf8'));
+if (callability.version !== 1 || callability.entries?.['openai-codex/gpt-5.4']?.runtimeStatus !== 'RUNTIME_REJECTED') failures.push('tracked runtime-callability evidence does not reject the known unsupported model');
+for (const [agent, route] of Object.entries(settingsPatch.subagents?.agentOverrides ?? {})) if (callability.entries?.[route.model]?.runtimeStatus === 'RUNTIME_REJECTED') failures.push(`${agent} active route uses a runtime-rejected model`);
 
 async function checkSymlinks(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

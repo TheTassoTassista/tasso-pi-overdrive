@@ -1,6 +1,6 @@
 # Final adversarial audit
 
-Audit date: 2026-09-09. Earlier completion reports were treated as untrusted. PASS requires current filesystem implementation plus a repeatable static/runtime proof. No failed authenticated run is credited as a pass.
+Audit date: 2026-09-10. Earlier completion reports were treated as untrusted. PASS requires current filesystem implementation plus repeatable static/runtime proof. The last authenticated run remains FAIL and is not credited as a pass.
 
 ## Original phases
 
@@ -16,7 +16,7 @@ Audit date: 2026-09-09. Earlier completion reports were treated as untrusted. PA
 | 7 — Output optimization | PASS | `lib/output-optimizer.mjs`; 97.06% fixture reduction and all critical diagnostics retained regardless of position/count |
 | 8 — Handoff/notebook | PASS | `npm run smoke:handoff`: state marker survives, handoff editable, new session has zero messages |
 | 9 — Subagents | PASS | `pi-subagents@0.66.0`; all twelve profiles dynamically discovered with runtime-enforced surfaces |
-| 10 — Model routing | PARTIAL | Scout/Planner/Oracle selected and attested the intended routes, but the registry/preset admitted `openai-codex/gpt-5.4`, which the authenticated Codex runtime rejects for a ChatGPT account. Runtime callability is not yet a preset prerequisite |
+| 10 — Model routing | PASS | registry, authentication, and cached runtime-callability are independent prerequisites; known-rejected `gpt-5.4` deterministically falls back to Luna before fan-out and every skip is recorded |
 | 11 — Benchmarking | PASS | six deterministic tasks, four preset evaluations, output benchmark, and zero-cost context inspection; missing live comparisons are labeled, not fabricated |
 | 12 — Web research | PARTIAL | known-URL fetch works; Brave and Perplexity search are correctly unavailable because both keys are missing. Unknown-URL discovery is materially affected |
 | 13 — Browser | PASS | real isolated Chromium profile/session opens, inspects local DOM marker, materializes, and closes |
@@ -28,7 +28,7 @@ Audit date: 2026-09-09. Earlier completion reports were treated as untrusted. PA
 | 19 — Adversarial review | PASS | correctness/security/simplicity required; blocking review forces Worker correction and re-review; prior full v4 E2E corroborates controller tests |
 | 20 — Application observability | PASS | collector returns actual sources/counts/bytes and legitimate zeros, never constants |
 | 21 — Agent observability | PASS | `pi-observability@1.3.2`; `/obs` registered and available runtime metadata collected |
-| 22 — Tracing | PASS | 228 files / 1,179 rows: owner-only, zero malformed/forbidden/secret-like content |
+| 22 — Tracing | PASS | 254 files / 1,289 rows: owner-only, zero malformed/forbidden/secret-like content |
 | 23 — Memory | PASS | docs/skills/notebook/session/handoff hierarchy; no ambient automatic-recall plugin |
 | 24 — Skills | PASS | all 15 package skills dynamically discovered and validated |
 | 25 — Prompt templates | PASS | all 12 package prompts dynamically registered |
@@ -37,13 +37,13 @@ Audit date: 2026-09-09. Earlier completion reports were treated as untrusted. PA
 | 28 — Self-improvement | PASS | bounded/redacted findings store; no automatic config rewriting |
 | 29 — Gardener/GC | PASS | optional read-only, unscheduled prompt commands are registered |
 | 30 — Personal package | PASS | permanent Git package `/home/tasso/Documents/Codex/tasso-pi-overdrive`; active Pi source points only there |
-| 31 — Default workflow | PARTIAL | one v4 controller, immutable receipts/journals, crash recovery and limits remain proven; the authenticated Council path fails before Worker because read-only council output is misclassified as an edit-requiring implementation task and one configured model is not callable |
+| 31 — Default workflow | PARTIAL | the deterministic zero-paid full workflow including Council, Judge, planted reviewer correction and final verification passes, but the repaired integrated path has not yet had a newly authorized authenticated E2E |
 | 32 — Cost/time optimization | PASS | default core set unchanged by model/council; lazy MCP/LSP; deterministic context estimator makes routine measurement cost zero |
 | 33 — Complete-system test | FAIL | authorized post-fix run `179bb6f7-414c-4529-baa2-709630b9bac9` failed before Worker after all three council members failed; final verification was NOT_RUN. Cleanup and fail-closed evidence publication passed |
 | 34 — Documentation | PASS | README and docs now describe current MCP/LSP/model/council/benchmark/E2E truth without stale pass claims |
 | 35 — Reproducibility | PASS | clean-HOME bootstrap installs exact packages/runtimes, policy, presets, council and secret-free web slots; no auth is created |
 
-Original-phase totals: **30 PASS, 5 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **83.3% (30/36)**; partials are not weighted into that percentage.
+Original-phase totals: **31 PASS, 4 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **86.1% (31/36)**; partials are not weighted into that percentage.
 
 ## Requested 37-point runtime audit
 
@@ -56,10 +56,10 @@ Original-phase totals: **30 PASS, 5 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. 
 | 5 | PASS | `npm run smoke:runtime`; `@juvio15/pi-ast-grep@0.4.2` |
 | 6 | PASS | `npm run smoke:catalog`: all 15 skills loaded from repository paths |
 | 7 | PASS | `npm run smoke:catalog`: 12 prompts and 14 local extension commands registered; total Pi catalog 83 |
-| 8 | PARTIAL | `npm run smoke:agents` discovers all twelve profiles, but the authenticated E2E did not prove all are callable: council-3's configured model is rejected and council-1/2 are rejected by inappropriate edit-expectation/structured-output handling |
+| 8 | PARTIAL | `npm run smoke:agents` discovers all twelve profiles and local contract tests prove Council advisory completion; a post-repair authenticated call of every Council role was intentionally not run |
 | 9 | PASS | `npm run smoke:agents`, `npm run smoke:guardrails`: Tester/council mutation absent; Worker shell absent; runtime denials exercised |
 | 10 | PASS | `tests/workflow-state.test.mjs`, `tests/tool-surface.test.mjs`: concurrency 3/depth 1 constants and recursive override rejection |
-| 11 | PARTIAL | real Scout/Planner/Oracle selection matched and forged attestations fail, but a model accepted by the live registry and preset (`gpt-5.4`) is not actually callable through the authenticated account |
+| 11 | PASS | routes require cached runtime-callable evidence; `gpt-5.4` is rejected before fan-out, efficient Council uses Sol/5.5/Luna plus Astra Judge, and canonical model/thinking plus forged-receipt controls pass |
 | 12 | PASS | `npm run smoke:handoff`: clean session message count 0 |
 | 13 | PASS | same smoke: notebook marker survived the handoff workflow |
 | 14 | PASS | `tests/output-optimizer.test.mjs`: beginning/middle/end warning floods and 120 critical lines retained |
@@ -84,22 +84,22 @@ Original-phase totals: **30 PASS, 5 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. 
 | 33 | PASS | exact versions in `config/packages.json`, MCP/LSP lockfiles, validator, and npm audits |
 | 34 | PASS | one controller/optimizer/trace/safety hook; protected `/council` deterministically shadows, rather than competes with, the upstream prompt |
 | 35 | PASS | package validator, trace/mission audits and Git inspection find no secret values |
-| 36 | PASS | final `npm run check`: 77/77 plus syntax/types/package validation |
+| 36 | PASS | final `npm run check`: 85/85 plus syntax/types/package validation |
 | 37 | FAIL | the one authorized post-fix fresh-repository run failed before Worker; no code change, verification, reviewers, correction, or final validator PASS occurred. Cleanup did pass |
 
-Requested-check totals: **32 PASS, 4 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **86.5% (32/37)**.
+Requested-check totals: **33 PASS, 3 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**. Strict full-PASS coverage is **89.2% (33/37)**.
 
 ## Model/council expansion audit
 
 | Capability | Status | Evidence or limitation |
 |---|---|---|
-| Real catalog and unauthenticated-provider handling | PARTIAL | `/models` reports registry IDs/status, but registry presence did not predict authenticated runtime callability for `gpt-5.4` |
+| Real catalog and unauthenticated-provider handling | PASS | `/models` distinguishes registry/authentication/runtime-callability; a secret-free cache is installed and `gpt-5.4` is explicitly rejected from active routes |
 | Per-role override, persistence, reload, reset | PASS | isolated-home runtime command proof |
-| All five preset modes | PARTIAL | all presets assign twelve registry-valid routes and custom preserves overrides, but registry-valid is insufficient: efficient selected an authenticated-runtime-unsupported model |
+| All five preset modes | PASS | all presets assign twelve callable routes, record deterministic fallback reasons, and custom invalid routes fail `BLOCKED_BY_MODEL` without rewriting user policy |
 | User-owned immutable policy boundary | PASS | mode 0600 atomic file; no model tool mutates it; nested route override rejected |
 | Model/thinking receipt binding | PASS | exact/suffixed route tests, resume tamper tests, launch-contract digest, durable protocol rejection |
 | Protected explicit council command | PASS | `/council` extension precedence and `/council-status` runtime proof |
-| Independent member contexts | PARTIAL | profiles and launch contracts are fresh/read-only/non-delegating, but the real child runtime treated council-1/2 as edit-requiring implementation tasks and rejected their read-only completion |
+| Independent member contexts | PARTIAL | profiles are runtime-discovered as fresh/read-only/non-delegating with `completionGuard: false`; local zero-edit Council passes, but authenticated post-repair completion was not rerun |
 | Judge sequencing and disagreement | PASS | all three structured results required before Judge; missing/malformed/early cases fail; disagreement retained |
 | Escalation policy | PASS | explicit, high-risk, reviewer disagreement and repeated-failure paths tested |
 | Hard limits/no nesting | PASS | constants 3/1/2 and recursive input attacks tested |
@@ -110,14 +110,11 @@ Requested-check totals: **32 PASS, 4 PARTIAL, 1 FAIL, 0 INTENTIONALLY OMITTED**.
 | Heterogeneous quality benchmark | INTENTIONALLY OMITTED | precondition—two authenticated provider families—was absent; fabricating it would be invalid |
 | Four-preset live review benchmark | INTENTIONALLY OMITTED | four extra paid calls were not authorized after the first E2E attempt |
 
-Expansion totals: **9 PASS, 4 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
+Expansion totals: **11 PASS, 2 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
 
 ## Critical gaps
 
-- The post-fix authenticated model-routed Council → Worker → Tester → verification → reviewer/correction path is currently FAIL. Council does not complete, so autonomous reliance is unsafe.
-- Preset validation trusts registry presence even when the authenticated runtime rejects a model (`gpt-5.4`).
-- Read-only council roles can be rejected by the child runtime as implementation tasks that made no edits. The task/acceptance contract is not aligned with the role boundary.
-- The E2E validator compares canonical model IDs against suffixed route strings, creating false `unintended model` findings. It must validate model and thinking as separate fields.
+- The last authenticated model-routed Council → Worker → Tester → verification → reviewer/correction run is still FAIL. All exposed deterministic causes are repaired locally, but autonomous reliance still requires a newly authorized authenticated E2E.
 - Rust and Go semantic navigation are unavailable until reviewed, pinned servers are installed. This is critical only for autonomous work in those languages.
 
 ## Non-critical gaps
@@ -125,6 +122,7 @@ Expansion totals: **9 PASS, 4 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
 - Brave/Perplexity search is unavailable; known-URL fetch remains functional.
 - Optional `gh`, `tree`, and `zip` are absent.
 - Live preset quality/cost and cross-provider-value experiments were not run.
+- Cached runtime-callability evidence does not expire automatically. Provider/account changes require an explicit evidence refresh; unknown models fail closed meanwhile.
 - The bundled upstream `/council` prompt remains visible as a duplicate catalog entry; the protected extension command has tested precedence and is the actual handler.
 - Nine owner-only temporary child-session directories and bounded foreground-history metadata remain after runtime cleanup. They are not active processes/worktrees, but retention is deferred rather than immediate.
 
@@ -142,6 +140,6 @@ Expansion totals: **9 PASS, 4 PARTIAL, 1 FAIL, 2 INTENTIONALLY OMITTED**.
 
 ## Before autonomous reliance
 
-Before another authenticated E2E, remove runtime-uncallable routes, make read-only council completion compatible with the child runtime, require structured output deterministically, and fix the validator's model/thinking comparison. Then obtain fresh explicit authorization; this audit does not authorize a third run. Continue to use durable clean Git repositories; invoke only the enforced workflow entry points; inspect retained worktree diffs before merge; keep deploy/publish/account mutations human-approved; use a VM/container for hostile code; add Rust/Go servers only when needed; configure web-search credentials only if live discovery matters.
+All four deterministic blockers are repaired and the local corrected Council passed 100/100; the complete zero-paid workflow with a planted correction reached final PASS. Before autonomous reliance, obtain explicit authorization for exactly one authenticated E2E and require it to pass without weakening policy. Continue to use durable clean Git repositories; invoke only the enforced workflow entry points; inspect retained worktree diffs before merge; keep deploy/publish/account mutations human-approved; use a VM/container for hostile code; add Rust/Go servers only when needed; configure web-search credentials only if live discovery matters.
 
 Do not replace the official Pi installation/auth, loosen route/receipt/verification limits, enable network in autonomous command sandboxes, stack another controller/optimizer/trace hook, or add automatic ambient memory. FFF, AST, TS/Python/C++ LSP, notebook/handoff, metadata trace, observability, browser profile isolation, safe fetch, native worktrees, verification exit propagation, package pins, bootstrap and backup/restore are working well.

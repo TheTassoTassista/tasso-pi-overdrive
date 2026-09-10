@@ -1,17 +1,25 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pi = process.env.PI_BIN || "pi";
 const provider = path.join(root, "tests", "fixtures", "deterministic-single-tool-provider.ts");
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-council-policy-"));
+const callabilityFile = path.join(temporary, "model-callability.json");
+fs.writeFileSync(callabilityFile, `${JSON.stringify({ version: 1, entries: {
+  "pi-overdrive-tool-audit/single-tool-driver": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
+  "pi-overdrive-tool-audit/single-tool-driver-alt": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
+} }, null, 2)}\n`, { mode: 0o600 });
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
 function runPi(message) {
   return new Promise((resolve) => {
-    const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--no-tools"], { cwd: root, env: { ...process.env, PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only" }, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--no-tools"], { cwd: root, env: { ...process.env, PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only", PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile }, stdio: ["pipe", "pipe", "pipe"] });
     const events = [];
     let buffer = "";
     let stderr = "";
@@ -60,8 +68,10 @@ try {
   check("pi-council-profiles-are-read-only-fresh-and-non-delegating", agents.status === 0 && agentEvidence?.status === "PASS" && agentEvidence.results?.some((entry) => entry.name === "council-runtime-surfaces-are-read-only-and-non-delegating" && entry.status === "PASS"), agentEvidence ?? agents.stderr);
 } catch (error) {
   check("council-smoke-harness", false, error instanceof Error ? error.message : String(error));
+} finally {
+  fs.rmSync(temporary, { recursive: true, force: true });
 }
 
 const status = results.length === 4 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
-process.stdout.write(`${JSON.stringify({ status, liveProvidersUsed: ["openai-codex"], crossProviderExecution: "BLOCKED_BY_CREDENTIAL", results }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ status, paidModelCalls: 0, providerExecution: "DETERMINISTIC_LOCAL_ONLY", crossProviderExecution: "BLOCKED_BY_CREDENTIAL", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

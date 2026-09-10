@@ -11,6 +11,7 @@ import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, in
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
 import { AGENT_TO_ROLE, canonicalExecutedRoute, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
+import { classifyDelegationFailure, retryableDelegationFailure } from "../lib/delegation-failure.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
@@ -58,13 +59,13 @@ function sanitizeState(state: any) {
     finalVerificationStatus: state?.finalVerificationStatus ?? "NOT_RUN",
     cleanupStatus: state?.cleanupStatus ?? "NOT_RUN",
     evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
-    modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, roles: state.modelPolicy.roles, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
+    modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, roles: state.modelPolicy.roles, routingDecisions: state.modelPolicy.routingDecisions, capabilityDigest: state.modelPolicy.capabilityDigest, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
     hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
     allocation: state?.allocation,
     evidence: {
-      roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
+      roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, thinking: item.thinking, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
       receipts: Array.isArray(evidence.receipts) ? evidence.receipts.map((item: any) => ({ agent: item.agent, round: item.round, iteration: item.iteration, executionId: item.executionId, sequence: item.sequence, sha256: item.sha256 })) : [],
       transitions: Array.isArray(evidence.transitions) ? evidence.transitions : [],
       verifications: Array.isArray(evidence.verifications) ? evidence.verifications.map((item: any) => ({
@@ -174,7 +175,9 @@ export default function (pi: ExtensionAPI) {
       let protocolNonce = taskDigest(randomUUID());
       let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
       const availableModels = ctx.modelRegistry.getAvailable();
-      let activeModelPolicy = resolveModelPolicy(availableModels, readModelPolicy());
+      const registeredModels = ctx.modelRegistry.getAll();
+      const modelCapabilityOptions = { registeredModels };
+      let activeModelPolicy = resolveModelPolicy(availableModels, readModelPolicy(), modelCapabilityOptions);
       const admittedExecutionIds = new Set<string>();
       const delegationAudit: Array<Record<string, unknown>> = [];
       const delegateOnce = ({ agent, task, cwd, result, round = 0, iteration = 0 }: DelegationInput, attempt: number): Promise<Record<string, any>> => new Promise((resolve, reject) => {
@@ -209,15 +212,16 @@ export default function (pi: ExtensionAPI) {
                   error: `model route attestation rejected: ${error instanceof Error ? error.message : "unknown error"}`,
                 };
               }
+              if (canonicalResponse.status !== "completed") canonicalResponse.failureCategory = classifyDelegationFailure(canonicalResponse);
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
               const normalized = { ...canonicalResponse, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
                 finish(resolve, normalized);
               } else {
-                const failure = new Error(`${agent} delegation ended with ${receipt.status}`);
-                (failure as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded = true;
+                const failure = new Error(`${agent} delegation ended with ${receipt.status}: ${String(canonicalResponse.error ?? "")}`);
+                Object.assign(failure, { delegationReceiptRecorded: true, failureCategory: classifyDelegationFailure(canonicalResponse), delegationStatus: receipt.status });
                 finish(reject, failure);
               }
             } catch (error) {
@@ -229,14 +233,15 @@ export default function (pi: ExtensionAPI) {
           let receiptRecorded = false;
           try {
             if (evidenceRun && roleReceiptStore) {
-              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message } });
+              const failureCategory = classifyDelegationFailure({ status, error: message });
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message, failureCategory } });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
-              delegationAudit.push({ agent, attempt, status, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
+              delegationAudit.push({ agent, attempt, status, failureCategory, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
               receiptRecorded = true;
             }
           } catch {}
           const failure = new Error(message);
-          (failure as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded = receiptRecorded;
+          Object.assign(failure, { delegationReceiptRecorded: receiptRecorded, failureCategory: classifyDelegationFailure({ status, error: message }), delegationStatus: status });
           finish(reject, failure);
         };
         const abort = () => {
@@ -278,9 +283,11 @@ export default function (pi: ExtensionAPI) {
             }
           } catch (error) {
             lastError = error;
+            const failureCategory = (error as any)?.failureCategory ?? classifyDelegationFailure(error);
             if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
-              delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed" });
+              delegationAudit.push({ agent: input.agent, attempt, status: "transport-failed", failureCategory });
             }
+            if (!retryableDelegationFailure({ status: (error as any)?.delegationStatus, error: error instanceof Error ? error.message : String(error) })) throw error;
           }
         }
         if (lastError) throw lastError;
@@ -313,7 +320,7 @@ export default function (pi: ExtensionAPI) {
           receiptSequence = priorRoleReceipts.length === 0 ? 0 : Math.max(...priorRoleReceipts.map((entry: any) => entry.receipt.sequence)) + 1;
           latestState = journal.workflow_state;
           if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
-          activeModelPolicy = validateResolvedModelPolicy(availableModels, latestState.modelPolicy);
+          activeModelPolicy = validateResolvedModelPolicy(availableModels, latestState.modelPolicy, modelCapabilityOptions);
           sequence = Math.max(0, ...((latestState.evidence?.roles ?? []).map((entry: any) => Number.parseInt(String(entry.nodeId ?? "0").split("-")[0] ?? "0", 10)).filter(Number.isFinite)));
           if (fs.existsSync(evidenceRun.executionFile)) {
             const loaded = readEvidenceExecution(evidenceRun, digest);

@@ -107,7 +107,7 @@ try {
     const councilRoles = ["oracle", "council-1", "council-2", "council-3", "council-judge"];
     const policyUnchanged = previewText.includes("Preview only; persistent policy unchanged.");
     const deterministic = {
-      status: preview.code === 0 && Object.keys(routes).length === MODEL_ROLES.length && Object.values(routes).every((route) => catalog.has(route.model)) && policyUnchanged ? "PASS" : "FAIL",
+      status: preview.code === 0 && Object.keys(routes).length === MODEL_ROLES.length && Object.values(routes).every((route) => catalog.get(route.model)?.usable === true) && policyUnchanged ? "PASS" : "FAIL",
       latencyMs: Number((performance.now() - started).toFixed(1)),
       rolesAssigned: Object.keys(routes).length,
       modelIdentities: new Set(Object.values(routes).map((route) => route.model)).size,
@@ -131,7 +131,7 @@ try {
     authenticatedProviders: [...new Set((inventory.availableModels ?? []).map((entry) => entry.model.split("/")[0]))],
     crossProviderQualityComparison: "NOT_RUN_SINGLE_AUTHENTICATED_PROVIDER",
     defaultSelection: "efficient",
-    defaultRationale: "Retains cheap Luna discovery/testing, Terra implementation, Sol review/planning, and reserves Astra for escalation; deterministic routes are valid and live review is reported separately.",
+    defaultRationale: "Retains Luna discovery/testing, Terra implementation, Sol review/planning, and Astra escalation while admitting only routes with cached runtime-callable evidence; live review is reported separately.",
     comparisons,
   };
 } catch (error) {
