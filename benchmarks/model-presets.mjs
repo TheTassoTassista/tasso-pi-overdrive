@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { MODEL_ROLES } from "../lib/model-policy.mjs";
+import { summarizeProviderCapabilities } from "../lib/model-inventory-report.mjs";
 
 const pi = process.env.PI_BIN || "pi";
 const live = process.argv.includes("--live");
@@ -96,6 +97,7 @@ let report;
 try {
   const catalogRun = await runPi({ id: "model-catalog", message: "/models", waitForNotification: true });
   const inventory = JSON.parse(notification(catalogRun));
+  const providerSummary = summarizeProviderCapabilities(inventory);
   const catalog = new Map((inventory.availableModels ?? []).map((entry) => [entry.model, entry]));
   const comparisons = [];
   for (const preset of presets) {
@@ -128,7 +130,8 @@ try {
     mode: live ? "deterministic-plus-bounded-live-review" : "deterministic-policy-evaluation",
     paidModelCalls: live ? comparisons.length : 0,
     registeredProviders: inventory.providers ?? [],
-    authenticatedProviders: [...new Set((inventory.availableModels ?? []).map((entry) => entry.model.split("/")[0]))],
+    authenticatedProviders: providerSummary.authenticatedProviders,
+    providerCapabilities: providerSummary.providerCapabilities,
     crossProviderQualityComparison: "NOT_RUN_SINGLE_AUTHENTICATED_PROVIDER",
     defaultSelection: "efficient",
     defaultRationale: "Retains Luna discovery/testing, Terra implementation, Sol review/planning, and Astra escalation while admitting only routes with cached runtime-callable evidence; live review is reported separately.",
