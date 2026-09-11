@@ -7,6 +7,7 @@ import { finished } from "node:stream/promises";
 import { Readable } from "node:stream";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promoteManagedRuntime, recoverManagedRuntime } from "../lib/managed-runtime-transaction.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const manifestFile = path.join(packageRoot, "config", "managed-lsp.json");
@@ -41,6 +42,30 @@ function removeTree(directory) {
   if (!fs.existsSync(directory)) return;
   spawnSync("chmod", ["-R", "u+w", directory], { stdio: "ignore" });
   fs.rmSync(directory, { recursive: true, force: true });
+}
+
+function syncTree(directory) {
+  const directories = [];
+  const visit = (current) => {
+    const stat = fs.lstatSync(current);
+    if (stat.isSymbolicLink()) throw new Error("managed_lsp_symlink_rejected");
+    if (stat.isDirectory()) {
+      directories.push(current);
+      for (const entry of fs.readdirSync(current)) visit(path.join(current, entry));
+      return;
+    }
+    if (stat.isFile()) {
+      const descriptor = fs.openSync(current, "r");
+      try { fs.fsyncSync(descriptor); }
+      finally { fs.closeSync(descriptor); }
+    }
+  };
+  visit(directory);
+  for (const current of directories.reverse()) {
+    const descriptor = fs.openSync(current, "r");
+    try { fs.fsyncSync(descriptor); }
+    finally { fs.closeSync(descriptor); }
+  }
 }
 
 function validateArchive(file, mode) {
@@ -82,6 +107,8 @@ function inspectManaged(root = managedRoot) {
   }
   if (!errors.length) {
     if (sha256(rustAnalyzer) !== manifest.rustAnalyzer.binarySha256) errors.push("rust_analyzer_binary_hash");
+    if (sha256(go) !== manifest.go.binarySha256) errors.push("go_binary_hash");
+    if (sha256(gopls) !== manifest.gopls.binarySha256) errors.push("gopls_binary_hash");
     const rustVersion = run(rustAnalyzer, ["--version"]);
     if (rustVersion !== `rust-analyzer ${manifest.rustAnalyzer.version}`) errors.push("rust_analyzer_version");
     const goVersion = run(go, ["version"]);
@@ -112,6 +139,7 @@ if (checkOnly) {
 }
 
 fs.mkdirSync(runtimeRoot, { recursive: true, mode: 0o700 });
+recoverManagedRuntime({ runtimeRoot, inspect: inspectManaged, removeTree });
 const current = inspectManaged();
 if (current.status === "PASS") {
   process.stdout.write(`${JSON.stringify({ ...current, installed: false }, null, 2)}\n`);
@@ -119,7 +147,6 @@ if (current.status === "PASS") {
 }
 
 const staging = fs.mkdtempSync(path.join(runtimeRoot, ".managed-install-"));
-let previous;
 try {
   fs.mkdirSync(path.join(staging, "bin"), { recursive: true, mode: 0o755 });
 
@@ -141,11 +168,12 @@ try {
   validateArchive(goArchive, "-tzf");
   run("tar", ["-xzf", goArchive, "-C", staging]);
   const managedGo = path.join(staging, "go", "bin", "go");
+  if (sha256(managedGo) !== manifest.go.binarySha256) throw new Error("go_binary_checksum_mismatch");
   const buildHome = path.join(staging, "build-home");
   const goPath = path.join(staging, "build-gopath");
   const goCache = path.join(staging, "build-cache");
   fs.mkdirSync(buildHome, { recursive: true, mode: 0o700 });
-  run(managedGo, ["install", manifest.gopls.module], { env: {
+  const goBuildEnvironment = {
     ...process.env,
     HOME: buildHome,
     GOBIN: path.join(staging, "bin"),
@@ -153,9 +181,20 @@ try {
     GOMODCACHE: path.join(goPath, "pkg", "mod"),
     GOCACHE: goCache,
     GOTOOLCHAIN: "local",
+    GOPROXY: "https://proxy.golang.org",
+    GOSUMDB: "sum.golang.org",
+    GOPRIVATE: "",
+    GONOPROXY: "",
+    GONOSUMDB: "",
+    GOENV: "off",
     GOFLAGS: "-trimpath -buildvcs=false",
     CGO_ENABLED: "0",
-  }, timeout: 20 * 60 * 1000 });
+  };
+  const downloadedModule = JSON.parse(run(managedGo, ["mod", "download", "-json", manifest.gopls.module], { env: goBuildEnvironment, timeout: 20 * 60 * 1000 }));
+  if (downloadedModule.Sum !== manifest.gopls.moduleSum || downloadedModule.GoModSum !== manifest.gopls.goModSum) throw new Error("gopls_module_checksum_mismatch");
+  if (downloadedModule.Origin?.Hash !== manifest.gopls.sourceCommit) throw new Error("gopls_source_commit_mismatch");
+  run(managedGo, ["install", manifest.gopls.module], { env: goBuildEnvironment, timeout: 20 * 60 * 1000 });
+  if (sha256(path.join(staging, "bin", "gopls")) !== manifest.gopls.binarySha256) throw new Error("gopls_binary_checksum_mismatch");
   removeTree(buildHome);
   removeTree(goPath);
   removeTree(goCache);
@@ -168,17 +207,11 @@ try {
     goplsBinarySha256: sha256(path.join(staging, "bin", "gopls")),
   }, null, 2)}\n`, { mode: 0o600 });
 
-  if (fs.existsSync(managedRoot)) {
-    previous = path.join(runtimeRoot, `.managed-previous-${process.pid}`);
-    fs.renameSync(managedRoot, previous);
-  }
-  fs.renameSync(staging, managedRoot);
-  if (previous) removeTree(previous);
+  syncTree(staging);
+  promoteManagedRuntime({ runtimeRoot, stagingRoot: staging, inspect: inspectManaged, removeTree });
   const result = inspectManaged();
-  if (result.status !== "PASS") throw new Error(`managed_lsp_validation_failed:${result.errors.join(",")}`);
   process.stdout.write(`${JSON.stringify({ ...result, installed: true }, null, 2)}\n`);
 } catch (error) {
   if (fs.existsSync(staging)) removeTree(staging);
-  if (previous && fs.existsSync(previous) && !fs.existsSync(managedRoot)) fs.renameSync(previous, managedRoot);
   throw error;
 }

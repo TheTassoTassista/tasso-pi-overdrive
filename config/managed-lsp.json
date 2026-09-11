@@ -19,6 +19,7 @@
     "version": "1.26.8",
     "url": "https://go.dev/dl/go1.26.8.linux-amd64.tar.gz",
     "archiveSha256": "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b",
+    "binarySha256": "d9a2fa19c7ef8b57f420012c21f49f235c46f08a68c12077d9c753dbb6ccdc34",
     "provenance": "go.dev official Linux amd64 archive"
   },
   "gopls": {
@@ -26,6 +27,7 @@
     "module": "golang.org/x/tools/gopls@v0.23.0",
     "moduleSum": "h1:Dn6mf9WXu9iLnTftDDMb9wV0c6Se7PjzEMqP0LEe08Y=",
     "goModSum": "h1:Ijg67bAdTicg9IINxII7MV+dQpHEXM4646WpNWVYBP0=",
+    "binarySha256": "1cc2e8fd55a4898c109c758939fc29323a9245f58deee7497253a740d53188f8",
     "sourceCommit": "014f87ff5c01915bc90f4f11a6bb8aea3e0edbd7",
     "provenance": "proxy.golang.org module authenticated by sum.golang.org"
   }

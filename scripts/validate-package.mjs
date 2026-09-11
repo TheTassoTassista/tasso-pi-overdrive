@@ -43,8 +43,8 @@ const managedLsp = JSON.parse(await readFile(path.join(root, 'config/managed-lsp
 if (managedLsp.version !== 1 || managedLsp.platform !== 'linux-x64') failures.push('managed LSP manifest version/platform mismatch');
 if (managedLsp.rustAnalyzer?.release !== '2026-09-07' || managedLsp.rustAnalyzer?.version !== '0.3.3041-standalone' || !/^[0-9a-f]{64}$/u.test(managedLsp.rustAnalyzer?.archiveSha256 ?? '') || !/^[0-9a-f]{64}$/u.test(managedLsp.rustAnalyzer?.binarySha256 ?? '')) failures.push('rust-analyzer release or checksums are not pinned');
 if (managedLsp.rustSource?.version !== '1.98.1' || !/^[0-9a-f]{64}$/u.test(managedLsp.rustSource?.archiveSha256 ?? '')) failures.push('rust-src is not pinned');
-if (managedLsp.go?.version !== '1.26.8' || !/^[0-9a-f]{64}$/u.test(managedLsp.go?.archiveSha256 ?? '')) failures.push('managed Go toolchain is not pinned');
-if (managedLsp.gopls?.version !== 'v0.23.0' || managedLsp.gopls?.module !== 'golang.org/x/tools/gopls@v0.23.0' || !/^h1:[A-Za-z0-9+/]{43}=$/u.test(managedLsp.gopls?.moduleSum ?? '')) failures.push('gopls module identity is not pinned');
+if (managedLsp.go?.version !== '1.26.8' || !/^[0-9a-f]{64}$/u.test(managedLsp.go?.archiveSha256 ?? '') || !/^[0-9a-f]{64}$/u.test(managedLsp.go?.binarySha256 ?? '')) failures.push('managed Go toolchain is not pinned');
+if (managedLsp.gopls?.version !== 'v0.23.0' || managedLsp.gopls?.module !== 'golang.org/x/tools/gopls@v0.23.0' || !/^h1:[A-Za-z0-9+/]{43}=$/u.test(managedLsp.gopls?.moduleSum ?? '') || !/^h1:[A-Za-z0-9+/]{43}=$/u.test(managedLsp.gopls?.goModSum ?? '') || !/^[0-9a-f]{64}$/u.test(managedLsp.gopls?.binarySha256 ?? '') || !/^[0-9a-f]{40}$/u.test(managedLsp.gopls?.sourceCommit ?? '')) failures.push('gopls module identity is not pinned');
 for (const name of ['rust-analyzer', 'rust-src', 'go', 'gopls']) if (!packagePolicy.trackedRuntimes?.[name]) failures.push(`${name} is missing from tracked runtime provenance`);
 
 const mcpConfig = JSON.parse(await readFile(path.join(root, 'config/mcp.json'), 'utf8'));
