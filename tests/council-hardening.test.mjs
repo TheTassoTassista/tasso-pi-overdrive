@@ -43,14 +43,16 @@ test("role-aware completion allows zero-edit advisors but rejects mutation and n
   }
 });
 
-test("only transient delegation failures are retryable", () => {
+test("only transport transients and attested post-launch structured output failures are retryable", () => {
   const cases = [
     [{ status: "transport_failed", error: "network reset" }, "TRANSIENT", true],
     [{ status: "failed", error: "unsupported model" }, "UNSUPPORTED_MODEL", false],
     [{ status: "failed", error: "401 unauthorized" }, "AUTH", false],
     [{ status: "protocol_rejected", error: "role mismatch" }, "POLICY", false],
     [{ status: "failed", error: "Subagent spawn limit reached for this session (24/24 used, 1 requested)." }, "RESOURCE_LIMIT", false],
-    [{ status: "structured_output_failed", error: "missing structured output" }, "STRUCTURED_OUTPUT", false],
+    [{ status: "structured_output_failed", launchStatus: "launched", routeAttested: true, error: "missing structured output" }, "STRUCTURED_OUTPUT_MODEL_INVALID", true],
+    [{ status: "structured_output_failed", launchStatus: "not_launched", routeAttested: false, error: "missing structured output" }, "STRUCTURED_OUTPUT_POLICY_ERROR", false],
+    [{ status: "invalid_request", launchStatus: "not_launched", error: "result.schema must be a JSON Schema object" }, "STRUCTURED_OUTPUT_POLICY_ERROR", false],
     [{ status: "failed", error: "deterministic test failure" }, "DETERMINISTIC", false],
   ];
   for (const [input, category, retryable] of cases) {

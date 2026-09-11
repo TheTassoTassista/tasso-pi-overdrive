@@ -11,14 +11,14 @@ import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, in
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
 import { AGENT_TO_ROLE, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
-import { classifyDelegationFailure, retryableDelegationFailure } from "../lib/delegation-failure.mjs";
+import { classifyDelegationFailure } from "../lib/delegation-failure.mjs";
+import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
-import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, MAX_TRANSIENT_RETRIES_PER_DELEGATION, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
+import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
 const CANCEL_EVENT = "prompt-template:subagent:cancel";
-const MAX_DELEGATION_ATTEMPTS = MAX_TRANSIENT_RETRIES_PER_DELEGATION + 1;
 const verifyScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
 
 const Params = Type.Object({
@@ -217,16 +217,16 @@ export default function (pi: ExtensionAPI) {
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
             try {
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
-              const canonicalResponse = canonicalizeDelegationResponse(route, response);
+              const canonicalResponse = canonicalizeDelegationResponse(route, response, { attempt, schema: result.kind === "structured" ? result.schema : undefined });
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
               const normalized = { ...canonicalResponse, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
                 finish(resolve, normalized);
               } else {
                 const failure = new Error(`${agent} delegation ended with ${receipt.status}: ${String(canonicalResponse.error ?? "")}`);
-                Object.assign(failure, { delegationReceiptRecorded: true, failureCategory: classifyDelegationFailure(canonicalResponse), delegationStatus: receipt.status });
+                Object.assign(failure, { delegationReceiptRecorded: true, failureCategory: receipt.failure_category, delegationStatus: receipt.status });
                 finish(reject, failure);
               }
             } catch (error) {
@@ -268,43 +268,41 @@ export default function (pi: ExtensionAPI) {
           result,
         });
       });
-      const delegate = async (input: DelegationInput): Promise<Record<string, any>> => {
-        let lastResponse: Record<string, any> | undefined;
-        let lastError: unknown;
-        for (let attempt = 1; attempt <= MAX_DELEGATION_ATTEMPTS; attempt += 1) {
-          if (signal?.aborted) throw new Error(`${input.agent} delegation cancelled`);
-          let beforeMutation: any;
-          if (input.agent === "worker") {
-            try { beforeMutation = snapshotWorktree(input.cwd); } catch {}
-          }
-          try {
-            lastResponse = await delegateOnce(input, attempt);
-            if (lastResponse?.status === "completed") return lastResponse;
-            if (input.agent === "worker" && beforeMutation) {
-              try {
-                const afterMutation = snapshotWorktree(input.cwd);
-                if (afterMutation.diffSha256 !== beforeMutation.diffSha256 || JSON.stringify(afterMutation.changedFiles) !== JSON.stringify(beforeMutation.changedFiles)) return lastResponse;
-              } catch { return lastResponse; }
-            }
-          } catch (error) {
-            lastError = error;
-            const failureCategory = (error as any)?.failureCategory ?? classifyDelegationFailure(error);
-            if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
-              const prelaunchResourceLimit = failureCategory === "RESOURCE_LIMIT";
-              delegationAudit.push({
-                agent: input.agent,
-                attempt,
-                status: prelaunchResourceLimit ? "prelaunch-rejected" : "transport-failed",
-                failureCategory,
-                ...(prelaunchResourceLimit ? { failureReason: "SUBAGENT_SPAWN_BUDGET_EXHAUSTED", launchStatus: "not_launched", modelCalls: 0 } : {}),
-              });
-            }
-            if (!retryableDelegationFailure({ status: (error as any)?.delegationStatus, error: error instanceof Error ? error.message : String(error) })) throw error;
-          }
+      const delegate = async (input: DelegationInput): Promise<Record<string, any>> => executeDelegationWithRetry(async (attempt: number) => {
+        if (signal?.aborted) throw new Error(`${input.agent} delegation cancelled`);
+        let beforeMutation: any;
+        if (input.agent === "worker") {
+          try { beforeMutation = snapshotWorktree(input.cwd); } catch {}
         }
-        if (lastError) throw lastError;
-        return lastResponse ?? { status: "failed" };
-      };
+        try {
+          return await delegateOnce(input, attempt);
+        } catch (error) {
+          let failureCategory = (error as any)?.failureCategory ?? classifyDelegationFailure(error);
+          if (input.agent === "worker" && beforeMutation) {
+            try {
+              const afterMutation = snapshotWorktree(input.cwd);
+              if (afterMutation.diffSha256 !== beforeMutation.diffSha256 || JSON.stringify(afterMutation.changedFiles) !== JSON.stringify(beforeMutation.changedFiles)) {
+                failureCategory = "DETERMINISTIC";
+                if (error && typeof error === "object") (error as any).failureCategory = failureCategory;
+              }
+            } catch {
+              failureCategory = "DETERMINISTIC";
+              if (error && typeof error === "object") (error as any).failureCategory = failureCategory;
+            }
+          }
+          if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
+            const prelaunchResourceLimit = failureCategory === "RESOURCE_LIMIT";
+            delegationAudit.push({
+              agent: input.agent,
+              attempt,
+              status: prelaunchResourceLimit ? "prelaunch-rejected" : "transport-failed",
+              failureCategory,
+              ...(prelaunchResourceLimit ? { failureReason: "SUBAGENT_SPAWN_BUDGET_EXHAUSTED", launchStatus: "not_launched", modelCalls: 0 } : {}),
+            });
+          }
+          throw error;
+        }
+      });
       try {
         const sourceRepository = fs.realpathSync(ctx.cwd);
         recovery = {

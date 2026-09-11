@@ -1,19 +1,19 @@
 # Benchmark and smoke results
 
-Recorded on 2026-09-11 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. No authenticated provider call or E2E was made for the spawn-budget remediation.
+Recorded on 2026-09-11 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. No authenticated provider call or E2E was made for the structured-output remediation.
 
 ## Current regression evidence
 
 | Check | Result | Runtime evidence |
 |---|---|---|
-| Unit/static package | PASS | `npm run check`: 93/93 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Unit/static package | PASS | `npm run check`: 101/101 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
 | Deterministic evaluator | PASS | `npm run benchmark:suite`: 6/6 task categories, zero paid calls |
 | Model preset evaluator | PASS | `npm run benchmark:models`: four presets, all twelve routes backed by cached runtime-callable evidence, zero paid calls |
 | Real Pi capability path | PASS | `npm run smoke:runtime`: FFF filename/content, two AST matches, TS diagnostics/definition/four references, and real public `web_fetch`, driven sequentially by a local deterministic provider |
 | Real model commands | PASS | `npm run smoke:models`: live catalog, authentication metadata unchanged, override/persistence/reload/reset, invalid-ID rejection, all concrete presets, custom preservation |
 | Council surface/policy | PASS | `npm run smoke:council`: protected `/council` command wins; all four roles are fresh/read-only/non-delegating with advisory completion semantics |
 | Local Council/workflow | PASS | `npm run smoke:council-local`: corrected valid Council 100/100; full zero-paid Scout→Council→Worker→Tester→review→correction→final verification reached PASS; all negative controls failed closed |
-| Real spawn bridge/accounting | PASS | `npm run smoke:spawn-budget`: installed `pi-subagents@0.66.0` event bridge and upstream accounting with a deterministic local provider; 31 delegations, Council-3 at slot 25, final PASS, retry uses a second upstream slot/reserve unit, limit-24 zero-call preflight, atomic rejection, corrected pre-launch diagnostic, cleanup PASS |
+| Real spawn bridge/accounting | PASS | `npm run smoke:spawn-budget`: installed `pi-subagents@0.66.0` native-schema event bridge and upstream accounting with a deterministic local provider; 32 delegations, Council-2 invalid at slot 24 then valid at slot 26 on the same route, Council-3 at slot 25, one shared retry-reserve unit used, final PASS, deterministic schema/config rejection before launch, limit-24 zero-call preflight, atomic rejection, cleanup PASS |
 | MCP | PASS | `npm run smoke:mcp`: mutation approval denial, allowlist, no side effect, metadata-only MCP trace; prior online Context7 read remains documented separately |
 | General LSP | PASS/PARTIAL | `npm run smoke:lsp`: real TS and Python definition/references/diagnostics and C++ diagnostic pass in read-only no-network Bubblewrap; missing Rust and Go servers report `PARTIAL` |
 | Web | PASS/PARTIAL | `npm run smoke:web`: `web_fetch` and DNS-pinned `safe_web_fetch` work; unsafe schemes/private targets fail; Brave and Perplexity search fail explicitly because both credentials are absent |
@@ -24,12 +24,12 @@ Recorded on 2026-09-11 with official Pi 0.85.1. A PASS below is backed by the cu
 | Notebook/handoff | PASS | `npm run smoke:handoff`: durable marker preserved, editable handoff produced, new session message count zero |
 | Bootstrap | PASS | `npm run smoke:bootstrap`: clean temporary HOME, exact packages/runtimes, derived spawn limit 42, all presets/council routes, private policy/backup, no auth created |
 | Restore | PASS | `npm run smoke:restore`: original settings restored byte-for-byte; SHA-256 `08288b6b68fad66fa8797adbf8855d8029042b2970edf326d5415bcf22c194cb` |
-| Output optimizer | PASS | `npm run benchmark`: 164,450 to 4,836 characters (97.06%); critical diagnostics retained; 14.988 ms mean over 100 runs |
-| Trace privacy | PASS | `npm run smoke:trace`: 317 files / 1,531 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
+| Output optimizer | PASS | `npm run benchmark`: 164,450 to 4,836 characters (97.06%); critical diagnostics retained; 17.601 ms mean over 100 runs |
+| Trace privacy | PASS | `npm run smoke:trace`: 323 files / 1,543 rows; zero malformed rows, truncated tails, insecure files, forbidden fields, or secret-like values |
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
-| Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 20 at measurement time |
+| Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 16 at measurement time |
 
-The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 93/93; this environmental limitation is not counted as a product pass or failure.
+The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 101/101; this environmental limitation is not counted as a product pass or failure.
 
 ## Preset comparison
 
@@ -64,6 +64,7 @@ The current zero-cost measurement, `npm run benchmark:context`, runs Pi seven ti
 - `secure_coding_workflow` alone: 548 schema characters / estimated 137 schema tokens
 - model routing: 0 new default tool schemas (slash commands only)
 - council: 0 new default tool schemas (internal to the existing workflow tool)
+- structured-output retry fix: 0 new default tools and 0 workflow-schema characters; workflow-only remains 548 characters / estimated 137 tokens
 - spawn-budget fix: 0 new tool-schema characters/tokens and 0 additional happy-path model calls; a 100,000/10,000-iteration local microbenchmark measured 0.327 µs for formula+assertion, 6.404 µs for the protected config read, and 6.731 µs combined mean preflight overhead
 
 The estimate uses Pi's documented four-characters-per-token estimator, so it must not be compared numerically as if it were a new provider-billed measurement. The exact seven-call live measurement was not rerun because it would consume additional paid calls. The important structural result is exact: the model/council expansion did not add tools to the default surface.
@@ -80,8 +81,10 @@ The explicitly authorized single post-fix run `179bb6f7-414c-4529-baa2-709630b9b
 
 The durable child sessions record 21 provider calls, 47,081 input tokens, 14,080 output tokens, 37,248 cache-read tokens, 10,030 reasoning tokens, 98,409 total reported tokens, and USD 0.7057564. The outer Luna coordinator made two additional calls; its token and cost data were not persisted by the no-session RPC harness. Total model-call count is therefore 23, while the reported token/cost total covers 21 of those calls only. Runtime/worktree/port/process cleanup passed and the temporary repository was removed.
 
-The deterministic defects exposed by that run are now repaired: a three-state callability cache excludes `gpt-5.4` and records the Luna fallback; Council profiles use read-only advisory completion semantics; native per-request schemas plus exact controller/receipt validation fail closed; provider/model/thinking are canonicalized separately; and only transient delegation failures retry. The local Council path passed 100/100 and the complete planted-correction workflow reached `FINAL` PASS.
+The deterministic defects exposed by that run are now repaired: a three-state callability cache excludes `gpt-5.4` and records the Luna fallback; Council profiles use read-only advisory completion semantics; native per-request schemas plus exact controller/receipt validation fail closed; provider/model/thinking are canonicalized separately; and retry is bounded to transport transients or attested post-launch invalid model output. The local Council path passed 100/100 and the complete planted-correction workflow reached `FINAL` PASS.
 
 A later, separately authorized run `957f5169-5dc6-45f4-a19e-0b15ad77e6f5` progressed through two complete Councils, two Workers, two Testers, two verification PASS results and two review rounds. During escalation of the second blocker, Council-1 and Council-2 of the third Council consumed cumulative session slots 23 and 24. Council-3 needed slot 25, but the static `maxSubagentSpawnsPerSession=24` rejected it before provider launch. The controller then applied route attestation to that non-execution and obscured the original resource-limit error as a route mismatch. The workflow correctly remained FAIL; it was not a validator-only false negative.
 
-The remediation derives 39 base spawns plus a bounded global retry reserve of 3 and configures 42. Preflight, atomic blocks, retry accounting, durable resume, and pre-launch canonicalization are covered by the real local pi-subagents bridge/accounting smoke described above. The authenticated result is still **FAIL**. **Post-fix authenticated E2E = NOT RUN.**
+The spawn-budget remediation derives 39 base spawns plus a bounded global retry reserve of 3 and configures 42. Authenticated run `ce66f0c2-a157-4017-9ddb-1c5be0dc8d98` then proved that fix in a fresh session: Council-3 completed at slot 25 and two earlier Councils, including two valid Council-2/gpt-5.5 structured results, completed. The E2E still ended **FAIL** because repeated-failure Council-2 at slot 24 was launched on its valid callable route but returned one invalid structured result; the old generic `STRUCTURED_OUTPUT` category did not use the available reserve.
+
+The local fix now separates deterministic pre-launch `STRUCTURED_OUTPUT_POLICY_ERROR` from attested post-launch `STRUCTURED_OUTPUT_MODEL_INVALID`. Only the latter receives one same-route retry, shared with the existing global reserve; a second invalid attempt fails closed. The installed bridge regression proves the invalid→valid path at 32 total spawns and one reserve unit, while double-invalid, malformed-schema, privacy, and 40/41/42/reject-before-fourth controls pass locally. The authenticated result remains **FAIL**. **Post-structured-output-fix authenticated E2E = NOT RUN.**

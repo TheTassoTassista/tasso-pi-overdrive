@@ -91,6 +91,27 @@ test("transient retries cannot consume slots reserved for an atomic Council", ()
   assert.equal(guard.snapshot().reservedBaseSpawns, 0);
 });
 
+test("retry reserve permits total slots 40, 41, and 42 then rejects a fourth retry before spawn", () => {
+  const plan = calculateRequiredSpawnBudget();
+  const guard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit: 42, plan });
+  for (let index = 0; index < plan.requiredBaseSpawns; index += 1) guard.claimSpawn(`base-${index}`);
+  assert.deepEqual([1, 2, 3].map((retry) => {
+    const snapshot = guard.claimSpawn(`retry-${retry}`, { retry: true });
+    return { used: snapshot.used, retriesUsed: snapshot.retriesUsed };
+  }), [
+    { used: 40, retriesUsed: 1 },
+    { used: 41, retriesUsed: 2 },
+    { used: 42, retriesUsed: 3 },
+  ]);
+  const beforeRejected = guard.snapshot();
+  assert.throws(() => guard.claimSpawn("retry-4", { retry: true }), (error) => {
+    assert.equal(error.code, "TRANSIENT_RETRY_RESERVE_EXHAUSTED");
+    assert.equal(error.failureCategory, "RESOURCE_LIMIT");
+    return true;
+  });
+  assert.deepEqual(guard.snapshot(), beforeRejected, "reserve and total counters remain atomic on rejection");
+});
+
 test("pre-launch spawn exhaustion preserves the cause and never runs route attestation or retry", () => {
   const original = "Subagent spawn limit reached for this session (24/24 used, 1 requested).";
   const response = canonicalizeDelegationResponse(

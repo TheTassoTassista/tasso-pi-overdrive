@@ -96,6 +96,8 @@ const retryFixture = (failures) => {
   return attempts;
 };
 check("transient-error-retries-once", retryFixture([{ status: "transport_failed", error: "temporary network reset" }, { status: "completed" }]) === 2);
+check("attested-structured-model-output-retries-once", retryFixture([{ status: "structured_output_failed", launchStatus: "launched", routeAttested: true, error: "missing structured output" }, { status: "completed" }]) === 2);
+check("prelaunch-schema-configuration-does-not-retry", retryFixture([{ status: "invalid_request", launchStatus: "not_launched", error: "result.schema must be a JSON Schema object" }, { status: "completed" }]) === 1);
 check("unsupported-model-does-not-retry", retryFixture([{ status: "failed", error: "unsupported model" }, { status: "completed" }]) === 1);
 
 const status = results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";

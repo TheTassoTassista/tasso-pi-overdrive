@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
+import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { runEnforcedWorkflow } from "../lib/workflow-state.mjs";
 import { calculateRequiredSpawnBudget, createWorkflowSpawnBudgetGuard } from "../lib/workflow-spawn-budget.mjs";
 
@@ -53,6 +54,8 @@ const executions = [];
 let localProviderInvocations = 0;
 let nodeSequence = 0;
 let transientFixtureAttempts = 0;
+let repeatedCouncilTwoInvalidAttempts = 0;
+let structuredFailureProjection;
 
 function reviewRound(task) {
   const match = /Review round (\d+)/u.exec(task);
@@ -78,10 +81,36 @@ function structuredValue(agent, task) {
 function deterministicProvider(params, slot) {
   localProviderInvocations += 1;
   if (params.agent === "worker") fs.appendFileSync(fixtureFile, `worker:${slot}:${params.task.includes("Correction iteration 2") ? 2 : params.task.includes("Correction iteration 1") ? 1 : 0}\n`);
+  const modelInvalid = params.agent === "council-2"
+    && params.task.includes("Council purpose: repeated-failure")
+    && repeatedCouncilTwoInvalidAttempts++ === 0;
   const structuredOutput = params.outputSchema ? structuredValue(params.agent, params.task ?? "") : undefined;
   const finalOutput = params.outputSchema ? undefined : `${params.agent} completed by deterministic local provider`;
   const launchContractDigest = createHash("sha256").update(`${slot}:${params.agent}:${params.model}:${params.delegatedThinkingOverride}`).digest("hex");
-  executions.push({ slot, agent: params.agent, task: params.task, model: params.model, thinking: params.delegatedThinkingOverride, structured: Boolean(params.outputSchema), launchContractDigest });
+  executions.push({ slot, agent: params.agent, task: params.task, model: params.model, thinking: params.delegatedThinkingOverride, structured: Boolean(params.outputSchema), outcome: modelInvalid ? "STRUCTURED_OUTPUT_MODEL_INVALID" : "completed", launchContractDigest });
+  if (modelInvalid) {
+    const syntheticSensitiveOutput = ["API", "_TOKEN=", "sk", "-test-never-project-this-raw-output", "\nconst hidden = process.env.SECRET;"].join("");
+    return {
+      isError: true,
+      content: [{ type: "text", text: "deterministic structured-output failure" }],
+      details: {
+        mode: "single",
+        runId: randomUUID(),
+        results: [{
+          agent: params.agent,
+          finalOutput: syntheticSensitiveOutput,
+          structuredOutputFailed: true,
+          error: "Missing structured output call; missing required property recommendation at path /recommendation",
+          exitCode: 1,
+          model: params.model,
+          thinking: params.delegatedThinkingOverride,
+          launchContractDigest,
+          usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, turns: 0 },
+          progressSummary: { toolCount: 0, durationMs: 0, tokens: 0 },
+        }],
+      },
+    };
+  }
   if (params.task.includes("TRANSIENT_RETRY_ACCOUNTING") && transientFixtureAttempts++ === 0) {
     return {
       isError: true,
@@ -161,17 +190,31 @@ const bridgeRequest = (input) => new Promise((resolve) => {
     result: input.result ?? { kind: "text" },
   });
 });
-const delegate = (input) => new Promise((resolve, reject) => {
-  guard.claimSpawn(input.agent);
+const delegate = (input) => executeDelegationWithRetry((attempt) => new Promise((resolve, reject) => {
+  guard.claimSpawn(input.agent, { retry: attempt > 1 });
   const requestId = randomUUID();
   const nodeId = `${String(nodeSequence += 1).padStart(2, "0")}-${input.agent}`;
   const ownerRunId = "deterministic-bridge-owner";
   const unsubscribe = bus.on(PROMPT_TEMPLATE_SUBAGENT_RESPONSE_EVENT, (raw) => {
     if (raw?.requestId !== requestId || raw?.nodeId !== nodeId || raw?.ownerRunId !== ownerRunId) return;
     unsubscribe();
-    const response = canonicalizeDelegationResponse(route, raw);
+    const response = canonicalizeDelegationResponse(route, raw, { attempt, schema: input.result?.kind === "structured" ? input.result.schema : undefined });
     if (response.status === "completed") resolve(response);
-    else reject(Object.assign(new Error(response.error ?? `${input.agent} failed`), { delegationStatus: response.status, failureCategory: response.failureCategory }));
+    else {
+      if (response.failureCategory === "STRUCTURED_OUTPUT_MODEL_INVALID") {
+        const serialized = JSON.stringify(response);
+        structuredFailureProjection = {
+          status: !serialized.includes("never-project-this-raw-output")
+            && response.failureMetadata?.outputLength === null
+            && response.failureMetadata?.rawOutputDigest === null
+            && response.failureMetadata?.missingRequiredFields?.includes("recommendation")
+            ? "PASS"
+            : "FAIL",
+          failureMetadata: response.failureMetadata,
+        };
+      }
+      reject(Object.assign(new Error(response.error ?? `${input.agent} failed`), { delegationStatus: response.status, failureCategory: response.failureCategory }));
+    }
   });
   bus.emit(PROMPT_TEMPLATE_SUBAGENT_REQUEST_EVENT, {
     requestId,
@@ -188,13 +231,14 @@ const delegate = (input) => new Promise((resolve, reject) => {
     artifacts: false,
     result: input.result,
   });
-});
+}));
 
 let state;
 let cleanup = "FAIL";
 let negative;
 let atomic;
 let bridgePrelaunch;
+let schemaPrelaunch;
 let retryAccounting;
 let longPathExecutions;
 let longPathProviderInvocations;
@@ -239,6 +283,31 @@ try {
     controllerSlotsConsumed: retryGuard.snapshot().used,
     retriesUsed: retryGuard.snapshot().retriesUsed,
     retryReserveRemaining: retryGuard.snapshot().retryReserveRemaining,
+  };
+
+  const beforeSchemaProviderCalls = localProviderInvocations;
+  const beforeSchemaUpstreamCount = upstreamState.subagentSpawns.count;
+  const malformedSchemaRaw = await bridgeRequest({
+    agent: "council-2",
+    nodeId: "schema-prelaunch-council-2",
+    task: "deterministic invalid schema configuration",
+    result: { kind: "structured", schema: "not-an-object" },
+  });
+  const malformedSchema = canonicalizeDelegationResponse(route, malformedSchemaRaw, { attempt: 1 });
+  schemaPrelaunch = {
+    status: malformedSchema.status === "invalid_request"
+      && malformedSchema.failureCategory === "STRUCTURED_OUTPUT_POLICY_ERROR"
+      && malformedSchema.launchStatus === "not_launched"
+      && malformedSchema.modelCalls === 0
+      && localProviderInvocations === beforeSchemaProviderCalls
+      && upstreamState.subagentSpawns.count === beforeSchemaUpstreamCount
+      ? "PASS"
+      : "FAIL",
+    failureCategory: malformedSchema.failureCategory,
+    launchStatus: malformedSchema.launchStatus,
+    modelCalls: malformedSchema.modelCalls,
+    providerInvocationsAdded: localProviderInvocations - beforeSchemaProviderCalls,
+    upstreamSlotsAdded: upstreamState.subagentSpawns.count - beforeSchemaUpstreamCount,
   };
 
   const beforePrelaunchProviderCalls = localProviderInvocations;
@@ -304,31 +373,47 @@ try {
 }
 
 const repeatedCouncilThree = longPathExecutions?.find((entry) => entry.agent === "council-3" && entry.task.includes("repeated-failure"));
+const repeatedCouncilTwo = (longPathExecutions ?? []).filter((entry) => entry.agent === "council-2" && entry.task.includes("repeated-failure"));
+const repeatedCouncilJudge = longPathExecutions?.find((entry) => entry.agent === "council-judge" && entry.task.includes("repeated-failure"));
 const workerSlots = (longPathExecutions ?? []).filter((entry) => entry.agent === "worker").map((entry) => entry.slot);
 const testerSlots = (longPathExecutions ?? []).filter((entry) => entry.agent === "tester").map((entry) => entry.slot);
+const councilPurposes = state?.evidence.councils.map((entry) => `${entry.purpose}:${entry.complete}`);
 const finalTransition = state?.evidence.transitions.at(-1);
 const longPathPassed = state?.status === "PASS"
   && finalTransition?.state === "FINAL"
   && finalTransition?.phase === "complete"
-  && longPathExecutions?.length === 31
-  && longPathUpstreamCount === 31
-  && longPathControllerCount === 31
+  && longPathExecutions?.length === 32
+  && longPathUpstreamCount === 32
+  && longPathControllerCount === 32
+  && state.spawnBudget.retriesUsed === 1
   && repeatedCouncilThree?.slot === 25
+  && repeatedCouncilTwo.length === 2
+  && repeatedCouncilTwo[0]?.slot === 24
+  && repeatedCouncilTwo[0]?.outcome === "STRUCTURED_OUTPUT_MODEL_INVALID"
+  && repeatedCouncilTwo[1]?.slot === 26
+  && repeatedCouncilTwo[1]?.outcome === "completed"
+  && structuredFailureProjection?.status === "PASS"
+  && repeatedCouncilJudge?.slot === 27
+  && repeatedCouncilJudge?.outcome === "completed"
+  && JSON.stringify(councilPurposes) === JSON.stringify(["high-risk-planning:true", "reviewer-disagreement:true", "repeated-failure:true"])
   && workerSlots.length === 3
   && testerSlots.length === 3
   && state.evidence.verifications.length === 3
   && state.evidence.reviews.at(-1)?.reviews.every((review) => review.verdict === "PASS")
   && cleanup === "PASS";
-const status = longPathPassed && negative?.status === "PASS" && atomic?.status === "PASS" && bridgePrelaunch?.status === "PASS" && retryAccounting?.status === "PASS" ? "PASS" : "FAIL";
+const status = longPathPassed && negative?.status === "PASS" && atomic?.status === "PASS" && bridgePrelaunch?.status === "PASS" && schemaPrelaunch?.status === "PASS" && retryAccounting?.status === "PASS" ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({
   status,
   providerExecution: "DETERMINISTIC_LOCAL_ONLY",
   paidModelCalls: 0,
   piSubagentsVersion: packageMetadata.version,
   budget: { requiredBaseSpawns: plan.requiredBaseSpawns, retryReserve: plan.retryReserve, requiredTotalSpawns: plan.requiredTotalSpawns, configuredSpawnLimit },
-  longPath: { status: longPathPassed ? "PASS" : "FAIL", finalState: state?.status, finalPhase: finalTransition, delegations: longPathExecutions?.length, localProviderInvocations: longPathProviderInvocations, upstreamSpawnCount: longPathUpstreamCount, controllerSpawnCount: longPathControllerCount, workerSlots, testerSlots },
+  longPath: { status: longPathPassed ? "PASS" : "FAIL", finalState: state?.status, finalPhase: finalTransition, delegations: longPathExecutions?.length, localProviderInvocations: longPathProviderInvocations, upstreamSpawnCount: longPathUpstreamCount, controllerSpawnCount: longPathControllerCount, retriesUsed: state?.spawnBudget?.retriesUsed, councilPurposes, repeatedFailureJudgeSlot: repeatedCouncilJudge?.slot, workerSlots, testerSlots },
   slot25: repeatedCouncilThree ? { status: "PASS", slot: repeatedCouncilThree.slot, agent: repeatedCouncilThree.agent, purpose: "repeated-failure", structured: repeatedCouncilThree.structured } : { status: "FAIL" },
+  structuredRetry: { status: repeatedCouncilTwo.length === 2 && repeatedCouncilTwo[0]?.outcome === "STRUCTURED_OUTPUT_MODEL_INVALID" && repeatedCouncilTwo[1]?.outcome === "completed" ? "PASS" : "FAIL", attempts: repeatedCouncilTwo.map(({ slot, agent, model, thinking, outcome }) => ({ slot, agent, model, thinking, outcome })) },
+  structuredFailureProjection,
   retryAccounting,
+  schemaPrelaunch,
   bridgePrelaunch,
   negativeLimit24: negative,
   atomicFanout: atomic,
