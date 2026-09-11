@@ -15,11 +15,12 @@ const agentDir = path.join(testHome, ".pi", "agent");
 const stateDir = path.join(root, "state");
 const configDir = path.join(root, "config");
 const backupDir = path.join(root, "backups");
+const lspRuntime = path.join(root, "lsp-runtime");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
 function run(args) {
-  const environment = { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_STATE_HOME: stateDir, XDG_CONFIG_HOME: configDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir };
+  const environment = { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_STATE_HOME: stateDir, XDG_CONFIG_HOME: configDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir, PI_OVERDRIVE_LSP_RUNTIME: lspRuntime, npm_config_cache: path.join(root, "npm-cache") };
   for (const name of ["BRAVE_SEARCH_API_KEY", "PERPLEXITY_API_KEY", "DEEPSEEK_API_KEY", "QWEN_API_KEY", "OPENAI_API_KEY"]) delete environment[name];
   return spawnSync(path.join(packageRoot, "scripts", "bootstrap.sh"), args, {
     cwd: packageRoot,
@@ -82,8 +83,9 @@ try {
   check("bootstrap-council-routes-load", councilAgents.every((name) => allowedModels.includes(settings.subagents?.agentOverrides?.[name]?.model)), Object.fromEntries(councilAgents.map((name) => [name, settings.subagents?.agentOverrides?.[name] ?? null])));
   check("bootstrap-credential-slots-are-cleanly-missing", Object.values(webCredentialStatus(webConfig, {})).every((entry) => entry.configured === false && entry.source === "missing"), webCredentialStatus(webConfig, {}));
   const toolRoot = path.join(testHome, ".local", "share", "pi-overdrive", "lsp-node", "node_modules");
-  const lspRoot = path.join(packageRoot, "runtime", "lsp", "node_modules");
+  const lspRoot = path.join(lspRuntime, "node_modules");
   check("bootstrap-pinned-tools-present", fs.existsSync(path.join(toolRoot, "@ast-grep", "cli")) && ["typescript", "pyright", "@vtsls/language-server"].every((name) => fs.existsSync(path.join(lspRoot, name))), { toolRoot, lspRoot });
+  check("bootstrap-lsp-runtime-isolated", lspRuntime.startsWith(`${root}${path.sep}`) && fs.existsSync(path.join(lspRuntime, "package-lock.json")), { lspRuntime });
   const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir) : [];
   check("bootstrap-created-private-backup", backups.length === 1 && (fs.statSync(path.join(backupDir, backups[0])).mode & 0o077) === 0, backups);
 } catch (error) {
@@ -92,6 +94,6 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-const status = results.length >= 13 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length >= 14 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, packageRoot, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

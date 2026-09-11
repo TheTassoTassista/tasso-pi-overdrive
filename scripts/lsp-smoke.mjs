@@ -8,15 +8,30 @@ import { fileURLToPath } from "node:url";
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pi = process.env.PI_BIN || "pi";
 const provider = path.join(packageRoot, "tests", "fixtures", "deterministic-single-tool-provider.ts");
+const lspExtension = path.join(packageRoot, "extensions", "lsp.ts");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-lsp-smoke-"));
+const auditHome = path.join(temporary, "home");
+const auditAgent = path.join(auditHome, ".pi", "agent");
+const auditConfig = path.join(temporary, "config");
+fs.mkdirSync(auditAgent, { recursive: true, mode: 0o700 });
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
 function run(cwd, args, timeoutMs = 45_000) {
   return new Promise((resolve) => {
-    const child = spawn(pi, ["--extension", provider, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--tools", "semantic_nav"], {
+    const child = spawn(pi, ["--extension", provider, "--extension", lspExtension, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--tools", "semantic_nav"], {
       cwd,
-      env: { ...process.env, PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only", PI_OVERDRIVE_AUDIT_TOOL: "semantic_nav", PI_OVERDRIVE_AUDIT_TOOL_ARGS: JSON.stringify(args), XDG_STATE_HOME: path.join(temporary, "state") },
+      env: {
+        ...process.env,
+        HOME: auditHome,
+        PI_CODING_AGENT_DIR: auditAgent,
+        XDG_CONFIG_HOME: auditConfig,
+        XDG_STATE_HOME: path.join(temporary, "state"),
+        npm_config_cache: path.join(temporary, "npm-cache"),
+        PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only",
+        PI_OVERDRIVE_AUDIT_TOOL: "semantic_nav",
+        PI_OVERDRIVE_AUDIT_TOOL_ARGS: JSON.stringify(args),
+      },
       stdio: ["pipe", "pipe", "pipe"],
     });
     const events = [];

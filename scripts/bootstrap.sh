@@ -22,6 +22,8 @@ prerequisite_args=()
 pi_bin=${PI_BIN:-$(command -v pi || true)}
 npm_bin=${NPM_BIN:-$(command -v npm || true)}
 agent_dir=${PI_CODING_AGENT_DIR:-"$HOME/.pi/agent"}
+lsp_manifest_root="$package_root/runtime/lsp"
+lsp_runtime_root=${PI_OVERDRIVE_LSP_RUNTIME:-"$lsp_manifest_root"}
 settings_file="$agent_dir/settings.json"
 install_manifest="$agent_dir/tasso-pi-overdrive-install.json"
 web_config_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
@@ -43,7 +45,7 @@ if [[ "$check_only" == true ]]; then
   "$pi_bin" list
   "$npm_bin" list --prefix "$package_root/runtime/mcp" --depth=0 \
     pi-mcp-adapter@2.32.1 @modelcontextprotocol/sdk@1.30.0
-  "$npm_bin" list --prefix "$package_root/runtime/lsp" --depth=0 \
+  "$npm_bin" list --prefix "$lsp_runtime_root" --depth=0 \
     @vtsls/language-server@0.3.0 pyright@1.1.410 typescript@6.0.3 \
     vscode-langservers-extracted@4.10.0 yaml-language-server@1.23.0 \
     bash-language-server@5.6.0 vscode-jsonrpc@9.0.2
@@ -85,7 +87,12 @@ backup_file "$HOME/.pi/config/pi-agent-browser-native/config.json" "$backup_dir/
 echo "Backup: $backup_dir"
 
 "$npm_bin" ci --prefix "$package_root/runtime/mcp" --omit=dev --ignore-scripts --no-audit --no-fund
-"$npm_bin" ci --prefix "$package_root/runtime/lsp" --omit=dev --ignore-scripts --no-audit --no-fund
+if [[ "$lsp_runtime_root" != "$lsp_manifest_root" ]]; then
+  install -d -m 700 "$lsp_runtime_root"
+  install -m 600 "$lsp_manifest_root/package.json" "$lsp_runtime_root/package.json"
+  install -m 600 "$lsp_manifest_root/package-lock.json" "$lsp_runtime_root/package-lock.json"
+fi
+"$npm_bin" ci --prefix "$lsp_runtime_root" --omit=dev --ignore-scripts --no-audit --no-fund
 
 install -d -m 700 "$agent_dir"
 node "$package_root/scripts/settings-tool.mjs" snapshot "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
