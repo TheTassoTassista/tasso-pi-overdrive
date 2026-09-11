@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -39,6 +39,13 @@ if (JSON.stringify(lspRuntime.dependencies) !== JSON.stringify(expectedLsp)) fai
 const lspLock = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package-lock.json'), 'utf8'));
 for (const [name, version] of Object.entries(expectedLsp)) if (lspLock.packages?.[`node_modules/${name}`]?.version !== version) failures.push(`LSP lock mismatch: ${name}@${version}`);
 if (lspRuntime.overrides?.minimatch !== '10.2.6' || lspLock.packages?.['node_modules/minimatch']?.version !== '10.2.6') failures.push('LSP minimatch security override is missing or not locked');
+const managedLsp = JSON.parse(await readFile(path.join(root, 'config/managed-lsp.json'), 'utf8'));
+if (managedLsp.version !== 1 || managedLsp.platform !== 'linux-x64') failures.push('managed LSP manifest version/platform mismatch');
+if (managedLsp.rustAnalyzer?.release !== '2026-09-07' || managedLsp.rustAnalyzer?.version !== '0.3.3041-standalone' || !/^[0-9a-f]{64}$/u.test(managedLsp.rustAnalyzer?.archiveSha256 ?? '') || !/^[0-9a-f]{64}$/u.test(managedLsp.rustAnalyzer?.binarySha256 ?? '')) failures.push('rust-analyzer release or checksums are not pinned');
+if (managedLsp.rustSource?.version !== '1.98.1' || !/^[0-9a-f]{64}$/u.test(managedLsp.rustSource?.archiveSha256 ?? '')) failures.push('rust-src is not pinned');
+if (managedLsp.go?.version !== '1.26.8' || !/^[0-9a-f]{64}$/u.test(managedLsp.go?.archiveSha256 ?? '')) failures.push('managed Go toolchain is not pinned');
+if (managedLsp.gopls?.version !== 'v0.23.0' || managedLsp.gopls?.module !== 'golang.org/x/tools/gopls@v0.23.0' || !/^h1:[A-Za-z0-9+/]{43}=$/u.test(managedLsp.gopls?.moduleSum ?? '')) failures.push('gopls module identity is not pinned');
+for (const name of ['rust-analyzer', 'rust-src', 'go', 'gopls']) if (!packagePolicy.trackedRuntimes?.[name]) failures.push(`${name} is missing from tracked runtime provenance`);
 
 const mcpConfig = JSON.parse(await readFile(path.join(root, 'config/mcp.json'), 'utf8'));
 if (mcpConfig.settings?.directTools !== false || mcpConfig.settings?.scriptMode !== false) failures.push('MCP must expose one proxy only (no direct tools or script surface)');

@@ -61,6 +61,32 @@ if [[ -d "$tool_root/node_modules/.bin" ]]; then
   )
   tool_path=/opt/pi-overdrive-tools/node_modules/.bin:/usr/bin:/bin
 fi
+if [[ -x "$tool_root/managed/bin/rust-analyzer" || -x "$tool_root/managed/bin/gopls" ]]; then
+  if [[ ${tool_args[*]} != *"/opt/pi-overdrive-tools"* ]]; then
+    tool_root=$(realpath -e -- "$tool_root")
+    tool_args+=(--ro-bind "$tool_root" /opt/pi-overdrive-tools)
+  fi
+  tool_path=/opt/pi-overdrive-tools/managed/bin:/opt/pi-overdrive-tools/managed/go/bin:$tool_path
+  if [[ -d "$tool_root/managed/rust-src/lib/rustlib/src/rust/library" ]]; then
+    tool_args+=(
+      --setenv RUST_SRC_PATH /opt/pi-overdrive-tools/managed/rust-src/lib/rustlib/src/rust/library
+      --setenv CARGO_HOME /tmp/cargo-home
+      --setenv CARGO_TARGET_DIR /tmp/cargo-target
+      --setenv CARGO_NET_OFFLINE true
+    )
+  fi
+  if [[ -x "$tool_root/managed/go/bin/go" ]]; then
+    tool_args+=(
+      --setenv GOROOT /opt/pi-overdrive-tools/managed/go
+      --setenv GOPATH /tmp/go
+      --setenv GOCACHE /tmp/go-cache
+      --setenv GOMODCACHE /tmp/go-mod-cache
+      --setenv GOTOOLCHAIN local
+      --setenv GOPROXY off
+      --setenv GOSUMDB off
+    )
+  fi
+fi
 
 # Hide repository-contained credentials from indirect interpreter/test access,
 # and make Git metadata read-only. The outer tool guard already denies direct

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "platform": "linux-x64",
+  "rustAnalyzer": {
+    "release": "2026-09-07",
+    "version": "0.3.3041-standalone",
+    "url": "https://github.com/rust-lang/rust-analyzer/releases/download/2026-09-07/rust-analyzer-x86_64-unknown-linux-gnu.gz",
+    "archiveSha256": "a3500183aa08bf740c0da6e030ad262d4cfa1c19e7ce195ab5f772bdf9ddfb12",
+    "binarySha256": "0ca302d1c841e9ffb772718d965a64181db4342337f8415cfa760cb0e36a025e",
+    "provenance": "rust-lang/rust-analyzer official GitHub release asset"
+  },
+  "rustSource": {
+    "version": "1.98.1",
+    "url": "https://static.rust-lang.org/dist/2026-09-03/rust-src-1.98.1.tar.xz",
+    "archiveSha256": "5c846ebcebcc7e2e0777a4cdaa12051691593f16a7e94edbae5e6241cc62d98c",
+    "provenance": "static.rust-lang.org channel-rust-1.98.1 manifest"
+  },
+  "go": {
+    "version": "1.26.8",
+    "url": "https://go.dev/dl/go1.26.8.linux-amd64.tar.gz",
+    "archiveSha256": "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b",
+    "provenance": "go.dev official Linux amd64 archive"
+  },
+  "gopls": {
+    "version": "v0.23.0",
+    "module": "golang.org/x/tools/gopls@v0.23.0",
+    "moduleSum": "h1:Dn6mf9WXu9iLnTftDDMb9wV0c6Se7PjzEMqP0LEe08Y=",
+    "goModSum": "h1:Ijg67bAdTicg9IINxII7MV+dQpHEXM4646WpNWVYBP0=",
+    "sourceCommit": "014f87ff5c01915bc90f4f11a6bb8aea3e0edbd7",
+    "provenance": "proxy.golang.org module authenticated by sum.golang.org"
+  }
+}

@@ -11,7 +11,7 @@ for argument in "$@"; do
   esac
 done
 
-required=(git rg fd jq curl wget tar unzip python3 gcc g++ make bwrap node npm)
+required=(git rg fd jq curl wget tar gzip xz unzip python3 gcc g++ make bwrap node npm)
 missing=()
 for command_name in "${required[@]}"; do
   command -v "$command_name" >/dev/null 2>&1 || missing+=("$command_name")

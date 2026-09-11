@@ -1,2 +1,5 @@
 runtime/**/node_modules/
-
+runtime/lsp/download-cache/
+runtime/lsp/managed/
+runtime/lsp/.managed-install-*/
+runtime/lsp/.managed-previous-*/

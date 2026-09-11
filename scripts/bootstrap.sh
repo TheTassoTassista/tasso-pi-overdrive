@@ -49,6 +49,7 @@ if [[ "$check_only" == true ]]; then
     @vtsls/language-server@0.3.0 pyright@1.1.410 typescript@6.0.3 \
     vscode-langservers-extracted@4.10.0 yaml-language-server@1.23.0 \
     bash-language-server@5.6.0 vscode-jsonrpc@9.0.2
+  node "$package_root/scripts/install-managed-lsp.mjs" --check --runtime "$lsp_runtime_root"
   "$npm_bin" list --prefix "$HOME/.local/share/pi-overdrive/lsp-node" --depth=0 \
     @ast-grep/cli@0.45.3
   node "$package_root/scripts/model-policy-tool.mjs" check "$model_policy"
@@ -93,6 +94,7 @@ if [[ "$lsp_runtime_root" != "$lsp_manifest_root" ]]; then
   install -m 600 "$lsp_manifest_root/package-lock.json" "$lsp_runtime_root/package-lock.json"
 fi
 "$npm_bin" ci --prefix "$lsp_runtime_root" --omit=dev --ignore-scripts --no-audit --no-fund
+node "$package_root/scripts/install-managed-lsp.mjs" --runtime "$lsp_runtime_root"
 
 install -d -m 700 "$agent_dir"
 node "$package_root/scripts/settings-tool.mjs" snapshot "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
