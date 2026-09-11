@@ -1,6 +1,6 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { executeLsp, lspRuntimeStatus, shutdownLspServers } from "../lib/lsp-manager.mjs";
@@ -87,25 +87,75 @@ test("clangd returns real diagnostics, definitions, and references", { timeout: 
   assert.ok(diagnostics.entries.some((entry) => entry.severity === "Error"), JSON.stringify(diagnostics));
 });
 
-test("recognized missing Rust and Go servers are PARTIAL for diagnostics/definition/references, and project switching does not leak", { timeout: 60_000 }, async () => {
+test("managed rust-analyzer supports read-only cross-file semantic navigation", { timeout: 120_000 }, async () => {
   const rust = fixture("pi-lsp-rust-");
-  writeFileSync(path.join(rust, "Cargo.toml"), "[package]\nname='fixture'\nversion='0.1.0'\n");
-  writeFileSync(path.join(rust, "main.rs"), "fn main() {}\n");
-  for (const operation of ["diagnostics", "definition", "references"]) {
-    const rustResult = await executeLsp(rust, { operation, path: "main.rs", line: 1, character: 4 });
-    assert.equal(rustResult.status, "PARTIAL", JSON.stringify(rustResult));
-    assert.equal(rustResult.language, "rust");
-  }
+  mkdirSync(path.join(rust, "src"));
+  writeFileSync(path.join(rust, "Cargo.toml"), "[package]\nname = \"rust_fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
+  writeFileSync(path.join(rust, "src", "lib.rs"), "pub fn twice(value: i32) -> i32 { value * 2 }\n");
+  writeFileSync(path.join(rust, "src", "main.rs"), "use rust_fixture::twice;\n\nfn main() {\n    let bad: &str = twice(21);\n    println!(\"{}\", twice(2));\n}\n");
+  const definition = await executeLsp(rust, { operation: "definition", path: "src/main.rs", line: 4, character: 22 });
+  assert.equal(definition.status, "PASS", JSON.stringify(definition));
+  assert.ok(definition.entries.some((entry) => entry.path === "src/lib.rs" && entry.start.line === 1), JSON.stringify(definition));
+  const references = await executeLsp(rust, { operation: "references", path: "src/main.rs", line: 4, character: 22 });
+  assert.equal(references.status, "PASS", JSON.stringify(references));
+  assert.ok(references.entries.some((entry) => entry.path === "src/lib.rs"), JSON.stringify(references));
+  assert.ok(references.entries.filter((entry) => entry.path === "src/main.rs").length >= 2, JSON.stringify(references));
+  const diagnostics = await executeLsp(rust, { operation: "diagnostics", path: "src/main.rs" });
+  assert.equal(diagnostics.status, "PASS", JSON.stringify(diagnostics));
+  assert.ok(diagnostics.entries.some((entry) => entry.severity === "Error"), JSON.stringify(diagnostics));
+  const hover = await executeLsp(rust, { operation: "hover", path: "src/main.rs", line: 4, character: 22 });
+  assert.equal(hover.status, "PASS", JSON.stringify(hover));
+  assert.match(hover.entries?.contents ?? "", /twice|i32/u);
+  const documentSymbols = await executeLsp(rust, { operation: "document_symbols", path: "src/main.rs" });
+  assert.equal(documentSymbols.status, "PASS", JSON.stringify(documentSymbols));
+  assert.ok(documentSymbols.entries.some((entry) => entry.name === "main"), JSON.stringify(documentSymbols));
+  const workspaceSymbols = await executeLsp(rust, { operation: "workspace_symbols", path: "src/main.rs", query: "twice" });
+  assert.equal(workspaceSymbols.status, "PASS", JSON.stringify(workspaceSymbols));
+  assert.ok(workspaceSymbols.entries.some((entry) => entry.name === "twice" && entry.location?.path === "src/lib.rs"), JSON.stringify(workspaceSymbols));
+  const originalLibrary = readFileSync(path.join(rust, "src", "lib.rs"), "utf8");
+  const originalMain = readFileSync(path.join(rust, "src", "main.rs"), "utf8");
+  const rename = await executeLsp(rust, { operation: "rename_preview", path: "src/main.rs", line: 4, character: 22, newName: "double_value" });
+  assert.equal(rename.status, "PASS", JSON.stringify(rename));
+  assert.ok(rename.entries.length >= 3, JSON.stringify(rename));
+  assert.equal(readFileSync(path.join(rust, "src", "lib.rs"), "utf8"), originalLibrary, "rename preview mutated the Rust library");
+  assert.equal(readFileSync(path.join(rust, "src", "main.rs"), "utf8"), originalMain, "rename preview mutated the Rust caller");
+});
 
+test("managed gopls supports read-only cross-package semantic navigation", { timeout: 120_000 }, async () => {
   const go = fixture("pi-lsp-go-");
-  writeFileSync(path.join(go, "go.mod"), "module example.invalid/fixture\n\ngo 1.22\n");
-  writeFileSync(path.join(go, "main.go"), "package main\nfunc main() {}\n");
-  for (const operation of ["diagnostics", "definition", "references"]) {
-    const goResult = await executeLsp(go, { operation, path: "main.go", line: 2, character: 6 });
-    assert.equal(goResult.status, "PARTIAL", JSON.stringify(goResult));
-    assert.equal(goResult.language, "go");
-  }
+  mkdirSync(path.join(go, "mathx"));
+  writeFileSync(path.join(go, "go.mod"), "module example.invalid/fixture\n\ngo 1.26\n");
+  writeFileSync(path.join(go, "mathx", "mathx.go"), "package mathx\n\nfunc Twice(value int) int { return value * 2 }\n");
+  writeFileSync(path.join(go, "main.go"), "package main\n\nimport (\n    \"fmt\"\n    \"example.invalid/fixture/mathx\"\n)\n\nfunc main() {\n    var bad string = mathx.Twice(21)\n    fmt.Println(mathx.Twice(2), bad)\n}\n");
+  const definition = await executeLsp(go, { operation: "definition", path: "main.go", line: 9, character: 30 });
+  assert.equal(definition.status, "PASS", JSON.stringify(definition));
+  assert.ok(definition.entries.some((entry) => entry.path === "mathx/mathx.go" && entry.start.line === 3), JSON.stringify(definition));
+  const references = await executeLsp(go, { operation: "references", path: "main.go", line: 9, character: 30 });
+  assert.equal(references.status, "PASS", JSON.stringify(references));
+  assert.ok(references.entries.some((entry) => entry.path === "mathx/mathx.go"), JSON.stringify(references));
+  assert.ok(references.entries.filter((entry) => entry.path === "main.go").length >= 2, JSON.stringify(references));
+  const diagnostics = await executeLsp(go, { operation: "diagnostics", path: "main.go" });
+  assert.equal(diagnostics.status, "PASS", JSON.stringify(diagnostics));
+  assert.ok(diagnostics.entries.some((entry) => entry.severity === "Error"), JSON.stringify(diagnostics));
+  const hover = await executeLsp(go, { operation: "hover", path: "main.go", line: 9, character: 30 });
+  assert.equal(hover.status, "PASS", JSON.stringify(hover));
+  assert.match(hover.entries?.contents ?? "", /Twice|int/u);
+  const documentSymbols = await executeLsp(go, { operation: "document_symbols", path: "main.go" });
+  assert.equal(documentSymbols.status, "PASS", JSON.stringify(documentSymbols));
+  assert.ok(documentSymbols.entries.some((entry) => entry.name === "main"), JSON.stringify(documentSymbols));
+  const workspaceSymbols = await executeLsp(go, { operation: "workspace_symbols", path: "main.go", query: "Twice" });
+  assert.equal(workspaceSymbols.status, "PASS", JSON.stringify(workspaceSymbols));
+  assert.ok(workspaceSymbols.entries.some((entry) => entry.name === "Twice" && entry.location?.path === "mathx/mathx.go"), JSON.stringify(workspaceSymbols));
+  const originalLibrary = readFileSync(path.join(go, "mathx", "mathx.go"), "utf8");
+  const originalMain = readFileSync(path.join(go, "main.go"), "utf8");
+  const rename = await executeLsp(go, { operation: "rename_preview", path: "main.go", line: 9, character: 30, newName: "Double" });
+  assert.equal(rename.status, "PASS", JSON.stringify(rename));
+  assert.ok(rename.entries.length >= 3, JSON.stringify(rename));
+  assert.equal(readFileSync(path.join(go, "mathx", "mathx.go"), "utf8"), originalLibrary, "rename preview mutated the Go library");
+  assert.equal(readFileSync(path.join(go, "main.go"), "utf8"), originalMain, "rename preview mutated the Go caller");
+});
 
+test("project switching does not leak and an arbitrary PATH server remains rejected", { timeout: 60_000 }, async () => {
   const second = fixture("pi-lsp-second-");
   writeFileSync(path.join(second, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true } }));
   writeFileSync(path.join(second, "unique.ts"), "export const onlyHere = 1;\nconsole.log(onlyHere);\n");
@@ -113,6 +163,23 @@ test("recognized missing Rust and Go servers are PARTIAL for diagnostics/definit
   assert.equal(result.status, "PASS", JSON.stringify(result));
   assert.deepEqual(new Set(result.entries.map((entry) => entry.path)), new Set(["unique.ts"]));
   assert.equal(result.projectRoot, ".");
+
+  const unpinnedBin = fixture("pi-lsp-unpinned-");
+  const jdtls = path.join(unpinnedBin, "jdtls");
+  writeFileSync(jdtls, "#!/bin/sh\nexit 0\n");
+  chmodSync(jdtls, 0o755);
+  const java = fixture("pi-lsp-java-");
+  writeFileSync(path.join(java, "Main.java"), "class Main {}\n");
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${unpinnedBin}${path.delimiter}${previousPath ?? ""}`;
+  try {
+    const rejected = await executeLsp(java, { operation: "diagnostics", path: "Main.java" });
+    assert.equal(rejected.status, "PARTIAL", JSON.stringify(rejected));
+    assert.equal(rejected.error, "language_server_unpinned", JSON.stringify(rejected));
+    assert.equal(lspRuntimeStatus().languages.java.runtimeStatus, "REJECTED_UNPINNED");
+  } finally {
+    process.env.PATH = previousPath;
+  }
 });
 
 test("server failure is reported and cleanup is explicit", { timeout: 30_000 }, async () => {

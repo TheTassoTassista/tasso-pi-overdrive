@@ -84,7 +84,17 @@ try {
   check("bootstrap-credential-slots-are-cleanly-missing", Object.values(webCredentialStatus(webConfig, {})).every((entry) => entry.configured === false && entry.source === "missing"), webCredentialStatus(webConfig, {}));
   const toolRoot = path.join(testHome, ".local", "share", "pi-overdrive", "lsp-node", "node_modules");
   const lspRoot = path.join(lspRuntime, "node_modules");
-  check("bootstrap-pinned-tools-present", fs.existsSync(path.join(toolRoot, "@ast-grep", "cli")) && ["typescript", "pyright", "@vtsls/language-server"].every((name) => fs.existsSync(path.join(lspRoot, name))), { toolRoot, lspRoot });
+  const managedRoot = path.join(lspRuntime, "managed");
+  check(
+    "bootstrap-pinned-tools-present",
+    fs.existsSync(path.join(toolRoot, "@ast-grep", "cli"))
+      && ["typescript", "pyright", "@vtsls/language-server"].every((name) => fs.existsSync(path.join(lspRoot, name)))
+      && fs.existsSync(path.join(managedRoot, "bin", "rust-analyzer"))
+      && fs.existsSync(path.join(managedRoot, "rust-src", "lib", "rustlib", "src", "rust", "library"))
+      && fs.existsSync(path.join(managedRoot, "bin", "gopls"))
+      && fs.existsSync(path.join(managedRoot, "go", "bin", "go")),
+    { toolRoot, lspRoot, managedRoot },
+  );
   check("bootstrap-lsp-runtime-isolated", lspRuntime.startsWith(`${root}${path.sep}`) && fs.existsSync(path.join(lspRuntime, "package-lock.json")), { lspRuntime });
   const backups = fs.existsSync(backupDir) ? fs.readdirSync(backupDir) : [];
   check("bootstrap-created-private-backup", backups.length === 1 && (fs.statSync(path.join(backupDir, backups[0])).mode & 0o077) === 0, backups);
