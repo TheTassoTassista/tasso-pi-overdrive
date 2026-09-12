@@ -9,6 +9,7 @@ import {
   assertConfiguredSpawnBudget,
   calculateRequiredSpawnBudget,
   createWorkflowSpawnBudgetGuard,
+  EXTERNAL_SUBAGENT_QUOTA,
   workflowSpawnBudgetForRequest,
 } from "../lib/workflow-spawn-budget.mjs";
 
@@ -28,6 +29,23 @@ test("current worst-case spawn budget is derived as base 39 plus bounded retry r
     reviewerDisagreementEscalations: 12,
     repeatedFailureEscalations: 5,
   });
+});
+
+test("unexposed upstream session quota stays explicitly unknown while the local bound remains authoritative", () => {
+  const plan = calculateRequiredSpawnBudget();
+  const guard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit: 42, plan, externalQuota: { status: "KNOWN", remaining: 999 } });
+  assert.equal(Object.isFrozen(EXTERNAL_SUBAGENT_QUOTA), true);
+  assert.deepEqual(guard.snapshot().externalQuota, {
+    status: "UNKNOWN",
+    authoritative: false,
+    scope: "PI_SESSION",
+    source: "pi-subagents-public-api",
+    reason: "UPSTREAM_LIVE_COUNTER_NOT_EXPOSED",
+    enforcement: "UPSTREAM_FAIL_CLOSED_BEFORE_PROVIDER_LAUNCH",
+  });
+  assert.equal(guard.snapshot().remaining, 42);
+  for (let index = 0; index < 42; index += 1) guard.claimSpawn(`bounded-${index}`, { retry: index >= 39 });
+  assert.throws(() => guard.claimSpawn("unbounded-43"), /ATOMIC_SUBAGENT_SPAWN_BUDGET_EXHAUSTED/u);
 });
 
 test("spawn formula follows correction, council, reviewer, and retry policy changes", () => {

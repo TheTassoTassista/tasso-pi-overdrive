@@ -8,7 +8,7 @@ import {
   settingsAgentOverrides, writeModelPolicy, writePrivateJsonAtomic,
 } from "../lib/model-policy.mjs";
 import { getSessionQuality, QUALITY_LEVELS, resetSessionQuality, setSessionQuality } from "../lib/routing-session.mjs";
-import { calculateRequiredSpawnBudget, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
+import { calculateRequiredSpawnBudget, EXTERNAL_SUBAGENT_QUOTA, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -53,6 +53,7 @@ function renderCouncilStatus(resolved: any): string {
     "Infrastructure note: DeepSeek and Qwen are different model families behind the same OmniRoute gateway, not independent infrastructure",
     "Hard limits: concurrency=3, depth=1, correction rounds=2, nested council=disabled",
     `Spawn budget: base=${spawnBudget.requiredBaseSpawns}, retry reserve=${spawnBudget.retryReserve}, required total=${spawnBudget.requiredTotalSpawns}, configured=${configuredSpawnLimit}`,
+    `External pi-subagents quota: ${EXTERNAL_SUBAGENT_QUOTA.status} (${EXTERNAL_SUBAGENT_QUOTA.reason}); upstream still fails closed before provider launch`,
   ].join("\n");
 }
 
