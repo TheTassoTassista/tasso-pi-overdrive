@@ -8,6 +8,7 @@ import {
   isSecretPath,
   validateSubagentCall,
   validateAllocatedBrowserCall,
+  validateAstGrepCall,
 } from "../lib/safety.mjs";
 
 function inputPath(input: Record<string, unknown>): string | undefined {
@@ -39,9 +40,9 @@ export default function (pi: ExtensionAPI) {
       if (isSecretPath(inspected.canonical)) return { block: true, reason: `Protected canonical path cannot be read: ${candidate}` };
     }
 
-    if (["ast_grep_scan", "ast_grep_debug_query"].includes(event.toolName) && typeof input.rule_file === "string") {
-      const rule = inspectWorkspacePath(ctx.cwd, input.rule_file, { mustExist: true });
-      if (!rule.allowed) return { block: true, reason: `AST rule file denied (${"reason" in rule ? rule.reason : "policy"})` };
+    if (event.toolName.startsWith("ast_grep_")) {
+      const policy = validateAstGrepCall(ctx.cwd, input);
+      if (!policy.allowed) return { block: true, reason: `AST workspace policy denied (${"reason" in policy ? policy.reason : "policy"})` };
     }
 
     if ((event.toolName === "write" || event.toolName === "edit" || event.toolName === "ast_grep_rewrite") && candidate) {

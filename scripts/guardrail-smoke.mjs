@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url";
 const pi = process.env.PI_BIN || "pi";
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const providerExtension = path.join(packageRoot, "tests", "fixtures", "deterministic-guardrail-provider.ts");
+const safetyExtension = path.join(packageRoot, "extensions", "safety.ts");
+const safeExecExtension = path.join(packageRoot, "extensions", "safe-exec.ts");
+const fffExtension = path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", "@ff-labs", "pi-fff", "src", "index.ts");
+const astGrepExtension = path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", "@juvio15", "pi-ast-grep", "src", "index.ts");
 const model = "pi-overdrive-audit/guardrail-driver";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-guardrail-"));
 const repo = path.join(root, "repo");
@@ -24,7 +28,15 @@ function resultText(event) {
 
 async function runPi() {
   const tools = "read,write,fffind,ast_grep_run,bash,safe_exec";
-  const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", providerExtension, "--provider", "pi-overdrive-audit", "--model", "guardrail-driver", "--api-key", "audit-only", "--tools", tools], {
+  const child = spawn(pi, [
+    "--offline", "--approve", "--no-session", "--mode", "rpc",
+    "--extension", providerExtension,
+    "--extension", safetyExtension,
+    "--extension", safeExecExtension,
+    "--extension", fffExtension,
+    "--extension", astGrepExtension,
+    "--provider", "pi-overdrive-audit", "--model", "guardrail-driver", "--api-key", "audit-only", "--tools", tools,
+  ], {
     cwd: repo,
     env: {
       ...process.env,
@@ -97,8 +109,8 @@ try {
   const invocation = await runPi();
   check("pi-guardrail-prompt-accepted", invocation.accepted.success === true, invocation.accepted.success);
   const ends = invocation.events.filter((event) => event.type === "tool_execution_end");
-  check("all-adversarial-calls-attempted", ends.length === 13, ends.map((event) => event.toolName));
-  check("all-adversarial-calls-denied", ends.length === 13 && ends.every((event) => event.isError === true), ends.map((event) => ({ tool: event.toolName, isError: event.isError, reason: resultText(event).slice(0, 180) })));
+  check("all-adversarial-calls-attempted", ends.length === 14, ends.map((event) => event.toolName));
+  check("all-adversarial-calls-denied", ends.length === 14 && ends.every((event) => event.isError === true), ends.map((event) => ({ tool: event.toolName, isError: event.isError, reason: resultText(event).slice(0, 180) })));
   const output = ends.map(resultText).join("\n");
   check("no-protected-content-leaked", !output.includes("PRIVATE_ENV_MARKER_DO_NOT_DISCLOSE") && !output.includes("OUTSIDE_PROTECTED_MARKER"), "protected marker absent from tool results");
   check("symlink-target-unchanged", fs.readFileSync(path.join(outside, "outside.js"), "utf8") === outsideBefore, "outside inode unchanged");

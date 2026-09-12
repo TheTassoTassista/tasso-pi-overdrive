@@ -77,6 +77,7 @@ function streamAudit(
 					["write", { path: "secret-link", content: "attempted overwrite" }],
 					["fffind", { pattern: "outside", path: "../", limit: 5 }],
 					["ast_grep_run", { pattern: "eval($A)", lang: "javascript", path: outside, max_results: 5 }],
+					["ast_grep_run", { pattern: "eval($A)", lang: "javascript", path: ".", follow: true, max_results: 5 }],
 					["bash", { command: "python3 -c \"open('.env').read()\"" }],
 					["bash", { command: "printf x > ../outside/escape.txt" }],
 					["bash", { command: "find . -name '*.txt' -delete" }],

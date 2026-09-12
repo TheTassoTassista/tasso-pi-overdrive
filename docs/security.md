@@ -9,6 +9,7 @@ Guardrails:
 - Direct read/grep attempts against common credential, key, `.env`, SSH, GPG, keyring, and certificate paths are blocked.
 - Writes to secret-like paths, `.git`, and `node_modules` are blocked.
 - Free-form `bash` is blocked for all guarded calls. `safe_exec` accepts only a fixed program enum plus an argument vector, rejects destructive Git, inline Node/Python and ad-hoc package execution, and requires an Overdrive allocation for executable/mutating commands.
+- ast-grep cannot enable symlink following; its target, config, and rule-file paths are constrained to canonical non-secret workspace files before the subprocess runs.
 - Autonomous Worker/Tester runs are accepted only in an isolated worktree. Worker has no shell and may delete only a canonical, single-linked regular file through `safe_remove_file`; Tester has no edit/write/general command tool.
 - Third-party search/fetch and browser tools were selected for explicit SSRF/output/redaction controls.
 - Metadata tracing never stores prompt text, argument values, tool output, URLs, environment values, or authentication material.
@@ -21,5 +22,23 @@ Limitations:
 - Credential hiding recognizes conventional names and key extensions. A secret stored under an arbitrary ordinary source filename is not distinguishable from source and can be read by repository code executed in the sandbox.
 - Project trust authorizes code loading; it does not provide filesystem or network containment.
 - Successful large outputs may omit low-signal lines. Every line classified ERROR/FATAL/failure is retained regardless of position or count; failed tool results are never compacted.
+
+Exact execution boundary:
+
+- Worker `safe_exec` and every verification command run inside Bubblewrap with
+  no network. Worker host-side edits are limited to its disposable canonical
+  worktree; raw shell and autonomous network tools are absent.
+- Tester has no mutation or general command tool. Its verification runs in a
+  read-only Bubblewrap workspace; its allocated browser profile is a separate
+  host process because Chromium cannot run inside this command sandbox.
+- Scout, Planner, Council, Judge, Correctness, and Simplicity are host-side
+  read-only roles. Oracle and Security add explicitly bounded web tools, so
+  their public network reads are trusted-host operations.
+- The workflow controller performs Git worktree allocation/cleanup, receipt
+  I/O, provider calls, MCP, LSP orchestration, and final host-side diff checks.
+  Those operations are trusted extension code, not model-selectable shell.
+- The top-level interactive Pi process retains guarded read/edit/write access
+  to the selected workspace. Installed extensions execute with the user's
+  authority. Neither can honestly be described as a complete sandbox.
 
 For untrusted repositories, unknown packages, destructive migrations, or production credentials, use an OS-level sandbox/container/VM and a dedicated low-privilege account. Review diffs before commit and use human confirmation for publish, deploy, merge, deletion, and account-changing browser actions.

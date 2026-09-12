@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { classifyCommand, inspectWorkspaceConstraint, inspectWorkspacePath, isAlwaysProtectedWritePath, isInside, isSecretPath, validateAllocatedBrowserCall, validateSubagentCall } from '../lib/safety.mjs';
+import { classifyCommand, inspectWorkspaceConstraint, inspectWorkspacePath, isAlwaysProtectedWritePath, isInside, isSecretPath, validateAllocatedBrowserCall, validateAstGrepCall, validateSubagentCall } from '../lib/safety.mjs';
 
 test('secret paths are recognized without opening them', () => {
   for (const value of ['.env', '.env.local', '/tmp/auth.json', '~/.ssh/id_ed25519', 'cert.pem']) assert.equal(isSecretPath(value), true, value);
@@ -114,4 +114,24 @@ test('allocated browser calls must use the unique assigned profile/session', () 
   assert.equal(validateAllocatedBrowserCall({ args: ['--session', 'pi-session-1', '--profile', '/private/profile-1', 'open', 'https://example.com'], sessionMode: 'fresh' }, allocation).allowed, true);
   assert.equal(validateAllocatedBrowserCall({ args: ['--session', 'pi-session-1', 'snapshot'] }, allocation).allowed, true);
   assert.equal(validateAllocatedBrowserCall({ args: ['--profile', '/other', 'open'], sessionMode: 'fresh' }, allocation).allowed, false);
+});
+
+test('ast-grep cannot follow nested symlinks or open auxiliary files outside the workspace', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'pi-ast-safety-'));
+  const outside = mkdtempSync(path.join(tmpdir(), 'pi-ast-outside-'));
+  try {
+    writeFileSync(path.join(root, 'rule.yml'), 'id: local\n');
+    writeFileSync(path.join(root, '.env'), 'SECRET\n');
+    writeFileSync(path.join(outside, 'rule.yml'), 'id: external\n');
+    symlinkSync(path.join(outside, 'rule.yml'), path.join(root, 'linked-rule.yml'));
+    assert.equal(validateAstGrepCall(root, { path: '.', follow: true }).allowed, false);
+    assert.equal(validateAstGrepCall(root, { path: '.', rule_file: '../pi-ast-outside/rule.yml' }).allowed, false);
+    assert.equal(validateAstGrepCall(root, { path: '.', rule_file: path.join(outside, 'rule.yml') }).allowed, false);
+    assert.equal(validateAstGrepCall(root, { path: '.', rule_file: 'linked-rule.yml' }).allowed, false);
+    assert.equal(validateAstGrepCall(root, { path: '.', config: '.env' }).allowed, false);
+    assert.equal(validateAstGrepCall(root, { path: '.', rule_file: 'rule.yml' }).allowed, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
 });
