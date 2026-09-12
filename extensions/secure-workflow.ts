@@ -17,6 +17,7 @@ import { classifyDelegationFailure } from "../lib/delegation-failure.mjs";
 import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
 import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
+import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
@@ -239,10 +240,11 @@ export default function (pi: ExtensionAPI) {
             try {
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
               const canonicalResponse = canonicalizeDelegationResponse(route, response, { attempt, schema: result.kind === "structured" ? result.schema : undefined });
-              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
+              const receiptResponse = { ...canonicalResponse, provider: canonicalResponse.routeAttested === true ? route.provider : null };
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: receiptResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
-              const normalized = { ...canonicalResponse, status: receipt.status, provider: route.provider, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, role: policyRole, attempt, retryCount: attempt - 1, callNumber, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, provider: route.provider, model: canonicalResponse.model, thinking: canonicalResponse.thinking, fallbackIndex: route.fallbackIndex, preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              const normalized = { ...canonicalResponse, status: receipt.status, provider: route.provider, usage: receipt.usage, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
+              delegationAudit.push({ agent, role: policyRole, attempt, retryCount: attempt - 1, callNumber, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, fallbackIndex: route.fallbackIndex, preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
                 finish(resolve, normalized);
               } else {
@@ -251,6 +253,9 @@ export default function (pi: ExtensionAPI) {
                 finish(reject, failure);
               }
             } catch (error) {
+              if (error && typeof error === "object") {
+                try { Object.assign(error, { delegationLaunched: true }); } catch {}
+              }
               finish(reject, error);
             }
           }
@@ -260,9 +265,9 @@ export default function (pi: ExtensionAPI) {
           try {
             if (evidenceRun && roleReceiptStore) {
               const failureCategory = classifyDelegationFailure({ status, error: message });
-              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message, failureCategory } });
+              const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message, failureCategory, launchStatus: "launched" } });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
-              delegationAudit.push({ agent, attempt, status, failureCategory, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
+              delegationAudit.push({ agent, attempt, status, failureCategory, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
               receiptRecorded = true;
             }
           } catch {}
@@ -313,12 +318,16 @@ export default function (pi: ExtensionAPI) {
           }
           if (!(error instanceof Error && (error as Error & { delegationReceiptRecorded?: boolean }).delegationReceiptRecorded)) {
             const prelaunchResourceLimit = failureCategory === "RESOURCE_LIMIT";
+            const launchStatus = (error as any)?.delegationLaunched === true ? "launched" : "not_launched";
             delegationAudit.push({
               agent: input.agent,
               attempt,
               status: prelaunchResourceLimit ? "prelaunch-rejected" : "transport-failed",
               failureCategory,
-              ...(prelaunchResourceLimit ? { failureReason: "SUBAGENT_SPAWN_BUDGET_EXHAUSTED", launchStatus: "not_launched", modelCalls: 0 } : {}),
+              launchStatus,
+              modelCalls: launchStatus === "not_launched" ? 0 : null,
+              usage: normalizeProviderUsage(undefined),
+              ...(prelaunchResourceLimit ? { failureReason: "SUBAGENT_SPAWN_BUDGET_EXHAUSTED" } : {}),
             });
           }
           throw error;
@@ -348,6 +357,7 @@ export default function (pi: ExtensionAPI) {
           if (!/^[0-9a-f]{64}$/u.test(protocolNonce ?? "")) throw new Error("interrupted workflow has no valid role-receipt protocol nonce");
           roleReceiptStore = openRoleReceiptStore(evidenceRun);
           const priorRoleReceipts = listRoleReceipts(roleReceiptStore);
+          delegationAudit.push(...priorRoleReceipts.map((entry: any) => usageAttemptFromReceipt(entry.receipt)));
           receiptSequence = priorRoleReceipts.length === 0 ? 0 : Math.max(...priorRoleReceipts.map((entry: any) => entry.receipt.sequence)) + 1;
           latestState = journal.workflow_state;
           if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
@@ -459,6 +469,10 @@ export default function (pi: ExtensionAPI) {
                 ...safeState,
                 repositoryEvidence,
                 delegationAttempts: delegationAudit,
+                usageAccounting: {
+                  workflow: aggregateUsageAttempts(delegationAudit),
+                  council: aggregateUsageAttempts(delegationAudit, { roles: ["council-1", "council-2", "council-3", "council-judge"] }),
+                },
                 recovery,
                 failure: workflowError ? { type: workflowError instanceof Error ? workflowError.name : "UnknownError", digest: taskDigest(workflowError instanceof Error ? workflowError.message : String(workflowError)) } : undefined,
               };
