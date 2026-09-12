@@ -1,6 +1,6 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { executeLsp, lspRuntimeStatus, shutdownLspServers } from "../lib/lsp-manager.mjs";
@@ -153,6 +153,91 @@ test("managed gopls supports read-only cross-package semantic navigation", { tim
   assert.ok(rename.entries.length >= 3, JSON.stringify(rename));
   assert.equal(readFileSync(path.join(go, "mathx", "mathx.go"), "utf8"), originalLibrary, "rename preview mutated the Go library");
   assert.equal(readFileSync(path.join(go, "main.go"), "utf8"), originalMain, "rename preview mutated the Go caller");
+});
+
+test("pinned Bash LSP provides sandboxed cross-file semantics despite PATH shadowing", { timeout: 120_000 }, async () => {
+  await shutdownLspServers();
+  const before = lspRuntimeStatus();
+  assert.equal(before.activeServers, 0);
+
+  const root = fixture("pi-lsp-bash-");
+  const files = {
+    ".shellcheckrc": "shell=bash\n",
+    "lib.sh": "#!/usr/bin/env bash\n\ndouble_value() {\n    local value=\"$1\"\n    printf '%s\\n' \"$((value * 2))\"\n}\n",
+    "main.sh": "#!/usr/bin/env bash\n\nsource ./lib.sh\n\nresult=\"$(double_value 21)\"\nprintf '%s\\n' \"$result\"\n",
+    "helper.bash": "#!/usr/bin/env bash\n\nhelper_value() {\n    printf '%s\\n' \"$1\"\n}\n",
+    "broken.sh": "#!/usr/bin/env bash\n\nsource ./missing.sh\n",
+  };
+  for (const [name, contents] of Object.entries(files)) writeFileSync(path.join(root, name), contents);
+  const originals = new Map(Object.keys(files).map((name) => [name, readFileSync(path.join(root, name))]));
+
+  const shadow = fixture("pi-lsp-bash-shadow-");
+  const marker = path.join(shadow, "path-shadow-ran");
+  const fakeServer = path.join(shadow, "bash-language-server");
+  writeFileSync(fakeServer, `#!/bin/sh\nprintf shadow > ${JSON.stringify(marker)}\nexit 99\n`);
+  chmodSync(fakeServer, 0o755);
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${shadow}${path.delimiter}${previousPath ?? ""}`;
+
+  try {
+    const policy = lspRuntimeStatus().languages.bash;
+    assert.equal(policy.version, "bash-language-server@5.6.0");
+    assert.equal(policy.binaryPath, path.join(before.runtimeRoot, "node_modules", ".bin", "bash-language-server"));
+    assert.equal(policy.source, "runtime/lsp/package-lock.json");
+    assert.equal(policy.pinned, true);
+    assert.equal(policy.allowed, true);
+
+    const definition = await executeLsp(root, { operation: "definition", path: "main.sh", line: 5, character: 15 });
+    assert.equal(definition.status, "PASS", JSON.stringify(definition));
+    assert.equal(definition.backend, "bash-language-server@5.6.0");
+    assert.equal(definition.serverReused, false);
+    assert.equal(definition.sandbox, "bubblewrap-read-only-no-network");
+    assert.ok(definition.entries.some((entry) => entry.path === "lib.sh" && entry.start.line === 3), JSON.stringify(definition));
+    assert.equal(lspRuntimeStatus().starts, before.starts + 1, "Bash server did not start lazily exactly once");
+    assert.equal(lspRuntimeStatus().activeServers, 1);
+
+    const references = await executeLsp(root, { operation: "references", path: "main.sh", line: 5, character: 15 });
+    assert.equal(references.status, "PASS", JSON.stringify(references));
+    assert.equal(references.serverReused, true);
+    assert.ok(references.entries.some((entry) => entry.path === "lib.sh"), JSON.stringify(references));
+    assert.ok(references.entries.some((entry) => entry.path === "main.sh"), JSON.stringify(references));
+
+    const hover = await executeLsp(root, { operation: "hover", path: "main.sh", line: 5, character: 15 });
+    assert.equal(hover.status, "PASS", JSON.stringify(hover));
+    assert.match(hover.entries?.contents ?? "", /double_value|lib\.sh/u);
+
+    const documentSymbols = await executeLsp(root, { operation: "document_symbols", path: "lib.sh" });
+    assert.equal(documentSymbols.status, "PASS", JSON.stringify(documentSymbols));
+    assert.ok(documentSymbols.entries.some((entry) => entry.name === "double_value"), JSON.stringify(documentSymbols));
+
+    const workspaceSymbols = await executeLsp(root, { operation: "workspace_symbols", path: "main.sh", query: "double_value" });
+    assert.equal(workspaceSymbols.status, "PASS", JSON.stringify(workspaceSymbols));
+    assert.ok(workspaceSymbols.entries.some((entry) => entry.name === "double_value" && entry.location?.path === "lib.sh"), JSON.stringify(workspaceSymbols));
+
+    const rename = await executeLsp(root, { operation: "rename_preview", path: "main.sh", line: 5, character: 15, newName: "twice_value" });
+    assert.equal(rename.status, "PASS", JSON.stringify(rename));
+    assert.ok(rename.entries.some((entry) => entry.path === "lib.sh" && entry.newText === "twice_value"), JSON.stringify(rename));
+    assert.ok(rename.entries.some((entry) => entry.path === "main.sh" && entry.newText === "twice_value"), JSON.stringify(rename));
+
+    const bashExtension = await executeLsp(root, { operation: "document_symbols", path: "helper.bash" });
+    assert.equal(bashExtension.status, "PASS", JSON.stringify(bashExtension));
+    assert.equal(bashExtension.language, "bash");
+    assert.ok(bashExtension.entries.some((entry) => entry.name === "helper_value"), JSON.stringify(bashExtension));
+
+    const diagnostics = await executeLsp(root, { operation: "diagnostics", path: "broken.sh" });
+    assert.equal(diagnostics.status, "PASS", JSON.stringify(diagnostics));
+    assert.ok(diagnostics.entries.some((entry) => entry.source === "bash-language-server" && /Source command could not be analyzed/u.test(entry.message)), JSON.stringify(diagnostics));
+
+    for (const [name, original] of originals) {
+      assert.deepEqual(readFileSync(path.join(root, name)), original, `${name} changed during read-only Bash LSP operations`);
+    }
+  } finally {
+    process.env.PATH = previousPath;
+    await shutdownLspServers();
+  }
+
+  assert.equal(lspRuntimeStatus().activeServers, 0);
+  assert.equal(existsSync(marker), false, "PATH-shadowed bash-language-server was executed");
 });
 
 test("project switching does not leak and an arbitrary PATH server remains rejected", { timeout: 60_000 }, async () => {

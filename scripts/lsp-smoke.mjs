@@ -25,6 +25,7 @@ async function checkOperation(name, cwd, args, predicate) {
 
 function run(cwd, args, timeoutMs = 45_000) {
   return new Promise((resolve) => {
+    const sequence = Array.isArray(args);
     const child = spawn(pi, ["--extension", provider, "--extension", lspExtension, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--tools", "semantic_nav"], {
       cwd,
       env: {
@@ -36,7 +37,9 @@ function run(cwd, args, timeoutMs = 45_000) {
         npm_config_cache: path.join(temporary, "npm-cache"),
         PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only",
         PI_OVERDRIVE_AUDIT_TOOL: "semantic_nav",
-        PI_OVERDRIVE_AUDIT_TOOL_ARGS: JSON.stringify(args),
+        ...(sequence
+          ? { PI_OVERDRIVE_AUDIT_TOOL_ARGS_SEQUENCE: JSON.stringify(args) }
+          : { PI_OVERDRIVE_AUDIT_TOOL_ARGS: JSON.stringify(args) }),
       },
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -64,7 +67,8 @@ function run(cwd, args, timeoutMs = 45_000) {
     child.once("close", (code) => {
       clearInterval(poll);
       clearTimeout(timer);
-      resolve({ code, stderr, event: events.find((event) => event.type === "tool_execution_end" && event.toolName === "semantic_nav") });
+      const toolEvents = events.filter((event) => event.type === "tool_execution_end" && event.toolName === "semantic_nav");
+      resolve({ code, stderr, event: toolEvents[0], toolEvents });
     });
   });
 }
@@ -102,6 +106,39 @@ try {
   const cppDetails = cppDiagnostics.event?.result?.details;
   check("pi-cpp-diagnostics", cppDiagnostics.code === 0 && cppDiagnostics.event?.isError === false && cppDetails?.entries?.some((entry) => entry.severity === "Error"), cppDetails ?? cppDiagnostics.stderr);
 
+  const bash = path.join(temporary, "bash");
+  fs.mkdirSync(bash);
+  fs.writeFileSync(path.join(bash, ".shellcheckrc"), "shell=bash\n");
+  fs.writeFileSync(path.join(bash, "lib.sh"), "#!/usr/bin/env bash\n\ndouble_value() {\n    local value=\"$1\"\n    printf '%s\\n' \"$((value * 2))\"\n}\n");
+  fs.writeFileSync(path.join(bash, "main.sh"), "#!/usr/bin/env bash\n\nsource ./lib.sh\n\nresult=\"$(double_value 21)\"\nprintf '%s\\n' \"$result\"\n");
+  fs.writeFileSync(path.join(bash, "helper.bash"), "#!/usr/bin/env bash\n\nhelper_value() {\n    printf '%s\\n' \"$1\"\n}\n");
+  fs.writeFileSync(path.join(bash, "broken.sh"), "#!/usr/bin/env bash\n\nsource ./missing.sh\n");
+  const bashBefore = [".shellcheckrc", "lib.sh", "main.sh", "helper.bash", "broken.sh"].map((name) => fs.readFileSync(path.join(bash, name), "utf8")).join("\0");
+  const bashRun = await run(bash, [
+    { operation: "definition", path: "main.sh", line: 5, character: 15 },
+    { operation: "references", path: "main.sh", line: 5, character: 15 },
+    { operation: "hover", path: "main.sh", line: 5, character: 15 },
+    { operation: "document_symbols", path: "lib.sh" },
+    { operation: "workspace_symbols", path: "main.sh", query: "double_value" },
+    { operation: "diagnostics", path: "broken.sh" },
+    { operation: "rename_preview", path: "main.sh", line: 5, character: 15, newName: "twice_value" },
+    { operation: "document_symbols", path: "helper.bash" },
+  ], 90_000);
+  const checkBash = (name, index, predicate) => {
+    const event = bashRun.toolEvents?.[index];
+    const details = event?.result?.details;
+    check(name, bashRun.code === 0 && event?.isError === false && details?.status === "PASS" && predicate(details), details ?? bashRun.stderr);
+  };
+  checkBash("pi-bash-definition", 0, (details) => details.backend === "bash-language-server@5.6.0" && details.sandbox === "bubblewrap-read-only-no-network" && details.serverReused === false && details.entries?.some((entry) => entry.path === "lib.sh"));
+  checkBash("pi-bash-references", 1, (details) => details.serverReused === true && details.entries?.some((entry) => entry.path === "lib.sh") && details.entries?.some((entry) => entry.path === "main.sh"));
+  checkBash("pi-bash-hover", 2, (details) => /double_value|lib\.sh/u.test(details.entries?.contents ?? ""));
+  checkBash("pi-bash-document-symbols", 3, (details) => details.entries?.some((entry) => entry.name === "double_value"));
+  checkBash("pi-bash-workspace-symbols", 4, (details) => details.entries?.some((entry) => entry.name === "double_value" && entry.location?.path === "lib.sh"));
+  checkBash("pi-bash-diagnostics", 5, (details) => details.entries?.some((entry) => entry.source === "bash-language-server" && /Source command could not be analyzed/u.test(entry.message)));
+  checkBash("pi-bash-rename-preview", 6, (details) => details.entries?.some((entry) => entry.path === "lib.sh" && entry.newText === "twice_value") && details.entries?.some((entry) => entry.path === "main.sh" && entry.newText === "twice_value"));
+  checkBash("pi-bash-extension", 7, (details) => details.language === "bash" && details.entries?.some((entry) => entry.name === "helper_value"));
+  check("pi-bash-fixture-read-only", [".shellcheckrc", "lib.sh", "main.sh", "helper.bash", "broken.sh"].map((name) => fs.readFileSync(path.join(bash, name), "utf8")).join("\0") === bashBefore, "fixture content unchanged");
+
   const rust = path.join(temporary, "rust");
   fs.mkdirSync(path.join(rust, "src"), { recursive: true });
   fs.writeFileSync(path.join(rust, "Cargo.toml"), "[package]\nname = \"rust_fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
@@ -137,6 +174,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 21 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 30 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, isolation: "bubblewrap-read-only-no-network", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

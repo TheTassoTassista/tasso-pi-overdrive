@@ -23,7 +23,11 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 		};
 		try {
 			stream.push({ type: "start", partial: output });
-			if (context.messages.some((message) => message.role === "toolResult")) {
+			const completedTools = context.messages.filter((message) => message.role === "toolResult").length;
+			const sequenceValue = process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS_SEQUENCE;
+			const sequence = sequenceValue ? JSON.parse(sequenceValue) : null;
+			const hasNextSequenceTool = Array.isArray(sequence) && completedTools < sequence.length;
+			if ((!Array.isArray(sequence) && completedTools > 0) || (Array.isArray(sequence) && !hasNextSequenceTool)) {
 				const value = "AUDIT_TOOL_FINISHED";
 				output.content.push({ type: "text", text: value });
 				stream.push({ type: "text_start", contentIndex: 0, partial: output });
@@ -33,8 +37,8 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 			} else {
 				const name = process.env.PI_OVERDRIVE_AUDIT_TOOL;
 				if (!name) throw new Error("PI_OVERDRIVE_AUDIT_TOOL is required");
-				const args = JSON.parse(process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS ?? "{}");
-				const toolCall = { type: "toolCall" as const, id: "single-audit-call", name, arguments: args };
+				const args = hasNextSequenceTool ? sequence[completedTools] : JSON.parse(process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS ?? "{}");
+				const toolCall = { type: "toolCall" as const, id: hasNextSequenceTool ? `audit-call-${completedTools + 1}` : "single-audit-call", name, arguments: args };
 				output.content.push(toolCall);
 				stream.push({ type: "toolcall_start", contentIndex: 0, partial: output });
 				stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(args), partial: output });

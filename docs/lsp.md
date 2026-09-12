@@ -23,15 +23,17 @@ Every admitted server runs through `scripts/sandbox-run.sh --workspace-read-only
 | C/C++ | system `clangd@22.1.8` | Available and version-checked on this host |
 | HTML/CSS/JSON | `vscode-langservers-extracted@4.10.0` | Available |
 | YAML | `yaml-language-server@1.23.0` | Available |
-| Bash | `bash-language-server@5.6.0` | Available |
-| Rust | `rust-analyzer` | Detected; `PARTIAL` because no reviewed pinned server is installed |
-| Go | `gopls` | Detected; `PARTIAL` because no Go toolchain/server is installed |
+| Bash | `bash-language-server@5.6.0` | Available and verified for cross-file definition/references, hover, document/workspace symbols, native source-resolution diagnostics, and preview-only rename |
+| Rust | `rust-analyzer@0.3.3041-standalone` plus managed `rust-src` | Available, pinned, and semantically verified |
+| Go | `gopls@v0.23.0` plus managed Go 1.26.8 | Available, pinned, and semantically verified |
 | Java | `jdtls` | Detected; `PARTIAL` because no Java runtime/server is installed |
 | Lua | `lua-language-server` | Detected; `PARTIAL` until pinned |
 | Ruby | `ruby-lsp` | Detected; `PARTIAL` until pinned |
 
 The tool never silently falls back to an unpinned executable found on `PATH`. `/lsp-status` reports availability without starting a server.
 
+The Bash semantic backend is the exact npm-locked `bash-language-server` from `runtime/lsp`, not a host-global executable. ShellCheck linting and shfmt formatting are separate capabilities: their host `PATH` integrations are deliberately disabled for `semantic_nav` because Overdrive does not pin/manage those executables. Native Bash Language Server source-resolution diagnostics remain enabled. ShellCheck diagnostics and shfmt formatting are therefore not claimed as core LSP guarantees.
+
 ## Evidence
 
-`npm run smoke:lsp` calls the registered Pi tool through a deterministic zero-token provider and proves real TypeScript, Python, and C++ results plus visible Rust absence. `tests/lsp-manager.test.mjs` additionally covers all three required operations, lazy startup, reuse, project switching, stale-result isolation, hover, symbols, rename non-mutation, server crash, missing Rust/Go servers, and explicit cleanup.
+`npm run smoke:lsp` calls the registered Pi tool through a deterministic zero-token provider and proves real TypeScript, Python, C++, Bash, Rust, and Go results. The named Bash checks cover definition, references, hover, document/workspace symbols, native missing-source diagnostics, preview-only rename, the `.bash` extension, and fixture immutability. `tests/lsp-manager.test.mjs` additionally proves lazy startup and reuse, exact pinned backend identity, rejection of a PATH-shadowing fake Bash server, Bubblewrap read-only/no-network isolation metadata, project switching, rename non-mutation, server failure, and explicit cleanup.
