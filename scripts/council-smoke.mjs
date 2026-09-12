@@ -1,68 +1,82 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pi = process.env.PI_BIN || "pi";
-const provider = path.join(root, "tests", "fixtures", "deterministic-single-tool-provider.ts");
+const pi = process.env.PI_BIN || path.join(path.dirname(process.execPath), "pi");
+const routingProvider = path.join(root, "tests", "fixtures", "deterministic-routing-provider.ts");
+const modelPolicyExtension = path.join(root, "extensions", "model-policy.ts");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-council-policy-"));
-const callabilityFile = path.join(temporary, "model-callability.json");
-fs.writeFileSync(callabilityFile, `${JSON.stringify({ version: 1, entries: {
-  "pi-overdrive-tool-audit/single-tool-driver": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
-  "pi-overdrive-tool-audit/single-tool-driver-alt": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" },
-} }, null, 2)}\n`, { mode: 0o600 });
+const agentDir = path.join(temporary, "agent");
+const policyFile = path.join(temporary, "config", "pi-overdrive", "model-policy.json");
+const callabilityFile = path.join(temporary, "config", "pi-overdrive", "model-callability.json");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
+const identities = [
+  "openai-codex/gpt-5.5", "openai-codex/gpt-5.6-luna", "openai-codex/gpt-5.6-sol",
+  "openai-codex/gpt-5.6-terra", "openai-codex/gpt-6-astra",
+  "omniroute/deepseek/deepseek-v4-pro-high", "omniroute/deepseek/deepseek-v4-flash",
+  "omniroute/openrouter/qwen/qwen3.8-27b", "omniroute/openrouter/qwen/qwen3-coder-next",
+  "omniroute/groq/qwen/qwen3-32b", "omniroute/auto/best-fast",
+  "omniroute/auto/best-reasoning", "omniroute/auto/best-coding",
+];
 
 function runPi(message) {
-  return new Promise((resolve) => {
-    const child = spawn(pi, ["--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--provider", "pi-overdrive-tool-audit", "--model", "single-tool-driver", "--api-key", "audit-only", "--no-tools"], { cwd: root, env: { ...process.env, PI_OVERDRIVE_TOOL_AUDIT_KEY: "audit-only", PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile }, stdio: ["pipe", "pipe", "pipe"] });
-    const events = [];
-    let buffer = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => {
-      buffer += chunk.toString("utf8");
-      for (;;) {
-        const newline = buffer.indexOf("\n");
-        if (newline < 0) break;
-        const line = buffer.slice(0, newline).replace(/\r$/u, "");
-        buffer = buffer.slice(newline + 1);
-        try { if (line) events.push(JSON.parse(line)); } catch {}
-      }
-    });
-    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk.toString("utf8")}`.slice(-5000); });
-    child.stdin.write(`${JSON.stringify(message)}\n`);
-    const timer = setTimeout(() => child.kill("SIGTERM"), 30_000);
-    const poll = setInterval(() => {
-      if (!events.some((event) => event.type === "response" || (event.type === "extension_ui_request" && event.method === "notify"))) return;
-      clearInterval(poll);
-      child.stdin.end();
-    }, 20);
-    child.once("close", (code) => {
-      clearTimeout(timer);
-      clearInterval(poll);
-      resolve({ code, events, stderr });
-    });
+  const child = spawnSync(pi, [
+    "--offline", "--approve", "--no-session", "--mode", "rpc",
+    "--extension", routingProvider, "--extension", modelPolicyExtension,
+    "--provider", "pi-overdrive-routing-audit", "--model", "driver",
+    "--api-key", "audit-only", "--no-tools",
+  ], {
+    cwd: root,
+    env: {
+      ...process.env,
+      PI_CODING_AGENT_DIR: agentDir,
+      PI_OVERDRIVE_MODEL_POLICY: policyFile,
+      PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile,
+      PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only",
+    },
+    input: `${JSON.stringify(message)}\n`,
+    encoding: "utf8",
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
   });
+  const events = String(child.stdout ?? "").split(/\r?\n/u).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
+  return { code: child.status, events, stderr: String(child.stderr ?? "").slice(-5000), signal: child.signal, error: child.error?.message };
 }
 
+const notifications = (run) => run.events.filter((event) => event.type === "extension_ui_request" && event.method === "notify").map((event) => String(event.message)).join("\n");
+const noModelCall = (run) => !run.events.some((event) => ["agent_start", "message_start", "message_update", "message_end"].includes(event.type));
+
 try {
-  const catalogRun = await runPi({ id: "council-catalog", type: "get_commands" });
+  fs.mkdirSync(path.join(agentDir, "extensions", "subagent"), { recursive: true, mode: 0o700 });
+  fs.mkdirSync(path.dirname(callabilityFile), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
+  fs.copyFileSync(path.join(root, "config", "subagents.json"), path.join(agentDir, "extensions", "subagent", "config.json"));
+  fs.chmodSync(path.join(agentDir, "extensions", "subagent", "config.json"), 0o600);
+  fs.writeFileSync(policyFile, `${JSON.stringify({ version: 2, preset: "normal", basePreset: "normal", overrides: {} }, null, 2)}\n`, { mode: 0o600 });
+  fs.writeFileSync(callabilityFile, `${JSON.stringify({ version: 1, entries: Object.fromEntries(identities.map((identity) => [identity, { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" }])) }, null, 2)}\n`, { mode: 0o600 });
+
+  const catalogRun = runPi({ id: "council-catalog", type: "get_commands" });
   const commands = catalogRun.events.find((event) => event.type === "response" && event.id === "council-catalog")?.data?.commands ?? [];
-  check("pi-council-commands-registered", catalogRun.code === 0 && commands.some((entry) => entry.name === "council" && entry.source === "extension") && commands.some((entry) => entry.name === "council-status" && entry.source === "extension"), commands.filter((entry) => entry.name.includes("council")).map((entry) => ({ name: entry.name, source: entry.source })));
+  check("pi-council-commands-registered", catalogRun.code === 0 && ["council", "council-status"].every((name) => commands.some((entry) => entry.name === name && entry.source === "extension")) && noModelCall(catalogRun), commands.filter((entry) => entry.name.includes("council")).map((entry) => ({ name: entry.name, source: entry.source })));
 
-  const precedenceRun = await runPi({ id: "council-precedence", type: "prompt", message: "/council" });
-  const precedenceText = precedenceRun.events.filter((event) => event.type === "extension_ui_request" && event.method === "notify").map((event) => event.message).join("\n");
-  check("protected-council-command-shadows-upstream-prompt", precedenceRun.code === 0 && precedenceText.includes("usage: /council TASK") && !precedenceRun.events.some((event) => event.type === "agent_start"), precedenceText || precedenceRun.stderr);
+  const precedenceRun = runPi({ id: "council-precedence", type: "prompt", message: "/council" });
+  const precedenceText = notifications(precedenceRun);
+  check("protected-council-command-shadows-upstream-prompt", precedenceRun.code === 0 && precedenceText.includes("usage: /council TASK") && noModelCall(precedenceRun), precedenceText || precedenceRun.stderr);
 
-  const statusRun = await runPi({ id: "council-status", type: "prompt", message: "/council-status" });
-  const statusText = statusRun.events.filter((event) => event.type === "extension_ui_request" && event.method === "notify").map((event) => event.message).join("\n");
-  check("pi-council-status-is-live-and-secret-free", statusRun.code === 0 && ["council-1:", "council-2:", "council-3:", "council-judge:", "concurrency=3", "depth=1", "nested council=disabled"].every((value) => statusText.includes(value)) && !/api[_ -]?key|credential\s*[:=]|token\s*[:=]/iu.test(statusText), statusText || statusRun.stderr);
+  const statusRun = runPi({ id: "council-status", type: "prompt", message: "/council-status" });
+  const statusText = notifications(statusRun);
+  check("pi-council-status-is-live-heterogeneous-and-secret-free", statusRun.code === 0 && [
+    "council-1: openai-codex/gpt-5.6-sol:high", "council-2: omniroute/deepseek/deepseek-v4-pro-high:off",
+    "council-3: omniroute/openrouter/qwen/qwen3.8-27b:off", "council-judge: openai-codex/gpt-6-astra:high",
+    "concurrency=3", "depth=1", "nested council=disabled", "same OmniRoute gateway",
+  ].every((value) => statusText.includes(value)) && !/api[_ -]?key|credential\s*[:=]|token\s*[:=]/iu.test(statusText) && noModelCall(statusRun), statusRun.code === 0 ? { heterogeneous: true, modelCalls: 0, characters: statusText.length } : statusText || statusRun.stderr || statusRun.error);
 
-  const agents = spawnSync(process.execPath, [path.join(root, "scripts", "agent-policy-smoke.mjs")], { cwd: root, env: process.env, encoding: "utf8", timeout: 180_000 });
+  const agents = spawnSync(process.execPath, [path.join(root, "scripts", "agent-policy-smoke.mjs")], { cwd: root, env: process.env, encoding: "utf8", timeout: 180_000, maxBuffer: 16 * 1024 * 1024 });
   let agentEvidence;
   try { agentEvidence = JSON.parse(agents.stdout); } catch {}
   check("pi-council-profiles-are-read-only-fresh-and-non-delegating", agents.status === 0 && agentEvidence?.status === "PASS" && agentEvidence.results?.some((entry) => entry.name === "council-runtime-surfaces-are-read-only-and-non-delegating" && entry.status === "PASS"), agentEvidence ?? agents.stderr);
@@ -73,5 +87,5 @@ try {
 }
 
 const status = results.length === 4 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
-process.stdout.write(`${JSON.stringify({ status, paidModelCalls: 0, providerExecution: "DETERMINISTIC_LOCAL_ONLY", crossProviderExecution: "BLOCKED_BY_CREDENTIAL", results }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ status, modelInferenceCalls: 0, providerExecution: "DETERMINISTIC_LOCAL_ONLY", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

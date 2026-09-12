@@ -60,7 +60,7 @@ try {
   check("bootstrap-installs-secret-free-web-routing", webConfig.provider === "brave" && webConfig.overdriveRouting?.secondaryProvider === "perplexity" && !Object.hasOwn(webConfig, "apiKeys"), webConfig);
   const modelPolicyFile = path.join(configDir, "pi-overdrive", "model-policy.json");
   const modelPolicy = fs.existsSync(modelPolicyFile) ? JSON.parse(fs.readFileSync(modelPolicyFile, "utf8")) : {};
-  check("bootstrap-installs-private-user-owned-model-policy", modelPolicy.preset === "efficient" && modelPolicy.version === 1 && (fs.statSync(modelPolicyFile).mode & 0o077) === 0, { preset: modelPolicy.preset, mode: fs.existsSync(modelPolicyFile) ? fs.statSync(modelPolicyFile).mode & 0o777 : null });
+  check("bootstrap-installs-private-user-owned-model-policy", modelPolicy.preset === "normal" && modelPolicy.version === 2 && (fs.statSync(modelPolicyFile).mode & 0o077) === 0, { preset: modelPolicy.preset, mode: fs.existsSync(modelPolicyFile) ? fs.statSync(modelPolicyFile).mode & 0o777 : null });
   const callabilityFile = path.join(configDir, "pi-overdrive", "model-callability.json");
   const callability = fs.existsSync(callabilityFile) ? JSON.parse(fs.readFileSync(callabilityFile, "utf8")) : {};
   check("bootstrap-installs-secret-free-callability-cache", callability.version === 1 && callability.entries?.["openai-codex/gpt-5.4"]?.runtimeStatus === "RUNTIME_REJECTED" && (fs.statSync(callabilityFile).mode & 0o077) === 0 && !/token|apiKey|credential/iu.test(JSON.stringify(callability)), { version: callability.version, entries: Object.keys(callability.entries ?? {}).length });

@@ -1,21 +1,22 @@
 # Benchmark and smoke results
 
-Recorded on 2026-09-11 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. No authenticated provider call or E2E was made for the structured-output remediation.
+Recorded on 2026-09-12 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. The routing-preset work used only metadata endpoints, command handlers and deterministic local providers—no authenticated inference or E2E call.
 
 ## Current regression evidence
 
 | Check | Result | Runtime evidence |
 |---|---|---|
-| Unit/static package | PASS | `npm run check`: 101/101 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Unit/static package | PASS | `npm run check`: 134/134 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Routing/quality policy | PASS | 25/25 focused unit tests: preset migration/persistence, quality session state/precedence, adaptive paths, security override, deterministic fallbacks, fail-closed routes, Council/Judge mappings, call limits and metadata privacy |
 | Deterministic evaluator | PASS | `npm run benchmark:suite`: 6/6 task categories, zero paid calls |
-| Model preset evaluator | PASS | `npm run benchmark:models`: four presets, all twelve routes backed by cached runtime-callable evidence, zero paid calls |
+| Model preset evaluator | PASS | `npm run benchmark:models`: `normal` and `token-saver`, all twelve roles resolved from current registry/auth/callability metadata, zero model calls; OmniRoute catalog entries remain runtime-unknown and therefore use direct fallbacks |
 | Real Pi capability path | PASS | `npm run smoke:runtime`: FFF filename/content, two AST matches, TS diagnostics/definition/four references, and real public `web_fetch`, driven sequentially by a local deterministic provider |
-| Real model commands | PASS | `npm run smoke:models`: live catalog, authentication metadata unchanged, override/persistence/reload/reset, invalid-ID rejection, all concrete presets, custom preservation |
-| Council surface/policy | PASS | `npm run smoke:council`: protected `/council` command wins; all four roles are fresh/read-only/non-delegating with advisory completion semantics |
+| Real Pi routing commands | PASS | `npm run smoke:models`: 9/9 through Pi RPC; `/preset`, `/quality`, and `/ai-tree` are registered, persistence/alias/session reset/immediate quality effect/JSON tree/secret-free output pass with zero model calls |
+| Council surface/policy | PASS | `npm run smoke:council`: 4/4; protected `/council` command wins, heterogeneous target routes render, and all four roles are fresh/read-only/non-delegating with advisory completion semantics |
 | Local Council/workflow | PASS | `npm run smoke:council-local`: corrected valid Council 100/100; full zero-paid Scout→Council→Worker→Tester→review→correction→final verification reached PASS; all negative controls failed closed |
 | Real spawn bridge/accounting | PASS | `npm run smoke:spawn-budget`: installed `pi-subagents@0.66.0` native-schema event bridge and upstream accounting with a deterministic local provider; 32 delegations, Council-2 invalid at slot 24 then valid at slot 26 on the same route, Council-3 at slot 25, one shared retry-reserve unit used, final PASS, deterministic schema/config rejection before launch, limit-24 zero-call preflight, atomic rejection, cleanup PASS |
 | MCP | PASS | `npm run smoke:mcp`: mutation approval denial, allowlist, no side effect, metadata-only MCP trace; prior online Context7 read remains documented separately |
-| General LSP | PASS/PARTIAL | `npm run smoke:lsp`: real TS and Python definition/references/diagnostics and C++ diagnostic pass in read-only no-network Bubblewrap; missing Rust and Go servers report `PARTIAL` |
+| General LSP | PASS | Current managed runtime and regression suite cover TypeScript, Python, C/C++, Rust, Go and Bash definition/reference/diagnostic paths plus JS/HTML/CSS/JSON/YAML semantic fixtures in read-only no-network isolation |
 | Web | PASS/PARTIAL | `npm run smoke:web`: `web_fetch` and DNS-pinned `safe_web_fetch` work; unsafe schemes/private targets fail; Brave and Perplexity search fail explicitly because both credentials are absent |
 | Browser | PASS | `npm run smoke:browser`: three actual Chromium calls with assigned profile/session, DOM marker inspection, profile materialization, and close |
 | Agent boundaries | PASS | `npm run smoke:agents`: all twelve profiles discovered; Tester/council are read-only, Worker has no shell, autonomous roles have no web tools |
@@ -29,20 +30,18 @@ Recorded on 2026-09-11 with official Pi 0.85.1. A PASS below is backed by the cu
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
 | Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 16 at measurement time |
 
-The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 101/101; this environmental limitation is not counted as a product pass or failure.
+The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 134/134; this environmental limitation is not counted as a product pass or failure.
 
 ## Preset comparison
 
-`npm run benchmark:models` queried the real Pi registry. Only `openai-codex` was authenticated, with eight available models. The route-rate columns sum the registry's published input-plus-output USD-per-million rates for the roles shown; they are not task-cost estimates.
+`npm run benchmark:models` queried the real Pi registry without inference. Both `openai-codex` and `omniroute` reported authentication present, with eight available models each. Runtime callability remains independent: five selected direct OpenAI models are attested callable; all eight newly catalogued OmniRoute routes are `RUNTIME_UNKNOWN`, so both presets currently resolve to declared direct fallbacks. The route-rate columns sum the registry's published input-plus-output USD-per-million rates for the roles shown; they are not task-cost estimates.
 
-| Preset | Deterministic status | Normal path rate | Added high-risk/council rate | Models | Providers | Live review |
+| Preset | Metadata-policy status | Currently selected path rate | Added high-risk/Council rate | Selected models | Selected providers | Live review |
 |---|---|---:|---:|---:|---:|---|
-| Budget | PASS | 9.8 | 7.0 | 1 | 1 | NOT RUN |
-| Efficient | PASS | 123.2 | 191.4 | 5 | 1 | NOT RUN |
-| Balanced | PASS | 89.6 | 191.4 | 5 | 1 | NOT RUN |
-| Max quality | PASS | 194.4 | 191.4 | 5 | 1 | NOT RUN |
+| Normal Work (`normal`) | PASS | 123.2 | 191.4 | 5 | 1 | NOT RUN |
+| Token Saver (`token-saver`) | PASS | 123.2 | 191.4 | 5 | 1 | NOT RUN |
 
-Efficient remains the default: Luna handles cheap reconnaissance/testing, Terra implementation, Sol planning/review, and Astra only Oracle/Judge. This is a routing/cost rationale, not evidence that heterogeneous councils improve quality. The `--live` four-review benchmark was not run because it would add paid calls after an authenticated E2E had already been attempted. A cross-provider quality comparison was impossible with one authenticated provider.
+`normal + auto` is the default. Token Saver's intended Qwen/DeepSeek primaries are present and authenticated through OmniRoute but are not selected until genuine runtime-callability evidence exists; equal current rate figures therefore describe safe fallback state, not equivalent preset policy. Deterministic local providers prove the heterogeneous target mappings and ordered fallback behavior. The `--live` review benchmark was not run because it would consume paid inference, so no cross-provider quality claim is made.
 
 ## Context and tool-schema overhead
 

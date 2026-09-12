@@ -125,7 +125,7 @@ function runMalformedJournalControl() {
   const controlRoot = path.join(root, "malformed-journal-evidence");
   const run = createEvidenceRun({ root: controlRoot });
   const digest = taskDigest("malformed journal fixture");
-  writeWorkflowJournal(run, initialWorkflowJournal(run, { taskDigest: digest, workflowVersion: 4, sourceRepository: repo, ownerRunId: "malformed-journal-owner" }));
+  writeWorkflowJournal(run, initialWorkflowJournal(run, { taskDigest: digest, workflowVersion: 5, sourceRepository: repo, ownerRunId: "malformed-journal-owner" }));
   fs.writeFileSync(run.stateFile, '{"run_id":');
   fs.chmodSync(run.stateFile, 0o600);
   const recovery = recoverInterruptedWorkflowRuns({ root: controlRoot });

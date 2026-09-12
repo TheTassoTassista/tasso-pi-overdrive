@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -29,6 +29,7 @@ if (!pkg.pi.extensions.includes('./extensions/mcp.ts')) failures.push('compact M
 if (!pkg.pi.extensions.includes('./extensions/web-policy.ts')) failures.push('bounded dual-provider web policy extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.includes('./extensions/typescript-navigation.ts')) failures.push('generalized one-tool LSP extension must replace the legacy TypeScript extension hook');
 if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
+if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 
 const lspRuntime = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package.json'), 'utf8'));
 const expectedLsp = {
@@ -90,7 +91,32 @@ for (const name of expectedAgents) {
 }
 
 const modelPolicy = JSON.parse(await readFile(path.join(root, 'config/model-policy.json'), 'utf8'));
-if (modelPolicy.version !== 1 || modelPolicy.preset !== 'efficient' || modelPolicy.basePreset !== 'efficient' || Object.keys(modelPolicy.overrides ?? {}).length !== 0) failures.push('tracked model policy default is not minimal efficient/user-owned state');
+if (modelPolicy.version !== 2 || modelPolicy.preset !== 'normal' || modelPolicy.basePreset !== 'normal' || Object.keys(modelPolicy.overrides ?? {}).length !== 0) failures.push('tracked model policy default is not minimal normal/user-owned state');
+const routingPolicy = JSON.parse(await readFile(path.join(root, 'config/routing-policy.json'), 'utf8'));
+const exactOmniRouteIds = [
+  'deepseek/deepseek-v4-pro-high', 'deepseek/deepseek-v4-flash', 'openrouter/qwen/qwen3.8-27b',
+  'openrouter/qwen/qwen3-coder-next', 'groq/qwen/qwen3-32b', 'auto/best-fast', 'auto/best-reasoning', 'auto/best-coding',
+];
+if (routingPolicy.version !== 1 || JSON.stringify(Object.keys(routingPolicy.presets ?? {}).sort()) !== JSON.stringify(['normal', 'token-saver'])) failures.push('routing policy must define exactly normal and token-saver');
+if (routingPolicy.governor?.absoluteModelCallCeiling !== 42 || routingPolicy.governor?.maxRetriesPerDelegation !== 1 || routingPolicy.governor?.maxCorrectionRounds !== 2) failures.push('routing governor hard limits are missing or invalid');
+for (const preset of ['normal', 'token-saver']) {
+  const caps = routingPolicy.context?.[preset];
+  const limits = routingPolicy.governor?.maxModelCalls?.[preset];
+  if (!caps || !['handoffChars', 'evidenceChars', 'councilChars'].every((key) => Number.isSafeInteger(caps[key]) && caps[key] >= 1000 && caps[key] <= 12000)) failures.push(`routing context caps are invalid for ${preset}`);
+  if (!limits || !['low', 'medium', 'high', 'max'].every((key) => Number.isSafeInteger(limits[key]) && limits[key] >= 1 && limits[key] <= 42)) failures.push(`routing governor call limits are invalid for ${preset}`);
+}
+for (const id of exactOmniRouteIds) {
+  const definition = Object.values(routingPolicy.models ?? {}).find((entry) => entry.catalogId === id);
+  if (!definition || definition.identity !== `omniroute/${id}` || definition.source !== 'OmniRoute') failures.push(`routing policy is missing exact OmniRoute catalog identity ${id}`);
+  if (!settingsPatch.enabledModels?.includes(`omniroute/${id}`) || !settingsPatch.subagents?.modelScope?.allow?.includes(`omniroute/${id}`)) failures.push(`OmniRoute route is outside enforced model scope: ${id}`);
+}
+for (const preset of ['normal', 'token-saver']) {
+  for (const role of expectedAgents.map((agent) => ({ 'correctness-reviewer': 'correctness', 'security-reviewer': 'security', 'simplicity-reviewer': 'simplicity', 'council-judge': 'council-judge' }[agent] ?? agent))) {
+    const route = routingPolicy.presets?.[preset]?.roles?.[role];
+    if (!route || !Array.isArray(route.chain) || route.chain.length === 0) failures.push(`routing policy missing ${preset}/${role}`);
+    for (const candidate of route?.chain ?? []) if (!routingPolicy.models?.[candidate?.[0]] || !['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(candidate?.[1])) failures.push(`invalid routing candidate in ${preset}/${role}`);
+  }
+}
 const callability = JSON.parse(await readFile(path.join(root, 'config/model-callability.json'), 'utf8'));
 if (callability.version !== 1 || callability.entries?.['openai-codex/gpt-5.4']?.runtimeStatus !== 'RUNTIME_REJECTED') failures.push('tracked runtime-callability evidence does not reject the known unsupported model');
 for (const [agent, route] of Object.entries(settingsPatch.subagents?.agentOverrides ?? {})) if (callability.entries?.[route.model]?.runtimeStatus === 'RUNTIME_REJECTED') failures.push(`${agent} active route uses a runtime-rejected model`);

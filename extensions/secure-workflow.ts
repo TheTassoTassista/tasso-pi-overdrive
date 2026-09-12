@@ -11,6 +11,8 @@ import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, in
 import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
 import { AGENT_TO_ROLE, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
+import { getSessionQuality } from "../lib/routing-session.mjs";
+import { resolveTokenGovernor, validateTokenGovernor } from "../lib/token-governor.mjs";
 import { classifyDelegationFailure } from "../lib/delegation-failure.mjs";
 import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
@@ -61,14 +63,15 @@ function sanitizeState(state: any) {
     finalVerificationStatus: state?.finalVerificationStatus ?? "NOT_RUN",
     cleanupStatus: state?.cleanupStatus ?? "NOT_RUN",
     evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
-    modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, roles: state.modelPolicy.roles, routingDecisions: state.modelPolicy.routingDecisions, capabilityDigest: state.modelPolicy.capabilityDigest, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
+    modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, qualityRequested: state.modelPolicy.qualityRequested, effectiveQuality: state.modelPolicy.effectiveQuality, roles: state.modelPolicy.roles, routingDecisions: state.modelPolicy.routingDecisions, capabilityDigest: state.modelPolicy.capabilityDigest, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
+    routingStrategy: state?.routingStrategy,
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
     hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
     spawnBudget: state?.spawnBudget,
     allocation: state?.allocation,
     evidence: {
-      roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, thinking: item.thinking, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
+      roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, thinking: item.thinking, provider: item.provider, fallbackIndex: item.fallbackIndex, callNumber: item.callNumber, retryCount: item.retryCount, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
       receipts: Array.isArray(evidence.receipts) ? evidence.receipts.map((item: any) => ({ agent: item.agent, round: item.round, iteration: item.iteration, executionId: item.executionId, sequence: item.sequence, sha256: item.sha256 })) : [],
       transitions: Array.isArray(evidence.transitions) ? evidence.transitions : [],
       verifications: Array.isArray(evidence.verifications) ? evidence.verifications.map((item: any) => ({
@@ -155,7 +158,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "secure_coding_workflow",
     label: "Enforced coding workflow",
-    description: "Run Scout → Planner → Worker → Tester → sandboxed verification → structured reviewers, with bounded mandatory correction in an isolated worktree. Concurrency/depth/model routing are not caller-configurable.",
+    description: "Run an adaptive tools-first coding workflow with bounded model escalation, sandboxed verification, mandatory correction on failure, and caller-independent concurrency/depth/routing limits.",
     parameters: Params,
     executionMode: "sequential",
     async execute(toolCallId, params, signal, _update, ctx) {
@@ -191,14 +194,32 @@ export default function (pi: ExtensionAPI) {
       const availableModels = ctx.modelRegistry.getAvailable();
       const registeredModels = ctx.modelRegistry.getAll();
       const modelCapabilityOptions = { registeredModels };
-      let activeModelPolicy = resolveModelPolicy(availableModels, readModelPolicy(), modelCapabilityOptions);
+      const storedModelPolicy = readModelPolicy();
+      let activeRoutingStrategy = resolveTokenGovernor({
+        task: params.task,
+        preset: storedModelPolicy.preset === "custom" ? storedModelPolicy.basePreset : storedModelPolicy.preset,
+        quality: getSessionQuality(),
+        includeOracle: params.includeOracle ?? false,
+        includeSecurity: params.includeSecurity ?? true,
+      });
+      let activeModelPolicy: any = resolveModelPolicy(availableModels, storedModelPolicy, { ...modelCapabilityOptions, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality });
+      pi.events.emit("pi-overdrive:routing-metadata", { kind: "workflow-policy", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, securitySensitive: activeRoutingStrategy.securitySensitive, modelCallLimit: activeRoutingStrategy.maxModelCalls, policyDigest: activeModelPolicy.digest });
       const admittedExecutionIds = new Set<string>();
       const delegationAudit: Array<Record<string, unknown>> = [];
       const delegateOnce = ({ agent, task, cwd, result, round = 0, iteration = 0 }: DelegationInput, attempt: number): Promise<Record<string, any>> => new Promise((resolve, reject) => {
         const policyRole = AGENT_TO_ROLE[agent as keyof typeof AGENT_TO_ROLE];
         const route = policyRole ? activeModelPolicy.roles[policyRole] : undefined;
         if (!route) { reject(new Error(`No model route is configured for ${agent}.`)); return; }
+        const beforeSpawn = spawnBudgetGuard.snapshot();
+        if (beforeSpawn.used >= activeRoutingStrategy.maxModelCalls) {
+          const error = new Error(`TOKEN_GOVERNOR_MODEL_CALL_BUDGET_EXHAUSTED:${beforeSpawn.used}/${activeRoutingStrategy.maxModelCalls}`);
+          Object.assign(error, { failureCategory: "RESOURCE_LIMIT", failureReason: "TOKEN_GOVERNOR_MODEL_CALL_BUDGET_EXHAUSTED" });
+          reject(error);
+          return;
+        }
         spawnBudgetGuard.claimSpawn(agent, { retry: attempt > 1 });
+        const callNumber = beforeSpawn.used + 1;
+        pi.events.emit("pi-overdrive:routing-metadata", { kind: "role-route", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, role: policyRole, provider: route.provider, model: route.model, effort: route.thinking, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1 });
         const requestId = randomUUID();
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
@@ -220,8 +241,8 @@ export default function (pi: ExtensionAPI) {
               const canonicalResponse = canonicalizeDelegationResponse(route, response, { attempt, schema: result.kind === "structured" ? result.schema : undefined });
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: canonicalResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
-              const normalized = { ...canonicalResponse, status: receipt.status, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
-              delegationAudit.push({ agent, attempt, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, model: canonicalResponse.model, thinking: canonicalResponse.thinking, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
+              const normalized = { ...canonicalResponse, status: receipt.status, provider: route.provider, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
+              delegationAudit.push({ agent, role: policyRole, attempt, retryCount: attempt - 1, callNumber, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: canonicalResponse.launchStatus, modelCalls: canonicalResponse.modelCalls, provider: route.provider, model: canonicalResponse.model, thinking: canonicalResponse.thinking, fallbackIndex: route.fallbackIndex, preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
                 finish(resolve, normalized);
               } else {
@@ -258,15 +279,15 @@ export default function (pi: ExtensionAPI) {
           failWithReceipt("timed_out", `${agent} delegation timed out`);
         }, 20 * 60 * 1000);
         signal?.addEventListener("abort", abort, { once: true });
-        pi.events.emit(REQUEST_EVENT, {
+          pi.events.emit(REQUEST_EVENT, {
           requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
           model: route.model,
           thinking: route.thinking,
           timeoutMs: 18 * 60 * 1000,
           toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
           artifacts: false,
-          result,
-        });
+            result,
+          });
       });
       const delegate = async (input: DelegationInput): Promise<Record<string, any>> => executeDelegationWithRetry(async (attempt: number) => {
         if (signal?.aborted) throw new Error(`${input.agent} delegation cancelled`);
@@ -331,6 +352,7 @@ export default function (pi: ExtensionAPI) {
           latestState = journal.workflow_state;
           if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
           activeModelPolicy = validateResolvedModelPolicy(availableModels, latestState.modelPolicy, modelCapabilityOptions);
+          activeRoutingStrategy = validateTokenGovernor(latestState.routingStrategy);
           sequence = Math.max(0, ...((latestState.evidence?.roles ?? []).map((entry: any) => Number.parseInt(String(entry.nodeId ?? "0").split("-")[0] ?? "0", 10)).filter(Number.isFinite)));
           if (fs.existsSync(evidenceRun.executionFile)) {
             const loaded = readEvidenceExecution(evidenceRun, digest);
@@ -378,6 +400,7 @@ export default function (pi: ExtensionAPI) {
               runId: evidenceRun.runId,
               taskId: digest,
               modelPolicy: activeModelPolicy,
+              routingStrategy: activeRoutingStrategy,
               spawnBudgetGuard,
               receiptVerifier: (response: any, expected: any) => {
                 if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);

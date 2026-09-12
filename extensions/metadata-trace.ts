@@ -57,6 +57,28 @@ export default function (pi: ExtensionAPI) {
     startedTools.delete(event.toolCallId);
     await record({ event: "tool_end", tool: event.toolName, success: !event.isError, durationMs: started ? Date.now() - started : undefined });
   });
+  pi.events.on("pi-overdrive:routing-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "routing_metadata",
+      kind: scalar("kind") as string | undefined,
+      preset: scalar("preset") as string | undefined,
+      qualityRequested: scalar("qualityRequested") as string | undefined,
+      effectiveQuality: scalar("effectiveQuality") as string | undefined,
+      difficulty: scalar("difficulty") as string | undefined,
+      securitySensitive: scalar("securitySensitive") as boolean | undefined,
+      role: scalar("role") as string | undefined,
+      provider: scalar("provider") as string | undefined,
+      model: scalar("model") as string | undefined,
+      effort: scalar("effort") as string | undefined,
+      fallbackIndex: scalar("fallbackIndex") as number | undefined,
+      callNumber: scalar("callNumber") as number | undefined,
+      retryCount: scalar("retryCount") as number | undefined,
+      modelCallLimit: scalar("modelCallLimit") as number | undefined,
+      policyDigest: scalar("policyDigest") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

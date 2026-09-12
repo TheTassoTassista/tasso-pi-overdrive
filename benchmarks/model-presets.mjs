@@ -5,7 +5,7 @@ import { summarizeProviderCapabilities } from "../lib/model-inventory-report.mjs
 
 const pi = process.env.PI_BIN || "pi";
 const live = process.argv.includes("--live");
-const presets = ["budget", "efficient", "balanced", "max-quality"];
+const presets = ["normal", "token-saver"];
 
 function runPi({ id, message, model = "openai-codex/gpt-5.6-luna", thinking = "low", timeoutMs = 180_000, waitForNotification = false }) {
   return new Promise((resolve) => {
@@ -51,7 +51,7 @@ function parseRoutes(text) {
   const routes = {};
   for (const role of MODEL_ROLES) {
     const line = text.split("\n").find((candidate) => candidate.startsWith(`${role}: `));
-    const match = line ? /^([^:]+): (.+):(off|minimal|low|medium|high|xhigh|max)$/u.exec(line) : undefined;
+    const match = line ? /^([^:]+): (.+):(off|minimal|low|medium|high|xhigh|max) \[/u.exec(line) : undefined;
     if (match) routes[role] = { model: match[2], thinking: match[3] };
   }
   return routes;
@@ -133,8 +133,8 @@ try {
     authenticatedProviders: providerSummary.authenticatedProviders,
     providerCapabilities: providerSummary.providerCapabilities,
     crossProviderQualityComparison: "NOT_RUN_SINGLE_AUTHENTICATED_PROVIDER",
-    defaultSelection: "efficient",
-    defaultRationale: "Retains Luna discovery/testing, Terra implementation, Sol review/planning, and Astra escalation while admitting only routes with cached runtime-callable evidence; live review is reported separately.",
+    defaultSelection: "normal + auto",
+    defaultRationale: "Uses deterministic tools and the minimum justified roles, retains Luna/Terra/Sol/Astra direct targets, and admits fallback routes only with cached runtime-callable evidence; live review is reported separately.",
     comparisons,
   };
 } catch (error) {

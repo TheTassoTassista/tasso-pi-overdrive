@@ -16,7 +16,15 @@
     "openai-codex/gpt-5.6-luna",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-5.6-sol",
-    "openai-codex/gpt-6-astra"
+    "openai-codex/gpt-6-astra",
+    "omniroute/auto/best-coding",
+    "omniroute/auto/best-fast",
+    "omniroute/auto/best-reasoning",
+    "omniroute/deepseek/deepseek-v4-flash",
+    "omniroute/deepseek/deepseek-v4-pro-high",
+    "omniroute/groq/qwen/qwen3-32b",
+    "omniroute/openrouter/qwen/qwen3-coder-next",
+    "omniroute/openrouter/qwen/qwen3.8-27b"
   ],
   "showCacheMissNotices": true,
   "enableSkillCommands": true,
@@ -42,7 +50,15 @@
         "openai-codex/gpt-5.6-luna",
         "openai-codex/gpt-5.6-sol",
         "openai-codex/gpt-5.6-terra",
-        "openai-codex/gpt-6-astra"
+        "openai-codex/gpt-6-astra",
+        "omniroute/auto/best-coding",
+        "omniroute/auto/best-fast",
+        "omniroute/auto/best-reasoning",
+        "omniroute/deepseek/deepseek-v4-flash",
+        "omniroute/deepseek/deepseek-v4-pro-high",
+        "omniroute/groq/qwen/qwen3-32b",
+        "omniroute/openrouter/qwen/qwen3-coder-next",
+        "omniroute/openrouter/qwen/qwen3.8-27b"
       ]
     },
     "agentOverrides": {

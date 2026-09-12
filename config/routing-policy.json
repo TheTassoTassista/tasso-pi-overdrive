@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "models": {
+    "luna": {
+      "identity": "openai-codex/gpt-5.6-luna",
+      "source": "direct",
+      "family": "OpenAI"
+    },
+    "sol": {
+      "identity": "openai-codex/gpt-5.6-sol",
+      "source": "direct",
+      "family": "OpenAI"
+    },
+    "terra": {
+      "identity": "openai-codex/gpt-5.6-terra",
+      "source": "direct",
+      "family": "OpenAI"
+    },
+    "astra": {
+      "identity": "openai-codex/gpt-6-astra",
+      "source": "direct",
+      "family": "OpenAI"
+    },
+    "gpt55": {
+      "identity": "openai-codex/gpt-5.5",
+      "source": "direct",
+      "family": "OpenAI"
+    },
+    "deepseek-reasoning": {
+      "identity": "omniroute/deepseek/deepseek-v4-pro-high",
+      "source": "OmniRoute",
+      "family": "DeepSeek",
+      "catalogId": "deepseek/deepseek-v4-pro-high",
+      "contextWindow": 1000000,
+      "maxTokens": 32768,
+      "pricing": null
+    },
+    "deepseek-coding": {
+      "identity": "omniroute/deepseek/deepseek-v4-flash",
+      "source": "OmniRoute",
+      "family": "DeepSeek",
+      "catalogId": "deepseek/deepseek-v4-flash",
+      "contextWindow": 1000000,
+      "maxTokens": 32768,
+      "pricing": {
+        "input": 0.22,
+        "output": 0.66,
+        "cacheRead": 0.007,
+        "cacheWrite": 0.22
+      }
+    },
+    "qwen-reasoning": {
+      "identity": "omniroute/openrouter/qwen/qwen3.8-27b",
+      "source": "OmniRoute",
+      "family": "Qwen",
+      "catalogId": "openrouter/qwen/qwen3.8-27b",
+      "contextWindow": 1000000,
+      "maxTokens": 32768,
+      "pricing": null
+    },
+    "qwen-coding": {
+      "identity": "omniroute/openrouter/qwen/qwen3-coder-next",
+      "source": "OmniRoute",
+      "family": "Qwen",
+      "catalogId": "openrouter/qwen/qwen3-coder-next",
+      "contextWindow": 262144,
+      "maxTokens": 32768,
+      "pricing": null
+    },
+    "qwen-fast": {
+      "identity": "omniroute/groq/qwen/qwen3-32b",
+      "source": "OmniRoute",
+      "family": "Qwen",
+      "catalogId": "groq/qwen/qwen3-32b",
+      "contextWindow": 128000,
+      "maxTokens": 16384,
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      }
+    },
+    "auto-fast": {
+      "identity": "omniroute/auto/best-fast",
+      "source": "OmniRoute",
+      "family": "automatic",
+      "catalogId": "auto/best-fast",
+      "contextWindow": 2000000,
+      "maxTokens": 32768,
+      "pricing": null
+    },
+    "auto-reasoning": {
+      "identity": "omniroute/auto/best-reasoning",
+      "source": "OmniRoute",
+      "family": "automatic",
+      "catalogId": "auto/best-reasoning",
+      "contextWindow": 2000000,
+      "maxTokens": 32768,
+      "pricing": null
+    },
+    "auto-coding": {
+      "identity": "omniroute/auto/best-coding",
+      "source": "OmniRoute",
+      "family": "automatic",
+      "catalogId": "auto/best-coding",
+      "contextWindow": 2000000,
+      "maxTokens": 32768,
+      "pricing": null
+    }
+  },
+  "presets": {
+    "normal": {
+      "displayName": "Normal Work",
+      "description": "Successful-result-per-token: direct proven models first, deterministic tools before optional escalation.",
+      "roles": {
+        "scout": { "mode": "conditional", "chain": [["luna", "low"], ["qwen-fast", "off"], ["auto-fast", "off"], ["terra", "low"]] },
+        "planner": { "mode": "conditional", "chain": [["sol", "high"], ["deepseek-reasoning", "off"], ["qwen-reasoning", "off"], ["auto-reasoning", "off"], ["astra", "high"]] },
+        "oracle": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["deepseek-reasoning", "off"]] },
+        "worker": { "mode": "enabled", "chain": [["terra", "high"], ["qwen-coding", "off"], ["deepseek-coding", "off"], ["auto-coding", "off"], ["sol", "high"]] },
+        "tester": { "mode": "conditional", "chain": [["luna", "medium"], ["qwen-fast", "off"], ["terra", "medium"]] },
+        "correctness": { "mode": "conditional", "chain": [["sol", "high"], ["deepseek-reasoning", "off"], ["astra", "high"]] },
+        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["astra", "high"]] },
+        "simplicity": { "mode": "conditional", "chain": [["luna", "medium"], ["qwen-fast", "off"], ["terra", "medium"]] },
+        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["astra", "high"]] },
+        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["sol", "high"]] },
+        "council-3": { "mode": "conditional", "chain": [["qwen-reasoning", "off"], ["qwen-coding", "off"], ["luna", "high"]] },
+        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"]] }
+      }
+    },
+    "token-saver": {
+      "displayName": "Token Saver",
+      "description": "Tools-first, smallest useful context and minimum fan-out; escalate once evidence shows the cheap path is insufficient.",
+      "roles": {
+        "scout": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "low"], ["auto-fast", "off"]] },
+        "planner": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["sol", "high"], ["qwen-reasoning", "off"], ["auto-reasoning", "off"]] },
+        "oracle": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["astra", "high"], ["sol", "high"]] },
+        "worker": { "mode": "enabled", "chain": [["qwen-coding", "off"], ["deepseek-coding", "off"], ["terra", "high"], ["auto-coding", "off"]] },
+        "tester": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "medium"], ["terra", "medium"]] },
+        "correctness": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["sol", "high"], ["astra", "high"]] },
+        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["astra", "high"]] },
+        "simplicity": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "medium"]] },
+        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["astra", "high"]] },
+        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["sol", "high"]] },
+        "council-3": { "mode": "conditional", "chain": [["qwen-reasoning", "off"], ["qwen-coding", "off"], ["luna", "high"]] },
+        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"]] }
+      }
+    }
+  },
+  "quality": {
+    "levels": ["auto", "low", "medium", "high", "max"],
+    "directEffort": {
+      "low": { "default": "low", "worker": "medium", "security": "high", "oracle": "high", "council-judge": "high" },
+      "medium": {},
+      "high": {},
+      "max": { "default": "max", "scout": "medium", "tester": "high", "simplicity": "high" }
+    }
+  },
+  "council": {
+    "members": ["council-1", "council-2", "council-3"],
+    "judge": "council-judge",
+    "triggers": ["explicit /council", "critical risk", "material reviewer disagreement", "second bounded correction"]
+  },
+  "context": {
+    "normal": { "handoffChars": 12000, "evidenceChars": 10000, "councilChars": 8000 },
+    "token-saver": { "handoffChars": 7000, "evidenceChars": 6000, "councilChars": 5000 }
+  },
+  "governor": {
+    "maxModelCalls": {
+      "normal": { "low": 14, "medium": 18, "high": 30, "max": 42 },
+      "token-saver": { "low": 12, "medium": 14, "high": 30, "max": 42 }
+    },
+    "maxRetriesPerDelegation": 1,
+    "maxCorrectionRounds": 2,
+    "absoluteModelCallCeiling": 42
+  }
+}

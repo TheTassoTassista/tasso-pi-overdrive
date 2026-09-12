@@ -18,7 +18,7 @@ for (let index = 0; index < roles.length; index += 1) {
 }
 const valid = {
   runId: "00000000-0000-4000-8000-000000000001", taskDigest: "a".repeat(64), ownerRunId,
-  workflowVersion: 4, status: "PASS", hardLimits: { concurrency: 3, subagentDepth: 1 },
+  workflowVersion: 5, status: "PASS", hardLimits: { concurrency: 3, subagentDepth: 1 },
   cleanupStatus: "PASS", evidenceStatus: "PASS", cleanup: { status: "PASS", resourcesAbsent: true },
   evidence: {
     roles,
@@ -31,7 +31,7 @@ const valid = {
 valid.finalVerdict = {
   run_id: valid.runId,
   task_id: valid.taskDigest,
-  workflow_version: 4,
+  workflow_version: 5,
   status: "PASS",
   round_count: 2,
   worker_status: "completed",

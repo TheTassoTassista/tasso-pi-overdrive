@@ -1,18 +1,19 @@
 # Workflow
 
-## Task sizing
+## Task sizing and adaptive path
 
-- Trivial, well-bounded change: supervisor inspects, edits, and verifies directly.
-- Unfamiliar or cross-cutting change: scout first, then planner.
-- Risky decision or stubborn failure: oracle before more edits.
-- Implementation: one worker per checkout.
-- Validation: tester plus the relevant adversarial reviewer(s).
+The persistent preset and session quality overlay resolve to an internal Token Governor decision before runtime allocation. The default `normal + auto` path classifies bounded work as simple, normal, hard or critical. The controller—not model/tool input—selects role booleans, context limits, Council authorization and a model-call ceiling.
 
-The normal substantial path is the `secure_coding_workflow` state machine: Scout → Planner → optional Oracle → Worker → Tester → sandboxed verification → correctness/security/simplicity reviews. A blocking review or failed verification mechanically schedules a correction Worker, then Tester, verification, and every reviewer again. The correction maximum is two; exhaustion returns FAIL.
+- Simple: Worker → deterministic sandboxed verification → stop.
+- Normal: optional compact Scout/Planner evidence → Worker → deterministic verification → stop when solved.
+- Hard: Scout/Planner → Worker → deterministic verification → AI Tester or an appropriate reviewer only when useful.
+- Critical/security-sensitive/disputed: strong planning and specialized review; Council only when justified.
+
+`token-saver` bypasses planning, Tester AI and reviewers on a successful simple/default path. It escalates after concrete failure rather than repeating a cheap model. A blocking review or failed verification still mechanically schedules a correction Worker, then complete deterministic re-verification and the necessary Tester/reviewer evidence. The correction maximum remains two; exhaustion returns FAIL. See [model-routing.md](model-routing.md) for exact routes and quality semantics.
 
 ## Council escalation
 
-Council is not part of trivial or ordinary successful work. The controller invokes it for an explicitly high-risk run (`includeOracle: true`), a material split between mandatory reviewer verdicts, or the second correction after repeated failure (with Oracle root-cause evidence). `/council TASK` is an Overdrive extension command that enters this same enforced controller path; it has tested precedence over the raw pi-subagents prompt with the same name. `/council-status` is the authoritative read-only view of routes and limits.
+Council is not part of trivial or ordinary successful work. The controller invokes it for an explicit `/council` request, critical risk at an authorized quality, an authorized material split between reviewer verdicts, or the second correction after repeated failure (with Oracle root-cause evidence). `/council-status` and `/ai-tree` are read-only views of routes and limits.
 
 Exactly three profiles run concurrently: `council-1` checks behavioral correctness, `council-2` checks security/failure containment, and `council-3` checks simplicity/operations. Each receives the same bounded evidence packet in a fresh context, has no mutation/delegation/web tool, and cannot see a peer's first answer. Their profiles explicitly use advisory completion semantics (`completionGuard: false`), so a correct zero-edit analysis succeeds without weakening the read-only boundary. Pi-subagents' native per-invocation structured schema requires conclusion, recommendation, evidence, confidence, risks, and blocking concerns; prose-only, partial, malformed, wrong-identity, or duplicated results fail closed before synthesis.
 
@@ -37,9 +38,9 @@ The supported retry policy is one retry per delegation, bounded globally to thre
 
 The controller's guard accounts for the current enforced workflow. Pi-subagents owns the authoritative session-wide counter. Its installed API does not expose that live counter to another extension, so unrelated manual subagent calls already made in the same Pi session cannot be subtracted during the initial controller preflight; the upstream limit still rejects such a collision before provider launch, and the corrected diagnostic remains `RESOURCE_LIMIT` / `SUBAGENT_SPAWN_BUDGET_EXHAUSTED` with `modelCalls=0`. Start a fresh Pi session before a maximum-path autonomous run if the same session has already used manual subagents.
 
-The current catalog has one authenticated provider (`openai-codex`) and four runtime-callable council identities under the efficient preset: Sol, 5.5, Luna, and Astra as judge. The rejected `gpt-5.4` route is skipped before fan-out with an explicit reason. This is model-identity diversity, not cross-provider diversity.
+The configured Council target is OpenAI Sol high + DeepSeek V4 Pro High through OmniRoute + Qwen 3.8 through OmniRoute, followed by direct OpenAI Astra high as Judge. DeepSeek and Qwen are different model families behind one shared gateway, so this is not infrastructure independence. Newly catalogued OmniRoute IDs remain `RUNTIME_UNKNOWN` until genuine callability evidence exists; live resolution then uses the declared direct fallbacks rather than treating metadata presence as inference proof.
 
-The controller is workflow version 4. Before the first role starts it writes an owner-only, atomically replaced journal under `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/<run-id>/state.json`. Every phase boundary is fsynced. The journal records the task/repository identity, a per-workflow protocol nonce, a controller-owned monotonic checkpoint sequence, process boot identity, current phase and round, completed roles, review and verification outcomes, blocker counts, correction status, cleanup/evidence state, and timestamps. Role prose retained for resumption is secret-redacted; terminal journals retain bounded metadata.
+The adaptive controller is workflow version 5. Before the first role starts it writes an owner-only, atomically replaced journal under `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/<run-id>/state.json`. Every phase boundary is fsynced. The journal records the task/repository identity, frozen preset/quality/difficulty/governor decision, per-workflow protocol nonce, controller-owned monotonic checkpoint sequence, process boot identity, current phase and round, completed roles, review and verification outcomes, blocker counts, correction status, cleanup/evidence state, and timestamps. Role prose retained for resumption is secret-redacted; terminal journals retain bounded metadata.
 
 Every terminal role attempt first writes an owner-only immutable receipt under the run's `role-receipts/` directory. A receipt binds a UUID execution ID and deterministic sequence number to exactly one run, task, nonce, role, round, iteration, attempt, node, owner, terminal status, exit code, provider/model, thinking level, and result/error digest. Creation uses a private temporary file, file sync, atomic no-replace publication, and parent-directory sync; identical duplicate bytes are idempotent and conflicts fail closed. The controller reopens and validates that durable receipt, including the active policy's model and thinking route, before admitting the role transition. Missing, malformed, truncated, stale, cross-run, cross-task, wrong-role/round/model/thinking, duplicate-conflicting, or out-of-order receipts cannot advance the state machine.
 

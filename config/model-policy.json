@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "preset": "efficient",
-  "basePreset": "efficient",
+  "version": 2,
+  "preset": "normal",
+  "basePreset": "normal",
   "overrides": {}
 }

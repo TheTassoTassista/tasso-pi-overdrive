@@ -5,12 +5,13 @@ A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux
 ## What changes
 
 - Default interactive model: `openai-codex/gpt-5.6-terra`, medium thinking.
-- Role routing: Luna for reconnaissance/testing, Terra for implementation, Sol for planning/review, Astra only for the hardest advisory pass.
+- Persistent routing presets: `normal` (default) and `token-saver`; session quality: `auto` (default), `low`, `medium`, `high`, or `max`. `/ai-tree` shows every exact route and fallback without a model call.
+- Normal direct targets remain Luna low for Scout, Sol high for Planner/review, Terra high for Worker, and Astra high for Oracle/Judge. Explicit DeepSeek and Qwen cloud routes through the existing OmniRoute gateway provide conditional model-family diversity once runtime-callable.
 - Native compaction remains enabled. A session notebook stores only durable task state; `/handoff <next phase>` distills a clean-session prompt at 85% context.
-- Twelve role profiles run with fresh context and enforced tool allowlists: the original eight workflow roles plus three independent council members and a judge. `secure_coding_workflow` owns the isolated worktree and enforces Scout → Planner → Worker → Tester → verification → three reviewers → bounded correction. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Version-4 workflow journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
+- Twelve role profiles run with fresh context and enforced tool allowlists: the original eight workflow roles plus three independent council members and a judge. Workflow version 5 uses the minimum justified roles, deterministic verification before AI interpretation, and bounded escalation/correction in one isolated worktree. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
 - Successful oversized shell output is compacted deterministically; failures remain intact.
 - Tool-call guardrails block secret reads, symlink/hard-link escapes, protected writes, all free-form shell, and caller overrides of isolation limits. Autonomous commands use an argument-vector allowlist inside Bubblewrap.
-- Traces contain only timestamps, model/tool names, input key names, durations, statuses, and context counts—never prompts, argument values, outputs, URLs, or credentials.
+- Traces contain only timestamps, routing/model/tool metadata, input key names, durations, statuses, counts and policy digests—never prompts, argument values, outputs, URLs or credentials.
 
 ## Install or reproduce
 
@@ -36,10 +37,11 @@ Shell-level status is available with `./scripts/status.sh`.
 
 1. Start Pi in a Git checkout, not in the home directory.
 2. For a new repository run `./scripts/project-init.sh /absolute/repo/path`; existing files are never overwritten.
-3. Use the task directly for trivial work. For substantial or autonomous work call `secure_coding_workflow`; its stage order, worktree, models, reviewer loop, and limits cannot be changed by tool input.
-4. Use `task_notebook` after a material decision or verified discovery—not after every turn.
-5. Use `verification_gate` before a completion claim. Use full mode for release/build/e2e work.
-6. At 85% context, finish the phase, update the notebook, and run `/handoff <next phase goal>`.
+3. Keep `/preset normal` and `/quality auto` for the recommended default. Use `/preset token-saver` when quota matters, and inspect `/ai-tree` before important work.
+4. For substantial or autonomous work call `secure_coding_workflow`; its adaptive role path, worktree, models, reviewer loop and limits cannot be changed by tool input.
+5. Use `task_notebook` after a material decision or verified discovery—not after every turn.
+6. Use `verification_gate` before a completion claim. Use full mode for release/build/e2e work.
+7. At 85% context, finish the phase, update the notebook, and run `/handoff <next phase goal>`.
 
 See [workflow.md](docs/workflow.md), [model-routing.md](docs/model-routing.md), and [verification.md](docs/verification.md) for exact policies.
 
@@ -67,8 +69,11 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `semantic_nav` | Lazy project-aware diagnostics, definition, references, hover, symbols, and read-only rename preview |
 | `/lsp-status` | Show server availability, pins, process cap, and isolation policy |
 | `/models` | List real available models and credential-free provider status |
+| `/preset [normal\|token-saver]` | Show or persist the economic/routing strategy |
+| `/quality [auto\|low\|medium\|high\|max]` | Show or set this session's quality authorization |
+| `/ai-tree [--json]` | Render exact roles, efforts, fallbacks and callability with zero model calls |
 | `/model-routing` | Show the active role map and policy receipt |
-| `/model-role` / `/model-preset` | Persist a role override or select/reset a preset |
+| `/model-role` / `/model-preset` | Compatibility controls for exact role overrides and preset preview |
 | `/council <task>` | Run the existing enforced workflow with high-risk council escalation |
 | `/council-status` | Show council routes, escalation policy, independence, and hard limits |
 | `/subagents-models` | Confirm live role-to-model routing |
@@ -111,14 +116,15 @@ The audit, accepted/rejected package rationale, and residual limitations are in 
 
 1. Start `pi` from a trusted Git checkout.
 2. Use `/feature <goal>` or `/bug <symptom>` for disciplined work.
-3. Use `secure_coding_workflow` for substantial autonomous changes; it launches the appropriate roles itself.
-4. Ask `scout` or `planner` directly only for read-only exploratory work.
-5. Before any delegated model call, the enforced workflow verifies the derived spawn budget (39 base + 3 bounded retry reserve = configured limit 42); `/council-status` displays all three values.
-6. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` only for a manual isolated experiment.
-7. Use `task_notebook` after a durable decision or verified discovery.
-8. Run `verification_gate` before any completion claim.
-9. Run `/context-health`; at 85% use `/handoff <next goal>`.
-10. Use `/obs`, `/output-stats`, and `/trace-path` for cost/latency/tool evidence.
-11. Run `scripts/status.sh` after upgrades; follow [operations.md](docs/operations.md) rather than updating pins blindly.
+3. Use `/preset normal` plus `/quality auto` by default; `/preset token-saver` reduces model quota and `/quality` resets to auto in a new session.
+4. Use `/ai-tree` to inspect exact routes, then `secure_coding_workflow` for substantial autonomous changes; it launches only the justified roles.
+5. Ask `scout` or `planner` directly only for read-only exploratory work.
+6. Before any delegated model call, the enforced workflow verifies the derived spawn budget (39 base + 3 bounded retry reserve = configured limit 42); `/council-status` displays all three values.
+7. Run `scripts/worktree-new.sh BRANCH [BASE_REF]` only for a manual isolated experiment.
+8. Use `task_notebook` after a durable decision or verified discovery.
+9. Run `verification_gate` before any completion claim.
+10. Run `/context-health`; at 85% use `/handoff <next goal>`.
+11. Use `/obs`, `/output-stats`, and `/trace-path` for cost/latency/tool evidence.
+12. Run `scripts/status.sh` after upgrades; follow [operations.md](docs/operations.md) rather than updating pins blindly.
 
 For problems, see [troubleshooting.md](docs/troubleshooting.md). Test and benchmark evidence is in [benchmark-results.md](docs/benchmark-results.md).
