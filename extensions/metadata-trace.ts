@@ -3,6 +3,7 @@ import { chmod, lstat, mkdir, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { pruneKnownTraceLogs, resolveRetentionDays } from "../lib/trace-retention.mjs";
 
 interface TraceRow {
   timestamp: string;
@@ -33,13 +34,31 @@ export default function (pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    const root = path.join(process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state"), "pi-overdrive", "traces");
+    const stateHome = process.env.XDG_STATE_HOME || path.join(homedir(), ".local", "state");
+    const root = path.join(stateHome, "pi-overdrive", "traces");
     await mkdir(root, { recursive: true, mode: 0o700 });
     const rootStat = await lstat(root);
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error("trace root must be a real directory");
     await chmod(root, 0o700);
     traceFile = path.join(root, `${safeSessionName(ctx.sessionManager.getSessionFile())}.jsonl`);
     await record({ event: "session_start", cwd: ctx.cwd, model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined });
+    const retention = resolveRetentionDays(process.env.PI_OVERDRIVE_TRACE_RETENTION_DAYS ?? process.env.PI_OVERDRIVE_TRACE_DAYS);
+    if (!retention.valid) {
+      void record({ event: "trace_retention", status: "SKIPPED_INVALID_CONFIG" });
+      return;
+    }
+    void pruneKnownTraceLogs({ stateHome, days: retention.days }).then(async (summary) => {
+      await record({
+        event: "trace_retention",
+        status: summary.status,
+        retentionDays: retention.days,
+        scanned: summary.scanned,
+        removed: summary.removed,
+        capped: summary.capped,
+      });
+    }).catch(async () => {
+      await record({ event: "trace_retention", status: "ERROR" }).catch(() => undefined);
+    });
   });
   pi.on("model_select", async (event) => record({ event: "model_select", model: `${event.model.provider}/${event.model.id}`, source: event.source }));
   pi.on("agent_start", async () => record({ event: "agent_start" }));

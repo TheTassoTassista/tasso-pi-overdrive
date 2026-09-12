@@ -15,6 +15,13 @@
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 
+Metadata traces, MCP metadata traces, and dated launcher logs have automatic
+owner-only retention at session startup. The default is 30 days; set
+`PI_OVERDRIVE_TRACE_RETENTION_DAYS` to an integer from 1 to 3650 to override
+it. Invalid values disable that cleanup run. Cleanup is flat, bounded, and
+never follows symlinks or accepts an arbitrary target directory. Inspect or
+apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a
