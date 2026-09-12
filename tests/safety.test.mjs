@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { classifyCommand, inspectWorkspaceConstraint, inspectWorkspacePath, isAlwaysProtectedWritePath, isInside, isSecretPath, validateAllocatedBrowserCall, validateAstGrepCall, validateSubagentCall } from '../lib/safety.mjs';
+import { classifyCommand, inspectWorkspaceConstraint, inspectWorkspacePath, isAlwaysProtectedWritePath, isInside, isSecretPath, removeVerifiedWorkspaceFile, validateAllocatedBrowserCall, validateAstGrepCall, validateSubagentCall } from '../lib/safety.mjs';
 
 test('secret paths are recognized without opening them', () => {
   for (const value of ['.env', '.env.local', '/tmp/auth.json', '~/.ssh/id_ed25519', 'cert.pem']) assert.equal(isSecretPath(value), true, value);
@@ -71,6 +71,34 @@ test('canonical guard denies writes through multiply-linked files', () => {
     writeFileSync(path.join(root, 'outside.txt'), 'protected');
     linkSync(path.join(root, 'outside.txt'), path.join(workspace, 'hardlink.txt'));
     assert.equal(inspectWorkspacePath(workspace, 'hardlink.txt', { forWrite: true }).allowed, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('descriptor-backed removal succeeds only when the validated inode loses its sole name', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'pi-remove-fd-'));
+  const workspace = path.join(root, 'workspace');
+  const outside = path.join(root, 'outside.txt');
+  try {
+    mkdirSync(workspace);
+    writeFileSync(outside, 'outside-safe');
+    writeFileSync(path.join(workspace, 'ordinary.txt'), 'ordinary');
+    removeVerifiedWorkspaceFile(workspace, 'ordinary.txt');
+    assert.equal(existsSync(path.join(workspace, 'ordinary.txt')), false);
+
+    const victim = path.join(workspace, 'victim.txt');
+    const moved = path.join(workspace, 'victim-held');
+    writeFileSync(victim, 'validated-inode');
+    assert.throws(() => removeVerifiedWorkspaceFile(workspace, 'victim.txt', {
+      beforeUnlink: () => {
+        renameSync(victim, moved);
+        symlinkSync(outside, victim);
+      },
+    }), /identity changed during removal/u);
+    assert.equal(readFileSync(outside, 'utf8'), 'outside-safe');
+    assert.equal(readFileSync(moved, 'utf8'), 'validated-inode');
+    assert.equal(existsSync(victim), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

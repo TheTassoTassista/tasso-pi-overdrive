@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pruneKnownTraceLogs, resolveRetentionDays } from "../lib/trace-retention.mjs";
@@ -65,6 +65,65 @@ test("retention never follows symlinks, recurses, or touches foreign names", asy
     assert.equal(existsSync(outsideFile), true);
     assert.equal(existsSync(nested), true);
     assert.equal(existsSync(path.join(fixture.overdrive, "traces", "source.ts")), true);
+  } finally {
+    rmSync(fixture.stateHome, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("retention detects a pathname swap after final validation without touching the symlink target", async () => {
+  const fixture = createState();
+  const outside = mkdtempSync(path.join(tmpdir(), "pi-trace-race-outside-"));
+  const nowMs = Date.UTC(2026, 8, 12, 12, 0, 0);
+  const oldTrace = path.join(fixture.overdrive, "traces", "race.jsonl");
+  const heldTrace = path.join(fixture.overdrive, "traces", "race-held");
+  const outsideFile = path.join(outside, "outside.jsonl");
+  try {
+    fileAt(oldTrace, "old trace\n", nowMs - 31 * DAY_MS);
+    fileAt(outsideFile, "outside-safe\n", nowMs - 31 * DAY_MS);
+    await assert.rejects(() => pruneKnownTraceLogs({
+      stateHome: fixture.stateHome,
+      days: 30,
+      nowMs,
+      beforeUnlink: (file) => {
+        assert.equal(file, oldTrace);
+        renameSync(oldTrace, heldTrace);
+        symlinkSync(outsideFile, oldTrace);
+      },
+    }), /identity changed during retention unlink/u);
+    assert.equal(readFileSync(outsideFile, "utf8"), "outside-safe\n");
+    assert.equal(readFileSync(heldTrace, "utf8"), "old trace\n");
+    assert.equal(existsSync(oldTrace), false);
+  } finally {
+    rmSync(fixture.stateHome, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("retention remains anchored to the opened known directory when its pathname is replaced", async () => {
+  const fixture = createState();
+  const outside = mkdtempSync(path.join(tmpdir(), "pi-trace-dir-race-outside-"));
+  const nowMs = Date.UTC(2026, 8, 12, 12, 0, 0);
+  const traceDirectory = path.join(fixture.overdrive, "traces");
+  const heldDirectory = path.join(fixture.overdrive, "traces-held");
+  const oldTrace = path.join(traceDirectory, "race.jsonl");
+  const outsideFile = path.join(outside, "race.jsonl");
+  try {
+    fileAt(oldTrace, "old trace\n", nowMs - 31 * DAY_MS);
+    fileAt(outsideFile, "outside-safe\n", nowMs - 31 * DAY_MS);
+    const summary = await pruneKnownTraceLogs({
+      stateHome: fixture.stateHome,
+      days: 30,
+      nowMs,
+      beforeUnlink: (file) => {
+        assert.equal(file, oldTrace);
+        renameSync(traceDirectory, heldDirectory);
+        symlinkSync(outside, traceDirectory);
+      },
+    });
+    assert.equal(summary.removed, 1);
+    assert.equal(readFileSync(outsideFile, "utf8"), "outside-safe\n");
+    assert.equal(existsSync(path.join(heldDirectory, "race.jsonl")), false);
   } finally {
     rmSync(fixture.stateHome, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

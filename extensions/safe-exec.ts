@@ -1,10 +1,9 @@
 import { fileURLToPath } from "node:url";
-import fs from "node:fs";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
-import { inspectWorkspacePath, isAlwaysProtectedWritePath } from "../lib/safety.mjs";
+import { inspectWorkspacePath, removeVerifiedWorkspaceFile } from "../lib/safety.mjs";
 
 const PROGRAMS = ["git", "rg", "fd", "jq", "node", "npm", "pnpm", "python", "python3", "pytest", "pyright", "cargo", "go", "cmake", "ctest", "make", "gcc", "g++"] as const;
 const READ_ONLY_GIT = new Set(["status", "diff", "show", "log", "rev-parse", "ls-files", "branch"]);
@@ -62,18 +61,7 @@ export default function (pi: ExtensionAPI) {
     async execute(_id, params, _signal, _update, ctx) {
       const allocation = findRuntimeAllocation(ctx.cwd);
       if (!allocation) throw new Error("File removal requires an Overdrive-managed worktree allocation.");
-      if (isAlwaysProtectedWritePath(params.path)) throw new Error("Protected paths cannot be removed.");
-      const inspected = inspectWorkspacePath(ctx.cwd, params.path, { mustExist: true, forWrite: true });
-      if (!inspected.allowed || !("stat" in inspected) || !("lexical" in inspected)) {
-        throw new Error(`File removal denied: ${"reason" in inspected ? inspected.reason : "policy"}`);
-      }
-      if (!inspected.stat?.isFile() || inspected.stat.nlink !== 1) throw new Error("Only single-linked regular files may be removed.");
-      if (isAlwaysProtectedWritePath(inspected.canonical)) throw new Error("Protected canonical paths cannot be removed.");
-      const immediatelyBefore = fs.lstatSync(inspected.lexical);
-      if (!immediatelyBefore.isFile() || immediatelyBefore.isSymbolicLink() || immediatelyBefore.dev !== inspected.stat.dev || immediatelyBefore.ino !== inspected.stat.ino || immediatelyBefore.nlink !== 1) {
-        throw new Error("File changed during removal validation.");
-      }
-      fs.unlinkSync(inspected.lexical);
+      removeVerifiedWorkspaceFile(ctx.cwd, params.path);
       return { content: [{ type: "text", text: `Removed ${params.path}` }], details: { removed: true, sandboxedWorktree: true } };
     },
   });
