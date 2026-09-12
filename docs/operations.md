@@ -15,6 +15,21 @@
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 
+## Daily Pi startup
+
+`scripts/install-pi-launcher.sh` installs an idempotent Fish function and a
+user-local launcher. Typing `pi` serializes startup, starts OmniRoute with its
+documented `--headless` flag, waits on `/api/health/ping`, starts only the
+existing `pi-overdrive-searxng` container through the restricted passwordless
+Docker rule, checks SearXNG on loopback, opens the web dashboard, and finally
+replaces the launcher process with the real Pi executable. It never creates a
+container or changes provider/authentication files. Re-run the installer after
+updating the package; validate the installed copies with:
+
+```bash
+scripts/install-pi-launcher.sh --check
+```
+
 ## Recovery after interruption or power loss
 
 Run `npm run smoke:recovery` to exercise the deterministic SIGKILL/resume control. A normal `secure_coding_workflow` invocation performs recovery automatically: live process identity is checked using Linux boot ID and `/proc` start ticks, stale `RUNNING` work is marked `INTERRUPTED`, and matching work resumes from the last durable structured checkpoint. It cannot become PASS without a valid immutable execution snapshot, successful cleanup verification, a digest-linked receipt, and a terminal `COMPLETED` journal.

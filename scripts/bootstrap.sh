@@ -130,6 +130,7 @@ for tool in ast-grep sg; do
 done
 
 if [[ "$skip_browser" != true ]]; then "$package_root/scripts/install-agent-browser.sh"; fi
+"$package_root/scripts/install-pi-launcher.sh" --install
 node "$package_root/scripts/validate-package.mjs"
 "$pi_bin" list
 echo "Pi Overdrive installed. Restart Pi, then run /doctor, /subagents-models, and /notebook."
