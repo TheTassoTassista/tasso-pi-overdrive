@@ -96,6 +96,8 @@ An unsupported/auth/policy response after launch remains fail-closed and is not 
 
 The controller owns the resulting role booleans, Council permissions, context caps and model-call ceiling. None is present in the model-callable tool schema. Ceilings range from 12 calls for cheap Token Saver work to 42 for the complete 39-spawn critical path plus the existing global three-retry reserve. Concurrency remains 3, depth 1, corrections 2 and transient/attested-structured retry at most one per delegation and three per workflow.
 
+The `low` effort overlay may reduce ordinary direct roles, but never lowers direct Security, Oracle, Council-member, or Judge reasoning below `high`. OmniRoute reasoning variants keep Pi effort `off` because their provider-side behavior is encoded by the exact model ID.
+
 Normal handoffs are capped at 12,000 characters (10,000 evidence; 8,000 Council). Token Saver uses 7,000/6,000/5,000. Planner returns only constraints, relevant files, steps and acceptance checks; Worker receives only available compact planning evidence; reviewers receive task, verification state and inspect the actual diff; Judge receives the three structured conclusions rather than full transcripts.
 
 ## Observability

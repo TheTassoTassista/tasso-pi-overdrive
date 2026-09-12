@@ -113,6 +113,13 @@ test("manual unsupported effort is rejected and quality max uses strongest suppo
   assert.equal(max.roles.scout.thinking, "medium");
 });
 
+test("low quality cannot weaken mandatory Security, Oracle, Council, or Judge direct reasoning", () => {
+  const low = resolveModelPolicy(directCatalog, policy(), { ...options(directCatalog), qualityRequested: "low", effectiveQuality: "low" });
+  for (const role of ["security", "oracle", "council-1", "council-2", "council-3", "council-judge"]) assert.equal(low.roles[role].thinking, "high", role);
+  assert.equal(low.roles.worker.thinking, "medium");
+  assert.equal(low.roles.scout.thinking, "low");
+});
+
 test("custom route remains user-owned, persists privately, and symlink writes are rejected", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-model-policy-"));
   try {

@@ -150,7 +150,7 @@
   "quality": {
     "levels": ["auto", "low", "medium", "high", "max"],
     "directEffort": {
-      "low": { "default": "low", "worker": "medium", "security": "high", "oracle": "high", "council-judge": "high" },
+      "low": { "default": "low", "worker": "medium", "security": "high", "oracle": "high", "council-1": "high", "council-2": "high", "council-3": "high", "council-judge": "high" },
       "medium": {},
       "high": {},
       "max": { "default": "max", "scout": "medium", "tester": "high", "simplicity": "high" }

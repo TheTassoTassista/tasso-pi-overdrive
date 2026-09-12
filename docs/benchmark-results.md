@@ -6,8 +6,8 @@ Recorded on 2026-09-12 with official Pi 0.85.1. A PASS below is backed by the cu
 
 | Check | Result | Runtime evidence |
 |---|---|---|
-| Unit/static package | PASS | `npm run check`: 134/134 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
-| Routing/quality policy | PASS | 25/25 focused unit tests: preset migration/persistence, quality session state/precedence, adaptive paths, security override, deterministic fallbacks, fail-closed routes, Council/Judge mappings, call limits and metadata privacy |
+| Unit/static package | PASS | `npm run check`: 135/135 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Routing/quality policy | PASS | 26/26 focused unit tests: preset migration/persistence, quality session state/precedence, adaptive paths, security/strong-Council override, deterministic fallbacks, fail-closed routes, Council/Judge mappings, call limits and metadata privacy |
 | Deterministic evaluator | PASS | `npm run benchmark:suite`: 6/6 task categories, zero paid calls |
 | Model preset evaluator | PASS | `npm run benchmark:models`: `normal` and `token-saver`, all twelve roles resolved from current registry/auth/callability metadata, zero model calls; OmniRoute catalog entries remain runtime-unknown and therefore use direct fallbacks |
 | Real Pi capability path | PASS | `npm run smoke:runtime`: FFF filename/content, two AST matches, TS diagnostics/definition/four references, and real public `web_fetch`, driven sequentially by a local deterministic provider |
@@ -30,7 +30,7 @@ Recorded on 2026-09-12 with official Pi 0.85.1. A PASS below is backed by the cu
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
 | Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 16 at measurement time |
 
-The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 134/134; this environmental limitation is not counted as a product pass or failure.
+The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 135/135; this environmental limitation is not counted as a product pass or failure.
 
 ## Preset comparison
 
