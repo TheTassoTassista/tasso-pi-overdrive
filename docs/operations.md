@@ -14,7 +14,8 @@
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
-- Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/` (created idempotently with `npm run setup:memory`; optional service endpoints are loopback-only).
+- Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/`.
+- Second Brain service runtimes/state: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services/`; user units live under `${XDG_CONFIG_HOME:-~/.config}/systemd/user/`. Their complete Python dependency graphs are tracked in deterministic lock files, and the embedding snapshot is revision- and checksum-pinned. Embeddings/OpenViking/Hindsight bind only `127.0.0.1:1934`, `:1933`, and `:8889`.
 
 Metadata traces, MCP metadata traces, and dated launcher logs have automatic
 owner-only retention at session startup. The default is 30 days; set
@@ -29,13 +30,14 @@ apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
 user-local launcher. Typing `pi` serializes startup, starts OmniRoute with its
 documented `--headless` flag, waits on `/api/health/ping`, starts only the
 existing `pi-overdrive-searxng` container through the restricted passwordless
-Docker rule, checks SearXNG on loopback, opens the web dashboard, and finally
+Docker rule, checks SearXNG on loopback, starts the hardened local Second Brain units with bounded fail-soft health, opens the web dashboard, and finally
 replaces the launcher process with the real Pi executable. It never creates a
 container or changes provider/authentication files. Re-run the installer after
 updating the package; validate the installed copies with:
 
 ```bash
 scripts/install-pi-launcher.sh --check
+pi-overdrive-memory-services status
 ```
 
 ## Recovery after interruption or power loss

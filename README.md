@@ -22,7 +22,7 @@ The setup has already been applied on the audited machine. To reproduce it again
 ./scripts/bootstrap.sh
 ```
 
-The bootstrap refuses Pi versions other than 0.85.1, backs up Pi configuration first, installs exact package versions and lockfile-backed LSP runtimes, writes owner-only config files, installs pinned user-local language tools, verifies the browser CLI tarball checksum, and downloads an isolated Chromium. It never reads or logs authentication values.
+The bootstrap refuses Pi versions other than 0.85.1, backs up Pi configuration first, installs exact package versions and lockfile-backed LSP and Second Brain Python runtimes, writes owner-only config files, installs pinned user-local language tools, verifies browser and embedding-model checksums, and downloads an isolated Chromium. It never reads or logs authentication values.
 
 Restart Pi after installation. Then check:
 
@@ -93,7 +93,7 @@ Prompt templates are available for bug, feature, refactor, review, security, per
 
 - `web_fetch` remains compatible and works without credentials. Prefer `safe_web_fetch` for bounded DNS-pinned retrieval and `web_research` for observable Brave-primary/Perplexity-secondary routing. Search requires the relevant provider key through the environment or `/web-tools`; `/web-status` never displays it.
 - Browser work uses an isolated Chromium by default. Do not attach a personal profile unless the task explicitly needs signed-in state and you accept that visible page data becomes model-visible.
-- OpenViking and Hindsight are optional loopback services, not startup dependencies. Their official HTTP contracts are integrated without auto-capture, auto-retain, compaction takeover, or hidden provider calls. Run `npm run setup:memory`, then open the printed folder as an Obsidian vault if desired. See [second-brain.md](docs/second-brain.md).
+- OpenViking and Hindsight run as lazy user-level loopback services with one pinned multilingual CPU embedder. They remain fail-soft startup dependencies: no auto-capture, transcript retention, compaction takeover, remote VLM, or hidden provider call. Run `npm run setup:memory` for the vault and `scripts/setup-second-brain-services.sh --install` for the local services. See [second-brain.md](docs/second-brain.md).
 - MCP uses the audited upstream adapter commit that adds Pi 0.85 compatibility. It exposes one lazy proxy and only two read-only Context7 documentation operations; direct tools, resources, script mode, sampling, elicitation, and host-config discovery are disabled. See [mcp.md](docs/mcp.md).
 - Semantic navigation exposes one non-default tool instead of per-language schemas. TypeScript/JavaScript, Python, C/C++, HTML, CSS, JSON, YAML, and Bash servers are pinned or system-version-bound; every server starts lazily in a read-only, no-network Bubblewrap sandbox. Rust, Go, Java, Lua, and Ruby are detected and return `PARTIAL` until a reviewed pinned server is added. See [lsp.md](docs/lsp.md).
 - `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, credential-file, Git-metadata, system-config, and network isolation. It has no network-enabled mode. See [sandbox.md](docs/sandbox.md).

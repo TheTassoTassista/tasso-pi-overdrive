@@ -27,9 +27,9 @@ verified event / explicit user memory / marked Obsidian note
 
 ## Why direct adapters are used
 
-OpenViking’s official Pi integration performs automatic recall before each prompt, captures turns, and can take over compaction. Those defaults conflict with this project’s conditional Router, curated write policy, no-transcript rule, existing handoff/compaction, and one-pack-per-workflow invariant. Pi Overdrive therefore uses OpenViking’s official REST surface directly: `POST /api/v1/search/find`, followed only when requested by one exact `GET /api/v1/content/overview` or `GET /api/v1/content/read`. The reviewed API contract is OpenViking `0.4.19`. See the official [Pi integration](https://docs.openviking.ai/en/agent-integrations/11-pi), [retrieval API](https://github.com/volcengine/OpenViking/blob/main/docs/en/api/06-retrieval.md), and [context layers](https://github.com/volcengine/OpenViking/blob/main/docs/en/concepts/03-context-layers.md).
+OpenViking’s official Pi integration performs automatic recall before each prompt, captures turns, and can take over compaction. Those defaults conflict with this project’s conditional Router, curated write policy, no-transcript rule, existing handoff/compaction, and one-pack-per-workflow invariant. Pi Overdrive therefore uses OpenViking’s official REST surface directly: bounded search/read plus explicit durable-resource publication. Deterministic L0/L1 sidecars are cached by source hash and published with the original L2; no VLM is required. The reviewed API contract is OpenViking `0.4.19`. See the official [Pi integration](https://docs.openviking.ai/en/agent-integrations/11-pi), [retrieval API](https://github.com/volcengine/OpenViking/blob/main/docs/en/api/06-retrieval.md), and [context layers](https://github.com/volcengine/OpenViking/blob/main/docs/en/concepts/03-context-layers.md).
 
-Hindsight is likewise accessed through its official REST contract instead of an auto-retain agent plugin. Recall uses `POST /v1/default/banks/{bank}/memories/recall`; Reflect uses `POST /v1/default/banks/{bank}/reflect`. The reviewed [release](https://github.com/vectorize-io/hindsight/releases/tag/v0.9.2) is `0.9.2`; its server API contract remains `0.9.0`. [Recall](https://hindsight.vectorize.io/developer/api/recall) returns evidence through semantic, keyword, graph, and temporal retrieval. [Reflect](https://hindsight.vectorize.io/api-reference) performs additional synthesis and is consequently never the default.
+Hindsight is likewise accessed through its official REST contract instead of an auto-retain agent plugin. Explicit durable writes use synchronous document-id upserts; Recall uses `POST /v1/default/banks/{bank}/memories/recall`; Reflect uses `POST /v1/default/banks/{bank}/reflect`. The reviewed [release](https://github.com/vectorize-io/hindsight/releases/tag/v0.9.2) is `0.9.2`; its server API contract remains `0.9.0`. [Recall](https://hindsight.vectorize.io/developer/api/recall) returns semantic, keyword, graph, and temporal evidence. Reflect remains gated and the local baseline intentionally configures every Hindsight LLM provider as `none`, so an explicit Reflect attempt fails closed rather than making a hidden inference call.
 
 No OpenViking or Hindsight client library is added. This keeps the Pi schema/startup surface small, avoids upstream auto-update behavior, and follows Hindsight’s own demonstrated pattern of a small `fetch` client for coding-agent integration. The adapters are isolated in `lib/memory-backends.mjs` and can be replaced if the reviewed HTTP contracts change.
 
@@ -105,7 +105,7 @@ Memory policy consumes the already resolved preset and effective quality. It doe
 
 Token Saver deliberately searches more local candidates while exposing fewer characters. Low quality is not “memory off.” Max is not “load everything.” All modes stop when the bounded useful set is sufficient.
 
-Token counts displayed by this feature are labeled estimates using `ceil(characters / 4)`; no tokenizer is claimed. Backend/service usage is separate from model input token accounting. Hindsight may itself use configured inference for retain/recall/reflect; that external usage is unavailable unless the service reports it and is never invented as zero.
+Token counts displayed by this feature are labeled estimates using `ceil(characters / 4)`; no tokenizer is claimed. Backend/service usage is separate from model input token accounting. The installed baseline uses only the pinned local CPU embedder for OpenViking and Hindsight; it has no configured local generative LLM and no paid API path.
 
 ## Obsidian
 
@@ -117,7 +117,7 @@ ${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/vault/SecondBrain
 
 The seed contains an Inbox, project Overview/Architecture/Current State notes, the suggested top-level folders, templates for decisions/lessons/research, and minimal `.obsidian/app.json`. Existing notes are never overwritten. No API token is written to Markdown.
 
-`/memory sync` is explicit and mtime-based. It follows no symlinks and imports only frontmatter-marked notes. Human notes become searchable immediately through the local curated ledger with `USER` or `PROJECT_DOC` provenance. Projection into an external OpenViking/Hindsight service is intentionally not automatic because ingestion can invoke embeddings or provider-backed extraction. That projection remains an operator-controlled external step and is a documented limitation.
+`/memory sync` is explicit and mtime-based. It follows no symlinks and imports only frontmatter-marked notes. Human notes become searchable immediately through the local curated ledger with `USER` or `PROJECT_DOC` provenance. `/memory remember` also projects its accepted durable entry into OpenViking and Hindsight through local-only, deduplicated writes; ordinary turns and raw transcripts are never retained. Vault sync projection remains an explicit future/operator step.
 
 Obsidian `1.13.7-2` was already installed on the audited host. Pi Overdrive installs no community plugin. The official Hindsight Obsidian plugin is beta/BRAT-installed and defaults require separate configuration, so it is not enabled automatically. The only manual UI step is: in Obsidian, choose “Open folder as vault” and select the path printed by `npm run setup:memory`.
 
@@ -137,11 +137,11 @@ As with all user-space path checks, a malicious process running concurrently as 
 
 ## Failure behavior
 
-OpenViking down, Hindsight down, ACE/ledger unwritable, Obsidian closed, or all backends down produce empty/partial packs plus metadata-only degradation events. No backend failure blocks Pi startup or the secure coding workflow. Startup creates no service, subprocess, GUI, watcher, or network connection; retrieval is lazy.
+OpenViking down, Hindsight down, ACE/ledger unwritable, Obsidian closed, or all backends down produce empty/partial packs plus metadata-only degradation events. No backend failure blocks Pi startup or the secure coding workflow. The extension itself launches no process or GUI. The installed Pi launcher asks the user service manager to start the three loopback services under one startup lock, waits for bounded health, and continues with Pi if memory remains degraded.
 
-The extension does not install or start OpenViking/Hindsight daemons. To enable them, operate reviewed versions separately, bind them to loopback, supply their model/embedding providers explicitly, and keep their data/backups under user control. Their inference/storage requirements are external operational dependencies, not hidden Pi package dependencies.
+`scripts/setup-second-brain-services.sh --install` reproducibly creates two private virtual environments from complete exact dependency locks, including reviewed roots `openviking==0.4.19`, `hindsight-api-slim[embedded-db]==0.9.2`, and `fastembed==0.8.0`. It installs the CPU-only `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` artifact from repository revision `faf4aa4225822f3bc6376869cb1164e8e3feedd0`, verifies every required file checksum before use, and disables ONNX Runtime telemetry before initialization. Hardened user-level systemd units are not enabled at boot; Pi starts them on demand. The units restrict network access to localhost, expose embedding/OpenViking/Hindsight on `1934`/`1933`/`8889`, keep their state under `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services`, and use no credential or provider configuration.
 
-The reviewed optional service packages are `openviking==0.4.19` and `hindsight-api==0.9.2`. Install them in a dedicated user-owned virtual environment only after choosing their provider/storage configuration; Pi Overdrive deliberately does not guess or copy credentials. Start OpenViking with an explicit `--host 127.0.0.1 --port 1933` override and Hindsight with `--host 127.0.0.1 --port 8888`, then verify each `/health` endpoint. OpenViking requires configured VLM and embedding capabilities; Hindsight retain/reflect can use its configured LLM and may therefore incur provider usage. Neither service is required for the local ledger, ACE, commands, vault, or ordinary Pi startup.
+The memory enrichment router is separate from normal Pi routing and cannot fan out. Its order is reuse → deterministic local summary → one catalog-verified zero-price Qwen worker only after independent `RUNTIME_CALLABLE` evidence → an explicitly allowed Codex-subscription last resort for durable-critical data. Current Qwen status is deliberately unprobed, so the installed automatic path stops locally. Unknown-cost `auto/best-free` and positive-price DeepSeek entries are disallowed.
 
 ## Commands
 
@@ -165,13 +165,15 @@ The existing metadata trace accepts only scalar memory metadata: router decision
 
 ## Backup, export, and recovery
 
-Stop Pi before a consistent manual backup, then copy the Second Brain root preserving modes. The canonical human projection is Markdown; curation and ACE are documented JSON. OpenViking and Hindsight data must be exported with their reviewed upstream tools because Pi Overdrive does not own those stores. Restoring the local root restores ledger, ACE, vault, and sync index without touching Pi authentication.
+Stop Pi and run `pi-overdrive-memory-services stop` before a consistent manual backup, then copy both `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain` and `.../services` preserving owner-only modes. The canonical human projection remains Markdown; curation, ACE, and enrichment provenance are documented JSON. Restoring these directories does not touch Pi authentication.
 
 ## Verification and benchmark
 
 - `npm run check`: all deterministic project tests, syntax, TypeScript, and package/secret validation.
 - `npm run smoke:memory`: actual Pi RPC command registration plus all-backends-down and local-fixture behavior; zero model/provider calls.
+- `npm run smoke:memory-services`: real multilingual embeddings, OpenViking L0/L1/L2 and bilingual search, Hindsight temporal retain/recall, Reflect gate, and duplicate suppression; zero model/provider calls.
 - `npm run benchmark:memory`: three deterministic fixture scenarios comparing exact character volume and explicitly estimated token volume.
 - `npm run setup:memory`: idempotent owner-only vault setup; no service/model call.
+- `scripts/setup-second-brain-services.sh --check`: exact package/config/unit/cache checks without inference.
 
 No authenticated inference is required by any Second Brain test.

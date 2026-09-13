@@ -1,12 +1,13 @@
 # Benchmark and smoke results
 
-Recorded on 2026-09-12 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. The routing-preset work used only metadata endpoints, command handlers and deterministic local providers—no authenticated inference or E2E call.
+Recorded through 2026-09-13 with official Pi 0.85.1. A PASS below is backed by the current filesystem plus a runtime command; the latest authenticated E2E remains a FAIL. Routing and Second Brain activation used only catalog metadata, deterministic local providers, CPU embeddings, and loopback services—no authenticated inference or E2E call.
 
 ## Current regression evidence
 
 | Check | Result | Runtime evidence |
 |---|---|---|
-| Unit/static package | PASS | `npm run check`: 135/135 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Unit/static package | PASS | `npm run check`: 216/216 Node tests, syntax, extension TypeScript, manifest/frontmatter/pin/path validation |
+| Local Second Brain services | PASS | `npm run smoke:memory-services`: 17/17 real checks for CPU multilingual embeddings, OpenViking bilingual search plus exact L0/L1/L2, Hindsight temporal retain/recall, Reflect fail-closed, and duplicate suppression; zero model/provider calls |
 | Routing/quality policy | PASS | 26/26 focused unit tests: preset migration/persistence, quality session state/precedence, adaptive paths, security/strong-Council override, deterministic fallbacks, fail-closed routes, Council/Judge mappings, call limits and metadata privacy |
 | Deterministic evaluator | PASS | `npm run benchmark:suite`: 6/6 task categories, zero paid calls |
 | Model preset evaluator | PASS | `npm run benchmark:models`: `normal` and `token-saver`, all twelve roles resolved from current registry/auth/callability metadata, zero model calls; OmniRoute catalog entries remain runtime-unknown and therefore use direct fallbacks |
@@ -30,7 +31,7 @@ Recorded on 2026-09-12 with official Pi 0.85.1. A PASS below is backed by the cu
 | Mission privacy | PASS | `npm run missions:audit`: 18 terminal artifacts, all owner-only, zero detected secret-like values; terminal retention cap 25 |
 | Observability | PASS | `npm run observe`: actual current values—0 sources, 0 critical, 0 warnings, 0 bytes; Git changed-path count was 16 at measurement time |
 
-The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 135/135; this environmental limitation is not counted as a product pass or failure.
+The nested Codex sandbox cannot create localhost listeners, Git subprocesses, or language-server/Bubblewrap namespaces. The required host-context suite passed 216/216; this environmental limitation is not counted as a product pass or failure.
 
 ## Preset comparison
 
@@ -74,7 +75,7 @@ The last fully passing pre-expansion workflow evidence is run `0789657a-a21f-461
 
 The post-expansion run `c8e1d5ac-4f17-4fd4-a4fa-336de3c0fad9` correctly ended FAIL before Scout admission. Both real Scout child executions completed on `openai-codex/gpt-5.6-luna:low`, but the controller expected `openai-codex/gpt-5.6-luna` plus a separate `low` field and rejected both responses. The run wrote FAIL evidence and cleaned its runtime; it did not become a false positive.
 
-At that stage, the controller was changed to accept the canonical model form or the exact `:thinking` suffix Pi-subagents emits, canonicalize it, store a launch-contract digest, and record every terminal attempt durably. The then-current 77-test suite passed; the current 93-test result is reported in the regression table above.
+At that stage, the controller was changed to accept the canonical model form or the exact `:thinking` suffix Pi-subagents emits, canonicalize it, store a launch-contract digest, and record every terminal attempt durably. The then-current 77-test suite passed; the present 216-test result is reported in the regression table above.
 
 The explicitly authorized single post-fix run `179bb6f7-414c-4529-baa2-709630b9bac9` nevertheless ended **FAIL**. Scout, Planner, and Oracle completed on the configured `openai-codex/gpt-5.6-luna:low`, `openai-codex/gpt-5.6-sol:high`, and `openai-codex/gpt-6-astra:high` routes. The high-risk council then failed closed before Worker: `gpt-5.4` was rejected by Codex as unsupported with a ChatGPT account; council-1 and the first council-2 attempt were rejected by the child runtime for making no edits even though these are deliberately read-only advisory roles; the second council-2 attempt omitted its required structured-output call. Each council member had two controller-level delegation attempts. Worker, Tester, verification, reviewers, correction, and Judge were therefore not run.
 

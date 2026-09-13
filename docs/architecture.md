@@ -23,6 +23,6 @@ State is separated by purpose:
 - Browser runtime/profile: isolated upstream browser state; personal profiles are never selected by default.
 - Trace data: owner-only metadata JSONL under `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/traces`.
 - Durable repository knowledge: small project docs, never raw session transcripts.
-- Second Brain control data: owner-only JSON and portable Markdown under `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain`; optional OpenViking/Hindsight stores remain externally operated loopback services.
+- Second Brain control data: owner-only JSON and portable Markdown under `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain`; pinned local CPU embeddings and user-level OpenViking/Hindsight stores live under the adjacent `services` directory and accept loopback traffic only.
 
 The permanent package is `/home/tasso/Documents/Codex/tasso-pi-overdrive`; active Pi settings reference no dated task output. Pi project trust is a code-loading decision, not a sandbox. Bubblewrap contains autonomous commands, while the trusted Pi/extension host remains outside it. High-risk or hostile kernel-facing code still belongs in a container/VM or a low-privilege account.
