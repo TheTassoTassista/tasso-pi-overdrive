@@ -89,6 +89,11 @@ try {
   check("memory-recent-zero-model-call", recent.code === 0 && notifications(recent).includes(accepted.entry.id) && modelCalls(recent) === 0, notifications(recent));
   const why = await run({ id: "why", type: "prompt", message: `/memory-why ${accepted.entry.id}` });
   check("memory-why-shows-provenance-zero-model-call", why.code === 0 && /fixture:smoke \(test\)|VERIFIED\/1/u.test(notifications(why)) && modelCalls(why) === 0, notifications(why));
+  const vaultProject = path.join(memoryRoot, "vault", "SecondBrain", "01 Projects");
+  fs.mkdirSync(vaultProject, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(vaultProject, "Smoke Sync.md"), "---\nmemory: true\ntype: fact\ntrust: PROJECT_DOC\nverified: true\n---\nIl sync locale conserva una prova italiana verificata.\n", { mode: 0o600 });
+  const sync = await run({ id: "sync", type: "prompt", message: "/memory sync" });
+  check("memory-sync-imports-marked-local-note-zero-model-call", sync.code === 0 && /Obsidian sync complete: 1 accepted, 0 rejected, 1 changed\./u.test(notifications(sync)) && modelCalls(sync) === 0, detail(sync));
   const history = await run({ id: "history", type: "prompt", message: "/memory-search Why did this architecture change before?" });
   check("hindsight-down-is-fail-soft", history.code === 0 && /sources=.*hindsight/u.test(notifications(history)) && /PARTIAL|DEGRADED/u.test(notifications(history)) && modelCalls(history) === 0, detail(history));
 
@@ -107,6 +112,6 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-const status = results.length === 11 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 12 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, modelCalls: 0, realProviderCalls: 0, guiLaunches: 0, duplicateServices: 0, tempRemoved: true, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);
