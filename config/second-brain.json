@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "enabled": true,
+  "openViking": {
+    "mode": "auto",
+    "apiContract": "0.4.19",
+    "endpoint": "http://127.0.0.1:1933",
+    "timeoutMs": 750,
+    "candidateLimit": 8,
+    "targetUri": "viking://~/resources"
+  },
+  "hindsight": {
+    "mode": "auto",
+    "reviewedRelease": "0.9.2",
+    "apiContract": "0.9.0",
+    "endpoint": "http://127.0.0.1:8888",
+    "timeoutMs": 750,
+    "bankPrefix": "pi-overdrive",
+    "reflect": "explicit-only"
+  },
+  "ace": {
+    "enabled": true,
+    "maxEntries": 128
+  },
+  "retentionDays": {
+    "temporary": 14,
+    "inferred": 45,
+    "project": 365,
+    "durable": 0
+  }
+}
