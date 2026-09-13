@@ -22,7 +22,7 @@ function run(message, overrides = {}) {
   return new Promise((resolve) => {
     const child = spawn(pi, ["--extension", provider, "--extension", extension, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-routing-audit", "--model", "driver", "--api-key", "audit-only", "--no-tools"], {
       cwd: packageRoot,
-      env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only", PI_OVERDRIVE_MEMORY_ROOT: memoryRoot, ...overrides },
+      env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only", PI_OVERDRIVE_MEMORY_ROOT: memoryRoot, PI_OVERDRIVE_OPENVIKING_URL: "http://127.0.0.1:1", PI_OVERDRIVE_HINDSIGHT_URL: "http://127.0.0.1:2", ...overrides },
       stdio: ["pipe", "pipe", "pipe"],
     });
     const events = [];

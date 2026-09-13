@@ -35,6 +35,7 @@ printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/sudo\"
 touch \"$PI_TEST_ROOT/searx-ready\"`);
   executable(path.join(bin, "docker"), "exit 99");
   executable(path.join(bin, "xdg-open"), "printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/browser\"");
+  executable(path.join(bin, "pi-overdrive-memory-services"), "printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/memory\"");
   executable(path.join(bin, "pi-real"), `
 printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/pi\"
 if [[ \"\${1:-}\" == --hold ]]; then /usr/bin/sleep 2; fi`);
@@ -63,6 +64,7 @@ test("launcher starts each service once, uses true headless mode, and execs real
     assert.equal(readFileSync(path.join(setup.calls, "sudo"), "utf8"), `-n ${path.join(setup.root, "bin", "docker")} start pi-overdrive-searxng\n`);
     assert.equal(readFileSync(path.join(setup.calls, "pi"), "utf8"), "--version\n--version\n");
     assert.equal(readFileSync(path.join(setup.calls, "browser"), "utf8"), "http://127.0.0.1:20128\nhttp://127.0.0.1:20128\n");
+    assert.equal(readFileSync(path.join(setup.calls, "memory"), "utf8"), "start\nstart\n");
   } finally {
     rmSync(setup.root, { recursive: true, force: true });
   }
@@ -97,6 +99,19 @@ test("startup lock is released before the long-running real Pi process", async (
   }
 });
 
+test("launcher keeps Pi usable when local Second Brain startup fails", () => {
+  const setup = fixture();
+  try {
+    executable(path.join(setup.root, "bin", "pi-overdrive-memory-services"), "exit 1");
+    const result = spawnSync(launcher, ["--version"], { env: setup.env, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /Second Brain is degraded/u);
+    assert.equal(readFileSync(path.join(setup.calls, "pi"), "utf8"), "--version\n");
+  } finally {
+    rmSync(setup.root, { recursive: true, force: true });
+  }
+});
+
 test("installer is idempotent and preserves one pre-existing Fish function backup", () => {
   const root = mkdtempSync(path.join(tmpdir(), "pi-launcher-install-"));
   try {
@@ -112,6 +127,7 @@ test("installer is idempotent and preserves one pre-existing Fish function backu
     const check = spawnSync(installer, ["--check"], { env, encoding: "utf8" });
     assert.equal(check.status, 0, check.stderr);
     assert.match(readFileSync(path.join(fishDir, "pi.fish"), "utf8"), /Managed by tasso-pi-overdrive/u);
+    assert.equal(existsSync(path.join(launcherDir, "pi-overdrive-memory-services")), true);
     assert.equal(readFileSync(path.join(fishDir, "pi.fish.pre-overdrive"), "utf8"), "function pi\n  command pi $argv\nend\n");
   } finally {
     rmSync(root, { recursive: true, force: true });

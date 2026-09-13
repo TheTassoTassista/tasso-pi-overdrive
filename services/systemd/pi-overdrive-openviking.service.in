@@ -1,0 +1,25 @@
+[Unit]
+Description=Pi Overdrive OpenViking memory service
+Requires=pi-overdrive-embeddings.service
+After=pi-overdrive-embeddings.service
+
+[Service]
+Type=simple
+Environment=HF_HUB_OFFLINE=1
+ExecStart=@SERVICE_ROOT@/openviking/venv/bin/openviking-server --config @SERVICE_ROOT@/openviking/ov.conf --host 127.0.0.1 --port 1933 --workers 1
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@SERVICE_ROOT@/openviking
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

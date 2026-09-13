@@ -110,9 +110,9 @@ test("backend endpoint overrides are restricted to loopback HTTP", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-memory-config-"));
   try {
     const file = path.join(root, "second-brain.json");
-    fs.writeFileSync(file, JSON.stringify({ version: 1, enabled: true, openViking: { endpoint: "http://127.0.0.1:1933" }, hindsight: { endpoint: "http://127.0.0.1:8888" } }));
+    fs.writeFileSync(file, JSON.stringify({ version: 1, enabled: true, openViking: { endpoint: "http://127.0.0.1:1933" }, hindsight: { endpoint: "http://127.0.0.1:8889" } }));
     assert.throws(() => readSecondBrainConfig({ file, environment: { PI_OVERDRIVE_OPENVIKING_URL: "http://memory.example.test" } }), /loopback/u);
-    assert.throws(() => readSecondBrainConfig({ file, environment: { PI_OVERDRIVE_HINDSIGHT_URL: "https://127.0.0.1:8888" } }), /loopback/u);
+    assert.throws(() => readSecondBrainConfig({ file, environment: { PI_OVERDRIVE_HINDSIGHT_URL: "https://127.0.0.1:8889" } }), /loopback/u);
     assert.equal(readSecondBrainConfig({ file, environment: {} }).openViking.endpoint, "http://127.0.0.1:1933");
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

@@ -3,10 +3,12 @@ set -euo pipefail
 
 package_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 launcher_source=$package_root/scripts/pi-launcher.sh
+memory_source=$package_root/scripts/pi-overdrive-memory-services.sh
 fish_source=$package_root/shell/pi.fish
 launcher_dir=${PI_OVERDRIVE_LAUNCHER_DIR:-"$HOME/.local/bin"}
 fish_dir=${PI_OVERDRIVE_FISH_FUNCTION_DIR:-"$HOME/.config/fish/functions"}
 launcher_target=$launcher_dir/pi-overdrive-launcher
+memory_target=$launcher_dir/pi-overdrive-memory-services
 fish_target=$fish_dir/pi.fish
 mode=${1:---install}
 
@@ -16,12 +18,16 @@ case "$mode" in
       echo "Installed Pi Overdrive launcher is missing or stale: $launcher_target" >&2
       exit 1
     }
+    cmp --silent -- "$memory_source" "$memory_target" || {
+      echo "Installed Pi Overdrive Second Brain manager is missing or stale: $memory_target" >&2
+      exit 1
+    }
     cmp --silent -- "$fish_source" "$fish_target" || {
       echo "Installed Pi Fish function is missing or stale: $fish_target" >&2
       exit 1
     }
-    [[ -x "$launcher_target" ]] || {
-      echo "Installed Pi Overdrive launcher is not executable: $launcher_target" >&2
+    [[ -x "$launcher_target" && -x "$memory_target" ]] || {
+      echo "Installed Pi Overdrive launcher or Second Brain manager is not executable." >&2
       exit 1
     }
     echo "Pi startup launcher installation: PASS"
@@ -35,8 +41,9 @@ case "$mode" in
       fi
     fi
     install -m 700 -- "$launcher_source" "$launcher_target"
+    install -m 700 -- "$memory_source" "$memory_target"
     install -m 600 -- "$fish_source" "$fish_target"
-    echo "Installed Pi Overdrive launcher and Fish function."
+    echo "Installed Pi Overdrive launcher, local Second Brain manager, and Fish function."
     ;;
   *)
     echo "usage: install-pi-launcher.sh [--install|--check]" >&2

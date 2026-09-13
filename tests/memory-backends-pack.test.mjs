@@ -6,7 +6,7 @@ import { SharedMemoryPackController } from "../lib/shared-memory-pack.mjs";
 
 function json(value, ok = true, status = 200) { return { ok, status, async json() { return value; } }; }
 const ovConfig = { endpoint: "http://127.0.0.1:1933", timeoutMs: 100, candidateLimit: 8, targetUri: "viking://~/resources" };
-const hsConfig = { endpoint: "http://127.0.0.1:8888", timeoutMs: 100, reflect: "explicit-only" };
+const hsConfig = { endpoint: "http://127.0.0.1:8889", timeoutMs: 100, writeTimeoutMs: 100, reflect: "explicit-only" };
 
 test("OpenViking retrieval is L0-first and scoped", async () => {
   const calls = [];
@@ -69,6 +69,38 @@ test("Hindsight Recall uses the official project bank endpoint and bounded budge
   assert.equal(result.operation, "recall");
   assert.match(calls[0].url, /\/v1\/default\/banks\/pi-overdrive\/memories\/recall$/u);
   assert.equal(JSON.parse(calls[0].options.body).max_tokens, 500);
+});
+
+test("Hindsight retain is synchronous, temporal, tagged, and document-upsertable", async () => {
+  const calls = [];
+  const adapter = new HindsightAdapter(hsConfig, { fetch: async (url, options) => { calls.push({ url, options }); return json({ items_count: 1 }); } });
+  const result = await adapter.retain({ bankId: "pi-overdrive", items: [{ content: "Il rilascio è riuscito.", context: "release", timestamp: "2026-09-13T10:00:00Z", documentId: "release-1", tags: ["project:pi-overdrive"] }] });
+  assert.equal(result.status, "OK");
+  assert.match(calls[0].url, /\/v1\/default\/banks\/pi-overdrive\/memories$/u);
+  const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.async, false);
+  assert.equal(body.items[0].document_id, "release-1");
+  assert.equal(body.items[0].timestamp, "2026-09-13T10:00:00.000Z");
+});
+
+test("durable backend writes reject secret-like payloads before HTTP", async () => {
+  let calls = 0;
+  const fetch = async () => { calls += 1; return json({}); };
+  const hindsight = await new HindsightAdapter(hsConfig, { fetch }).retain({ bankId: "pi-overdrive", items: [{ content: "password=never-store-this", documentId: "secret" }] });
+  const openViking = await new OpenVikingAdapter(ovConfig, { fetch }).publishResource({ uri: "viking://~/resources/secret/content.md", content: "Bearer never-store-this", l0: "safe", l1: "safe" });
+  assert.equal(hindsight.reason, "secret_rejected");
+  assert.equal(openViking.reason, "secret_rejected");
+  assert.equal(calls, 0);
+});
+
+test("OpenViking publishing creates original L2 then deterministic L0/L1 sidecars", async () => {
+  const calls = [];
+  const adapter = new OpenVikingAdapter({ ...ovConfig, writeTimeoutMs: 100 }, { fetch: async (_url, options) => { calls.push(JSON.parse(options.body)); return json({ status: "ok", result: {} }); } });
+  const result = await adapter.publishResource({ uri: "viking://~/resources/fixture/content.md", content: "Original full content.", l0: "Short abstract.", l1: "Detailed overview.", tags: ["project=fixture"] });
+  assert.equal(result.status, "OK");
+  assert.deepEqual(calls.map((call) => call.uri), ["viking://~/resources/fixture/content.md", "viking://~/resources/fixture/.abstract.md", "viking://~/resources/fixture/.overview.md"]);
+  assert.equal(calls[0].processing_mode, "semantic_and_vectors");
+  assert.equal(calls[1].processing_mode, "vectors_only");
 });
 
 test("Hindsight Reflect is never default and requires explicit authorization", async () => {

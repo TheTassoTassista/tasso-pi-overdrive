@@ -78,7 +78,8 @@ export default function secondBrainExtension(pi: ExtensionAPI): void {
           const content = value.slice("remember ".length).trim();
           const result = active.ledger.accept({ type: "decision", project: active.projectId, content, source: "explicit user decision", sourceType: "user", trustLevel: "USER", confidence: 1, verified: false, importance: "high", retentionDays: 0, tags: ["user-decision"], reason: "User explicitly requested durable memory" });
           pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_write_candidate", accepted: result.status === "ACCEPTED", reason: result.reason, dedupeHit: result.dedupeHit === true });
-          ctx.ui.notify(`Memory ${result.status}${result.entry ? `: ${result.entry.id}` : ` (${result.reason})`}.`, result.status === "ACCEPTED" ? "info" : "warning");
+          const projection = result.entry ? await active.publishDurable(result.entry) : undefined;
+          ctx.ui.notify(`Memory ${result.status}${result.entry ? `: ${result.entry.id}; local services=${projection.status}` : ` (${result.reason})`}.`, result.status === "ACCEPTED" ? "info" : "warning");
           return;
         }
         if (value.startsWith("learn ")) {

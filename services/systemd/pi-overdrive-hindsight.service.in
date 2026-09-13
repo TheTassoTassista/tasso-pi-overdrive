@@ -1,0 +1,26 @@
+[Unit]
+Description=Pi Overdrive Hindsight temporal memory service
+Requires=pi-overdrive-embeddings.service
+After=pi-overdrive-embeddings.service
+
+[Service]
+Type=simple
+EnvironmentFile=@SERVICE_ROOT@/hindsight/hindsight.env
+Environment=HOME=@SERVICE_ROOT@/hindsight/home
+ExecStart=@SERVICE_ROOT@/hindsight/venv/bin/hindsight-api --host 127.0.0.1 --port 8889 --workers 1 --log-level warning --no-access-log
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@SERVICE_ROOT@/hindsight
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

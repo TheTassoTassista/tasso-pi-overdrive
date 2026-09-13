@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "scope": "durable-memory-enrichment-only",
+  "fanout": false,
+  "maxRemoteCallsPerOperation": 1,
+  "chain": [
+    "reuse-task-output",
+    "local-deterministic",
+    "omniroute/groq/qwen/qwen3-32b",
+    "openai-codex/gpt-5.6-sol"
+  ],
+  "models": {
+    "omniroute/groq/qwen/qwen3-32b": {
+      "costStatus": "ZERO_EXTRA_COST",
+      "runtimeStatus": "CATALOG_AVAILABLE_UNPROBED",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "reasoning": 0
+      },
+      "eligibleWhen": "runtime-callable"
+    },
+    "openai-codex/gpt-5.6-sol": {
+      "costStatus": "SUBSCRIPTION_INCLUDED",
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "eligibleWhen": "explicit-last-resort"
+    },
+    "omniroute/auto/best-free": {
+      "costStatus": "UNKNOWN_COST",
+      "runtimeStatus": "DISALLOWED"
+    },
+    "omniroute/deepseek/deepseek-v4-pro": {
+      "costStatus": "PAID",
+      "runtimeStatus": "DISALLOWED"
+    },
+    "omniroute/deepseek/deepseek-v4-flash": {
+      "costStatus": "PAID",
+      "runtimeStatus": "DISALLOWED"
+    }
+  }
+}

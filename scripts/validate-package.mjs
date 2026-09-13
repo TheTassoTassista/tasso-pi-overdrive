@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -32,10 +32,31 @@ if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
-if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8888') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
+if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
 if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u.test(secondBrain.hindsight?.bankPrefix ?? '')) failures.push('Second Brain Hindsight bank prefix is missing or unsafe');
 if (Object.keys(secondBrain).some((key) => /token|secret|api.?key/iu.test(key)) || /(?:token|secret|api.?key)\s*[:=]/iu.test(JSON.stringify(secondBrain))) failures.push('Second Brain tracked config must not contain credential fields');
+if (secondBrain.localEmbeddings?.endpoint !== 'http://127.0.0.1:1934' || secondBrain.localEmbeddings?.model !== 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2' || secondBrain.localEmbeddings?.dimensions !== 384 || secondBrain.localEmbeddings?.device !== 'cpu' || secondBrain.localEmbeddings?.offlineAfterSetup !== true) failures.push('Second Brain must use the pinned CPU multilingual loopback embedding service');
+if (new Set([secondBrain.openViking?.endpoint, secondBrain.hindsight?.endpoint, secondBrain.localEmbeddings?.endpoint]).size !== 3) failures.push('Second Brain loopback ports must be unique');
+const memoryModels = JSON.parse(await readFile(path.join(root, 'config/memory-model-policy.json'), 'utf8'));
+if (memoryModels.version !== 1 || memoryModels.scope !== 'durable-memory-enrichment-only' || memoryModels.fanout !== false || memoryModels.maxRemoteCallsPerOperation !== 1) failures.push('memory enrichment router must be isolated, single-route, and bounded to one remote call');
+if (memoryModels.models?.['omniroute/groq/qwen/qwen3-32b']?.costStatus !== 'ZERO_EXTRA_COST' || memoryModels.models?.['omniroute/groq/qwen/qwen3-32b']?.runtimeStatus !== 'CATALOG_AVAILABLE_UNPROBED') failures.push('only the catalog-verified zero-price Qwen route may remain as an unprobed optional memory worker');
+if (memoryModels.models?.['omniroute/auto/best-free']?.runtimeStatus !== 'DISALLOWED' || memoryModels.models?.['omniroute/deepseek/deepseek-v4-pro']?.runtimeStatus !== 'DISALLOWED' || memoryModels.models?.['omniroute/deepseek/deepseek-v4-flash']?.runtimeStatus !== 'DISALLOWED') failures.push('unknown-cost and paid OmniRoute memory candidates must be disallowed');
+if (/council/iu.test(JSON.stringify(memoryModels))) failures.push('memory enrichment routing must never invoke Council fanout');
+for (const relative of ['services/local_embeddings.py', 'services/requirements-openviking.lock.txt', 'services/requirements-hindsight.lock.txt', 'services/systemd/pi-overdrive-embeddings.service.in', 'services/systemd/pi-overdrive-openviking.service.in', 'services/systemd/pi-overdrive-hindsight.service.in', 'scripts/pi-overdrive-memory-services.sh', 'scripts/setup-second-brain-services.sh']) {
+  try { await readFile(path.join(root, relative), 'utf8'); } catch { failures.push(`missing Second Brain service component ${relative}`); }
+}
+for (const relative of ['services/requirements-openviking.lock.txt', 'services/requirements-hindsight.lock.txt']) {
+  const entries = (await readFile(path.join(root, relative), 'utf8')).split(/\r?\n/u).filter(Boolean);
+  if (entries.length < 100 || entries.some((entry) => !/^[A-Za-z0-9_.-]+==[^\s=]+$/u.test(entry))) failures.push(`Second Brain dependency lock is incomplete or not exactly pinned: ${relative}`);
+  if (entries.join('\n') !== [...entries].sort().join('\n')) failures.push(`Second Brain dependency lock is not deterministically sorted: ${relative}`);
+}
+const embeddingModel = JSON.parse(await readFile(path.join(root, 'config/local-embedding-model.json'), 'utf8'));
+if (embeddingModel.modelId !== secondBrain.localEmbeddings?.model || embeddingModel.repository !== 'qdrant/paraphrase-multilingual-MiniLM-L12-v2-onnx-Q' || !/^[0-9a-f]{40}$/u.test(embeddingModel.revision ?? '') || embeddingModel.dimensions !== 384) failures.push('local embedding artifact identity/revision is not pinned');
+if (Object.keys(embeddingModel.files ?? {}).length !== 5 || Object.values(embeddingModel.files ?? {}).some((digest) => !/^[0-9a-f]{64}$/u.test(digest))) failures.push('local embedding artifact file checksums are incomplete');
+const serviceSetup = await readFile(path.join(root, 'scripts/setup-second-brain-services.sh'), 'utf8');
+for (const pin of ['openviking 0.4.19', 'fastembed 0.8.0', 'hindsight-api-slim 0.9.2']) if (!serviceSetup.includes(pin)) failures.push(`Second Brain setup is missing exact runtime pin check: ${pin}`);
+if (!serviceSetup.includes('HINDSIGHT_API_LLM_PROVIDER=none') || !serviceSetup.includes('HINDSIGHT_API_REFLECT_LLM_PROVIDER=none') || !serviceSetup.includes('HINDSIGHT_API_EMBEDDINGS_PROVIDER=openai')) failures.push('Hindsight must use LLM-none and the loopback embedding endpoint');
 
 const lspRuntime = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package.json'), 'utf8'));
 const expectedLsp = {
@@ -138,13 +159,13 @@ async function checkSymlinks(directory) {
 }
 await checkSymlinks(root);
 
-for (const relative of ['package.json', 'config', 'extensions', 'agents', 'scripts', 'lib', 'benchmarks', 'docs', 'vault-template']) {
+for (const relative of ['package.json', 'config', 'extensions', 'agents', 'scripts', 'services', 'lib', 'benchmarks', 'docs', 'vault-template']) {
   const target = path.join(root, relative);
   const files = [];
   const walkText = async (item) => {
     const stat = await lstat(item);
     if (stat.isDirectory()) for (const entry of await readdir(item)) await walkText(path.join(item, entry));
-    else if (stat.isFile() && /\.(?:json|mjs|ts|sh|md)$/u.test(item)) files.push(item);
+    else if (stat.isFile() && /\.(?:json|mjs|ts|sh|md|py|in)$/u.test(item)) files.push(item);
   };
   await walkText(target);
   for (const file of files) {

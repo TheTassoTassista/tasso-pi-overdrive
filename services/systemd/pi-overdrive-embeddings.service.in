@@ -1,0 +1,23 @@
+[Unit]
+Description=Pi Overdrive local multilingual embeddings
+
+[Service]
+Type=simple
+Environment=ORT_DISABLE_TELEMETRY=1
+ExecStart=@SERVICE_ROOT@/openviking/venv/bin/python @SERVICE_ROOT@/embeddings/local_embeddings.py --cache-dir @SERVICE_ROOT@/embeddings/cache --model-path @SERVICE_ROOT@/embeddings/cache/models--qdrant--paraphrase-multilingual-MiniLM-L12-v2-onnx-Q/snapshots/faf4aa4225822f3bc6376869cb1164e8e3feedd0 --host 127.0.0.1 --port 1934
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@SERVICE_ROOT@/embeddings
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+LockPersonality=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

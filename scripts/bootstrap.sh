@@ -55,6 +55,7 @@ if [[ "$check_only" == true ]]; then
   node "$package_root/scripts/model-policy-tool.mjs" check "$model_policy"
   node "$package_root/scripts/model-callability-tool.mjs" check "$model_callability"
   node "$package_root/scripts/setup-second-brain.mjs"
+  if [[ ${PI_OVERDRIVE_SKIP_MEMORY_SERVICES:-0} != 1 ]]; then "$package_root/scripts/setup-second-brain-services.sh" --check; fi
   command -v agent-browser >/dev/null 2>&1 && agent-browser --version
   echo "Bootstrap validation: PASS (configuration only; authentication intentionally not inspected)."
   exit 0
@@ -117,6 +118,7 @@ node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package
 node "$package_root/scripts/model-policy-tool.mjs" initialize "$model_policy" "$package_root/config/model-policy.json"
 node "$package_root/scripts/model-callability-tool.mjs" initialize "$model_callability" "$package_root/config/model-callability.json"
 node "$package_root/scripts/setup-second-brain.mjs"
+if [[ ${PI_OVERDRIVE_SKIP_MEMORY_SERVICES:-0} != 1 ]]; then "$package_root/scripts/setup-second-brain-services.sh" --install; fi
 
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
 install -d -m 700 "$tool_root" "$HOME/.local/bin"

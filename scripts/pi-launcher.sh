@@ -16,6 +16,7 @@ omniroute_bin=/usr/bin/omniroute
 sudo_bin=/usr/bin/sudo
 docker_bin=/usr/bin/docker
 browser_bin=/usr/bin/xdg-open
+memory_manager_bin=${PI_OVERDRIVE_MEMORY_MANAGER:-"$HOME/.local/bin/pi-overdrive-memory-services"}
 
 # Test overrides are accepted only behind an explicit test switch. Production
 # startup never resolves these privileged helpers through PATH.
@@ -32,6 +33,7 @@ if [[ ${PI_OVERDRIVE_LAUNCHER_TEST_MODE:-0} == 1 ]]; then
   sudo_bin=$test_bin_dir/sudo
   docker_bin=$test_bin_dir/docker
   browser_bin=$test_bin_dir/xdg-open
+  memory_manager_bin=${PI_OVERDRIVE_TEST_MEMORY_MANAGER:-$test_bin_dir/pi-overdrive-memory-services}
   omniroute_url=${PI_OVERDRIVE_TEST_OMNIROUTE_URL:-$omniroute_url}
   omniroute_health_url=${PI_OVERDRIVE_TEST_OMNIROUTE_HEALTH_URL:-$omniroute_url/api/health/ping}
   searxng_health_url=${PI_OVERDRIVE_TEST_SEARXNG_HEALTH_URL:-$searxng_health_url}
@@ -140,6 +142,16 @@ open_dashboard() {
   "$browser_bin" "$omniroute_url" >/dev/null 2>&1 9>&- &
 }
 
+start_second_brain() {
+  if [[ ! -x "$memory_manager_bin" ]]; then
+    echo "Pi Overdrive: local Second Brain manager is not installed; continuing without service-backed memory." >&2
+    return 0
+  fi
+  if ! "$memory_manager_bin" start; then
+    echo "Pi Overdrive: local Second Brain is degraded; Pi startup will continue." >&2
+  fi
+}
+
 resolve_real_pi() {
   if [[ ${PI_OVERDRIVE_LAUNCHER_TEST_MODE:-0} == 1 ]]; then
     printf '%s\n' "${PI_OVERDRIVE_TEST_REAL_PI:?test Pi binary is required}"
@@ -150,6 +162,7 @@ resolve_real_pi() {
 
 start_omniroute
 start_searxng
+start_second_brain
 open_dashboard
 
 "$flock_bin" -u 9
