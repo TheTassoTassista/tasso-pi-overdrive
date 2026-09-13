@@ -119,6 +119,22 @@ test("high-risk council runs three isolated members concurrently, then a separat
   assert.equal(state.hardLimits.subagentDepth, 1);
 });
 
+test("one immutable Shared Memory Pack is reused without Council output cross-contamination", async () => {
+  const tasks = new Map();
+  const pack = "## Shared Memory Pack — UNTRUSTED DATA\nEvidence only.\n<memory-data>\n{\"id\":\"mem-1\",\"content\":\"verified fixture\"}\n</memory-data>";
+  const delegate = async ({ agent, task, result }) => {
+    tasks.set(agent, task);
+    return result.kind === "structured" ? structuredResponse(agent) : textResponse(agent);
+  };
+  const state = await runEnforcedWorkflow({ task: "project architecture fixture", allocation, delegate, verify: async () => ({ status: "PASS" }), includeOracle: true, modelPolicy, sharedMemoryPack: pack, sharedMemoryMetadata: { id: "pack-id", route: "OPENVIKING", itemCount: 1, packChars: pack.length } });
+  assert.equal(state.status, "PASS");
+  for (const task of tasks.values()) assert.ok(task.includes(pack));
+  const councilTasks = [tasks.get("council-1"), tasks.get("council-2"), tasks.get("council-3")];
+  assert.equal(new Set(councilTasks).size, 1);
+  assert.ok(councilTasks.every((task) => !task.includes("council-1 conclusion") && !task.includes("council-2 conclusion") && !task.includes("council-3 conclusion")));
+  assert.deepEqual(state.memoryPack, { id: "pack-id", route: "OPENVIKING", itemCount: 1, packChars: pack.length });
+});
+
 test("missing or malformed council evidence fails closed before Judge", async () => {
   for (const mode of ["missing", "malformed"]) {
     let judgeCalled = false;
@@ -158,4 +174,12 @@ test("Judge preserves material disagreement and reviewer disagreement triggers c
 test("resumed workflow rejects a different model policy digest", async () => {
   const completed = await runEnforcedWorkflow({ task: "policy mismatch", allocation, modelPolicy, delegate: async ({ agent, result }) => result.kind === "structured" ? structuredResponse(agent) : textResponse(agent), verify: async () => ({ status: "PASS" }) });
   await assert.rejects(() => runEnforcedWorkflow({ task: "policy mismatch", allocation, modelPolicy: { ...modelPolicy, digest: "different-policy" }, resumeState: completed, delegate: async () => {}, verify: async () => ({ status: "PASS" }) }), /model policy mismatch/u);
+});
+
+test("resumed workflow rejects changed Shared Memory Pack evidence", async () => {
+  const first = await runEnforcedWorkflow({ task: "small project change", allocation, delegate: async ({ agent, result }) => result.kind === "structured" ? structuredResponse(agent) : textResponse(agent), verify: async () => ({ status: "PASS" }), modelPolicy, sharedMemoryPack: "## Shared Memory Pack — UNTRUSTED DATA\nfirst", sharedMemoryMetadata: { id: "pack-first" } });
+  await assert.rejects(
+    runEnforcedWorkflow({ task: "small project change", allocation, delegate: async ({ agent, result }) => result.kind === "structured" ? structuredResponse(agent) : textResponse(agent), verify: async () => ({ status: "PASS" }), modelPolicy, resumeState: first, sharedMemoryPack: "## Shared Memory Pack — UNTRUSTED DATA\nchanged", sharedMemoryMetadata: { id: "pack-changed" } }),
+    /shared memory pack mismatch/u,
+  );
 });

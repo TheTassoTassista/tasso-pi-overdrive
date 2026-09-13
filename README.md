@@ -1,6 +1,6 @@
 # Tasso Pi Overdrive
 
-A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, one compact lazy MCP proxy, compact search and output, lazy multi-language semantic navigation, AST tools, browser automation, web fetch, verification, observability, and reusable project templates.
+A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, one compact lazy MCP proxy, compact search and output, lazy multi-language semantic navigation, AST tools, browser automation, web fetch, verification, observability, a fail-soft Second Brain, and reusable project templates.
 
 ## What changes
 
@@ -12,6 +12,7 @@ A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux
 - Successful oversized shell output is compacted deterministically; failures remain intact.
 - Tool-call guardrails block secret reads, symlink/hard-link escapes, protected writes, all free-form shell, and caller overrides of isolation limits. Autonomous commands use an argument-vector allowlist inside Bubblewrap.
 - Traces contain only timestamps, routing/model/tool metadata, input key names, durations, statuses, counts and policy digests—never prompts, argument values, outputs, URLs or credentials.
+- The Second Brain conditionally routes project context to OpenViking, temporal history to Hindsight, and reusable working lessons to an ACE-style playbook. One compact untrusted Shared Memory Pack is reused across workflow roles; unavailable memory never blocks Pi.
 
 ## Install or reproduce
 
@@ -29,6 +30,7 @@ Restart Pi after installation. Then check:
 /doctor
 /subagents-models
 /context-health
+/memory
 ```
 
 Shell-level status is available with `./scripts/status.sh`.
@@ -43,7 +45,7 @@ Shell-level status is available with `./scripts/status.sh`.
 6. Use `verification_gate` before a completion claim. Use full mode for release/build/e2e work.
 7. At 85% context, finish the phase, update the notebook, and run `/handoff <next phase goal>`.
 
-See [workflow.md](docs/workflow.md), [model-routing.md](docs/model-routing.md), and [verification.md](docs/verification.md) for exact policies.
+See [workflow.md](docs/workflow.md), [model-routing.md](docs/model-routing.md), [second-brain.md](docs/second-brain.md), and [verification.md](docs/verification.md) for exact policies.
 
 ## Component inventory
 
@@ -62,6 +64,9 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/context-health` | Show context pressure and next action |
 | `/output-stats` | Show shell-output reductions this session |
 | `/trace-path` | Show the current metadata-only JSONL trace |
+| `/memory` / `/memory-status` | Show compact/detailed fail-soft memory state |
+| `/memory-search QUERY` | Search curated/OpenViking/Hindsight/ACE context without a Pi model call |
+| `/memory-recent` / `/memory-why ID` | Inspect accepted memories and provenance |
 | `mcp` | Lazy proxy for the two read-only Context7 documentation tools |
 | `/web-status` | Show Brave/Perplexity routing and credential presence without keys |
 | `web_research` | Observable Brave-first search, Perplexity fallback, or explicit cross-check |
@@ -88,6 +93,7 @@ Prompt templates are available for bug, feature, refactor, review, security, per
 
 - `web_fetch` remains compatible and works without credentials. Prefer `safe_web_fetch` for bounded DNS-pinned retrieval and `web_research` for observable Brave-primary/Perplexity-secondary routing. Search requires the relevant provider key through the environment or `/web-tools`; `/web-status` never displays it.
 - Browser work uses an isolated Chromium by default. Do not attach a personal profile unless the task explicitly needs signed-in state and you accept that visible page data becomes model-visible.
+- OpenViking and Hindsight are optional loopback services, not startup dependencies. Their official HTTP contracts are integrated without auto-capture, auto-retain, compaction takeover, or hidden provider calls. Run `npm run setup:memory`, then open the printed folder as an Obsidian vault if desired. See [second-brain.md](docs/second-brain.md).
 - MCP uses the audited upstream adapter commit that adds Pi 0.85 compatibility. It exposes one lazy proxy and only two read-only Context7 documentation operations; direct tools, resources, script mode, sampling, elicitation, and host-config discovery are disabled. See [mcp.md](docs/mcp.md).
 - Semantic navigation exposes one non-default tool instead of per-language schemas. TypeScript/JavaScript, Python, C/C++, HTML, CSS, JSON, YAML, and Bash servers are pinned or system-version-bound; every server starts lazily in a read-only, no-network Bubblewrap sandbox. Rust, Go, Java, Lua, and Ruby are detected and return `PARTIAL` until a reviewed pinned server is added. See [lsp.md](docs/lsp.md).
 - `scripts/sandbox-run.sh ROOT -- COMMAND` runs a command with Bubblewrap process, mount, home, temporary-directory, credential-file, Git-metadata, system-config, and network isolation. It has no network-enabled mode. See [sandbox.md](docs/sandbox.md).

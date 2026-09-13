@@ -14,6 +14,7 @@
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
+- Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/` (created idempotently with `npm run setup:memory`; optional service endpoints are loopback-only).
 
 Metadata traces, MCP metadata traces, and dated launcher logs have automatic
 owner-only retention at session startup. The default is 30 days; set
