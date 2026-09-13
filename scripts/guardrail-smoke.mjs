@@ -29,7 +29,7 @@ function resultText(event) {
 async function runPi() {
   const tools = "read,write,fffind,ast_grep_run,bash,safe_exec";
   const child = spawn(pi, [
-    "--offline", "--approve", "--no-session", "--mode", "rpc",
+    "-ne", "--offline", "--approve", "--no-session", "--mode", "rpc",
     "--extension", providerExtension,
     "--extension", safetyExtension,
     "--extension", safeExecExtension,
