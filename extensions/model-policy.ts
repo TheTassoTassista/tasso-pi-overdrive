@@ -9,6 +9,7 @@ import {
 } from "../lib/model-policy.mjs";
 import { getSessionQuality, QUALITY_LEVELS, resetSessionQuality, setSessionQuality } from "../lib/routing-session.mjs";
 import { calculateRequiredSpawnBudget, EXTERNAL_SUBAGENT_QUOTA, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
+import { memoryPolicyTopology, resolveMemoryPolicy } from "../lib/memory-policy.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -58,6 +59,7 @@ function renderCouncilStatus(resolved: any): string {
 }
 
 function aiTreeObject(resolved: any, quality: string): object {
+  const memoryPolicy = resolveMemoryPolicy({ preset: resolved.basePreset, qualityRequested: quality, effectiveQuality: quality === "auto" ? resolved.effectiveQuality : quality });
   return {
     title: "PI OVERDRIVE AI ROUTING",
     preset: { id: resolved.preset, base: resolved.basePreset, displayName: resolved.displayName },
@@ -80,6 +82,7 @@ function aiTreeObject(resolved: any, quality: string): object {
     deterministicVerification: { position: "before AI tester/review escalation", mandatory: true, failurePropagation: "fail-closed" },
     council: { members: ROUTING_POLICY.council.members, judge: ROUTING_POLICY.council.judge, triggers: ROUTING_POLICY.council.triggers, concurrency: 3, depth: 1, sharedGatewayWarning: "DeepSeek and Qwen share OmniRoute infrastructure" },
     tokenContextPolicy: { toolsFirst: true, stopWhenSolved: true, presetCaps: (ROUTING_POLICY as any).context[resolved.basePreset], correctionRounds: 2, retryPolicy: "one retry only for eligible transient/attested structured-output failures; workflow reserve 3" },
+    secondBrain: memoryPolicyTopology(memoryPolicy),
     policyDigest: resolved.digest,
   };
 }
@@ -107,6 +110,14 @@ export function renderAiTree(resolved: any, quality = getSessionQuality(), json 
     "Council topology: OpenAI direct + DeepSeek via OmniRoute + Qwen via OmniRoute → GPT-6 Astra Judge (exact route shown above)",
     "Diversity note: DeepSeek and Qwen are model-family diverse but share the OmniRoute gateway",
     `Context: tools-first, compact handoffs <=${tree.tokenContextPolicy.presetCaps.handoffChars} chars, stop when solved, corrections<=2`,
+    "Second Brain",
+    `├── Current-context check → Memory Router (${tree.secondBrain.router})`,
+    `├── OpenViking: ${tree.secondBrain.openViking}`,
+    `├── Hindsight: ${tree.secondBrain.hindsight}`,
+    `├── ACE: ${tree.secondBrain.ace}`,
+    `├── Shared Memory Pack: ${tree.secondBrain.sharedMemoryPack}`,
+    `├── Memory Curator: ${tree.secondBrain.curator}`,
+    `└── Token Governor memory policy: ${tree.secondBrain.tokenGovernor}`,
     `Policy receipt: ${tree.policyDigest.slice(0, 16)}`,
   ].join("\n");
 }

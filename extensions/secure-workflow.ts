@@ -18,6 +18,7 @@ import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
 import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
 import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
+import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
@@ -66,6 +67,7 @@ function sanitizeState(state: any) {
     evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
     modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, qualityRequested: state.modelPolicy.qualityRequested, effectiveQuality: state.modelPolicy.effectiveQuality, roles: state.modelPolicy.roles, routingDecisions: state.modelPolicy.routingDecisions, capabilityDigest: state.modelPolicy.capabilityDigest, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
     routingStrategy: state?.routingStrategy,
+    memoryPack: state?.memoryPack ? { id: state.memoryPack.id, route: state.memoryPack.route, status: state.memoryPack.status, candidateCount: state.memoryPack.candidateCount, itemCount: state.memoryPack.itemCount, packChars: state.memoryPack.packChars, approximateTokens: state.memoryPack.approximateTokens, degradationCount: state.memoryPack.degradationCount } : undefined,
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
     hardLimits: state?.hardLimits ?? { concurrency: 3, subagentDepth: 1, correctionIterations: 2 },
@@ -205,6 +207,23 @@ export default function (pi: ExtensionAPI) {
       });
       let activeModelPolicy: any = resolveModelPolicy(availableModels, storedModelPolicy, { ...modelCapabilityOptions, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality });
       pi.events.emit("pi-overdrive:routing-metadata", { kind: "workflow-policy", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, securitySensitive: activeRoutingStrategy.securitySensitive, modelCallLimit: activeRoutingStrategy.maxModelCalls, policyDigest: activeModelPolicy.digest });
+      let sharedMemoryPack = "";
+      let sharedMemoryMetadata: Record<string, unknown> | undefined;
+      let secondBrainRuntime: ReturnType<typeof createSecondBrainRuntime> | undefined;
+      try {
+        secondBrainRuntime = createSecondBrainRuntime({
+          cwd: ctx.cwd,
+          preset: activeRoutingStrategy.preset,
+          qualityRequested: activeRoutingStrategy.qualityRequested,
+          effectiveQuality: activeRoutingStrategy.effectiveQuality,
+          emit: (metadata: object) => pi.events.emit("pi-overdrive:memory-metadata", metadata),
+        });
+        const pack = await secondBrainRuntime.controller.build(params.task, { currentContextSufficient: false });
+        sharedMemoryPack = pack.text;
+        sharedMemoryMetadata = { id: pack.id, route: pack.route.decision, ...pack.metadata };
+      } catch {
+        pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_degradation_event", backend: "workflow-controller" });
+      }
       const admittedExecutionIds = new Set<string>();
       const delegationAudit: Array<Record<string, unknown>> = [];
       const delegateOnce = ({ agent, task, cwd, result, round = 0, iteration = 0 }: DelegationInput, attempt: number): Promise<Record<string, any>> => new Promise((resolve, reject) => {
@@ -411,6 +430,8 @@ export default function (pi: ExtensionAPI) {
               taskId: digest,
               modelPolicy: activeModelPolicy,
               routingStrategy: activeRoutingStrategy,
+              sharedMemoryPack,
+              sharedMemoryMetadata,
               spawnBudgetGuard,
               receiptVerifier: (response: any, expected: any) => {
                 if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);

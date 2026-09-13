@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -30,6 +30,12 @@ if (!pkg.pi.extensions.includes('./extensions/web-policy.ts')) failures.push('bo
 if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.includes('./extensions/typescript-navigation.ts')) failures.push('generalized one-tool LSP extension must replace the legacy TypeScript extension hook');
 if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
+if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
+const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
+if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8888') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
+if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
+if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,159}$/u.test(secondBrain.hindsight?.bankPrefix ?? '')) failures.push('Second Brain Hindsight bank prefix is missing or unsafe');
+if (Object.keys(secondBrain).some((key) => /token|secret|api.?key/iu.test(key)) || /(?:token|secret|api.?key)\s*[:=]/iu.test(JSON.stringify(secondBrain))) failures.push('Second Brain tracked config must not contain credential fields');
 
 const lspRuntime = JSON.parse(await readFile(path.join(root, 'runtime/lsp/package.json'), 'utf8'));
 const expectedLsp = {
@@ -132,7 +138,7 @@ async function checkSymlinks(directory) {
 }
 await checkSymlinks(root);
 
-for (const relative of ['package.json', 'config', 'extensions', 'agents', 'scripts', 'lib']) {
+for (const relative of ['package.json', 'config', 'extensions', 'agents', 'scripts', 'lib', 'benchmarks', 'docs', 'vault-template']) {
   const target = path.join(root, relative);
   const files = [];
   const walkText = async (item) => {

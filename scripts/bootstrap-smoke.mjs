@@ -20,7 +20,7 @@ const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 
 function run(args) {
-  const environment = { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_STATE_HOME: stateDir, XDG_CONFIG_HOME: configDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir, PI_OVERDRIVE_LSP_RUNTIME: lspRuntime, npm_config_cache: path.join(root, "npm-cache") };
+  const environment = { ...process.env, HOME: testHome, PI_CODING_AGENT_DIR: agentDir, XDG_DATA_HOME: path.join(testHome, ".local", "share"), XDG_STATE_HOME: stateDir, XDG_CONFIG_HOME: configDir, PI_OVERDRIVE_BACKUP_ROOT: backupDir, PI_OVERDRIVE_LSP_RUNTIME: lspRuntime, npm_config_cache: path.join(root, "npm-cache") };
   for (const name of ["BRAVE_SEARCH_API_KEY", "PERPLEXITY_API_KEY", "DEEPSEEK_API_KEY", "QWEN_API_KEY", "OPENAI_API_KEY"]) delete environment[name];
   return spawnSync(path.join(packageRoot, "scripts", "bootstrap.sh"), args, {
     cwd: packageRoot,
@@ -64,6 +64,9 @@ try {
   const callabilityFile = path.join(configDir, "pi-overdrive", "model-callability.json");
   const callability = fs.existsSync(callabilityFile) ? JSON.parse(fs.readFileSync(callabilityFile, "utf8")) : {};
   check("bootstrap-installs-secret-free-callability-cache", callability.version === 1 && callability.entries?.["openai-codex/gpt-5.4"]?.runtimeStatus === "RUNTIME_REJECTED" && (fs.statSync(callabilityFile).mode & 0o077) === 0 && !/token|apiKey|credential/iu.test(JSON.stringify(callability)), { version: callability.version, entries: Object.keys(callability.entries ?? {}).length });
+  const memoryRoot = path.join(testHome, ".local", "share", "pi-overdrive", "second-brain");
+  const memoryVault = path.join(memoryRoot, "vault", "SecondBrain");
+  check("bootstrap-creates-private-portable-second-brain", fs.existsSync(path.join(memoryVault, "01 Projects", "Pi Overdrive", "Architecture.md")) && (fs.statSync(memoryRoot).mode & 0o077) === 0 && (fs.statSync(memoryVault).mode & 0o077) === 0, { memoryRoot, memoryVault });
   const allowedModels = settings.subagents?.modelScope?.allow?.filter((entry) => entry !== "inherit") ?? [];
   const catalog = allowedModels.map((identity, index) => {
     const separator = identity.indexOf("/");
@@ -104,6 +107,6 @@ try {
   fs.rmSync(root, { recursive: true, force: true });
 }
 
-const status = results.length >= 14 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length >= 15 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, packageRoot, results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

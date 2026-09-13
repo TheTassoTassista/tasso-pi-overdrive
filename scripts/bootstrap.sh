@@ -54,6 +54,7 @@ if [[ "$check_only" == true ]]; then
     @ast-grep/cli@0.45.3
   node "$package_root/scripts/model-policy-tool.mjs" check "$model_policy"
   node "$package_root/scripts/model-callability-tool.mjs" check "$model_callability"
+  node "$package_root/scripts/setup-second-brain.mjs"
   command -v agent-browser >/dev/null 2>&1 && agent-browser --version
   echo "Bootstrap validation: PASS (configuration only; authentication intentionally not inspected)."
   exit 0
@@ -115,6 +116,7 @@ node "$package_root/scripts/config-policy-tool.mjs" enable "$web_config" "$packa
 node "$package_root/scripts/settings-tool.mjs" enable "$settings_file" "$package_root/config/settings-patch.json" "$install_manifest" "$package_root"
 node "$package_root/scripts/model-policy-tool.mjs" initialize "$model_policy" "$package_root/config/model-policy.json"
 node "$package_root/scripts/model-callability-tool.mjs" initialize "$model_callability" "$package_root/config/model-callability.json"
+node "$package_root/scripts/setup-second-brain.mjs"
 
 tool_root="$HOME/.local/share/pi-overdrive/lsp-node"
 install -d -m 700 "$tool_root" "$HOME/.local/bin"
@@ -133,4 +135,4 @@ if [[ "$skip_browser" != true ]]; then "$package_root/scripts/install-agent-brow
 "$package_root/scripts/install-pi-launcher.sh" --install
 node "$package_root/scripts/validate-package.mjs"
 "$pi_bin" list
-echo "Pi Overdrive installed. Restart Pi, then run /doctor, /subagents-models, and /notebook."
+echo "Pi Overdrive installed. Restart Pi, then run /doctor, /memory, /subagents-models, and /notebook."

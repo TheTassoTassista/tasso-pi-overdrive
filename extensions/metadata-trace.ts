@@ -98,6 +98,35 @@ export default function (pi: ExtensionAPI) {
       policyDigest: scalar("policyDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:memory-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "memory_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      backend: scalar("backend") as string | undefined,
+      operation: scalar("operation") as string | undefined,
+      decision: scalar("decision") as string | undefined,
+      retrievalLevel: scalar("retrievalLevel") as number | undefined,
+      sourceCount: scalar("sourceCount") as number | undefined,
+      reflectRequested: scalar("reflectRequested") as boolean | undefined,
+      retrievedCandidateCount: scalar("retrievedCandidateCount") as number | undefined,
+      retrievedItemCount: scalar("retrievedItemCount") as number | undefined,
+      packChars: scalar("packChars") as number | undefined,
+      approximateTokens: scalar("approximateTokens") as number | undefined,
+      degradationCount: scalar("degradationCount") as number | undefined,
+      latencyMs: scalar("latencyMs") as number | undefined,
+      hindsightRecallUsed: scalar("hindsightRecallUsed") as boolean | undefined,
+      hindsightReflectUsed: scalar("hindsightReflectUsed") as boolean | undefined,
+      aceEntriesUsed: scalar("aceEntriesUsed") as number | undefined,
+      accepted: scalar("accepted") as boolean | undefined,
+      dedupeHit: scalar("dedupeHit") as boolean | undefined,
+      scanned: scalar("scanned") as number | undefined,
+      changed: scalar("changed") as number | undefined,
+      rejected: scalar("rejected") as number | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {
