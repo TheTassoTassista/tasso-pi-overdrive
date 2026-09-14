@@ -31,6 +31,15 @@ if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.incl
 if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
+const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
+const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
+for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
+try {
+  const taskGovernor = await import(path.join(root, 'lib/task-governor.mjs'));
+  const simplePolicy = taskGovernor.resolveTaskPolicy({ task: 'Change one string value.', preset: 'normal', quality: 'auto' });
+  taskGovernor.validateTaskPolicy(simplePolicy);
+  if (simplePolicy.decisionModelCalls !== 0 || simplePolicy.needs.planner || simplePolicy.needs.secondBrain || simplePolicy.needs.council || simplePolicy.modelNeed.roles.length !== 1) failures.push('Task Governor simple-path invariant failed');
+} catch (error) { failures.push(`Task Governor validation failed: ${error.message}`); }
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');

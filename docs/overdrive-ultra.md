@@ -30,6 +30,12 @@ The architecture is lazy and fail-soft. Optional parsers, debugger adapters, eva
 - No feature may turn secrets, raw prompts, file bodies, or provider output into trace metadata.
 - A disabled or unavailable optional feature must leave the basic `read`/`edit`/`write` path usable.
 
+## Implemented control plane
+
+Phase 1 adds the versioned deterministic Task Governor. It composes the existing Token Governor, Memory Router, and preset/quality policies into one digest-bound Task Policy. A small direct string change resolves to one Worker, four capability intents (`read`, `edit`, `lsp`, `verify`), no Planner, memory, debugger, browser, reviewer, or Council. A race under load resolves to a focused debugging policy with Planner, project memory, SmartRead/LSP intent, debug/eval/Sentinel intent, Worker, deterministic verification, and correctness review.
+
+The Task Policy contains metadata and limits, never the raw task. The secure workflow persists it and validates its digest on resume. `/task-policy [--json] TASK` previews the decision locally without a model call. The active tool list is still enforced by the existing minimal surface; Phase 2 will translate capability intent into dynamic schema visibility.
+
 ## Planned subsystems
 
 The implementation order is deliberate: Task Governor and Tool Governor land before new large schemas. ResourceFS provides typed, policy-checked URIs. SmartRead selects bounded views. Artifact Store externalizes large outputs. Context Governor builds one provenance-bearing Task Context Pack. Edit Engine V2 and AST transactions operate through snapshots and LSP validation. DAP and eval are isolated, lazy runtimes. StreamGuard can correct an in-flight trajectory without duplicate injections. Sentinel is read-only and policy-gated. Agent Hub consumes metadata and authoritative receipts. Director Mode is an explicit state machine, never an approval bypass.
@@ -40,4 +46,4 @@ Git/GitHub resources, commit planning, imported rule formats, ACP, browser expan
 
 Every phase has a focused test, local benchmark when relevant, local commit, and an entry in `docs/overdrive-ultra-progress.md`. Cross-product claims are scoped to the category actually measured. A missing OMP runtime or missing comparable metric is `NOT RUN`, not a win.
 
-No OMP source has been copied as of Phase 0. Any later reuse must retain MIT attribution and be listed with its source path and commit; clean-room implementation remains preferred.
+No OMP source has been copied through Phase 1. Any later reuse must retain MIT attribution and be listed with its source path and commit; clean-room implementation remains preferred.

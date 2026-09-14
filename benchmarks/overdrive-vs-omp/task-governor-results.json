@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-14T13:56:24.647Z",
+  "status": "PASS",
+  "startingOverdrive": {
+    "implementation": "token-governor-v1",
+    "iterations": 10000,
+    "totalMs": 39.568,
+    "meanDecisionMs": 0.003957,
+    "paidModelCalls": 0,
+    "providerCalls": 0,
+    "limitations": "No unified risk/scope/context/memory/tool policy; secure workflow attempted Second Brain construction for every task.",
+    "decisions": [
+      {
+        "id": "simple-string",
+        "modelRoleCount": 2,
+        "council": false
+      },
+      {
+        "id": "bounded-code",
+        "modelRoleCount": 2,
+        "council": false
+      },
+      {
+        "id": "race-under-load",
+        "modelRoleCount": 5,
+        "council": false
+      },
+      {
+        "id": "critical-migration",
+        "modelRoleCount": 11,
+        "council": true
+      }
+    ]
+  },
+  "overdriveUltra": {
+    "implementation": "deterministic-v1",
+    "iterations": 10000,
+    "totalMs": 674.69,
+    "meanDecisionMs": 0.067469,
+    "cases": 4,
+    "meanOverheadVsStartingMs": 0.063512,
+    "paidModelCalls": 0,
+    "providerCalls": 0,
+    "decisions": [
+      {
+        "id": "simple-string",
+        "status": "PASS",
+        "decisionModelCalls": 0,
+        "difficulty": "normal",
+        "risk": "low",
+        "capabilityCount": 4,
+        "modelRoleCount": 1,
+        "assertions": {
+          "planner": true,
+          "secondBrain": true,
+          "council": true,
+          "debugger": true
+        }
+      },
+      {
+        "id": "bounded-code",
+        "status": "PASS",
+        "decisionModelCalls": 0,
+        "difficulty": "normal",
+        "risk": "low",
+        "capabilityCount": 5,
+        "modelRoleCount": 2,
+        "assertions": {
+          "council": true,
+          "debugger": true
+        }
+      },
+      {
+        "id": "race-under-load",
+        "status": "PASS",
+        "decisionModelCalls": 0,
+        "difficulty": "hard",
+        "risk": "high",
+        "capabilityCount": 9,
+        "modelRoleCount": 5,
+        "assertions": {
+          "planner": true,
+          "secondBrain": true,
+          "debugger": true,
+          "eval": true,
+          "sentinel": true,
+          "reviewer": true
+        }
+      },
+      {
+        "id": "critical-migration",
+        "status": "PASS",
+        "decisionModelCalls": 0,
+        "difficulty": "critical",
+        "risk": "critical",
+        "capabilityCount": 3,
+        "modelRoleCount": 11,
+        "assertions": {
+          "planner": true,
+          "reviewer": true,
+          "council": true
+        }
+      }
+    ],
+    "validation": "PASS"
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not converted into numeric benchmark evidence."
+  }
+}

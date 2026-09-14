@@ -10,6 +10,7 @@ import {
 import { getSessionQuality, QUALITY_LEVELS, resetSessionQuality, setSessionQuality } from "../lib/routing-session.mjs";
 import { calculateRequiredSpawnBudget, EXTERNAL_SUBAGENT_QUOTA, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
 import { memoryPolicyTopology, resolveMemoryPolicy } from "../lib/memory-policy.mjs";
+import { availableContextFromPiUsage, renderTaskPolicy, resolveTaskPolicy } from "../lib/task-governor.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -174,6 +175,20 @@ function syncUserSubagentSettings(resolved: any): void {
 
 export default function modelPolicyExtension(pi: ExtensionAPI): void {
   resetSessionQuality();
+  pi.registerCommand("task-policy", {
+    description: "Inspect the deterministic policy for a task without making a model call",
+    handler: async (args, ctx) => {
+      try {
+        let task = args.trim();
+        const json = task.startsWith("--json ");
+        if (json) task = task.slice("--json ".length).trim();
+        if (!task) throw new Error("usage: /task-policy [--json] TASK");
+        const stored = readModelPolicy();
+        const preset = stored.preset === "custom" ? stored.basePreset : stored.preset;
+        ctx.ui.notify(renderTaskPolicy(resolveTaskPolicy({ task, preset, quality: getSessionQuality(), availableContext: availableContextFromPiUsage(ctx.getContextUsage()) }), json), "info");
+      } catch (error) { notifyError(ctx, error); }
+    },
+  });
   pi.registerCommand("models", {
     description: "List registered/authenticated models and public callability metadata",
     handler: async (_args, ctx) => { try { ctx.ui.notify(JSON.stringify(publicInventory(ctx), null, 2), "info"); } catch (error) { notifyError(ctx, error); } },

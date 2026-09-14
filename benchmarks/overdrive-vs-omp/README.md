@@ -13,6 +13,9 @@ Run:
 
 ```sh
 npm run benchmark:ultra:baseline
+npm run benchmark:ultra:task-governor
 ```
+
+`task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

@@ -33,6 +33,19 @@ OMP source was pinned to `4267074ac91456866e95ed8de0b6353388f08502`, package 18.
 
 The benchmark tree is `benchmarks/overdrive-vs-omp/`. Later results must use the same starting fixtures, record both successes and failures, and distinguish estimated tokens from provider-reported tokens.
 
+## Phase 1 Task Governor
+
+`npm run benchmark:ultra:task-governor` runs 10,000 deterministic decisions over four fixed task classes and validates the resulting policies. The recorded Ultra run completed in 674.690 ms total, or 0.067469 ms mean per decision, with zero model/provider calls. The starting Token Governor took 39.568 ms total, or 0.003957 ms mean; the unified policy therefore adds 0.063512 ms mean local overhead in this run.
+
+| Task fixture | Policy result | Active capability intents | Active model roles |
+|---|---|---:|---:|
+| Change one string | PASS; no Planner/memory/debugger/Council | 4 | 1 |
+| Bounded parser change | PASS; no debugger/Council | 5 | 2 |
+| Intermittent race under load | PASS; Planner/memory/debug/eval/Sentinel/reviewer | 9 | 5 |
+| Critical production migration | PASS; Planner/reviewer/Council | 3 | 11 |
+
+Timing is a local microbenchmark and not a cross-product superiority claim. OMP remains `NOT_RUN` because its required Bun runtime is unavailable. Capability intents for future tools are policy decisions, not claims that DAP, eval, or Sentinel already exist.
+
 ## Known baseline finding
 
 The local smoke initially failed only because its expected documentation-directory list had drifted behind the already-committed project template. The fixture showed every actual template file was created and user `AGENTS.md` was preserved. Phase 0 updates the smoke expectation to the current template and reruns it; this is a test repair, not a feature claim.

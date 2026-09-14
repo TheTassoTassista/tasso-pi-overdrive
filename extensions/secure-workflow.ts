@@ -12,7 +12,8 @@ import { redactMissionValue } from "../lib/mission-privacy.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
 import { AGENT_TO_ROLE, readModelPolicy, resolveModelPolicy, validateResolvedModelPolicy } from "../lib/model-policy.mjs";
 import { getSessionQuality } from "../lib/routing-session.mjs";
-import { resolveTokenGovernor, validateTokenGovernor } from "../lib/token-governor.mjs";
+import { validateTokenGovernor } from "../lib/token-governor.mjs";
+import { availableContextFromPiUsage, resolveTaskPolicy, taskPolicyMetadata, validateTaskPolicy } from "../lib/task-governor.mjs";
 import { classifyDelegationFailure } from "../lib/delegation-failure.mjs";
 import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
@@ -67,6 +68,7 @@ function sanitizeState(state: any) {
     evidenceStatus: state?.evidenceStatus ?? "NOT_RUN",
     modelPolicy: state?.modelPolicy ? { version: state.modelPolicy.version, preset: state.modelPolicy.preset, basePreset: state.modelPolicy.basePreset, qualityRequested: state.modelPolicy.qualityRequested, effectiveQuality: state.modelPolicy.effectiveQuality, roles: state.modelPolicy.roles, routingDecisions: state.modelPolicy.routingDecisions, capabilityDigest: state.modelPolicy.capabilityDigest, diversity: state.modelPolicy.diversity, digest: state.modelPolicy.digest } : undefined,
     routingStrategy: state?.routingStrategy,
+    taskPolicy: state?.taskPolicy,
     memoryPack: state?.memoryPack ? { id: state.memoryPack.id, route: state.memoryPack.route, status: state.memoryPack.status, candidateCount: state.memoryPack.candidateCount, itemCount: state.memoryPack.itemCount, packChars: state.memoryPack.packChars, approximateTokens: state.memoryPack.approximateTokens, degradationCount: state.memoryPack.degradationCount } : undefined,
     timestamps: state?.timestamps,
     ownerRunId: state?.ownerRunId,
@@ -198,29 +200,36 @@ export default function (pi: ExtensionAPI) {
       const registeredModels = ctx.modelRegistry.getAll();
       const modelCapabilityOptions = { registeredModels };
       const storedModelPolicy = readModelPolicy();
-      let activeRoutingStrategy = resolveTokenGovernor({
+      let activeTaskPolicy: any = resolveTaskPolicy({
         task: params.task,
         preset: storedModelPolicy.preset === "custom" ? storedModelPolicy.basePreset : storedModelPolicy.preset,
         quality: getSessionQuality(),
         includeOracle: params.includeOracle ?? false,
         includeSecurity: params.includeSecurity ?? true,
+        availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
       });
+      let activeRoutingStrategy = activeTaskPolicy.routingStrategy;
       let activeModelPolicy: any = resolveModelPolicy(availableModels, storedModelPolicy, { ...modelCapabilityOptions, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality });
       pi.events.emit("pi-overdrive:routing-metadata", { kind: "workflow-policy", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, securitySensitive: activeRoutingStrategy.securitySensitive, modelCallLimit: activeRoutingStrategy.maxModelCalls, policyDigest: activeModelPolicy.digest });
+      pi.events.emit("pi-overdrive:routing-metadata", taskPolicyMetadata(activeTaskPolicy));
       let sharedMemoryPack = "";
       let sharedMemoryMetadata: Record<string, unknown> | undefined;
       let secondBrainRuntime: ReturnType<typeof createSecondBrainRuntime> | undefined;
       try {
-        secondBrainRuntime = createSecondBrainRuntime({
-          cwd: ctx.cwd,
-          preset: activeRoutingStrategy.preset,
-          qualityRequested: activeRoutingStrategy.qualityRequested,
-          effectiveQuality: activeRoutingStrategy.effectiveQuality,
-          emit: (metadata: object) => pi.events.emit("pi-overdrive:memory-metadata", metadata),
-        });
-        const pack = await secondBrainRuntime.controller.build(params.task, { currentContextSufficient: false });
-        sharedMemoryPack = pack.text;
-        sharedMemoryMetadata = { id: pack.id, route: pack.route.decision, ...pack.metadata };
+        if (!activeTaskPolicy.needs.secondBrain) {
+          pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_policy_skip", reason: "task_policy_current_context_sufficient", taskPolicyDigest: activeTaskPolicy.digest });
+        } else {
+          secondBrainRuntime = createSecondBrainRuntime({
+            cwd: ctx.cwd,
+            preset: activeRoutingStrategy.preset,
+            qualityRequested: activeRoutingStrategy.qualityRequested,
+            effectiveQuality: activeRoutingStrategy.effectiveQuality,
+            emit: (metadata: object) => pi.events.emit("pi-overdrive:memory-metadata", metadata),
+          });
+          const pack = await secondBrainRuntime.controller.build(params.task, { currentContextSufficient: false });
+          sharedMemoryPack = pack.text;
+          sharedMemoryMetadata = { id: pack.id, route: pack.route.decision, ...pack.metadata };
+        }
       } catch {
         pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_degradation_event", backend: "workflow-controller" });
       }
@@ -382,6 +391,7 @@ export default function (pi: ExtensionAPI) {
           if (!latestState || latestState.workflowVersion !== WORKFLOW_VERSION) throw new Error("interrupted workflow has no compatible resumable state");
           activeModelPolicy = validateResolvedModelPolicy(availableModels, latestState.modelPolicy, modelCapabilityOptions);
           activeRoutingStrategy = validateTokenGovernor(latestState.routingStrategy);
+          if (latestState.taskPolicy) activeTaskPolicy = validateTaskPolicy(latestState.taskPolicy);
           sequence = Math.max(0, ...((latestState.evidence?.roles ?? []).map((entry: any) => Number.parseInt(String(entry.nodeId ?? "0").split("-")[0] ?? "0", 10)).filter(Number.isFinite)));
           if (fs.existsSync(evidenceRun.executionFile)) {
             const loaded = readEvidenceExecution(evidenceRun, digest);
@@ -430,6 +440,7 @@ export default function (pi: ExtensionAPI) {
               taskId: digest,
               modelPolicy: activeModelPolicy,
               routingStrategy: activeRoutingStrategy,
+              taskPolicy: activeTaskPolicy,
               sharedMemoryPack,
               sharedMemoryMetadata,
               spawnBudgetGuard,
