@@ -1,0 +1,65 @@
+# Oh My Pi gap analysis for Overdrive Ultra
+
+## Audit identity and method
+
+This is a source audit, not a marketing comparison.
+
+- OMP repository: `https://github.com/can1357/oh-my-pi.git`
+- Audited commit: `4267074ac91456866e95ed8de0b6353388f08502`
+- Audited package version: 18.1.21
+- Commit date: 2026-09-14
+- License at that commit: MIT, verified from the root `LICENSE`
+- Source reuse in Phase 0: none; the designs below are clean-room targets
+- Overdrive base: `0f107b8670b69b214e478b8d854377956f7039be`, official Pi 0.85.1
+
+The audit read OMP's README, relevant documentation, package/crate layout, tool entry points, tests, and current public issues. OMP was not executed because the host did not have its required Bun >=1.4 runtime. Missing OMP numbers remain `NOT RUN`; source inspection is not treated as benchmark evidence.
+
+## Architecture finding
+
+OMP is a broad, tightly integrated coding-agent distribution. Its strongest differentiator is the depth of the tool harness: unified resource-aware reads, hash-anchored edits, AST rewrites, LSP write-through, DAP, persistent eval, isolated subagents, artifact spill, and native fast paths. Overdrive is a Pi package/control plane: it already has stronger explicit routing, bounded Council/Judge orchestration, immutable workflow evidence, sandboxed autonomous roles, and a cross-session Second Brain. Ultra should add tool-plane depth without replacing those control-plane invariants.
+
+Status below means the state at the Overdrive base commit, before Ultra implementation.
+
+| OMP feature | OMP implementation path | Value | Overdrive base | OMP weakness or current issue | Ultra target and expected impact | Phase |
+|---|---|---|---|---|---|---:|
+| Unified rich read | `packages/coding-agent/src/tools/read.ts`, `read-selector.ts`, `read-summary.ts`, `read-sqlite.ts`, `read-archive.ts` | One bounded entry for text, directories, archives, DBs, documents, images, URLs and internal URIs | PARTIAL: Pi read plus FFF/MCP/web are separate | A large multiplexer has a larger trusted parser surface; format support varies | ResourceFS-backed SmartRead with raw fallback; reduce rereads/context while failing soft | 3–4 |
+| Hashline edits | `packages/coding-agent/src/edit/`, `crates/pi-edit/src/modes/hashline/` | Compact content anchors reject stale locations | MISSING: Pi exact-string edit rejects missing/ambiguous text but has no read-bound anchors | Prior duplicate-anchor bug #1090 shows model-tolerance heuristics need regression coverage | Seen-range-bound hash anchors plus exact-string fallback and transactions; smaller requests and stronger stale safety | 7 |
+| Structural AST edits | `packages/coding-agent/src/tools/ast-edit.ts`, `crates/pi-natives/src/ast.rs` | Language-aware preview/apply rewrites | PARTIAL: pinned ast-grep search only | Structural rewrites can be over-broad without preview counts and transaction rollback | Preview, bounded match set, snapshot, apply, LSP verify, rollback | 8 |
+| LSP tool and write-through | `packages/coding-agent/src/lsp/`, `packages/coding-agent/src/edit/index.ts` | 14 semantic operations and post-edit diagnostics | PARTIAL: real diagnostics/navigation/rename preview for ten language families; no automatic edit hook | Server capability differences and mutation-bearing actions require classification | Preserve managed read-only mux; add pre/post snapshots, safe actions and `willRenameFiles` policy | 9 |
+| DAP debugger | `packages/coding-agent/src/dap/`, `packages/coding-agent/src/tools/debug.ts` | Stateful breakpoints, stepping, frames and evaluation | MISSING | Adapter lifecycle and attach can cross security boundaries | Lazy isolated single-session DAP with explicit adapter allowlist and bounded output | 10 |
+| Persistent JS/Python eval | `packages/coding-agent/src/eval/`, `packages/coding-agent/src/tools/eval.ts` | Retained state, display capture and tool bridge | MISSING | Closed P1 #11707 demonstrates teardown races can kill the host session | Separate lazy kernels, strict timeout/kill, bounded artifacts, no ambient secrets/network | 11 |
+| TTSR stream rules | `packages/coding-agent/src/export/ttsr.ts`, `session/ttsr-coordinator.ts`, `session/stream-guards.ts` | Conditional in-flight reminders/corrections | MISSING | Open #12057: deferred injection can requeue before persistence; repeat gap bypass | Controller-owned reservation before injection, dedupe, cooldown and metadata receipt | 12 |
+| Advisor/watchdog | `packages/coding-agent/src/advisor/`, `docs/advisor-watchdog.md` | Conditional second opinion during a live session | PARTIAL: Oracle/reviewers exist only at workflow stages | OMP permits configured mutating advisor tools; this expands blast radius | Read-only Sentinel, task-policy gated, no spawn/edit/shell, bounded advice | 13 |
+| Task subagents | `packages/coding-agent/src/task/`, `structured-subagent.ts`, `spawn-policy.ts` | Typed agents, discovery, batch/async execution | PARTIAL: fixed twelve-role workflow with stronger hard caps | Open #12023 can omit interleaved user work; open #12028 drops plugin model frontmatter; open #12051 reports stale question loops | Preserve state machine, reconcile task-policy digest, add inspectable runtime registry without relaxing depth/concurrency | 1, 14 |
+| Agent Hub | `packages/coding-agent/src/tools/hub/`, `docs/agent-hub.md` | Roster, status, transcripts, steer/revive/kill | MISSING | Rich control can expose cross-agent content or permit unsafe steering | Metadata-first Agent Hub; Council member outputs stay isolated until Judge | 14 |
+| Vibe mode | `packages/coding-agent/src/vibe/`, `docs/vibe-mode.md` | Higher-autonomy multi-step mode | MISSING | Broad autonomy can hide policy decisions | Director Mode as an explicit state-machine policy, not an approval bypass | 15 |
+| Subagent worktree isolation | `packages/coding-agent/src/task/isolation-runner.ts`, `isolation-ownership.ts` | Per-task copy/worktree execution and apply/merge controls | PARTIAL/STRONG: shared enforced workflow worktree plus unique runtime allocations | Isolation modes add copy cost and ownership complexity | V2 capability probe; prefer native worktrees/reflink only when measured, retain Bubblewrap | 16 |
+| Model harness profiles | KDL compatibility tree plus task agent model/thinking fields | Per-model tool/prompt behavior | PARTIAL: explicit routes/effort and callability, no tool-contract profiles | Open #12028 shows discovery source can change model behavior | Data-only profiles that adapt edit/read format, never provider routes or Council policy | 17 |
+| GitHub/resource model | `packages/coding-agent/src/tools/gh.ts`, `internal-urls/filesystem-resource.ts`, `tools/github-cache.ts` | Bounded repository/PR/file/search resources | PARTIAL: `gh`, MCP and web exist but are separate | Remote mutation/approval and cache staleness require strict provenance | Read-only `git://`/`github://` resources first; explicit mutation outside autonomous roles | 18 |
+| Artifact/blob store | `packages/coding-agent/src/session/artifacts.ts`, `blob-broker/`, `internal-urls/artifact-protocol.ts` | Spill large results and re-open by URI | MISSING: output compression currently discards noncritical bulk | OMP has two stores with different IDs/lifetimes; complexity can confuse retention | One content-addressed private store with quotas, provenance, redaction and inline fallback | 5 |
+| Commit splitter | `packages/coding-agent/src/commit/agentic/`, `commit/pipeline.ts` | Analyze hunks and propose coherent commits | MISSING | Agentic commit planning can add model cost and accidentally stage user work | Deterministic hunk ownership/exclusions; proposal-only by default; never auto-stage unrelated files | 19 |
+| Rule/config interoperability | `packages/coding-agent/src/discovery/`, `docs/rulebook-matching-pipeline.md` | Imports native, AGENTS, Cursor, Windsurf, Cline and GitHub rules | PARTIAL: Pi/AGENTS/skills/project templates | OMP docs list partially parsed but non-enforced semantics | Normalize supported read-only rule sources with precedence/provenance and conflict diagnostics | 20 |
+| ACP/editor mode | `packages/coding-agent/src/modes/acp/`, `commands/acp.ts`, `session/acp-permission-gate.ts` | Editor clients can stream/control sessions | MISSING | Remote/editor permissions must not bypass host policy | Minimal ACP bridge preserving Overdrive approvals, receipts and task policy | 21 |
+| Browser engine | `packages/coding-agent/src/tools/browser/`, `tools/browser.ts` | Persistent CDP/relay/spawned automation | PARTIAL/STRONG: pinned isolated Chromium profile and real DOM smoke | Open #12055 relay click/type timeout; open #12047 launch failure report | Extend only isolated spawned Chromium, preserve assigned profile/session and cleanup | 22 |
+| Computer use | `packages/coding-agent/src/tools/computer/`, `docs/computer-use.md` | Native screenshots, accessibility and input | MISSING | Host-wide actions are intrinsically high risk and screen content is untrusted | Defer unless an accessibility-first, allowlisted, confirmed-action design is demonstrably safe | 23 |
+| Collaboration relay | `packages/coding-agent/src/collab/`, `packages/collab-web/` | Encrypted multi-client shared sessions | MISSING | Guest prompt/interrupt rights broaden authority; network service adds attack surface | Implement only with concrete local value, explicit opt-in and unchanged host authority | 24 |
+| Context compaction/promotion | `packages/agent/src/compaction/`, `packages/coding-agent/src/session/context-notes.ts`, `docs/compaction.md` | Multiple compaction modes and earlier-context promotion | PARTIAL: Pi compaction, handoff/notebook, Token Governor and Second Brain packs | Many strategies complicate correctness; task omission risks remain | Deterministic context-fit gate unifying SmartRead, memory and artifacts before model launch | 6 |
+| Native Rust fast paths | `crates/pi-natives`, `crates/pi-edit`, `crates/pi-shell`, `crates/pi-ast` | Fast search/edit/shell parsing with bounded native APIs | MISSING as package-owned code; system `rg`, `fd`, ast-grep are already fast | Native code increases platform/build/audit burden | Add only after profiling proves a hot path and keep JS/system fallback | 25 |
+| Shell output minimizer | `crates/pi-shell/src/minimizer/`, `docs/bash-tool-runtime.md` | Reduces repetitive command output and spills full text | PARTIAL: output optimizer retains critical diagnostics | Long-output caveats remain; filtering can hide evidence | StreamGuard + Artifact Store keep every ERROR/FATAL and externalize full output | 5, 12 |
+| Cost/usage UI | `packages/coding-agent/src/session/session-stats.ts`, `packages/stats/` | Persistent local usage analysis | STRONG: receipts aggregate each launched attempt and mark unavailable values honestly | Open #12039: OMP footer excludes task-subagent spend and materially underreports | Preserve exact receipt accounting; Agent Hub must use the same aggregate | 14 |
+| Autonomous memory | `packages/coding-agent/src/memory-backend/`, `mnemopi/`, `docs/memory.md` | Local/Hindsight/MnemoPi backends | STRONGER by architecture, not benchmarked task quality: OpenViking + Hindsight + ACE + Router + immutable Shared Memory Pack | OMP memory is broad but off by default; backend quality is task-dependent | Expose bounded `memory://` resources without replacing current stores | 3, 6 |
+
+## Current issue lessons incorporated
+
+- #12057: StreamGuard reservations must be persisted before a deferred injection can be matched again.
+- #12055 and #12047: browser relay and launch paths are not assumed reliable; Ultra keeps the already-proven isolated spawned profile.
+- #12039: every Agent Hub cost view must consume the same authoritative nested receipt aggregate.
+- #12028: agent/model selection needs execution-time attestation, not discovery-time display alone.
+- #12023 and #12051: task completion needs a controller-owned reconciliation watermark and loop guard.
+- #11707 (closed): eval termination must make all send paths idempotent and unable to crash Pi.
+
+These issue reports are design inputs, not evidence that all OMP users encounter the problem.
+
+## Phase 0 conclusion
+
+The first implementation priority is governance, not more tools. Overdrive already exposes an estimated 4,916-token default-context delta over a no-tools control. Task and Tool Governors must make later capabilities conditional before ResourceFS, DAP, eval, or browser schemas are added. Routing, retry, Council independence, concurrency 3, depth 1, correction rounds 2, spawn budget 42, sandbox policy, and Second Brain topology are frozen invariants.

@@ -38,7 +38,7 @@ try {
   writeFileSync(path.join(repo, 'AGENTS.md'), 'existing project rules\n');
   run('project-template-init', path.join(packageRoot, 'scripts', 'project-init.sh'), [repo], repo);
   check('project-template-preserves-files', readFileSync(path.join(repo, 'AGENTS.md'), 'utf8') === 'existing project rules\n', 'existing AGENTS.md retained');
-  check('project-template-directories', ['product', 'architecture', 'api', 'workflows', 'security', 'testing', 'reliability', 'references', 'plans/active', 'plans/completed'].every((item) => existsSync(path.join(repo, 'docs', item))), 'recommended documentation map created');
+  check('project-template-directories', ['completed', 'decisions', 'plans', 'releases', 'reliability', 'research', 'reviews'].every((item) => existsSync(path.join(repo, 'docs', item))), 'current documentation map created');
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "overdriveBaseCommit": "0f107b8670b69b214e478b8d854377956f7039be",
+  "omp": {
+    "repository": "https://github.com/can1357/oh-my-pi.git",
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "packageVersion": "18.1.21",
+    "license": "MIT",
+    "sourceInspection": "fresh shallow clone outside the product tree",
+    "sourceReuse": "none"
+  }
+}

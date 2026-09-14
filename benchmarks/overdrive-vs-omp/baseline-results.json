@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-14T13:33:15.084Z",
+  "overdrive": {
+    "baseCommit": "0f107b8670b69b214e478b8d854377956f7039be",
+    "piVersion": "0.85.1",
+    "package": {
+      "trackedFiles": 291,
+      "trackedBytes": 1347821
+    },
+    "paidModelCalls": 0,
+    "deterministicProviderTurns": 8,
+    "toolCalls": 4,
+    "measurements": [
+      {
+        "label": "read-200-lines",
+        "tool": "read",
+        "elapsedMs": 1058.137,
+        "requestChars": 43,
+        "outputChars": 7855,
+        "isError": false,
+        "assistantTurns": 2,
+        "peakProcessCount": 1,
+        "peakRssKiB": 185328,
+        "outputDigest": "50b108bcbe330142c3bfe7a73905aa77d3e055238b405d8ae64054788b3bd341"
+      },
+      {
+        "label": "grep-50-results",
+        "tool": "grep",
+        "elapsedMs": 1093.092,
+        "requestChars": 51,
+        "outputChars": 2748,
+        "isError": false,
+        "assistantTurns": 2,
+        "peakProcessCount": 1,
+        "peakRssKiB": 185444,
+        "outputDigest": "756badebcd5c2fddaa772ffaf8159de6539fc1f2456b958844528ea94d39f027"
+      },
+      {
+        "label": "exact-edit",
+        "tool": "edit",
+        "elapsedMs": 1108.417,
+        "requestChars": 68,
+        "outputChars": 45,
+        "isError": false,
+        "assistantTurns": 2,
+        "peakProcessCount": 1,
+        "peakRssKiB": 185352,
+        "outputDigest": "f10374c1613ceb26725d2b1e13de61311a4a46fdc0b96c4a8b794a416d9e5699"
+      },
+      {
+        "label": "stale-edit",
+        "tool": "edit",
+        "elapsedMs": 1102.551,
+        "requestChars": 70,
+        "outputChars": 113,
+        "isError": true,
+        "assistantTurns": 2,
+        "peakProcessCount": 1,
+        "peakRssKiB": 187144,
+        "outputDigest": "00c14b8755a9dec2f6e01789cf968e4bb20e2ce4fe6fe34b4511fdd3c72c950c"
+      }
+    ],
+    "assertions": {
+      "readBounded": true,
+      "searchBounded": true,
+      "exactEditCorrect": true,
+      "staleEditRejected": true
+    }
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "license": "MIT",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is not installed; no numeric OMP result is inferred from source inspection."
+  },
+  "status": "PASS"
+}
