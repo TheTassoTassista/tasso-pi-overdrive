@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 0 — baseline and OMP reference audit
-- Last completed phase commit: none yet (Phase 0 changes are under validation)
+- Current phase: 1 — Task Governor
+- Last completed phase commit: `f4ce1c8` — `docs(ultra): establish OMP audit and baseline`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -29,15 +29,9 @@
 - `npm run check`: 216/216 tests PASS plus syntax/type/package validation when pointed at the already-verified stable managed binary runtime.
 - `npm run smoke:local`: PASS after the expectation correction; temporary worktree/repository cleanup PASS.
 
-## Dirty files expected before the Phase 0 commit
+## Dirty files
 
-- `package.json`
-- `scripts/local-smoke.mjs`
-- `benchmarks/overdrive-vs-omp/`
-- `docs/omp-gap-analysis.md`
-- `docs/overdrive-ultra-benchmarks.md`
-- `docs/overdrive-ultra.md`
-- `docs/overdrive-ultra-progress.md`
+- Only this ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -49,4 +43,4 @@
 
 ## Exact next action
 
-Verify both worktrees and the protected audit hash, then create the local Phase 0 commit. After recording its hash here, begin Phase 1 by extending the existing deterministic Token Governor into a versioned Task Policy without changing routing or workflow hard limits.
+Inspect the existing `lib/token-governor.mjs`, routing-session state, memory policy, workflow entry points, and OMP task/spawn policy. Then implement and test a versioned deterministic Task Policy without changing routing, fan-out, retries, concurrency, depth, correction rounds, or spawn budget.
