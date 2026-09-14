@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-14T14:29:13.504Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "startingOverdrive": {
+    "id": "starting-overdrive-core",
+    "status": "PASS",
+    "elapsedMs": 258.796,
+    "toolCount": 7,
+    "toolNames": [
+      "read",
+      "edit",
+      "write",
+      "secure_coding_workflow",
+      "mcp",
+      "task_notebook",
+      "verification_gate"
+    ],
+    "toolSchemaCharacters": 4171,
+    "estimatedToolSchemaTokens": 1043,
+    "exitCode": 0,
+    "error": null,
+    "stderr": ""
+  },
+  "overdriveUltra": {
+    "measurements": [
+      {
+        "id": "ultra-simple-edit",
+        "status": "PASS",
+        "elapsedMs": 310.619,
+        "toolCount": 4,
+        "toolNames": [
+          "read",
+          "edit",
+          "semantic_nav",
+          "verification_gate"
+        ],
+        "toolSchemaCharacters": 2799,
+        "estimatedToolSchemaTokens": 700,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "ultra-search-only",
+        "status": "PASS",
+        "elapsedMs": 310.509,
+        "toolCount": 6,
+        "toolNames": [
+          "read",
+          "ffgrep",
+          "fffind",
+          "ast_grep_run",
+          "semantic_nav",
+          "task_notebook"
+        ],
+        "toolSchemaCharacters": 3012,
+        "estimatedToolSchemaTokens": 753,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "ultra-structural-edit",
+        "status": "PASS",
+        "elapsedMs": 296.051,
+        "toolCount": 7,
+        "toolNames": [
+          "read",
+          "edit",
+          "write",
+          "ast_grep_rewrite",
+          "semantic_nav",
+          "task_notebook",
+          "verification_gate"
+        ],
+        "toolSchemaCharacters": 4180,
+        "estimatedToolSchemaTokens": 1045,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "ultra-debugging",
+        "status": "PASS",
+        "elapsedMs": 297.09,
+        "toolCount": 10,
+        "toolNames": [
+          "read",
+          "ffgrep",
+          "fffind",
+          "ast_grep_run",
+          "edit",
+          "write",
+          "semantic_nav",
+          "task_notebook",
+          "verification_gate",
+          "secure_coding_workflow"
+        ],
+        "toolSchemaCharacters": 5587,
+        "estimatedToolSchemaTokens": 1397,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "ultra-research",
+        "status": "PASS",
+        "elapsedMs": 367.105,
+        "toolCount": 4,
+        "toolNames": [
+          "read",
+          "task_notebook",
+          "web_research",
+          "safe_web_fetch"
+        ],
+        "toolSchemaCharacters": 2104,
+        "estimatedToolSchemaTokens": 526,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "ultra-browser",
+        "status": "PASS",
+        "elapsedMs": 285.944,
+        "toolCount": 2,
+        "toolNames": [
+          "read",
+          "agent_browser"
+        ],
+        "toolSchemaCharacters": 1148,
+        "estimatedToolSchemaTokens": 287,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
+        "id": "explicit-cli-preserved",
+        "status": "PASS",
+        "elapsedMs": 298.058,
+        "toolCount": 2,
+        "toolNames": [
+          "read",
+          "safe_exec"
+        ],
+        "toolSchemaCharacters": 1136,
+        "estimatedToolSchemaTokens": 284,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      }
+    ],
+    "controlPlane": {
+      "status": "PASS",
+      "command": {
+        "name": "tools",
+        "source": "extension"
+      },
+      "providerTurns": 0,
+      "exitCode": 0
+    },
+    "assertions": {
+      "allPiRunsComplete": true,
+      "simpleRequiredAccessible": true,
+      "simpleSchemaReduced": true,
+      "simpleHighRiskHidden": true,
+      "searchOnlyNonMutating": true,
+      "structuralRewriteSemantic": true,
+      "debuggingFocused": true,
+      "researchFocused": true,
+      "browserExplicitOnly": true,
+      "explicitCliPreserved": true,
+      "controllerOnlyNeverVisible": true,
+      "toolsCommandRegistered": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 8,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  }
+}

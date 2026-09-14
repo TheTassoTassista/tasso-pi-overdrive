@@ -14,6 +14,7 @@ test("simple string change selects a minimal policy with no expensive systems", 
   assert.equal(policy.needs.secondBrain, false);
   assert.equal(policy.needs.debugger, false);
   assert.equal(policy.needs.browser, false);
+  assert.equal(policy.classification.signals.directSmallEdit, true);
   assert.equal(policy.memory.reflect, false);
   assert.equal(policy.needs.council, false);
   assert.ok(policy.toolNeed.capabilities.length <= 4, policy.toolNeed.capabilities.join(","));
@@ -24,6 +25,15 @@ test("intermittent race under load activates focused debugging capabilities", ()
   for (const key of ["planner", "secondBrain", "smartRead", "lsp", "debugger", "eval", "sentinel", "reviewer"]) assert.equal(policy.needs[key], true, key);
   for (const capability of ["read", "search", "edit", "lsp", "memory", "debug", "eval", "sentinel", "verify"]) assert.ok(policy.toolNeed.capabilities.includes(capability), capability);
   assert.ok(policy.reviewNeed.roles.includes("correctness"));
+});
+
+test("structural edit intent is semantic and cannot be activated by a tool name alone", () => {
+  const structural = resolveTaskPolicy({ task: "Replace every call expression to legacyApi with modernApi across TypeScript source files." });
+  assert.equal(structural.classification.signals.structuralEdit, true);
+  assert.ok(structural.toolNeed.capabilities.includes("structural-edit"));
+  const superficial = resolveTaskPolicy({ task: "Use ast_grep_rewrite to change one string value." });
+  assert.equal(superficial.classification.signals.structuralEdit, false);
+  assert.equal(superficial.toolNeed.capabilities.includes("structural-edit"), false);
 });
 
 test("default Task Policy preserves Token Governor routing exactly", () => {

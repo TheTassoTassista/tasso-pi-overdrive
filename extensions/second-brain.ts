@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSessionQuality } from "../lib/routing-session.mjs";
 import { readModelPolicy } from "../lib/model-policy.mjs";
+import { availableContextFromPiUsage, resolveTaskPolicy } from "../lib/task-governor.mjs";
 import { createSecondBrainRuntime, secondBrainHealth } from "../lib/second-brain-runtime.mjs";
 import { syncObsidianVault } from "../lib/obsidian-sync.mjs";
 
@@ -44,13 +45,23 @@ function renderSearch(pack: any): string {
 }
 
 export default function secondBrainExtension(pi: ExtensionAPI): void {
-  pi.on("session_start", async (_event, ctx) => {
-    try { runtimeFor(ctx, pi); ctx.ui.setStatus("second-brain", "memory: lazy"); }
-    catch { ctx.ui.setStatus("second-brain", "memory: degraded"); }
+  pi.on("session_start", (_event, ctx) => {
+    ctx.ui.setStatus("second-brain", "memory: lazy");
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
     try {
+      const stored = readModelPolicy();
+      const taskPolicy = resolveTaskPolicy({
+        task: event.prompt,
+        preset: stored.preset === "custom" ? stored.basePreset : stored.preset,
+        quality: getSessionQuality(),
+        availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
+      });
+      if (!taskPolicy.needs.secondBrain) {
+        pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_policy_skip", reason: "task_policy_current_context_sufficient", taskPolicyDigest: taskPolicy.digest });
+        return undefined;
+      }
       const active = runtimeFor(ctx, pi);
       const pack = await active.controller.build(event.prompt);
       if (!pack.text) return undefined;

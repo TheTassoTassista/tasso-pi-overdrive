@@ -49,3 +49,20 @@ Timing is a local microbenchmark and not a cross-product superiority claim. OMP 
 ## Known baseline finding
 
 The local smoke initially failed only because its expected documentation-directory list had drifted behind the already-committed project template. The fixture showed every actual template file was created and user `AGENTS.md` was preserved. Phase 0 updates the smoke expectation to the current template and reruns it; this is a test repair, not a feature claim.
+
+## Phase 2 Tool Governor
+
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. It made eight deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+
+| Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
+|---|---:|---:|---:|---|
+| Starting Overdrive core | 7 | 4,171 | 1,043 | Control |
+| Ultra simple string edit | 4 | 2,799 | 700 | read/edit/LSP/verification; no write/AST/web/browser/controller |
+| Ultra search-only | 6 | 3,012 | 753 | FFF + AST search; no mutation |
+| Ultra structural edit | 7 | 4,180 | 1,045 | semantic `structural-edit` activates AST rewrite |
+| Ultra debugging | 10 | 5,587 | 1,397 | focused search/edit/LSP/memory/verify/workflow |
+| Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
+| Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
+| Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
+
+The simple-edit fixture reduces serialized schema size by 32.9% relative to the former seven-tool core. This is an isolated schema-selection benchmark, not a provider billing-token claim and not a claim that every production task will have fewer than seven tools. Hard debugging correctly expands above the old core. `/tools` registration and every visibility/security assertion passed. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product winner is declared.

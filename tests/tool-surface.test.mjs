@@ -11,4 +11,5 @@ test("explicit CLI tool policies are never overridden", () => {
   for (const flag of ["--tools", "-t", "--no-tools", "-nt", "--exclude-tools", "-xt"]) {
     assert.deepEqual(selectInitialToolSurface(["fffind"], [...CORE_TOOLS, "fffind"], [flag, "fffind"]), ["fffind"]);
   }
+  assert.deepEqual(selectInitialToolSurface(["read"], [...CORE_TOOLS], ["--tools=read"]), ["read"]);
 });

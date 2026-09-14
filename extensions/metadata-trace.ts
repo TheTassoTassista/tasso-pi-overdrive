@@ -127,6 +127,27 @@ export default function (pi: ExtensionAPI) {
       rejected: scalar("rejected") as number | undefined,
     });
   });
+  pi.events.on("pi-overdrive:tool-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    const names = (key: string) => Array.isArray(data[key]) ? (data[key] as unknown[]).filter((entry): entry is string => typeof entry === "string").slice(0, 64) : undefined;
+    await record({
+      event: "tool_metadata",
+      kind: scalar("kind") as string | undefined,
+      mode: scalar("mode") as string | undefined,
+      action: scalar("action") as string | undefined,
+      tool: scalar("tool") as string | undefined,
+      tier: scalar("tier") as string | undefined,
+      activeToolCount: scalar("activeToolCount") as number | undefined,
+      inactiveToolCount: scalar("inactiveToolCount") as number | undefined,
+      decisionModelCalls: scalar("decisionModelCalls") as number | undefined,
+      taskPolicyDigest: scalar("taskPolicyDigest") as string | undefined,
+      digest: scalar("digest") as string | undefined,
+      activeTools: names("activeTools"),
+      highRiskActive: names("highRiskActive"),
+      unavailableCapabilities: names("unavailableCapabilities"),
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {
