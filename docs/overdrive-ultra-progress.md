@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 4 — SmartRead
-- Last completed phase commit: `c5214cd` — `feat(ultra): add policy-checked resource fs`
+- Current phase: 5 — Artifact Store
+- Last completed phase commit: `e4894c7` — `feat(ultra): add deterministic smart read`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -30,6 +30,9 @@
 - Bound repository traversal to held `O_NOFOLLOW` descriptors with inode revalidation; denied secrets, `.git`, `node_modules`, symlinks, hard links, binaries, oversize reads, and risky capabilities.
 - Routed memory resources through the existing Second Brain controller and suppressed duplicate automatic retrieval for explicit `memory://` tasks.
 - Added the conditional `resource_fs` schema, zero-model `/resources` catalog, sanitized tool errors, metadata-only tracing, package guards, and real-Pi benchmarks.
+- Implemented deterministic SmartRead with `auto`, bounded `raw`, structural `smart`, and exact numbered `range` modes.
+- Intercepted large built-in source reads before model context, reused descriptor-bound ResourceFS path security, enriched symbols through the pinned read-only LSP, and retained deterministic multi-language/line fallbacks.
+- Added task/context-budget selection, late-symbol focus ranking, conditional Tool Governor visibility, zero-model `/smart-read` counters, metadata-only traces, package guards, regressions, and a real-Pi context-reduction benchmark.
 
 ## Current validation
 
@@ -50,6 +53,10 @@
 - Phase 3 ResourceFS real-Pi benchmark: PASS on Pi 0.85.1; built-in read control PASS, ResourceFS read PASS with trust/digest metadata, `.env` denial recorded as a true tool error, `/resources` registered; six deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 3 Tool Governor rerun: PASS; explicit resource URI 3 tools/1,620 schema chars/~405 tokens and ResourceFS absent for ordinary prompts; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 3 full `npm run check`: 248/248 PASS plus syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 4 focused SmartRead tests: 10/10 PASS; four modes, late symbol beyond 200 declarations, LSP/fallback, exact ranges, multi-language parsing, ResourceFS denials, and metadata non-disclosure.
+- Phase 4 SmartRead real-Pi benchmark: PASS on Pi 0.85.1; automatic built-in read interception, real sandboxed LSP enrichment, late symbol at lines 1203–1206 retained, exact range recovery, and `/smart-read` registration; 35,090 raw source chars to 5,701 model-facing chars (83.75% reduction), six deterministic local provider turns, zero network/external-provider/paid calls, cost zero.
+- Phase 4 Tool Governor rerun: PASS; simple edit remains 4 tools/2,799 schema chars, source/search/structural/debug tasks receive conditional SmartRead, explicit CLI remains authoritative; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 4 full `npm run check`: 260/260 PASS plus syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -64,9 +71,10 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Debug, eval, Sentinel, SmartRead, and Artifact Store capabilities remain honestly unavailable until their respective phases land.
+- Debug, eval, Sentinel, and Artifact Store capabilities remain honestly unavailable until their respective phases land.
 - ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory resources; additional schemes remain deferred to their owning phases.
+- SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 
 ## Exact next action
 
-Inspect current read/search/LSP/resource behavior and OMP's pinned read selector, summaries, archive/database/document handlers, and truncation tests. Define the smallest fail-soft SmartRead layer that reduces rereads and context without turning ResourceFS into a broad permanent parser surface.
+Inspect current output compression, trace retention, workflow/session identity, and OMP's pinned artifact/blob stores. Define one private content-addressed, task/session-scoped `artifact://` store with deterministic previews, bounded range/search reopening, deduplication, quotas, redaction policy, and fail-soft inline fallback without conflating artifacts with metadata traces.
