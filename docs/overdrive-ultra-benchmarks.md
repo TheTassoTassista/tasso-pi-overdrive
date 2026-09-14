@@ -52,7 +52,7 @@ The local smoke initially failed only because its expected documentation-directo
 
 ## Phase 2 Tool Governor
 
-`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. It made eight deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The current Phase 3 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
 
 | Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
 |---|---:|---:|---:|---|
@@ -60,9 +60,23 @@ The local smoke initially failed only because its expected documentation-directo
 | Ultra simple string edit | 4 | 2,799 | 700 | read/edit/LSP/verification; no write/AST/web/browser/controller |
 | Ultra search-only | 6 | 3,012 | 753 | FFF + AST search; no mutation |
 | Ultra structural edit | 7 | 4,180 | 1,045 | semantic `structural-edit` activates AST rewrite |
+| Ultra explicit resource URI | 3 | 1,620 | 405 | read + ResourceFS + memory notebook; ResourceFS absent otherwise |
 | Ultra debugging | 10 | 5,587 | 1,397 | focused search/edit/LSP/memory/verify/workflow |
 | Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
 | Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
 | Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
 
 The simple-edit fixture reduces serialized schema size by 32.9% relative to the former seven-tool core. This is an isolated schema-selection benchmark, not a provider billing-token claim and not a claim that every production task will have fewer than seven tools. Hard debugging correctly expands above the old core. `/tools` registration and every visibility/security assertion passed. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product winner is declared.
+
+## Phase 3 ResourceFS
+
+`npm run benchmark:ultra:resource-fs` launches official Pi 0.85.1 with the actual ResourceFS extension and a deterministic local single-tool provider. It waits for Pi's `agent_settled` lifecycle event, so asynchronous built-in and extension tools are measured on the same protocol boundary. Three tool calls use six deterministic provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Elapsed | Output | Evidence |
+|---|---:|---:|---:|---|
+| Built-in `read`, 200 lines | PASS | 392.073 ms | 5,346 chars | Control path |
+| ResourceFS `repo://root/fixture.txt`, 200 lines | PASS | 267.249 ms | 5,534 chars | Explicit workspace-untrusted/immutable metadata and URI digest |
+| ResourceFS `.env` read | PASS (denied) | 275.481 ms | 61 chars | Pi records `isError=true`; sanitized `resource_repo_path_protected` |
+| `/resources` command registration | PASS | — | — | Source is the actual extension |
+
+The timings are one local run and not a performance superiority claim. ResourceFS deliberately adds 188 output characters in this fixture for a trust boundary, truncation state, and digest. Its purpose is policy and provenance, not replacing the built-in read tool for ordinary paths. OMP remains `NOT_RUN`; Bun is absent and no synthetic comparison is reported.

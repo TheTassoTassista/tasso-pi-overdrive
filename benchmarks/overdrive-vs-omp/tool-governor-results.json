@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-14T14:29:13.504Z",
+  "recordedAt": "2026-09-14T14:52:08.190Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-deterministic-local-provider",
   "piVersion": "0.85.1",
   "startingOverdrive": {
     "id": "starting-overdrive-core",
     "status": "PASS",
-    "elapsedMs": 258.796,
+    "elapsedMs": 340.034,
     "toolCount": 7,
     "toolNames": [
       "read",
@@ -29,7 +29,7 @@
       {
         "id": "ultra-simple-edit",
         "status": "PASS",
-        "elapsedMs": 310.619,
+        "elapsedMs": 256.092,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -46,7 +46,7 @@
       {
         "id": "ultra-search-only",
         "status": "PASS",
-        "elapsedMs": 310.509,
+        "elapsedMs": 267.998,
         "toolCount": 6,
         "toolNames": [
           "read",
@@ -65,7 +65,7 @@
       {
         "id": "ultra-structural-edit",
         "status": "PASS",
-        "elapsedMs": 296.051,
+        "elapsedMs": 257.463,
         "toolCount": 7,
         "toolNames": [
           "read",
@@ -83,9 +83,25 @@
         "stderr": ""
       },
       {
+        "id": "ultra-resource-uri",
+        "status": "PASS",
+        "elapsedMs": 268.53,
+        "toolCount": 3,
+        "toolNames": [
+          "read",
+          "resource_fs",
+          "task_notebook"
+        ],
+        "toolSchemaCharacters": 1620,
+        "estimatedToolSchemaTokens": 405,
+        "exitCode": 0,
+        "error": null,
+        "stderr": ""
+      },
+      {
         "id": "ultra-debugging",
         "status": "PASS",
-        "elapsedMs": 297.09,
+        "elapsedMs": 265.176,
         "toolCount": 10,
         "toolNames": [
           "read",
@@ -108,7 +124,7 @@
       {
         "id": "ultra-research",
         "status": "PASS",
-        "elapsedMs": 367.105,
+        "elapsedMs": 265.162,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -125,7 +141,7 @@
       {
         "id": "ultra-browser",
         "status": "PASS",
-        "elapsedMs": 285.944,
+        "elapsedMs": 269.336,
         "toolCount": 2,
         "toolNames": [
           "read",
@@ -140,7 +156,7 @@
       {
         "id": "explicit-cli-preserved",
         "status": "PASS",
-        "elapsedMs": 298.058,
+        "elapsedMs": 254.422,
         "toolCount": 2,
         "toolNames": [
           "read",
@@ -169,6 +185,7 @@
       "simpleHighRiskHidden": true,
       "searchOnlyNonMutating": true,
       "structuralRewriteSemantic": true,
+      "resourceUriConditional": true,
       "debuggingFocused": true,
       "researchFocused": true,
       "browserExplicitOnly": true,
@@ -178,7 +195,7 @@
     }
   },
   "accounting": {
-    "deterministicLocalProviderTurns": 8,
+    "deterministicLocalProviderTurns": 9,
     "paidModelCalls": 0,
     "externalProviderCalls": 0,
     "networkCalls": 0,

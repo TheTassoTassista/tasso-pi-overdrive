@@ -36,6 +36,22 @@ test("structural edit intent is semantic and cannot be activated by a tool name 
   assert.equal(superficial.toolNeed.capabilities.includes("structural-edit"), false);
 });
 
+test("ResourceFS activates only for an explicit supported URI", () => {
+  const explicit = resolveTaskPolicy({ task: "Inspect repo://root/src/parser.ts without changing it." });
+  assert.equal(explicit.classification.signals.resources, true);
+  assert.equal(explicit.needs.resources, true);
+  assert.ok(explicit.toolNeed.capabilities.includes("resources"));
+  const ordinary = resolveTaskPolicy({ task: "Inspect src/parser.ts without changing it." });
+  assert.equal(ordinary.classification.signals.resources, false);
+  assert.equal(ordinary.needs.resources, false);
+  assert.equal(ordinary.toolNeed.capabilities.includes("resources"), false);
+  const memory = resolveTaskPolicy({ task: "Inspect memory://root/prior%20decision." });
+  assert.equal(memory.needs.resources, true);
+  assert.equal(memory.classification.signals.memoryResource, true);
+  assert.equal(memory.needs.secondBrain, false);
+  assert.equal(memory.toolNeed.capabilities.includes("memory"), false);
+});
+
 test("default Task Policy preserves Token Governor routing exactly", () => {
   const input = { task: "Refactor the concurrent recovery state machine and integration tests.", preset: "token-saver", quality: "high", includeSecurity: true };
   const policy = resolveTaskPolicy(input);

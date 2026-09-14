@@ -87,12 +87,13 @@ try {
   const simple = measure("ultra-simple-edit", "Change one string value.");
   const search = measure("ultra-search-only", "Find every function call matching deprecatedApi without changing files.");
   const structural = measure("ultra-structural-edit", "Replace every call expression to legacyApi with modernApi across TypeScript source files.");
+  const resource = measure("ultra-resource-uri", "Inspect repo://root/fixture.txt without changing it.");
   const debugging = measure("ultra-debugging", "Find and fix the intermittent race condition under load in src/queue.ts.");
   const research = measure("ultra-research", "Research the latest online documentation and prior project decisions.");
   const browser = measure("ultra-browser", "Inspect the browser DOM for the frontend page.");
   const explicit = measure("explicit-cli-preserved", "Research the latest online documentation.", ["--tools", "read,safe_exec"]);
   const controlPlane = inspectCommands();
-  const measurements = [starting, simple, search, structural, debugging, research, browser, explicit];
+  const measurements = [starting, simple, search, structural, resource, debugging, research, browser, explicit];
   const required = {
     allPiRunsComplete: measurements.every((entry) => entry.status === "PASS"),
     simpleRequiredAccessible: ["read", "edit", "semantic_nav", "verification_gate"].every((name) => simple.toolNames.includes(name)),
@@ -100,6 +101,7 @@ try {
     simpleHighRiskHidden: ["write", "ast_grep_rewrite", "web_research", "safe_web_fetch", "agent_browser", "safe_exec", "mcp", "subagent", "safe_remove_file"].every((name) => !simple.toolNames.includes(name)),
     searchOnlyNonMutating: ["ffgrep", "fffind", "ast_grep_run"].every((name) => search.toolNames.includes(name)) && ["grep", "find", "ls", "ast_grep_scan", "edit", "write", "ast_grep_rewrite", "secure_coding_workflow"].every((name) => !search.toolNames.includes(name)),
     structuralRewriteSemantic: structural.toolNames.includes("ast_grep_rewrite") && !simple.toolNames.includes("ast_grep_rewrite"),
+    resourceUriConditional: resource.toolNames.includes("resource_fs") && !simple.toolNames.includes("resource_fs") && !search.toolNames.includes("resource_fs"),
     debuggingFocused: ["fffind", "ast_grep_run", "task_notebook", "secure_coding_workflow"].every((name) => debugging.toolNames.includes(name)) && !debugging.toolNames.includes("agent_browser"),
     researchFocused: ["task_notebook", "web_research", "safe_web_fetch"].every((name) => research.toolNames.includes(name)) && !research.toolNames.includes("agent_browser"),
     browserExplicitOnly: browser.toolNames.includes("agent_browser") && !simple.toolNames.includes("agent_browser") && !research.toolNames.includes("agent_browser"),

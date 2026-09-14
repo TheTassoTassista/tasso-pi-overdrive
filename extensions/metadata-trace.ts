@@ -148,6 +148,24 @@ export default function (pi: ExtensionAPI) {
       unavailableCapabilities: names("unavailableCapabilities"),
     });
   });
+  pi.events.on("pi-overdrive:resource-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "resource_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      scheme: scalar("scheme") as string | undefined,
+      operation: scalar("operation") as string | undefined,
+      trust: scalar("trust") as string | undefined,
+      immutable: scalar("immutable") as boolean | undefined,
+      contentChars: scalar("contentChars") as number | undefined,
+      contentBytes: scalar("contentBytes") as number | undefined,
+      truncated: scalar("truncated") as boolean | undefined,
+      uriDigest: scalar("uriDigest") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

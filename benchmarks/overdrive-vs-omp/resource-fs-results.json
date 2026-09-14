@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-14T14:51:54.640Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "rawRead": {
+      "id": "builtin-read",
+      "status": "PASS",
+      "elapsedMs": 392.073,
+      "tool": "read",
+      "requestChars": 45,
+      "outputChars": 5346,
+      "details": null,
+      "isError": false,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "resourceRead": {
+      "id": "resource-read",
+      "status": "PASS",
+      "elapsedMs": 267.249,
+      "tool": "resource_fs",
+      "requestChars": 84,
+      "outputChars": 5534,
+      "details": {
+        "kind": "resource_access",
+        "version": 1,
+        "scheme": "repo",
+        "operation": "READ",
+        "trust": "WORKSPACE_UNTRUSTED",
+        "immutable": true,
+        "contentChars": 5317,
+        "contentBytes": 5317,
+        "truncated": true,
+        "uriDigest": "5d9ae9d9b79f9a5496279bcf813b98525c493a7a5c0f12fd05bdc2a477e17f64"
+      },
+      "isError": false,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "deniedSecret": {
+      "id": "resource-secret-denied",
+      "status": "PASS",
+      "elapsedMs": 275.481,
+      "tool": "resource_fs",
+      "requestChars": 45,
+      "outputChars": 61,
+      "details": {},
+      "isError": true,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "command": {
+      "status": "PASS",
+      "source": "extension",
+      "exitCode": 0
+    },
+    "assertions": {
+      "allPiRunsComplete": true,
+      "builtinReadWorks": true,
+      "resourceReadWorks": true,
+      "explicitTrustMetadata": true,
+      "secretDenied": true,
+      "publicSurfaceReadOnly": true,
+      "commandRegistered": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 6,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "interpretation": "ResourceFS intentionally adds trust/digest metadata and strict policy checks; it is not expected to beat Pi's raw read tool on output size or latency.",
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  }
+}

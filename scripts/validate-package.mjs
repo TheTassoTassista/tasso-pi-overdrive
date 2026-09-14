@@ -31,6 +31,7 @@ if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.incl
 if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
 for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
@@ -40,6 +41,19 @@ try {
   taskGovernor.validateTaskPolicy(simplePolicy);
   if (simplePolicy.decisionModelCalls !== 0 || simplePolicy.needs.planner || simplePolicy.needs.secondBrain || simplePolicy.needs.council || simplePolicy.modelNeed.roles.length !== 1) failures.push('Task Governor simple-path invariant failed');
 } catch (error) { failures.push(`Task Governor validation failed: ${error.message}`); }
+try {
+  const resourceFs = await import(path.join(root, 'lib/resource-fs.mjs'));
+  const resources = resourceFs.createResourceFs([
+    resourceFs.createRepoResourceDefinition(),
+    resourceFs.createMemoryResourceDefinition(async () => ({ text: '' })),
+  ]);
+  const catalog = resources.describe();
+  if (JSON.stringify(catalog.map((entry) => entry.scheme)) !== JSON.stringify(['repo', 'memory'])) failures.push('ResourceFS must expose only the reviewed repo and memory schemes');
+  if (catalog.some((entry) => entry.immutable !== true || entry.capabilities.some((capability) => ['WRITE', 'MUTATE', 'EXECUTE'].includes(capability)))) failures.push('ResourceFS reviewed schemes must remain immutable and non-mutating');
+  resourceFs.parseResourceUri('repo://root/src/example.ts');
+} catch (error) { failures.push(`ResourceFS validation failed: ${error.message}`); }
+const resourcesExtension = await readFile(path.join(root, 'extensions/resources.ts'), 'utf8');
+if (!resourcesExtension.includes('Type.Literal("describe"), Type.Literal("read"), Type.Literal("search")') || !resourcesExtension.includes('registerCommand("resources"')) failures.push('ResourceFS public tool/command surface changed');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
