@@ -166,6 +166,32 @@ export default function (pi: ExtensionAPI) {
       uriDigest: scalar("uriDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:smart-read-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "smart_read_metadata",
+      kind: scalar("kind") as string | undefined,
+      access: scalar("access") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      selectedMode: scalar("selectedMode") as string | undefined,
+      parser: scalar("parser") as string | undefined,
+      lspStatus: scalar("lspStatus") as string | undefined,
+      language: scalar("language") as string | undefined,
+      sourceBytes: scalar("sourceBytes") as number | undefined,
+      totalLines: scalar("totalLines") as number | undefined,
+      sourceChars: scalar("sourceChars") as number | undefined,
+      outputChars: scalar("outputChars") as number | undefined,
+      reductionPercent: scalar("reductionPercent") as number | undefined,
+      declarationCount: scalar("declarationCount") as number | undefined,
+      importCount: scalar("importCount") as number | undefined,
+      truncated: scalar("truncated") as boolean | undefined,
+      uriDigest: scalar("uriDigest") as string | undefined,
+      contentDigest: scalar("contentDigest") as string | undefined,
+      taskPolicyDigest: scalar("taskPolicyDigest") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

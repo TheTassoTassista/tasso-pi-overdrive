@@ -44,9 +44,13 @@ Phase 3 adds a clean-room ResourceFS core with two deliberately narrow, immutabl
 
 ResourceFS currently exposes no `WRITE`, `MUTATE`, or `EXECUTE` operation. A future risky handler cannot register without a controller-owned authorization callback. One conditional `resource_fs` schema appears only for explicit supported URIs, while `/resources` reports the catalog without a model call. Explicit `memory://` access suppresses duplicate automatic memory injection. Tool output marks resource bodies as untrusted data, and traces contain only scheme/operation/status/size/trust plus a URI digest—never the URI, query, path, or body.
 
+Phase 4 adds deterministic SmartRead. A large supported source read through Pi's ordinary `read` tool is replaced before model context with file structure, imports/includes, declarations, signatures, exact ranges, reopen suggestions, and an omission marker. Small files remain verbatim. Explicit `auto`, `raw`, `smart`, and `range` modes are available through the conditional `smart_read` tool; raw and range modes are hard-bounded.
+
+SmartRead uses the Task Policy's preset/context budget and task text only for local ranking. ResourceFS owns canonical path enforcement, the pinned read-only LSP enriches document symbols when available, and deterministic multi-language parsing/line fallback keeps the feature fail-soft without a model call. Metadata traces contain only bounded counts, sizes, status, and digests. FFF remains the locator and `semantic_nav` remains the deeper definition/reference path; SmartRead does not duplicate either system.
+
 ## Planned subsystems
 
-The implementation order is deliberate: Task Governor and Tool Governor land before new large schemas. ResourceFS now provides typed, policy-checked repository and memory URIs. SmartRead selects bounded views. Artifact Store externalizes large outputs. Context Governor builds one provenance-bearing Task Context Pack. Edit Engine V2 and AST transactions operate through snapshots and LSP validation. DAP and eval are isolated, lazy runtimes. StreamGuard can correct an in-flight trajectory without duplicate injections. Sentinel is read-only and policy-gated. Agent Hub consumes metadata and authoritative receipts. Director Mode is an explicit state machine, never an approval bypass.
+The implementation order is deliberate: Task Governor and Tool Governor landed before new large schemas. ResourceFS provides typed, policy-checked repository and memory URIs, and SmartRead now selects bounded source views. Artifact Store externalizes large outputs next. Context Governor builds one provenance-bearing Task Context Pack. Edit Engine V2 and AST transactions operate through snapshots and LSP validation. DAP and eval are isolated, lazy runtimes. StreamGuard can correct an in-flight trajectory without duplicate injections. Sentinel is read-only and policy-gated. Agent Hub consumes metadata and authoritative receipts. Director Mode is an explicit state machine, never an approval bypass.
 
 Git/GitHub resources, commit planning, imported rule formats, ACP, browser expansion, computer use, collaboration and native fast paths follow only after their security and overhead are measured. Computer use and collaboration may be intentionally deferred when the safe design is not better than omission. Native code is justified only by profiling.
 
@@ -54,4 +58,4 @@ Git/GitHub resources, commit planning, imported rule formats, ACP, browser expan
 
 Every phase has a focused test, local benchmark when relevant, local commit, and an entry in `docs/overdrive-ultra-progress.md`. Cross-product claims are scoped to the category actually measured. A missing OMP runtime or missing comparable metric is `NOT RUN`, not a win.
 
-No OMP source has been copied through Phase 3. Any later reuse must retain MIT attribution and be listed with its source path and commit; clean-room implementation remains preferred.
+No OMP source has been copied through Phase 4. Any later reuse must retain MIT attribution and be listed with its source path and commit; clean-room implementation remains preferred.

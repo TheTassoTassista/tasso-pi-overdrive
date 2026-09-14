@@ -52,6 +52,15 @@ test("ResourceFS activates only for an explicit supported URI", () => {
   assert.equal(memory.toolNeed.capabilities.includes("memory"), false);
 });
 
+test("SmartRead is selected for source inspection but omitted for a direct small edit", () => {
+  const inspection = resolveTaskPolicy({ task: "Inspect src/router.ts and explain the implementation." });
+  assert.equal(inspection.needs.smartRead, true);
+  assert.ok(inspection.toolNeed.capabilities.includes("smart-read"));
+  const direct = resolveTaskPolicy({ task: "Change one string value." });
+  assert.equal(direct.needs.smartRead, false);
+  assert.equal(direct.toolNeed.capabilities.includes("smart-read"), false);
+});
+
 test("default Task Policy preserves Token Governor routing exactly", () => {
   const input = { task: "Refactor the concurrent recovery state machine and integration tests.", preset: "token-saver", quality: "high", includeSecurity: true };
   const policy = resolveTaskPolicy(input);

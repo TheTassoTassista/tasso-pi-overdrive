@@ -32,6 +32,7 @@ if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
 for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
@@ -54,6 +55,14 @@ try {
 } catch (error) { failures.push(`ResourceFS validation failed: ${error.message}`); }
 const resourcesExtension = await readFile(path.join(root, 'extensions/resources.ts'), 'utf8');
 if (!resourcesExtension.includes('Type.Literal("describe"), Type.Literal("read"), Type.Literal("search")') || !resourcesExtension.includes('registerCommand("resources"')) failures.push('ResourceFS public tool/command surface changed');
+try {
+  const smartRead = await import(path.join(root, 'lib/smart-read.mjs'));
+  const fixture = path.join(root, 'lib/task-governor.mjs');
+  const result = await smartRead.smartReadRepo({ cwd: root, source: path.relative(root, fixture), mode: 'smart', targetChars: 3000 });
+  if (result.kind !== 'SMART_READ_RESULT' || result.selectedMode !== 'smart' || result.outputChars > 3000 || !result.content.includes('source lines omitted from structural view')) failures.push('SmartRead bounded structural-view invariant failed');
+} catch (error) { failures.push(`SmartRead validation failed: ${error.message}`); }
+const smartReadExtension = await readFile(path.join(root, 'extensions/smart-read.ts'), 'utf8');
+for (const marker of ['Type.Literal("auto")', 'Type.Literal("raw")', 'Type.Literal("smart")', 'Type.Literal("range")', 'registerCommand("smart-read"', 'pi.on("tool_result"']) if (!smartReadExtension.includes(marker)) failures.push(`SmartRead public integration marker is missing: ${marker}`);
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');

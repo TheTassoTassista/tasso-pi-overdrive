@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-14T14:52:08.190Z",
+  "recordedAt": "2026-09-14T15:15:49.870Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-deterministic-local-provider",
   "piVersion": "0.85.1",
   "startingOverdrive": {
     "id": "starting-overdrive-core",
     "status": "PASS",
-    "elapsedMs": 340.034,
+    "elapsedMs": 391.893,
     "toolCount": 7,
     "toolNames": [
       "read",
@@ -29,7 +29,7 @@
       {
         "id": "ultra-simple-edit",
         "status": "PASS",
-        "elapsedMs": 256.092,
+        "elapsedMs": 288.722,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -46,18 +46,19 @@
       {
         "id": "ultra-search-only",
         "status": "PASS",
-        "elapsedMs": 267.998,
-        "toolCount": 6,
+        "elapsedMs": 326.842,
+        "toolCount": 7,
         "toolNames": [
           "read",
           "ffgrep",
           "fffind",
           "ast_grep_run",
+          "smart_read",
           "semantic_nav",
           "task_notebook"
         ],
-        "toolSchemaCharacters": 3012,
-        "estimatedToolSchemaTokens": 753,
+        "toolSchemaCharacters": 3481,
+        "estimatedToolSchemaTokens": 871,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -65,19 +66,20 @@
       {
         "id": "ultra-structural-edit",
         "status": "PASS",
-        "elapsedMs": 257.463,
-        "toolCount": 7,
+        "elapsedMs": 318.469,
+        "toolCount": 8,
         "toolNames": [
           "read",
           "edit",
           "write",
           "ast_grep_rewrite",
+          "smart_read",
           "semantic_nav",
           "task_notebook",
           "verification_gate"
         ],
-        "toolSchemaCharacters": 4180,
-        "estimatedToolSchemaTokens": 1045,
+        "toolSchemaCharacters": 4649,
+        "estimatedToolSchemaTokens": 1163,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -85,7 +87,7 @@
       {
         "id": "ultra-resource-uri",
         "status": "PASS",
-        "elapsedMs": 268.53,
+        "elapsedMs": 400.908,
         "toolCount": 3,
         "toolNames": [
           "read",
@@ -101,8 +103,8 @@
       {
         "id": "ultra-debugging",
         "status": "PASS",
-        "elapsedMs": 265.176,
-        "toolCount": 10,
+        "elapsedMs": 318.383,
+        "toolCount": 11,
         "toolNames": [
           "read",
           "ffgrep",
@@ -110,13 +112,14 @@
           "ast_grep_run",
           "edit",
           "write",
+          "smart_read",
           "semantic_nav",
           "task_notebook",
           "verification_gate",
           "secure_coding_workflow"
         ],
-        "toolSchemaCharacters": 5587,
-        "estimatedToolSchemaTokens": 1397,
+        "toolSchemaCharacters": 6056,
+        "estimatedToolSchemaTokens": 1514,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -124,7 +127,7 @@
       {
         "id": "ultra-research",
         "status": "PASS",
-        "elapsedMs": 265.162,
+        "elapsedMs": 344.097,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -141,7 +144,7 @@
       {
         "id": "ultra-browser",
         "status": "PASS",
-        "elapsedMs": 269.336,
+        "elapsedMs": 345.242,
         "toolCount": 2,
         "toolNames": [
           "read",
@@ -156,7 +159,7 @@
       {
         "id": "explicit-cli-preserved",
         "status": "PASS",
-        "elapsedMs": 254.422,
+        "elapsedMs": 286.823,
         "toolCount": 2,
         "toolNames": [
           "read",

@@ -15,7 +15,7 @@ const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
   "edit", "write", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
   "verification_gate", "secure_coding_workflow", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
-  "resource_fs", "bash", "subagent", "safe_remove_file", "third_party_unknown",
+  "resource_fs", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
 
 function policyFor(task, availableTools = available) {
@@ -50,6 +50,11 @@ test("ResourceFS schema is conditional on a supported URI", () => {
   const explicit = policyFor("Inspect repo://root/src/parser.ts without changing it.");
   assert.ok(explicit.toolPolicy.activeTools.includes("resource_fs"));
   assert.equal(policyFor("Inspect src/parser.ts without changing it.").toolPolicy.activeTools.includes("resource_fs"), false);
+});
+
+test("SmartRead schema follows source-inspection policy without affecting direct edits", () => {
+  assert.ok(policyFor("Inspect src/router.ts and explain the implementation.").toolPolicy.activeTools.includes("smart_read"));
+  assert.equal(policyFor("Change one string value.").toolPolicy.activeTools.includes("smart_read"), false);
 });
 
 test("search-only tasks do not expose mutation tools", () => {

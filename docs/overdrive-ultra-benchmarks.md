@@ -52,16 +52,16 @@ The local smoke initially failed only because its expected documentation-directo
 
 ## Phase 2 Tool Governor
 
-`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The current Phase 3 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The current Phase 4 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
 
 | Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
 |---|---:|---:|---:|---|
 | Starting Overdrive core | 7 | 4,171 | 1,043 | Control |
 | Ultra simple string edit | 4 | 2,799 | 700 | read/edit/LSP/verification; no write/AST/web/browser/controller |
-| Ultra search-only | 6 | 3,012 | 753 | FFF + AST search; no mutation |
-| Ultra structural edit | 7 | 4,180 | 1,045 | semantic `structural-edit` activates AST rewrite |
+| Ultra search-only | 7 | 3,481 | 871 | FFF + AST search + SmartRead; no mutation |
+| Ultra structural edit | 8 | 4,649 | 1,163 | semantic `structural-edit` activates AST rewrite; SmartRead inspects source |
 | Ultra explicit resource URI | 3 | 1,620 | 405 | read + ResourceFS + memory notebook; ResourceFS absent otherwise |
-| Ultra debugging | 10 | 5,587 | 1,397 | focused search/edit/LSP/memory/verify/workflow |
+| Ultra debugging | 11 | 6,056 | 1,514 | focused search/edit/SmartRead/LSP/memory/verify/workflow |
 | Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
 | Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
 | Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
@@ -80,3 +80,16 @@ The simple-edit fixture reduces serialized schema size by 32.9% relative to the 
 | `/resources` command registration | PASS | — | — | Source is the actual extension |
 
 The timings are one local run and not a performance superiority claim. ResourceFS deliberately adds 188 output characters in this fixture for a trust boundary, truncation state, and digest. Its purpose is policy and provenance, not replacing the built-in read tool for ordinary paths. OMP remains `NOT_RUN`; Bun is absent and no synthetic comparison is reported.
+
+## Phase 4 SmartRead
+
+`npm run benchmark:ultra:smart-read` launches official Pi 0.85.1 with the actual SmartRead extension and deterministic local single-tool provider. The fixture is a 35,090-character, 1,206-line TypeScript source whose task-relevant declaration is deliberately last, at lines 1203–1206. Three tool calls use six deterministic local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Elapsed | Model-facing output | Evidence |
+|---|---:|---:|---:|---|
+| Built-in raw `read` control | PASS | 281.309 ms | 35,090 chars | Exact complete source control |
+| Built-in `read` with automatic SmartRead | PASS | 1,195.316 ms | 5,701 chars | LSP + deterministic parser; focused late symbol retained; implementation body omitted |
+| Explicit SmartRead exact range | PASS | 425.292 ms | 259 chars | Exact numbered lines 1203–1206 plus omission markers |
+| `/smart-read` command registration | PASS | — | — | Source is the actual extension |
+
+The automatic result saves 29,389 characters (83.75%). Using the declared four-character approximation, the comparison is 8,773 versus 1,426 tokens. The cold structural read is slower because it starts a sandboxed LSP; this benchmark demonstrates context reduction and exact code-location recovery, not a latency win. OMP remains `NOT_RUN` because its required Bun runtime is unavailable.

@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-14T15:15:29.727Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "fixture": {
+    "language": "typescript",
+    "sourceChars": 35090,
+    "sourceLines": 1206,
+    "targetSymbol": "targetHandler",
+    "targetRange": {
+      "start": 1203,
+      "end": 1206
+    }
+  },
+  "overdriveUltra": {
+    "rawRead": {
+      "id": "raw-builtin-read",
+      "status": "PASS",
+      "elapsedMs": 281.309,
+      "tool": "read",
+      "requestChars": 20,
+      "outputChars": 35090,
+      "outputDigest": "d36b3528385e025a9a6cffc6dcee74d413c0089713457014e6bfaf13747d7342",
+      "details": null,
+      "isError": false,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "automaticSmartRead": {
+      "id": "automatic-smart-read",
+      "status": "PASS",
+      "elapsedMs": 1195.316,
+      "tool": "read",
+      "requestChars": 20,
+      "outputChars": 5701,
+      "outputDigest": "71f6c26d9b37dcd56bf21d73edd3ca6eaf9cd32c60a06a06119f9d2b27b12958",
+      "details": {
+        "kind": "smart_read",
+        "version": 1,
+        "selectedMode": "smart",
+        "parser": "lsp+deterministic-parser",
+        "lspStatus": "PASS",
+        "language": "typescript",
+        "sourceBytes": 35090,
+        "totalLines": 1206,
+        "sourceChars": 35090,
+        "outputChars": 5663,
+        "reductionPercent": 83.86,
+        "declarationCount": 241,
+        "importCount": 2,
+        "truncated": true,
+        "uriDigest": "461d4ecc8d75a07c0fa3290b429d12eff4f37537fe6615cd8c4f32766a06d01a",
+        "contentDigest": "d36b3528385e025a9a6cffc6dcee74d413c0089713457014e6bfaf13747d7342",
+        "immutable": true,
+        "trust": "WORKSPACE_UNTRUSTED"
+      },
+      "isError": false,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "exactRange": {
+      "id": "exact-range",
+      "status": "PASS",
+      "elapsedMs": 425.292,
+      "tool": "smart_read",
+      "requestChars": 70,
+      "outputChars": 259,
+      "outputDigest": "927374fce304f19bc2afbd69e7e579b2f49973f1e5d4eee380095115f853de6b",
+      "details": {
+        "kind": "smart_read",
+        "version": 1,
+        "selectedMode": "range",
+        "parser": "raw",
+        "lspStatus": "SKIPPED",
+        "language": "typescript",
+        "sourceBytes": 35090,
+        "totalLines": 1206,
+        "sourceChars": 35090,
+        "outputChars": 221,
+        "reductionPercent": 99.37,
+        "declarationCount": 0,
+        "importCount": 0,
+        "truncated": true,
+        "uriDigest": "461d4ecc8d75a07c0fa3290b429d12eff4f37537fe6615cd8c4f32766a06d01a",
+        "contentDigest": "d36b3528385e025a9a6cffc6dcee74d413c0089713457014e6bfaf13747d7342",
+        "immutable": true,
+        "trust": "WORKSPACE_UNTRUSTED"
+      },
+      "isError": false,
+      "providerTurns": 2,
+      "exitCode": 0,
+      "stderr": ""
+    },
+    "command": {
+      "status": "PASS",
+      "source": "extension",
+      "exitCode": 0
+    },
+    "comparison": {
+      "rawSourceChars": 35090,
+      "smartOutputChars": 5701,
+      "estimatedRawTokens": 8773,
+      "estimatedSmartTokens": 1426,
+      "savedChars": 29389,
+      "savedPercent": 83.75
+    },
+    "assertions": {
+      "allPiRunsComplete": true,
+      "builtinRawReadWorks": true,
+      "automaticHookSelectedSmart": true,
+      "deterministicOrLspParserUsed": true,
+      "lspEnrichmentWorks": true,
+      "correctLateSymbolPreserved": true,
+      "rawImplementationOmitted": true,
+      "exactRangeRecoveryWorks": true,
+      "contextReduced": true,
+      "commandRegistered": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 6,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  }
+}
