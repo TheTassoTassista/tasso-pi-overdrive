@@ -6,7 +6,7 @@
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
 - Current phase: 2 — Tool Governor
-- Last completed phase commit: `f4ce1c8` — `docs(ultra): establish OMP audit and baseline`
+- Last completed phase commit: `9da4b39` — `feat(ultra): add deterministic task governor`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -38,7 +38,7 @@
 
 ## Dirty files
 
-- Phase 1 implementation, tests, benchmark result, documentation, and this ledger are expected before the phase-boundary commit.
+- Only this phase-boundary ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
