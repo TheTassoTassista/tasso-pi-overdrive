@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 3 — ResourceFS
-- Last completed phase commit: `4dfa752` — `feat(ultra): add semantic tool governor`
+- Current phase: 4 — SmartRead
+- Last completed phase commit: `c5214cd` — `feat(ultra): add policy-checked resource fs`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -26,6 +26,10 @@
 - Added four enforced visibility tiers, FFF-first search fallback selection, semantic structural-edit gating, fail-closed unknown tools, explicit CLI precedence, and session-local `/tools` discovery/manual control.
 - Made top-level Second Brain runtime construction truly lazy and skipped retrieval for Task-Policy-sufficient direct edits.
 - Added metadata-only Tool Policy tracing without prompt, schema, file-content, provider-output, or secret fields.
+- Implemented a clean-room ResourceFS with strict canonical URIs and only immutable `repo://root` and `memory://root` handlers.
+- Bound repository traversal to held `O_NOFOLLOW` descriptors with inode revalidation; denied secrets, `.git`, `node_modules`, symlinks, hard links, binaries, oversize reads, and risky capabilities.
+- Routed memory resources through the existing Second Brain controller and suppressed duplicate automatic retrieval for explicit `memory://` tasks.
+- Added the conditional `resource_fs` schema, zero-model `/resources` catalog, sanitized tool errors, metadata-only tracing, package guards, and real-Pi benchmarks.
 
 ## Current validation
 
@@ -42,6 +46,10 @@
 - Phase 2 focused tests: 12 Task Governor + 11 Tool Governor + 2 tool-surface tests PASS; semantic AST positive/negative controls and search-only non-mutation PASS.
 - Phase 2 real-Pi benchmark: PASS on Pi 0.85.1; starting core 7 tools/4,171 schema chars, simple edit 4/2,799, search-only 6/3,012, structural edit 7/4,180, web research 4/2,104, browser 2/1,148; `/tools` registered; eight deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 2 full `npm run check`: 239/239 PASS plus syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime for ignored Rust/Go binaries.
+- Phase 3 focused/adversarial tests: strict URI parsing, scheme/capability/authorization denial, repository bounds, symlink/hard-link/secret/binary/oversize defenses, literal search, memory routing, result caps, and metadata non-disclosure PASS.
+- Phase 3 ResourceFS real-Pi benchmark: PASS on Pi 0.85.1; built-in read control PASS, ResourceFS read PASS with trust/digest metadata, `.env` denial recorded as a true tool error, `/resources` registered; six deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 3 Tool Governor rerun: PASS; explicit resource URI 3 tools/1,620 schema chars/~405 tokens and ResourceFS absent for ordinary prompts; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 3 full `npm run check`: 248/248 PASS plus syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -56,8 +64,9 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Debug, eval, Sentinel, ResourceFS, SmartRead, and Artifact Store capabilities remain honestly unavailable until their respective phases land.
+- Debug, eval, Sentinel, SmartRead, and Artifact Store capabilities remain honestly unavailable until their respective phases land.
+- ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory resources; additional schemes remain deferred to their owning phases.
 
 ## Exact next action
 
-Inspect the current read/MCP/web/memory adapters and OMP's pinned internal resource URL/filesystem resource design. Define the smallest policy-checked `resource://`/typed-resource core that can later back SmartRead, memory, artifacts, Git/GitHub and debug data without adding a permanent broad parser schema.
+Inspect current read/search/LSP/resource behavior and OMP's pinned read selector, summaries, archive/database/document handlers, and truncation tests. Define the smallest fail-soft SmartRead layer that reduces rereads and context without turning ResourceFS into a broad permanent parser surface.
