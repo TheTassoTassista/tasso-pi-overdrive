@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 5 — Artifact Store
-- Last completed phase commit: `e4894c7` — `feat(ultra): add deterministic smart read`
+- Current phase: 6 — Context Governor
+- Last completed phase commit: `d07a118` — `feat(ultra): add content-addressed artifact store`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -33,6 +33,11 @@
 - Implemented deterministic SmartRead with `auto`, bounded `raw`, structural `smart`, and exact numbered `range` modes.
 - Intercepted large built-in source reads before model context, reused descriptor-bound ResourceFS path security, enriched symbols through the pinned read-only LSP, and retained deterministic multi-language/line fallbacks.
 - Added task/context-budget selection, late-symbol focus ranking, conditional Tool Governor visibility, zero-model `/smart-read` counters, metadata-only traces, package guards, regressions, and a real-Pi context-reduction benchmark.
+- Implemented one clean-room content-addressed Artifact Store for large UTF-8 tool output with deterministic previews, strict manifests, bounded provenance, session/workspace scope, task digests, deduplication, quotas, and fail-soft inline degradation.
+- Added `artifact://<sha256>` as an immutable ResourceFS handler with bounded numbered ranges and literal search, while preventing recursive artifact reopening and allowing large repository/memory resource results to externalize.
+- Enforced owner-only directories/files, atomic durable writes, `O_NOFOLLOW`, owner/link/mode/inode checks, content-hash verification, complete private-key and credential redaction, terminal-control sanitization, and pre-redaction quota enforcement.
+- Added separate bounded artifact expiry/orphan retention, `/artifacts` metadata-only inspection, metadata-only tracing, package guards, adversarial regressions, and a real-Pi success/error/deduplication benchmark.
+- Repaired the interrupted benchmark so plain Node owns its deterministic generator while Pi loads the virtual-runtime fixture, and added the provider fixture to syntax validation so duplicate declarations fail the normal gate.
 
 ## Current validation
 
@@ -57,6 +62,10 @@
 - Phase 4 SmartRead real-Pi benchmark: PASS on Pi 0.85.1; automatic built-in read interception, real sandboxed LSP enrichment, late symbol at lines 1203–1206 retained, exact range recovery, and `/smart-read` registration; 35,090 raw source chars to 5,701 model-facing chars (83.75% reduction), six deterministic local provider turns, zero network/external-provider/paid calls, cost zero.
 - Phase 4 Tool Governor rerun: PASS; simple edit remains 4 tools/2,799 schema chars, source/search/structural/debug tasks receive conditional SmartRead, explicit CLI remains authoritative; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 4 full `npm run check`: 260/260 PASS plus syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 5 focused Artifact Store tests: 12/12 PASS; content addressing, concurrent dedupe/provenance, session isolation, strict artifact URIs, exact ranges/search, credential/private-key/control sanitization, critical diagnostics, quotas, manifest tamper, symlink/hard-link denial, and paired/orphan retention.
+- Phase 5 Artifact Store real-Pi benchmark: PASS on Pi 0.85.1; 46,070 raw tool-result characters to a 5,352-character preview (88.38% reduction), exact lines 419–421 reopened, true tool-error `isError` preserved, critical `ERROR` retained, duplicate payload deduplicated to one private object, and `/artifacts` plus `/resources` registered; four deterministic local provider turns, zero network/external-provider/paid calls, cost zero, temporary cleanup PASS.
+- Phase 5 ResourceFS and Tool Governor real-Pi regressions: PASS; ResourceFS read/secret denial and conditional schema surfaces remain intact, explicit CLI remains authoritative, and the simple edit remains four tools/2,799 schema characters.
+- Phase 5 full `npm run check`: 272/272 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The expected unconfigured worktree run was 270/272 solely because ignored Rust/Go managed binaries are absent; no installation or source change was made.
 
 ## Dirty files
 
@@ -71,10 +80,11 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Debug, eval, Sentinel, and Artifact Store capabilities remain honestly unavailable until their respective phases land.
-- ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory resources; additional schemes remain deferred to their owning phases.
+- Debug, eval, and Sentinel capabilities remain honestly unavailable until their respective phases land.
+- ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
+- Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 
 ## Exact next action
 
-Inspect current output compression, trace retention, workflow/session identity, and OMP's pinned artifact/blob stores. Define one private content-addressed, task/session-scoped `artifact://` store with deterministic previews, bounded range/search reopening, deduplication, quotas, redaction policy, and fail-soft inline fallback without conflating artifacts with metadata traces.
+Inspect Pi's pre-provider context assembly, compaction hooks, model context metadata, existing Token/Task Governor budgets, SmartRead, Shared Memory Pack, tool schemas, artifact previews, and OMP's pinned compaction/context-note paths. Define one deterministic Context Fit Gate that accounts for current conversation, reserved output, active schemas, memory, artifacts, and target-model usable context before a request; reduce in the mandated order and fail closed or use only an already-policy-compatible route when fit cannot be proven.
