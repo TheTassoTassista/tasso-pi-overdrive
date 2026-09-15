@@ -219,6 +219,37 @@ export default function (pi: ExtensionAPI) {
       capped: scalar("capped") as boolean | undefined,
     });
   });
+  pi.events.on("pi-overdrive:context-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    const reductions = Array.isArray(data.reductions) ? (data.reductions as Array<Record<string, unknown>>).slice(0, 5) : [];
+    const reductionStages = reductions.map((entry) => typeof entry.name === "string" ? entry.name : "unknown");
+    const reductionSavedTokens = reductions.reduce((total, entry) => total + (Number.isSafeInteger(entry.savedTokens) && Number(entry.savedTokens) >= 0 ? Number(entry.savedTokens) : 0), 0);
+    const reductionChangedMessages = reductions.reduce((total, entry) => total + (Number.isSafeInteger(entry.changedMessages) && Number(entry.changedMessages) >= 0 ? Number(entry.changedMessages) : 0), 0);
+    await record({
+      event: "context_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      reason: scalar("reason") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      provider: scalar("provider") as string | undefined,
+      model: scalar("model") as string | undefined,
+      contextWindow: scalar("contextWindow") as number | undefined,
+      reserveOutputTokens: scalar("reserveOutputTokens") as number | undefined,
+      safetyTokens: scalar("safetyTokens") as number | undefined,
+      usableInputTokens: scalar("usableInputTokens") as number | undefined,
+      initialInputTokens: scalar("initialInputTokens") as number | undefined,
+      finalInputTokens: scalar("finalInputTokens") as number | undefined,
+      messageCount: scalar("messageCount") as number | undefined,
+      toolCount: scalar("toolCount") as number | undefined,
+      reductionStages,
+      reductionSavedTokens,
+      reductionChangedMessages,
+      requiresConversationCompaction: scalar("requiresConversationCompaction") as boolean | undefined,
+      routeSwitchPermitted: scalar("routeSwitchPermitted") as boolean | undefined,
+      proofDigest: scalar("proofDigest") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

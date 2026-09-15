@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -34,6 +34,7 @@ if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('
 if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
+if (pkg.pi.extensions.at(-1) !== './extensions/context-governor.ts') failures.push('Context Governor must be the final extension so it sees the complete model payload');
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
 for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
@@ -73,6 +74,18 @@ const artifactExtension = await readFile(path.join(root, 'extensions/artifacts.t
 if (!artifactExtension.includes('registerCommand("artifacts"') || !artifactExtension.includes('pi.on("tool_result"')) failures.push('Artifact Store hook/command integration is missing');
 const artifactPolicy = JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8'));
 if (artifactPolicy.redactSecrets !== true || artifactPolicy.trust !== 'TOOL_OUTPUT_UNTRUSTED' || artifactPolicy.inlineThresholdBytes > artifactPolicy.maxArtifactBytes || artifactPolicy.maxArtifactBytes > artifactPolicy.maxScopeBytes) failures.push('Artifact Store security/quota policy is invalid');
+try {
+  const contextGovernor = await import(path.join(root, 'lib/context-governor.mjs'));
+  const policy = contextGovernor.validateContextGovernorPolicy(JSON.parse(await readFile(path.join(root, 'config/context-governor.json'), 'utf8')));
+  if (policy.safetyTokens !== 4096 || policy.smartReadTargetChars > policy.toolResultMaxChars || policy.artifactDuplicateMaxChars >= policy.smartReadTargetChars) failures.push('Context Governor safety or reduction-order policy changed');
+  if (JSON.stringify(contextGovernor.CONTEXT_REDUCTION_ORDER) !== JSON.stringify(['redundant-artifacts', 'tool-output', 'smart-read-envelope', 'second-brain', 'conversation'])) failures.push('Context Governor reduction order changed');
+} catch (error) { failures.push(`Context Governor validation failed: ${error.message}`); }
+const contextGovernorExtension = await readFile(path.join(root, 'extensions/context-governor.ts'), 'utf8');
+for (const marker of ['pi.on("context"', 'pi.on("before_provider_request"', 'ctx.abort()', 'registerCommand("context-fit"']) if (!contextGovernorExtension.includes(marker)) failures.push(`Context Governor fail-closed integration marker is missing: ${marker}`);
+const handoffExtension = await readFile(path.join(root, 'extensions/handoff.ts'), 'utf8');
+if (!handoffExtension.includes('governContext({') || handoffExtension.indexOf('governContext({') > handoffExtension.indexOf('ctx.modelRegistry.complete(')) failures.push('/handoff direct provider path is not gated before model completion');
+const metadataTraceExtension = await readFile(path.join(root, 'extensions/metadata-trace.ts'), 'utf8');
+if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.push('Context Governor metadata-only tracing listener is missing');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
@@ -151,6 +164,7 @@ const expectedAgents = ['scout', 'planner', 'oracle', 'worker', 'tester', 'corre
 for (const name of expectedAgents) {
   const text = await readFile(path.join(root, 'agents', `${name}.md`), 'utf8').catch(() => '');
   if (!text) failures.push(`missing agent ${name}`);
+  if (!text.includes('../extensions/context-governor.ts')) failures.push(`${name} does not load the Context Fit Gate in its fresh subagent process`);
   if (name === 'tester' && /^tools:.*\b(?:bash|safe_exec|edit|write)\b/mu.test(text)) failures.push('Tester has mutation or general command capability');
   if (name === 'worker' && /^tools:.*\bbash\b/mu.test(text)) failures.push('Worker has free-shell capability');
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);

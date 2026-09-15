@@ -27,6 +27,8 @@ apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
 
 Artifact retention is intentionally separate. Pi runs a bounded expiry/orphan pass at session startup. Preview it with `npm run artifacts:retention`; apply only after reviewing the summary with `node scripts/artifact-retention.mjs --apply`. `/artifacts` shows current-session manifest metadata and counters without a model call. Reopen a reported `artifact://<sha256>` through `resource_fs` using a bounded line range or literal search; artifact IDs never map to arbitrary paths and do not cross session/workspace scope.
 
+The Context Governor runs automatically as the final extension before every normal provider request and inside each fresh subagent. Use `/context-fit` for a zero-model-call report of the active provider/model window, reserved output/safety budget, component estimates, and applied reductions. A BLOCKED report means the latest request was not sent; compact or hand off the session, or explicitly choose a route already allowed by policy with a large enough context window. The governor never changes routing automatically. `/handoff` performs the same fit check before its direct distillation request.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

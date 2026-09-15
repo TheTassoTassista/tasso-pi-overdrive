@@ -2,7 +2,7 @@
 name: security-reviewer
 description: Adversarial read-only security review of changed trust boundaries and data flows.
 tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, semantic_nav, web_search, web_fetch
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/@juicesharp/rpiv-web-tools/index.ts, ../extensions/lsp.ts
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/@juicesharp/rpiv-web-tools/index.ts, ../extensions/lsp.ts, ../extensions/context-governor.ts
 defaultContext: fresh
 acceptanceRole: read-only
 inheritGlobalContext: false

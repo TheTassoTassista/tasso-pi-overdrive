@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-15T14:01:53.357Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "fit": {
+      "status": "COMPLETE",
+      "elapsedMs": 380.148,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerInvocations": [
+        {
+          "kind": "provider_stream_entered",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "messageCount": 1,
+          "signalAborted": false
+        },
+        {
+          "kind": "provider_stream_entered",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "messageCount": 3,
+          "signalAborted": false
+        },
+        {
+          "kind": "provider_stream_entered",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "messageCount": 5,
+          "signalAborted": false
+        }
+      ],
+      "fitDecisions": [
+        {
+          "kind": "context_fit",
+          "status": "PASS",
+          "reason": "CONTEXT_FITS_TARGET",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "initialInputTokens": 544,
+          "finalInputTokens": 544,
+          "usableInputTokens": 2480,
+          "reductions": [],
+          "proofDigest": "e9108d0e1a440edbf67699b4556e493493a4758eab12493f2092f51a11cb94ac"
+        },
+        {
+          "kind": "context_fit_provider_attestation",
+          "status": "PASS",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "proofDigest": "e9108d0e1a440edbf67699b4556e493493a4758eab12493f2092f51a11cb94ac"
+        },
+        {
+          "kind": "context_fit",
+          "status": "PASS",
+          "reason": "CONTEXT_FITS_TARGET",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "initialInputTokens": 1906,
+          "finalInputTokens": 1906,
+          "usableInputTokens": 2480,
+          "reductions": [],
+          "proofDigest": "18174300d2b2e6d7a3a5184a87b737196745813c2a1d2f448a2b21b4b8515f91"
+        },
+        {
+          "kind": "context_fit_provider_attestation",
+          "status": "PASS",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "proofDigest": "18174300d2b2e6d7a3a5184a87b737196745813c2a1d2f448a2b21b4b8515f91"
+        },
+        {
+          "kind": "context_fit",
+          "status": "PASS",
+          "reason": "CONTEXT_FITS_TARGET",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "initialInputTokens": 3268,
+          "finalInputTokens": 2183,
+          "usableInputTokens": 2480,
+          "reductions": [
+            {
+              "name": "redundant-artifacts",
+              "changedMessages": 1,
+              "beforeInputTokens": 3268,
+              "afterInputTokens": 2183,
+              "savedTokens": 1085,
+              "fitAfter": "PASS"
+            }
+          ],
+          "proofDigest": "71a4d688a8c0967826f9b92ee0a4120356d9b5612bb07b01c098d91232e6e651"
+        },
+        {
+          "kind": "context_fit_provider_attestation",
+          "status": "PASS",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "fit-driver",
+          "proofDigest": "71a4d688a8c0967826f9b92ee0a4120356d9b5612bb07b01c098d91232e6e651"
+        }
+      ],
+      "finalPayload": {
+        "messageCount": 5,
+        "toolResults": 2,
+        "contextCharacters": 8191,
+        "artifactReferences": 5,
+        "redundantMarkers": 1,
+        "criticalDiagnostics": 2
+      },
+      "eventTypes": [
+        "message_start",
+        "message_update",
+        "message_update",
+        "message_update",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_end",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "turn_start",
+        "extension_ui_request",
+        "message_start",
+        "message_update",
+        "message_update",
+        "message_update",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "blocked": {
+      "status": "COMPLETE",
+      "elapsedMs": 249.345,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerInvocations": [],
+      "fitDecisions": [
+        {
+          "kind": "context_fit",
+          "status": "BLOCKED",
+          "reason": "CONTEXT_CANNOT_FIT_WITH_SAFE_LOCAL_REDUCTIONS",
+          "provider": "pi-overdrive-context-fit-audit",
+          "model": "blocked-driver",
+          "initialInputTokens": 39216,
+          "finalInputTokens": 39216,
+          "usableInputTokens": 1880,
+          "reductions": [
+            {
+              "name": "redundant-artifacts",
+              "changedMessages": 0,
+              "beforeInputTokens": 39216,
+              "afterInputTokens": 39216,
+              "savedTokens": 0,
+              "fitAfter": "BLOCKED"
+            },
+            {
+              "name": "tool-output",
+              "changedMessages": 0,
+              "beforeInputTokens": 39216,
+              "afterInputTokens": 39216,
+              "savedTokens": 0,
+              "fitAfter": "BLOCKED"
+            },
+            {
+              "name": "smart-read-envelope",
+              "changedMessages": 0,
+              "beforeInputTokens": 39216,
+              "afterInputTokens": 39216,
+              "savedTokens": 0,
+              "fitAfter": "BLOCKED"
+            },
+            {
+              "name": "second-brain",
+              "changedMessages": 0,
+              "beforeInputTokens": 39216,
+              "afterInputTokens": 39216,
+              "savedTokens": 0,
+              "fitAfter": "BLOCKED"
+            },
+            {
+              "name": "conversation",
+              "changedMessages": 0,
+              "beforeInputTokens": 39216,
+              "afterInputTokens": 39216,
+              "savedTokens": 0,
+              "fitAfter": "BLOCKED"
+            }
+          ],
+          "proofDigest": "02807b6f00a1f430da0344945918740166620a20c3eeeb7596b932ffdf02d5da"
+        }
+      ],
+      "finalPayload": null,
+      "eventTypes": [
+        "response",
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "extension_ui_request",
+        "extension_ui_request",
+        "message_start",
+        "message_end",
+        "turn_end",
+        "agent_end",
+        "agent_settled"
+      ],
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "command": {
+      "status": "PASS",
+      "command": {
+        "name": "context-fit",
+        "source": "extension"
+      },
+      "providerInvocations": 0,
+      "exitCode": 0
+    },
+    "assertions": {
+      "fitRunComplete": true,
+      "fitAuthorizedEveryRequest": true,
+      "providerAttestedEveryFitRequest": true,
+      "redundantArtifactsReducedBeforeThirdRequest": true,
+      "artifactReferencesRemainReopenable": true,
+      "criticalDiagnosticsNeverDropped": true,
+      "blockedRunComplete": true,
+      "blockedBeforeProviderEntry": true,
+      "commandRegisteredWithoutProviderCall": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 3,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

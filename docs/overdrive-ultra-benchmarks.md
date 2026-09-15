@@ -108,3 +108,19 @@ The automatic result saves 29,389 characters (83.75%). Using the declared four-c
 | Temporary state cleanup | PASS | — | Benchmark root removed in both PASS and FAIL paths |
 
 The recorded run completed the tool sequence in 383.318 ms. Using the declared four-character approximation, the main comparison is 11,518 versus 1,338 tokens; these are estimates, not provider billing values. The failure control prevents a context-reduction PASS from masking lost Pi error semantics. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product latency or reduction winner is declared.
+
+## Phase 6 Context Governor
+
+`npm run benchmark:ultra:context-governor` launches official Pi 0.85.1 with the actual Artifact Store and Context Governor plus a deterministic local provider. Two scenarios and one command-discovery process use zero network/external-provider/paid calls and cost zero.
+
+| Real Pi operation | Result | Context evidence |
+|---|---:|---|
+| First two fit requests | PASS | 544 and 1,906 estimated input tokens; no unnecessary reduction |
+| Third request with duplicate artifact | PASS | 3,268 → 2,183 tokens against 2,480 usable; redundant-artifact stage changed exactly one message and saved 1,085 tokens |
+| Evidence preservation | PASS | two tool results, five reopenable artifact references, one explicit omission marker, both critical diagnostics retained |
+| Provider attestation | PASS | all three successful context proofs matched provider/model immediately before request payload dispatch |
+| Irreducible current user request | PASS (blocked) | 39,216 tokens against 1,880 usable; all safe stages exhausted; zero provider stream entries |
+| `/context-fit` registration | PASS | extension command discovered with zero provider calls |
+| Temporary cleanup | PASS | benchmark root removed in both PASS and FAIL paths |
+
+These are conservative local estimates aligned with Pi's four-character approximation, not provider billing tokens. The benchmark proves pre-provider behavior and preservation properties; it does not claim an automatic model switch or cross-product superiority. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable.

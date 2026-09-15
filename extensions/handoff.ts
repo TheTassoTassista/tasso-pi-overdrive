@@ -2,6 +2,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { type Message, uuidv7 } from "@earendil-works/pi-ai";
 import type { CustomEntry, ExtensionAPI, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { BorderedLoader, convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
+import { CONTEXT_FIT_STATUS, contextFitMetadata, governContext, readContextGovernorPolicy, renderContextFit } from "../lib/context-governor.mjs";
 import { NOTEBOOK_ENTRY_TYPE, formatNotebook, isNotebookState } from "./notebook.ts";
 
 const SYSTEM_PROMPT = `Create a concise, self-contained handoff prompt for a new coding session. Preserve only verified facts, decisions, constraints, relevant files, current repository state, unresolved risks, and the next task. Distinguish evidence from assumptions. Never reproduce credentials, environment values, or secret material. Output only the handoff prompt.`;
@@ -67,6 +68,21 @@ export default function (pi: ExtensionAPI) {
         content: [{ type: "text", text: `## Canonical notebook\n${notebookText(branch)}\n\n## Recent/compacted conversation\n${conversation}\n\n## Next phase\n${goal}` }],
         timestamp: Date.now(),
       };
+      const fit = governContext({
+        messages: [userMessage],
+        systemPrompt: SYSTEM_PROMPT,
+        tools: [],
+        activeToolNames: [],
+        model: ctx.model,
+        reserveOutputTokens: 5000,
+        policy: readContextGovernorPolicy(),
+      });
+      const fitMetadata = { ...contextFitMetadata(fit), kind: "context_fit_direct_handoff" };
+      pi.events.emit("pi-overdrive:context-metadata", fitMetadata);
+      if (fit.proof.status !== CONTEXT_FIT_STATUS.PASS) {
+        ctx.ui.notify(renderContextFit(fit), "error");
+        return;
+      }
       const generate = async (signal?: AbortSignal): Promise<string | null> => {
         const response = await ctx.modelRegistry.complete(ctx.model!, { systemPrompt: SYSTEM_PROMPT, messages: [userMessage] }, {
           ...(signal ? { signal } : {}),

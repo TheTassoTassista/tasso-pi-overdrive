@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "safetyTokens": 4096,
+  "toolResultMaxChars": 8000,
+  "toolResultMaxLines": 160,
+  "smartReadTargetChars": 6000,
+  "artifactDuplicateMaxChars": 512
+}

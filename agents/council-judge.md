@@ -2,7 +2,7 @@
 name: council-judge
 description: Read-only council synthesizer that adjudicates independent advisor evidence.
 tools: read, grep, find, ls, semantic_nav
-subagentOnlyExtensions: ../extensions/lsp.ts
+subagentOnlyExtensions: ../extensions/lsp.ts, ../extensions/context-governor.ts
 defaultContext: fresh
 acceptanceRole: read-only
 completionGuard: false
