@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-15T13:27:21.138Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "fixture": {
+    "sourceChars": 46070,
+    "sourceBytes": 46070,
+    "lines": 700,
+    "sha256": "33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af"
+  },
+  "overdriveUltra": {
+    "status": "PASS",
+    "timedOut": false,
+    "elapsedMs": 383.318,
+    "exitCode": 0,
+    "stderrBytes": 0,
+    "stderrDigest": null,
+    "eventTypes": [
+      "turn_start",
+      "message_start",
+      "message_update",
+      "message_update",
+      "message_update",
+      "message_end",
+      "tool_execution_start",
+      "tool_execution_end",
+      "message_start",
+      "message_end",
+      "turn_end",
+      "turn_start",
+      "message_start",
+      "message_update",
+      "message_update",
+      "message_update",
+      "message_end",
+      "turn_end",
+      "agent_end",
+      "agent_settled"
+    ],
+    "providerTurns": 4,
+    "externalized": {
+      "outputChars": 5352,
+      "isError": false,
+      "details": {
+        "fixture": true,
+        "sourceChars": 46070,
+        "artifact": {
+          "version": 1,
+          "kind": "ARTIFACT_MANIFEST",
+          "id": "33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "uri": "artifact://33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "sha256": "33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "sizeBytes": 46070,
+          "sourceBytes": 46070,
+          "characters": 46070,
+          "lines": 700,
+          "mime": "text/plain",
+          "producerTools": [
+            "artifact_fixture"
+          ],
+          "createdAt": "2026-09-15T13:27:20.804Z",
+          "expiresAt": "2026-09-22T13:27:20.804Z",
+          "retentionDays": 7,
+          "sessionDigest": "b3e27e53a75854666287000afe2db6e14a1536dc96bceb405414afa7ccb0f99c",
+          "scopeDigest": "aef03a5bf526845f0c1561b89915637ba435b4208222c3b16318060866455ed1",
+          "taskDigests": [
+            "819b9049e64c11cf6797dfe6230f6cfd8a370c8a3597e5ce6ccac1d7d3247b1e"
+          ],
+          "trust": "TOOL_OUTPUT_UNTRUSTED",
+          "immutable": true,
+          "redacted": false,
+          "sanitizedControls": false,
+          "deduplicated": false
+        }
+      }
+    },
+    "reopened": {
+      "outputChars": 482,
+      "isError": false,
+      "details": {
+        "kind": "resource_access",
+        "version": 1,
+        "scheme": "artifact",
+        "operation": "READ",
+        "trust": "TOOL_OUTPUT_UNTRUSTED",
+        "immutable": true,
+        "contentChars": 259,
+        "contentBytes": 259,
+        "truncated": true,
+        "uriDigest": "c314ad9926d29584a7b5ac950055533c20ac36bea2d128f7fa0ce62eab5ce501"
+      }
+    },
+    "failed": {
+      "outputChars": 5352,
+      "isError": true,
+      "details": {
+        "artifact": {
+          "version": 1,
+          "kind": "ARTIFACT_MANIFEST",
+          "id": "33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "uri": "artifact://33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "sha256": "33de2ff671f17cbab6fb07d9c49ac41812c307a1951097da8a3bd88fa5c011af",
+          "sizeBytes": 46070,
+          "sourceBytes": 46070,
+          "characters": 46070,
+          "lines": 700,
+          "mime": "text/plain",
+          "producerTools": [
+            "artifact_fixture"
+          ],
+          "createdAt": "2026-09-15T13:27:20.804Z",
+          "expiresAt": "2026-09-22T13:27:20.804Z",
+          "retentionDays": 7,
+          "sessionDigest": "b3e27e53a75854666287000afe2db6e14a1536dc96bceb405414afa7ccb0f99c",
+          "scopeDigest": "aef03a5bf526845f0c1561b89915637ba435b4208222c3b16318060866455ed1",
+          "taskDigests": [
+            "819b9049e64c11cf6797dfe6230f6cfd8a370c8a3597e5ce6ccac1d7d3247b1e"
+          ],
+          "trust": "TOOL_OUTPUT_UNTRUSTED",
+          "immutable": true,
+          "redacted": false,
+          "sanitizedControls": false,
+          "deduplicated": true
+        }
+      }
+    },
+    "command": {
+      "status": "PASS",
+      "commands": [
+        {
+          "name": "resources",
+          "source": "extension"
+        },
+        {
+          "name": "artifacts",
+          "source": "extension"
+        }
+      ],
+      "exitCode": 0
+    },
+    "storedArtifacts": 1,
+    "comparison": {
+      "originalChars": 46070,
+      "previewChars": 5352,
+      "savedChars": 40718,
+      "savedPercent": 88.38,
+      "estimatedOriginalTokens": 11518,
+      "estimatedPreviewTokens": 1338
+    },
+    "assertions": {
+      "piRunComplete": true,
+      "largeOutputExternalized": true,
+      "deterministicPreviewReduced": true,
+      "criticalDiagnosticPreserved": true,
+      "boundedArtifactRangeReopened": true,
+      "errorSemanticsPreserved": true,
+      "storedContentCompleteAndAddressed": true,
+      "privateFiles": true,
+      "scopedManifest": true,
+      "commandsRegistered": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 4,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

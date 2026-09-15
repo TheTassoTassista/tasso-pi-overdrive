@@ -50,6 +50,7 @@ test("ResourceFS schema is conditional on a supported URI", () => {
   const explicit = policyFor("Inspect repo://root/src/parser.ts without changing it.");
   assert.ok(explicit.toolPolicy.activeTools.includes("resource_fs"));
   assert.equal(policyFor("Inspect src/parser.ts without changing it.").toolPolicy.activeTools.includes("resource_fs"), false);
+  assert.ok(policyFor(`Inspect artifact://${"a".repeat(64)} without changing files.`).toolPolicy.activeTools.includes("resource_fs"));
 });
 
 test("SmartRead schema follows source-inspection policy without affecting direct edits", () => {

@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -33,6 +33,7 @@ if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('Omn
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
 for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
@@ -63,6 +64,15 @@ try {
 } catch (error) { failures.push(`SmartRead validation failed: ${error.message}`); }
 const smartReadExtension = await readFile(path.join(root, 'extensions/smart-read.ts'), 'utf8');
 for (const marker of ['Type.Literal("auto")', 'Type.Literal("raw")', 'Type.Literal("smart")', 'Type.Literal("range")', 'registerCommand("smart-read"', 'pi.on("tool_result"']) if (!smartReadExtension.includes(marker)) failures.push(`SmartRead public integration marker is missing: ${marker}`);
+try {
+  const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
+  artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));
+  if (!artifacts.ARTIFACT_ID.test('a'.repeat(64)) || artifacts.ARTIFACT_ID.test('../escape')) failures.push('Artifact Store ID policy is not path-safe');
+} catch (error) { failures.push(`Artifact Store validation failed: ${error.message}`); }
+const artifactExtension = await readFile(path.join(root, 'extensions/artifacts.ts'), 'utf8');
+if (!artifactExtension.includes('registerCommand("artifacts"') || !artifactExtension.includes('pi.on("tool_result"')) failures.push('Artifact Store hook/command integration is missing');
+const artifactPolicy = JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8'));
+if (artifactPolicy.redactSecrets !== true || artifactPolicy.trust !== 'TOOL_OUTPUT_UNTRUSTED' || artifactPolicy.inlineThresholdBytes > artifactPolicy.maxArtifactBytes || artifactPolicy.maxArtifactBytes > artifactPolicy.maxScopeBytes) failures.push('Artifact Store security/quota policy is invalid');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');

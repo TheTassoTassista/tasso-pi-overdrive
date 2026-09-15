@@ -13,6 +13,7 @@
 - Workflow journals and immutable receipts: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/`.
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
+- Session-scoped Artifact Store: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/artifacts/` (owner-only, content-addressed, sanitized, default retention seven days).
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 - Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/`.
 - Second Brain service runtimes/state: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services/`; user units live under `${XDG_CONFIG_HOME:-~/.config}/systemd/user/`. Their complete Python dependency graphs are tracked in deterministic lock files, and the embedding snapshot is revision- and checksum-pinned. Embeddings/OpenViking/Hindsight bind only `127.0.0.1:1934`, `:1933`, and `:8889`.
@@ -23,6 +24,8 @@ owner-only retention at session startup. The default is 30 days; set
 it. Invalid values disable that cleanup run. Cleanup is flat, bounded, and
 never follows symlinks or accepts an arbitrary target directory. Inspect or
 apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
+
+Artifact retention is intentionally separate. Pi runs a bounded expiry/orphan pass at session startup. Preview it with `npm run artifacts:retention`; apply only after reviewing the summary with `node scripts/artifact-retention.mjs --apply`. `/artifacts` shows current-session manifest metadata and counters without a model call. Reopen a reported `artifact://<sha256>` through `resource_fs` using a bounded line range or literal search; artifact IDs never map to arbitrary paths and do not cross session/workspace scope.
 
 ## Daily Pi startup
 

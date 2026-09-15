@@ -93,3 +93,18 @@ The timings are one local run and not a performance superiority claim. ResourceF
 | `/smart-read` command registration | PASS | — | — | Source is the actual extension |
 
 The automatic result saves 29,389 characters (83.75%). Using the declared four-character approximation, the comparison is 8,773 versus 1,426 tokens. The cold structural read is slower because it starts a sandboxed LSP; this benchmark demonstrates context reduction and exact code-location recovery, not a latency win. OMP remains `NOT_RUN` because its required Bun runtime is unavailable.
+
+## Phase 5 Artifact Store
+
+`npm run benchmark:ultra:artifacts` launches official Pi 0.85.1 with the actual Artifact Store and ResourceFS extensions. The deterministic payload generator lives directly in the Node benchmark, while Pi loads the TypeScript fixture/provider inside its own runtime. The fixture provider is also syntax-checked by the full project gate. Three tool calls use four deterministic local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Model-facing output | Evidence |
+|---|---:|---:|---|
+| Large 46,070-character tool result | PASS | 5,352 chars | 88.38% reduction; deterministic preview, URI and manifest metadata |
+| ResourceFS artifact range, lines 419–421 | PASS | 482 chars | Exact numbered lines recovered; critical `ERROR` at line 420 retained |
+| Same payload from a failing tool | PASS | 5,352 chars | `isError=true`, critical diagnostic retained, content object deduplicated |
+| Stored object integrity/privacy | PASS | 1 object | SHA-256 matches; scope/session digests; owner-only mode; one link; no temporary path in manifest |
+| `/artifacts` and `/resources` registration | PASS | — | Sources are the actual extensions |
+| Temporary state cleanup | PASS | — | Benchmark root removed in both PASS and FAIL paths |
+
+The recorded run completed the tool sequence in 383.318 ms. Using the declared four-character approximation, the main comparison is 11,518 versus 1,338 tokens; these are estimates, not provider billing values. The failure control prevents a context-reduction PASS from masking lost Pi error semantics. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product latency or reduction winner is declared.

@@ -50,6 +50,9 @@ test("ResourceFS activates only for an explicit supported URI", () => {
   assert.equal(memory.classification.signals.memoryResource, true);
   assert.equal(memory.needs.secondBrain, false);
   assert.equal(memory.toolNeed.capabilities.includes("memory"), false);
+  const artifact = resolveTaskPolicy({ task: `Inspect artifact://${"a".repeat(64)} without changing files.` });
+  assert.equal(artifact.needs.resources, true);
+  assert.ok(artifact.toolNeed.capabilities.includes("resources"));
 });
 
 test("SmartRead is selected for source inspection but omitted for a direct small edit", () => {

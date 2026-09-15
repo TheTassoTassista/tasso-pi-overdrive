@@ -192,6 +192,33 @@ export default function (pi: ExtensionAPI) {
       taskPolicyDigest: scalar("taskPolicyDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:artifact-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "artifact_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      producerTool: scalar("producerTool") as string | undefined,
+      sourceBytes: scalar("sourceBytes") as number | undefined,
+      storedBytes: scalar("storedBytes") as number | undefined,
+      previewChars: scalar("previewChars") as number | undefined,
+      lines: scalar("lines") as number | undefined,
+      redacted: scalar("redacted") as boolean | undefined,
+      sanitizedControls: scalar("sanitizedControls") as boolean | undefined,
+      deduplicated: scalar("deduplicated") as boolean | undefined,
+      artifactDigest: scalar("artifactDigest") as string | undefined,
+      sessionDigest: scalar("sessionDigest") as string | undefined,
+      taskDigest: scalar("taskDigest") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      scannedArtifacts: scalar("scannedArtifacts") as number | undefined,
+      removedArtifacts: scalar("removedArtifacts") as number | undefined,
+      scannedOrphans: scalar("scannedOrphans") as number | undefined,
+      removedOrphans: scalar("removedOrphans") as number | undefined,
+      skipped: scalar("skipped") as number | undefined,
+      capped: scalar("capped") as boolean | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {
