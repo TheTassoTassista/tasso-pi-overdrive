@@ -6,6 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { readAstEditPolicy, TransactionalAstEdit } from "../lib/ast-edit-engine.mjs";
 import { AST_EDIT_CONTRACT, EDIT_CONTRACT, EditEngine, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
+import { LspWriteGuard } from "../lib/lsp-write-guard.mjs";
 
 const Action = Type.Union([Type.Literal("preview"), Type.Literal("apply")]);
 const Replacement = Type.Object({
@@ -16,6 +17,11 @@ const Replacement = Type.Object({
 function safeCode(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String((error as EditEngineError).code) : error instanceof Error ? error.message : "EDIT_ENGINE_FAILED";
   return /^[A-Z][A-Z0-9_]{2,63}$/u.test(code) ? code : "EDIT_ENGINE_FAILED";
+}
+
+function safeLspClassification(error: unknown): string | undefined {
+  const classification = error && typeof error === "object" && "classification" in error ? String((error as { classification?: unknown }).classification) : "";
+  return ["UNCHANGED", "IMPROVED", "REGRESSED", "UNKNOWN_UNVERIFIABLE"].includes(classification) ? classification : undefined;
 }
 
 function astGrepBinary(): { path: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number } {
@@ -79,7 +85,9 @@ function evidenceFor(event: any) {
 export default function editEngineExtension(pi: ExtensionAPI): void {
   let engine: EditEngine | undefined;
   let astEngine: TransactionalAstEdit | undefined;
+  let writeGuard: LspWriteGuard | undefined;
   let initializationError: string | undefined;
+  let writeGuardInitializationError: string | undefined;
   let astInitializationError: string | undefined;
   let astVersion: string | undefined;
   let astBinaryIdentity: { path: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number } | undefined;
@@ -103,10 +111,19 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       initializationError = undefined;
     } catch (error) {
       engine = undefined;
+      writeGuard = undefined;
       initializationError = safeCode(error);
       pi.events.emit("pi-overdrive:edit-metadata", { kind: "edit_engine", status: "DEGRADED", errorCode: initializationError });
     }
     if (!engine) return;
+    try {
+      writeGuard = new LspWriteGuard({ cwd: ctx.cwd, editEngine: engine });
+      writeGuardInitializationError = undefined;
+    } catch (error) {
+      writeGuard = undefined;
+      writeGuardInitializationError = safeCode(error);
+      pi.events.emit("pi-overdrive:edit-metadata", { kind: "lsp_write_guard", status: "DEGRADED", errorCode: writeGuardInitializationError });
+    }
     try {
       const astPolicy = loadAstEditPolicy();
       astEngine = new TransactionalAstEdit({
@@ -169,26 +186,32 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       try {
         if (parameters.action === "preview") {
           if (!parameters.snapshotId || !parameters.edits || parameters.transactionId !== undefined) throw new Error("EDIT_INPUT_INVALID");
+          if (!writeGuard) throw new Error(writeGuardInitializationError ?? "LSP_WRITE_GUARD_UNAVAILABLE");
           const result = engine.preview({ snapshotId: parameters.snapshotId, edits: parameters.edits });
+          const lspValidation: any = await writeGuard.preview({ transactionId: result.transactionId, expectedContract: EDIT_CONTRACT });
           pi.events.emit("pi-overdrive:edit-metadata", {
             kind: "edit_preview", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
             beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount,
             recovered: result.status === "SAFE_RECOVERY", syntaxStatus: result.syntaxStatus,
+            lspStatus: lspValidation.status, baselineErrorCount: lspValidation.baselineErrorCount, candidateErrorCount: lspValidation.candidateErrorCount,
+            baselineDiagnosticDigest: lspValidation.baselineDigest, candidateDiagnosticDigest: lspValidation.candidateDigest,
           });
-          return { content: [{ type: "text", text: `${result.preview}\n[Preview only; no file changed. Apply transaction ${result.transactionId} after review.]` }], details: result };
+          return { content: [{ type: "text", text: `${result.preview}\n[LSP preflight=${lspValidation.status}; baseline errors=${lspValidation.baselineErrorCount ?? "n/a"}; candidate errors=${lspValidation.candidateErrorCount ?? "n/a"}.]\n[Preview only; no file changed. Apply transaction ${result.transactionId} after review.]` }], details: { ...result, lspValidation } };
         }
         if (!parameters.transactionId || parameters.snapshotId !== undefined || parameters.edits !== undefined) throw new Error("EDIT_INPUT_INVALID");
         if (signal?.aborted) throw new Error("Transactional edit aborted before mutation.");
-        const result = engine.apply({ transactionId: parameters.transactionId, expectedContract: EDIT_CONTRACT });
+        if (!writeGuard) throw new Error(writeGuardInitializationError ?? "LSP_WRITE_GUARD_UNAVAILABLE");
+        const result = await writeGuard.apply({ transactionId: parameters.transactionId, expectedContract: EDIT_CONTRACT });
         pi.events.emit("pi-overdrive:edit-metadata", {
           kind: "edit_apply", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
           beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount,
           recovered: result.recovered, syntaxStatus: result.syntaxStatus, receiptDigest: result.receipt.sha256,
+          lspStatus: result.validation?.status, postErrorCount: result.validation?.postErrorCount, postDiagnosticDigest: result.validation?.postDigest,
         });
         return { content: [{ type: "text", text: `APPLIED transaction ${result.transactionId}; immutable receipt ${result.receipt.sha256}.` }], details: result };
       } catch (error) {
         const errorCode = safeCode(error);
-        pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "edit_apply" : "edit_preview", status: "FAIL", errorCode });
+        pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "edit_apply" : "edit_preview", status: "FAIL", errorCode, lspClassification: safeLspClassification(error) });
         throw new Error(errorCode === "STALE_EDIT" ? "STALE_EDIT: file changed or the anchor cannot be recovered safely; read the exact range again." : `Transactional edit denied (${errorCode}).`);
       }
     },
@@ -220,25 +243,31 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       try {
         if (parameters.action === "preview") {
           if (!parameters.snapshotId || !parameters.pattern || parameters.rewrite === undefined || !parameters.expectedMatches || parameters.transactionId !== undefined) throw new Error("AST_INPUT_INVALID");
+          if (!writeGuard) throw new Error(writeGuardInitializationError ?? "LSP_WRITE_GUARD_UNAVAILABLE");
           const result = await astEngine.preview({ snapshotId: parameters.snapshotId, pattern: parameters.pattern, rewrite: parameters.rewrite, lang: parameters.lang, expectedMatches: parameters.expectedMatches }, signal);
+          const lspValidation: any = await writeGuard.preview({ transactionId: result.transactionId, expectedContract: AST_EDIT_CONTRACT });
           pi.events.emit("pi-overdrive:edit-metadata", {
             kind: "ast_edit_preview", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
             beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount, matchCount: result.matchCount,
             patternDigest: result.patternDigest, rewriteDigest: result.rewriteDigest, syntaxStatus: result.syntaxStatus,
+            lspStatus: lspValidation.status, baselineErrorCount: lspValidation.baselineErrorCount, candidateErrorCount: lspValidation.candidateErrorCount,
+            baselineDiagnosticDigest: lspValidation.baselineDigest, candidateDiagnosticDigest: lspValidation.candidateDigest,
           });
-          return { content: [{ type: "text", text: `${result.preview}\n[AST preview only; ${result.matchCount} matches, no file changed. Apply transaction ${result.transactionId} after review.]` }], details: result };
+          return { content: [{ type: "text", text: `${result.preview}\n[LSP preflight=${lspValidation.status}; baseline errors=${lspValidation.baselineErrorCount ?? "n/a"}; candidate errors=${lspValidation.candidateErrorCount ?? "n/a"}.]\n[AST preview only; ${result.matchCount} matches, no file changed. Apply transaction ${result.transactionId} after review.]` }], details: { ...result, lspValidation } };
         }
         if (!parameters.transactionId || parameters.snapshotId !== undefined || parameters.pattern !== undefined || parameters.rewrite !== undefined || parameters.lang !== undefined || parameters.expectedMatches !== undefined) throw new Error("AST_INPUT_INVALID");
-        const result = astEngine.apply({ transactionId: parameters.transactionId });
+        if (!writeGuard) throw new Error(writeGuardInitializationError ?? "LSP_WRITE_GUARD_UNAVAILABLE");
+        const result = await writeGuard.apply({ transactionId: parameters.transactionId, expectedContract: AST_EDIT_CONTRACT }, astEngine);
         pi.events.emit("pi-overdrive:edit-metadata", {
           kind: "ast_edit_apply", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
           beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount,
           syntaxStatus: result.syntaxStatus, receiptDigest: result.receipt.sha256,
+          lspStatus: result.validation?.status, postErrorCount: result.validation?.postErrorCount, postDiagnosticDigest: result.validation?.postDigest,
         });
         return { content: [{ type: "text", text: `APPLIED AST transaction ${result.transactionId}; immutable receipt ${result.receipt.sha256}.` }], details: result };
       } catch (error) {
         const errorCode = safeCode(error);
-        pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "ast_edit_apply" : "ast_edit_preview", status: "FAIL", contract: AST_EDIT_CONTRACT, errorCode });
+        pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "ast_edit_apply" : "ast_edit_preview", status: "FAIL", contract: AST_EDIT_CONTRACT, errorCode, lspClassification: safeLspClassification(error) });
         throw new Error(errorCode === "STALE_EDIT" ? "STALE_EDIT: source changed; read all structural target ranges again." : `Transactional AST edit denied (${errorCode}).`);
       }
     },
@@ -264,5 +293,10 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
         ctx.ui.notify(`Transactional AST edit unavailable (${safeCode(error)}).`, "error");
       }
     },
+  });
+
+  pi.registerCommand("lsp-write", {
+    description: "Show transactional LSP write-guard status without a model call",
+    handler: async (_args, ctx) => ctx.ui.notify(writeGuard ? JSON.stringify(writeGuard.status(), null, 2) : `LSP write guard unavailable (${writeGuardInitializationError ?? "not initialized"}).`, writeGuard ? "info" : "error"),
   });
 }

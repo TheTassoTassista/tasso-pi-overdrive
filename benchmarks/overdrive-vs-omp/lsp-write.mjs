@@ -1,0 +1,180 @@
+#!/usr/bin/env node
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const benchmarkRoot = path.dirname(fileURLToPath(import.meta.url));
+const packageRoot = path.resolve(benchmarkRoot, "../..");
+const provider = path.join(packageRoot, "tests", "fixtures", "deterministic-edit-engine-provider.ts");
+const extension = path.join(packageRoot, "extensions", "edit-engine.ts");
+const pi = process.env.PI_BIN ?? "pi";
+const writeResults = process.argv.includes("--write-results");
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-lsp-write-"));
+
+function parseJsonLines(text) { return String(text ?? "").split(/\r?\n/u).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } }); }
+function textOf(message) { return (message?.content ?? []).filter((entry) => entry?.type === "text").map((entry) => entry.text ?? "").join(""); }
+function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+function filesBelow(root, predicate) {
+  if (!fs.existsSync(root)) return [];
+  const output = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile() && predicate(full)) output.push(full);
+    }
+  };
+  walk(root);
+  return output;
+}
+
+async function runScenario(scenario) {
+  const root = path.join(temporary, scenario);
+  const stateHome = path.join(root, "state");
+  const agentDir = path.join(root, "agent");
+  const fixture = path.join(root, "source.ts");
+  const auditFile = path.join(root, "audit.jsonl");
+  fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
+  fs.writeFileSync(path.join(root, "tsconfig.json"), `${JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ["source.ts"] })}\n`, { mode: 0o600 });
+  fs.writeFileSync(fixture, "const value: string = 'safe';\n", { mode: 0o600 });
+  fs.writeFileSync(auditFile, "", { mode: 0o600 });
+  const child = spawn(pi, [
+    "--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--extension", extension,
+    "--provider", "pi-overdrive-edit-audit", "--api-key", "audit-only", "--model", "edit-driver", "--thinking", "low",
+    "--tools", "read,transactional_edit",
+  ], {
+    cwd: root,
+    env: {
+      ...process.env, XDG_STATE_HOME: stateHome, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_EDIT_AUDIT_KEY: "audit-only",
+      PI_OVERDRIVE_EDIT_AUDIT_FIXTURE: "source.ts", PI_OVERDRIVE_EDIT_AUDIT_SCENARIO: scenario,
+      PI_OVERDRIVE_EDIT_AUDIT_MODE: "exact", PI_OVERDRIVE_EDIT_AUDIT_RECEIPT: auditFile,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const events = [];
+  let buffer = "";
+  let stderr = "";
+  let timedOut = false;
+  let exitCode = null;
+  const settled = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { timedOut = true; resolve(); }, 60_000);
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      for (;;) {
+        const newline = buffer.indexOf("\n");
+        if (newline < 0) break;
+        const line = buffer.slice(0, newline).replace(/\r$/u, "");
+        buffer = buffer.slice(newline + 1);
+        if (!line) continue;
+        try {
+          const event = JSON.parse(line);
+          events.push(event);
+          if (event.type === "agent_settled") { clearTimeout(timeout); resolve(); }
+        } catch {}
+      }
+    });
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4000); });
+    child.once("error", (error) => { clearTimeout(timeout); reject(error); });
+  });
+  const closed = new Promise((resolve) => child.once("close", (code) => { exitCode = code; resolve(); }));
+  const started = performance.now();
+  try {
+    child.stdin.write(`${JSON.stringify({ id: scenario, type: "prompt", message: `Run deterministic ${scenario}.` })}\n`);
+    await settled;
+  } finally {
+    child.stdin.end();
+    const timeout = setTimeout(() => child.kill("SIGTERM"), 5_000);
+    await closed;
+    clearTimeout(timeout);
+  }
+  const ended = [...events].reverse().find((event) => event.type === "agent_end");
+  let finalPayload;
+  try { finalPayload = JSON.parse(textOf([...(ended?.messages ?? [])].reverse().find((message) => message.role === "assistant"))); } catch {}
+  const audit = parseJsonLines(fs.readFileSync(auditFile, "utf8"));
+  const receiptFiles = filesBelow(path.join(stateHome, "pi-overdrive", "edit-receipts"), (file) => /^[0-9a-f-]{36}\.json$/iu.test(path.basename(file)));
+  const receipts = receiptFiles.map((file) => ({ text: fs.readFileSync(file, "utf8"), mode: fs.lstatSync(file).mode & 0o777 }));
+  return {
+    status: !timedOut && exitCode === 0 && finalPayload ? "COMPLETE" : "FAILED",
+    elapsedMs: Number((performance.now() - started).toFixed(3)), timedOut, exitCode,
+    providerTurns: audit.filter((entry) => entry.kind === "provider_turn").length,
+    editMetadata: audit.filter((entry) => entry.auditKind === "edit_metadata").map(({ auditKind: _auditKind, ...entry }) => entry),
+    finalPayload: finalPayload ?? null, finalContents: fs.readFileSync(fixture, "utf8"),
+    receipts: receipts.map((entry) => {
+      const parsed = JSON.parse(entry.text);
+      return {
+        mode: entry.mode, digest: sha256(entry.text), validation: parsed.validation ?? null,
+        containsRawData: /source\.ts|'safe'|'safer'|const value/iu.test(entry.text),
+      };
+    }),
+    stagedFiles: filesBelow(root, (file) => path.basename(file).startsWith(".pi-overdrive-edit-")).length,
+    stderrBytes: Buffer.byteLength(stderr), stderrDigest: stderr ? sha256(stderr) : null,
+  };
+}
+
+function inspectCommand() {
+  const root = path.join(temporary, "command");
+  const agentDir = path.join(root, "agent");
+  const auditFile = path.join(root, "audit.jsonl");
+  const runtime = path.join(root, "sentinel-runtime");
+  const marker = path.join(root, "lsp-started");
+  const sentinel = path.join(runtime, "node_modules", ".bin", "vtsls");
+  fs.mkdirSync(path.dirname(sentinel), { recursive: true, mode: 0o700 });
+  fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(sentinel, `#!/bin/sh\nprintf invoked > ${JSON.stringify(marker)}\nexit 99\n`, { mode: 0o700 });
+  fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
+  fs.writeFileSync(auditFile, "", { mode: 0o600 });
+  const run = spawnSync(pi, [
+    "--offline", "--approve", "--no-session", "--mode", "rpc", "--extension", provider, "--extension", extension,
+    "--provider", "pi-overdrive-edit-audit", "--api-key", "audit-only", "--model", "edit-driver", "--thinking", "low", "--no-tools",
+  ], {
+    cwd: root,
+    env: { ...process.env, XDG_STATE_HOME: path.join(root, "state"), PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_LSP_RUNTIME: runtime, PI_OVERDRIVE_EDIT_AUDIT_KEY: "audit-only", PI_OVERDRIVE_EDIT_AUDIT_RECEIPT: auditFile },
+    input: `${JSON.stringify({ id: "commands", type: "get_commands" })}\n`, encoding: "utf8", timeout: 45_000,
+  });
+  const commands = parseJsonLines(run.stdout).find((event) => event.type === "response" && event.id === "commands")?.data?.commands ?? [];
+  return {
+    status: run.status === 0 && commands.some((entry) => entry.name === "lsp-write" && entry.source === "extension") && !fs.existsSync(marker) ? "PASS" : "FAIL",
+    providerTurns: parseJsonLines(fs.readFileSync(auditFile, "utf8")).filter((entry) => entry.kind === "provider_turn").length,
+    lspStarted: fs.existsSync(marker), exitCode: run.status,
+  };
+}
+
+let report;
+try {
+  const success = await runScenario("lsp-success");
+  const regression = await runScenario("lsp-regression");
+  const command = inspectCommand();
+  const successReceipt = success.receipts[0];
+  const metadata = [...success.editMetadata, ...regression.editMetadata];
+  const assertions = {
+    realPiSuccessCompleted: success.status === "COMPLETE" && success.providerTurns === 4 && success.finalPayload?.toolResults === 3,
+    candidateOverlayWasNonMutating: success.finalPayload?.previewNonMutating === true && success.finalPayload?.previewStatus === "READY",
+    postValidatedAtomicApply: success.finalPayload?.applyStatus === "APPLIED" && success.finalPayload?.applyIsError === false && success.finalContents === "const value: string = 'safer';\n",
+    immutableValidatedReceipt: success.receipts.length === 1 && successReceipt?.mode === 0o400 && successReceipt?.validation?.status === "PASS" && /^[0-9a-f]{64}$/u.test(successReceipt?.validation?.postDigest ?? "") && successReceipt?.containsRawData === false,
+    regressionBlockedBeforeWrite: regression.status === "COMPLETE" && regression.providerTurns === 3 && regression.finalPayload?.previewIsError === true && regression.finalPayload?.previewStatus === "LSP_NEW_BLOCKING_DIAGNOSTIC" && regression.finalContents === "const value: string = 'safe';\n" && regression.receipts.length === 0,
+    metadataOnly: metadata.some((entry) => entry.kind === "edit_preview" && entry.lspStatus === "PASS" && /^[0-9a-f]{64}$/u.test(entry.candidateDiagnosticDigest ?? "")) && metadata.every((entry) => !JSON.stringify(entry).includes(temporary) && !/'safe'|'safer'|const value/iu.test(JSON.stringify(entry))),
+    noStagedResidue: success.stagedFiles === 0 && regression.stagedFiles === 0,
+    commandRegisteredWithoutProviderOrLspStart: command.status === "PASS" && command.providerTurns === 0 && command.lspStarted === false,
+  };
+  report = {
+    version: 1, recordedAt: new Date().toISOString(), status: Object.values(assertions).every(Boolean) ? "PASS" : "FAIL",
+    measurementMode: "real-pi-process-deterministic-local-provider-real-managed-lsp", piVersion: spawnSync(pi, ["--version"], { encoding: "utf8" }).stdout.trim(),
+    overdriveUltra: { success, regression, command, assertions },
+    accounting: { deterministicLocalProviderTurns: success.providerTurns + regression.providerTurns, paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
+    ompReference: { commit: "4267074ac91456866e95ed8de0b6353388f08502", version: "18.1.21", executableStatus: "NOT_RUN", reason: "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence." },
+  };
+} catch (error) {
+  report = { version: 1, recordedAt: new Date().toISOString(), status: "FAIL", accounting: { paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 }, error: error instanceof Error ? error.message : String(error) };
+} finally {
+  fs.rmSync(temporary, { recursive: true, force: true });
+  if (report) report.cleanup = { temporaryRemoved: !fs.existsSync(temporary) };
+}
+
+const serialized = `${JSON.stringify(report, null, 2)}\n`;
+if (writeResults) fs.writeFileSync(path.join(benchmarkRoot, "lsp-write-results.json"), serialized, { mode: 0o600 });
+process.stdout.write(serialized);
+process.exit(report.status === "PASS" ? 0 : 1);

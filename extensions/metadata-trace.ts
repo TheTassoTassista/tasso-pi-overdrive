@@ -178,6 +178,7 @@ export default function (pi: ExtensionAPI) {
       selectedMode: scalar("selectedMode") as string | undefined,
       parser: scalar("parser") as string | undefined,
       lspStatus: scalar("lspStatus") as string | undefined,
+      lspClassification: scalar("lspClassification") as string | undefined,
       language: scalar("language") as string | undefined,
       sourceBytes: scalar("sourceBytes") as number | undefined,
       totalLines: scalar("totalLines") as number | undefined,
@@ -272,6 +273,13 @@ export default function (pi: ExtensionAPI) {
       syntaxStatus: scalar("syntaxStatus") as string | undefined,
       patternDigest: scalar("patternDigest") as string | undefined,
       rewriteDigest: scalar("rewriteDigest") as string | undefined,
+      lspStatus: scalar("lspStatus") as string | undefined,
+      baselineErrorCount: scalar("baselineErrorCount") as number | undefined,
+      candidateErrorCount: scalar("candidateErrorCount") as number | undefined,
+      postErrorCount: scalar("postErrorCount") as number | undefined,
+      baselineDiagnosticDigest: scalar("baselineDiagnosticDigest") as string | undefined,
+      candidateDiagnosticDigest: scalar("candidateDiagnosticDigest") as string | undefined,
+      postDiagnosticDigest: scalar("postDiagnosticDigest") as string | undefined,
     });
   });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));

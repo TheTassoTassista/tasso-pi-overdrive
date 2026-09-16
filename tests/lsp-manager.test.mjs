@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { executeLsp, lspRuntimeStatus, shutdownLspServers } from "../lib/lsp-manager.mjs";
+import { executeLsp, executeLspOverlay, lspRuntimeStatus, shutdownLspServers } from "../lib/lsp-manager.mjs";
 
 const roots = [];
 function fixture(prefix) {
@@ -52,6 +52,28 @@ test("TypeScript LSP is lazy, project-aware, reused, and supports diagnostics/de
   assert.ok(rename.entries.length >= 3, JSON.stringify(rename));
   assert.equal(readFileSync(path.join(root, "src", "main.ts"), "utf8"), original, "rename preview mutated the source");
   assert.equal(lspRuntimeStatus().activeServers, 1);
+});
+
+test("TypeScript diagnostic overlay evaluates candidate bytes without mutating the file", { timeout: 60_000 }, async () => {
+  await shutdownLspServers();
+  const root = fixture("pi-lsp-overlay-");
+  writeFileSync(path.join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ["source.ts"] }));
+  const source = path.join(root, "source.ts");
+  const original = "const value: string = 'safe';\n";
+  writeFileSync(source, original);
+
+  const baseline = await executeLspOverlay(root, "source.ts", original);
+  assert.equal(baseline.status, "PASS", JSON.stringify(baseline));
+  assert.equal(baseline.entries.some((entry) => entry.severity === "Error"), false, JSON.stringify(baseline));
+
+  const candidate = await executeLspOverlay(root, "source.ts", "const value: string = 1;\n");
+  assert.equal(candidate.status, "PASS", JSON.stringify(candidate));
+  assert.ok(candidate.entries.some((entry) => entry.severity === "Error" && String(entry.code) === "2322"), JSON.stringify(candidate));
+  assert.equal(readFileSync(source, "utf8"), original, "candidate overlay reached the real filesystem");
+
+  const restored = await executeLspOverlay(root, "source.ts", original);
+  assert.equal(restored.status, "PASS", JSON.stringify(restored));
+  assert.equal(restored.entries.some((entry) => entry.severity === "Error"), false, JSON.stringify(restored));
 });
 
 test("Python LSP returns real diagnostics, definitions, and references", { timeout: 60_000 }, async () => {
@@ -274,6 +296,8 @@ test("server failure is reported and cleanup is explicit", { timeout: 30_000 }, 
   const crashed = await executeLsp(crash, { operation: "diagnostics", path: "crash.py" }, { sandboxRunner: "/usr/bin/false" });
   assert.equal(crashed.status, "FAIL", JSON.stringify(crashed));
   assert.match(crashed.error, /language_server_(?:exited|start_failed)/u);
+  const recovered = await executeLsp(crash, { operation: "diagnostics", path: "crash.py" });
+  assert.equal(recovered.status, "PASS", JSON.stringify(recovered));
 
   const root = fixture("pi-lsp-unsupported-");
   writeFileSync(path.join(root, "notes.txt"), "text\n");

@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -80,6 +80,15 @@ try {
   if (policy.binaryVersion !== 'ast-grep 0.45.3' || policy.binarySha256 !== '7a5ab30160186184c0bf8bffc87da4af25123c183964cd98c11b0b354137db0a' || policy.maxMatches > 32 || policy.maxCliOutputBytes > 2 * 1024 * 1024) failures.push('Transactional AST edit binary identity or hard bounds changed');
 } catch (error) { failures.push(`Transactional AST edit validation failed: ${error.message}`); }
 for (const marker of ['name: "transactional_ast_edit"', 'expectedMatches', 'ensureAstRuntime', 'AST_BINARY_DIGEST_MISMATCH', 'registerCommand("ast-edit"']) if (!editEngineExtension.includes(marker)) failures.push(`Transactional AST edit integration marker is missing: ${marker}`);
+try {
+  const lspWriteGuard = await import(path.join(root, 'lib/lsp-write-guard.mjs'));
+  const policy = lspWriteGuard.validateLspWriteGuardPolicy(JSON.parse(await readFile(path.join(root, 'config/lsp-write-guard.json'), 'utf8')));
+  if (!policy.enabled || JSON.stringify(policy.blockingSeverities) !== JSON.stringify(['Error']) || policy.requirePostMatch !== true || policy.maxDiagnostics > 2000 || policy.unsupportedLanguageAction !== 'SKIP' || policy.managedServerUnavailableAction !== 'BLOCK' || policy.runtimeFailureAction !== 'BLOCK') failures.push('LSP write-guard policy changed or weakened');
+} catch (error) { failures.push(`LSP write-guard validation failed: ${error.message}`); }
+for (const marker of ['LspWriteGuard', 'registerCommand("lsp-write"']) if (!editEngineExtension.includes(marker)) failures.push(`LSP write-guard integration marker is missing: ${marker}`);
+const editEngineSource = await readFile(path.join(root, 'lib/edit-engine.mjs'), 'utf8');
+const lspManagerSource = await readFile(path.join(root, 'lib/lsp-manager.mjs'), 'utf8');
+if (!editEngineSource.includes('applyValidated(') || !lspManagerSource.includes('executeLspOverlay(')) failures.push('LSP write-guard atomic validation or diagnostic-overlay path is missing');
 try {
   const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
   artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));

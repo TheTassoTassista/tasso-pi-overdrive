@@ -16,6 +16,7 @@ npm run benchmark:ultra:baseline
 npm run benchmark:ultra:task-governor
 npm run benchmark:ultra:edit-engine
 npm run benchmark:ultra:ast-edit
+npm run benchmark:ultra:lsp-write
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -23,5 +24,7 @@ npm run benchmark:ultra:ast-edit
 `edit-engine.mjs` drives the real Pi read → snapshot → preview → apply lifecycle with a deterministic local provider. It records a safe-relocation success and a preview/apply race denial, receipt privacy/mode, metadata-only events, staged-file cleanup, and slash-command discovery. It performs no network, external-provider, paid-model, or billable call.
 
 `ast-edit.mjs` drives real Pi through read → snapshot → transactional AST preview → atomic apply and a separate stale race. The actual pinned ast-grep CLI rewrites two duplicate call expressions from private snapshot bytes; the benchmark verifies match counts, non-mutating preview, receipt contract/privacy/mode, external-content preservation, staged-file cleanup, and `/ast-edit` discovery. It performs no network, external-provider, paid-model, or billable call.
+
+`lsp-write.mjs` drives real Pi through baseline/candidate overlays and the post-rename guard using the actual pinned TypeScript server. It proves a safe edit receives a post-validated private receipt, an introduced type error is rejected before write, no staged residue remains, and `/lsp-write` discovery starts neither a provider turn nor an LSP process. It performs no network, external-provider, paid-model, or billable call.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

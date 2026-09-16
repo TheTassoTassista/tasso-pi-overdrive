@@ -8,6 +8,8 @@ Pi exposes one opt-in `semantic_nav` tool. This avoids one schema per operation 
 
 Positions are one-based. `rename_preview` returns edits but the client rejects every server-originated `workspace/applyEdit` request, and the project is mounted read-only. Apply an accepted rename through the normal editor and verification workflow.
 
+Transactional exact and AST edits also use the same mux as an internal write guard. Current and exact candidate bytes are checked through document overlays before mutation. TypeScript/JavaScript combines the VTSLS overlay synchronization barrier with the pinned TypeScript LanguageService over those identical bytes, so an omitted empty push notification cannot become a false-green shortcut. After the atomic rename, diagnostics are forced again from the real filesystem; regression or divergence rolls the target back before the immutable receipt is published. Existing errors are compared semantically rather than blocked by count alone. This adds no model-facing schema and does not permit server-originated mutation. `/lsp-write` reports only local counters.
+
 ## Runtime and isolation
 
 Servers start only on their first tool call and are keyed by canonical project root plus language. At most three processes are retained; the oldest idle process is shut down before another starts. Instances are reused within a project, never across project roots, shut down after five idle minutes, and closed at Pi session shutdown.
@@ -36,4 +38,4 @@ The Bash semantic backend is the exact npm-locked `bash-language-server` from `r
 
 ## Evidence
 
-`npm run smoke:lsp` calls the registered Pi tool through a deterministic zero-token provider and proves real TypeScript, Python, C++, Bash, Rust, and Go results. The named Bash checks cover definition, references, hover, document/workspace symbols, native missing-source diagnostics, preview-only rename, the `.bash` extension, and fixture immutability. `tests/lsp-manager.test.mjs` additionally proves lazy startup and reuse, exact pinned backend identity, rejection of a PATH-shadowing fake Bash server, Bubblewrap read-only/no-network isolation metadata, project switching, rename non-mutation, server failure, and explicit cleanup.
+`npm run smoke:lsp` calls the registered Pi tool through a deterministic zero-token provider and proves real TypeScript, Python, C++, Bash, Rust, and Go results. The named Bash checks cover definition, references, hover, document/workspace symbols, native missing-source diagnostics, preview-only rename, the `.bash` extension, and fixture immutability. `tests/lsp-manager.test.mjs` additionally proves lazy startup and reuse, exact pinned backend identity, rejection of a PATH-shadowing fake Bash server, Bubblewrap read-only/no-network isolation metadata, project switching, rename non-mutation, candidate overlay isolation, failure recovery, and explicit cleanup. `tests/lsp-write-guard.test.mjs` covers the pre/post transaction policy and rollback boundary.

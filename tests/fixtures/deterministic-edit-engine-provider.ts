@@ -82,15 +82,26 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				if (!snapshotId) throw new Error("edit_audit_snapshot_missing");
 				if (scenario === "recovery" && mode === "exact") fs.writeFileSync(target, `external prefix\n${fs.readFileSync(target, "utf8")}`);
 				if (mode === "ast") emitToolCall(stream, output, 2, "transactional_ast_edit", { action: "preview", snapshotId, pattern: "legacy($X)", rewrite: "modern($X)", lang: "javascript", expectedMatches: 2 });
+				else if (scenario === "lsp-regression") emitToolCall(stream, output, 2, "transactional_edit", { action: "preview", snapshotId, edits: [{ oldText: "'safe'", newText: "1" }] });
+				else if (scenario === "lsp-success") emitToolCall(stream, output, 2, "transactional_edit", { action: "preview", snapshotId, edits: [{ oldText: "'safe'", newText: "'safer'" }] });
 				else emitToolCall(stream, output, 2, "transactional_edit", { action: "preview", snapshotId, edits: [{ oldText: "anchor old", newText: "anchor new" }] });
 				return;
 			}
 			if (completed === 2) {
 				const preview = textOf(results[1]);
 				const transactionId = preview.match(/Apply transaction ([0-9a-f-]{36})/iu)?.[1];
+				if (scenario === "lsp-regression") {
+					emitText(stream, output, JSON.stringify({
+						scenario, mode, toolResults: completed, snapshotBound: /\[EDIT SNAPSHOT\]/u.test(textOf(results[0])),
+						previewIsError: (results[1] as any)?.isError === true,
+						previewStatus: /LSP_NEW_BLOCKING_DIAGNOSTIC/u.test(preview) ? "LSP_NEW_BLOCKING_DIAGNOSTIC" : "UNKNOWN",
+						finalDigest: digestFile(target),
+					}));
+					return;
+				}
 				if (!transactionId) throw new Error("edit_audit_transaction_missing");
 				const current = fs.readFileSync(target, "utf8");
-				previewNonMutating = mode === "ast" ? current.includes("legacy(value)") && !current.includes("modern(value)") : current.includes("anchor old") && !current.includes("anchor new");
+				previewNonMutating = mode === "ast" ? current.includes("legacy(value)") && !current.includes("modern(value)") : scenario === "lsp-success" ? current.includes("'safe'") && !current.includes("'safer'") : current.includes("anchor old") && !current.includes("anchor new");
 				if (scenario === "stale") fs.writeFileSync(target, "external after preview\n");
 				emitToolCall(stream, output, 3, mode === "ast" ? "transactional_ast_edit" : "transactional_edit", { action: "apply", transactionId });
 				return;

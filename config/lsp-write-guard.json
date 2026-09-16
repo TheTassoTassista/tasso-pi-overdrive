@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "blockingSeverities": ["Error"],
+  "maxDiagnostics": 500,
+  "requirePostMatch": true,
+  "unsupportedLanguageAction": "SKIP",
+  "managedServerUnavailableAction": "BLOCK",
+  "runtimeFailureAction": "BLOCK"
+}

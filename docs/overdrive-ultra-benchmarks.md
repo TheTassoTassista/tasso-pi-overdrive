@@ -156,3 +156,19 @@ The current Phase 8 regression rerun recorded recovery and stale scenarios at 28
 | Temporary cleanup | PASS | Benchmark root and private snapshot directories removed in PASS and FAIL paths |
 
 The recorded success and stale scenarios completed in 474.905 ms and 344.731 ms respectively. These are single-host lifecycle measurements, not a latency comparison. The exact pinned CLI and first-use SHA-256 attestation are part of the measurement; OMP remains `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product success or performance claim is inferred.
+
+## Phase 9 LSP write guard
+
+`npm run benchmark:ultra:lsp-write` launches official Pi 0.85.1 with the actual read/transactional-edit path and pinned TypeScript LSP. The success and rejection scenarios use seven deterministic local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Candidate overlay isolation | PASS | Exact candidate bytes were checked through LSP while the live fixture retained its baseline bytes |
+| Pre-write type regression | PASS (blocked) | New TS2322 caused `LSP_NEW_BLOCKING_DIAGNOSTIC`; original file unchanged; no receipt |
+| Post-write validation | PASS | Safe candidate was atomically installed, reread from the real filesystem, and matched the accepted diagnostic digest |
+| Immutable validation receipt | PASS | One mode-0400 receipt contains bounded language/backend/project/count/digest evidence and no path, diagnostic message, or source body |
+| Metadata trace contract | PASS | Baseline/candidate/post status, counts, and digests only; no fixture path or source text |
+| Residue and lazy lifecycle | PASS | No staged files; `/lsp-write` discovery used zero provider turns and a sentinel proved no eager LSP start |
+| Temporary cleanup | PASS | Benchmark root removed in PASS and FAIL paths |
+
+The recorded safe and rejected scenarios completed in 2,078.088 ms and 1,970.364 ms. These are single-host lifecycle observations, not an OMP latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable.

@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-16T22:18:18.663Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-real-managed-lsp",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "success": {
+      "status": "COMPLETE",
+      "elapsedMs": 2078.088,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 4,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "b66eff8484181ed11e6753cce778010048c93c6cce8531ee7de115aa840d228b",
+          "contentDigest": "f1a7963a3c8f9f80f6a1de8f73420ff992fc70b52b82ca4dc54e80fbf3daf0f5",
+          "seenRangeCount": 1,
+          "totalLines": 2
+        },
+        {
+          "kind": "edit_preview",
+          "status": "READY",
+          "contract": "hash-replace-v1",
+          "pathDigest": "b66eff8484181ed11e6753cce778010048c93c6cce8531ee7de115aa840d228b",
+          "beforeDigest": "f1a7963a3c8f9f80f6a1de8f73420ff992fc70b52b82ca4dc54e80fbf3daf0f5",
+          "afterDigest": "e0e8e04b234d9f94239d5744441e20eb1d84de6d9e65292cf26b3dc4de324d6b",
+          "editCount": 1,
+          "recovered": false,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9",
+          "lspStatus": "PASS",
+          "baselineErrorCount": 0,
+          "candidateErrorCount": 0,
+          "baselineDiagnosticDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "candidateDiagnosticDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "kind": "edit_apply",
+          "status": "APPLIED",
+          "contract": "hash-replace-v1",
+          "pathDigest": "b66eff8484181ed11e6753cce778010048c93c6cce8531ee7de115aa840d228b",
+          "beforeDigest": "f1a7963a3c8f9f80f6a1de8f73420ff992fc70b52b82ca4dc54e80fbf3daf0f5",
+          "afterDigest": "e0e8e04b234d9f94239d5744441e20eb1d84de6d9e65292cf26b3dc4de324d6b",
+          "editCount": 1,
+          "recovered": false,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9",
+          "receiptDigest": "00d895b77939e1c7aa9f4f6415b456698b91da76321797324c2c8705e496b634",
+          "lspStatus": "PASS",
+          "postErrorCount": 0,
+          "postDiagnosticDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "lsp-success",
+        "mode": "exact",
+        "toolResults": 3,
+        "snapshotBound": true,
+        "previewStatus": "READY",
+        "previewNonMutating": true,
+        "applyIsError": false,
+        "applyStatus": "APPLIED",
+        "finalDigest": "e0e8e04b234d9f94239d5744441e20eb1d84de6d9e65292cf26b3dc4de324d6b"
+      },
+      "finalContents": "const value: string = 'safer';\n",
+      "receipts": [
+        {
+          "mode": 256,
+          "digest": "00d895b77939e1c7aa9f4f6415b456698b91da76321797324c2c8705e496b634",
+          "validation": {
+            "backendDigest": "f60c114bd993cb1357721680bdd19ff9c92e34b73a1995d330869ca34964f50c",
+            "baselineDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "baselineErrorCount": 0,
+            "candidateDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "candidateErrorCount": 0,
+            "kind": "LSP_WRITE_GUARD",
+            "language": "typescript",
+            "postDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "postErrorCount": 0,
+            "projectDigest": "cdb4ee2aea69cc6a83331bbe96dc2caa9a299d21329efb0336fc02a82e1839a8",
+            "status": "PASS"
+          },
+          "containsRawData": false
+        }
+      ],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "regression": {
+      "status": "COMPLETE",
+      "elapsedMs": 1970.364,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 3,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "b66eff8484181ed11e6753cce778010048c93c6cce8531ee7de115aa840d228b",
+          "contentDigest": "f1a7963a3c8f9f80f6a1de8f73420ff992fc70b52b82ca4dc54e80fbf3daf0f5",
+          "seenRangeCount": 1,
+          "totalLines": 2
+        },
+        {
+          "kind": "edit_preview",
+          "status": "FAIL",
+          "errorCode": "LSP_NEW_BLOCKING_DIAGNOSTIC",
+          "lspClassification": "REGRESSED"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "lsp-regression",
+        "mode": "exact",
+        "toolResults": 2,
+        "snapshotBound": true,
+        "previewIsError": true,
+        "previewStatus": "LSP_NEW_BLOCKING_DIAGNOSTIC",
+        "finalDigest": "f1a7963a3c8f9f80f6a1de8f73420ff992fc70b52b82ca4dc54e80fbf3daf0f5"
+      },
+      "finalContents": "const value: string = 'safe';\n",
+      "receipts": [],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "lspStarted": false,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiSuccessCompleted": true,
+      "candidateOverlayWasNonMutating": true,
+      "postValidatedAtomicApply": true,
+      "immutableValidatedReceipt": true,
+      "regressionBlockedBeforeWrite": true,
+      "metadataOnly": true,
+      "noStagedResidue": true,
+      "commandRegisteredWithoutProviderOrLspStart": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 7,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

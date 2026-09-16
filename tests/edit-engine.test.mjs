@@ -132,12 +132,11 @@ test("receipt persistence failure rolls the already-renamed target back", (t) =>
   assert.equal(engine.status().stats.rollbacks, 1);
 });
 
-test("rollback never overwrites an external change made after the atomic rename", (t) => {
+test("receipt-boundary revalidation detects and preserves an external post-rename change", (t) => {
   let target;
   const data = fixture(t, {
     beforeReceipt: () => {
       fs.writeFileSync(target, "external after atomic rename\n");
-      throw new Error("forced receipt failure");
     },
   });
   const { root, engine } = data;
