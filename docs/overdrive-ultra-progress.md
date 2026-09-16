@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 9 — LSP-on-write / IDE-like edits
-- Last completed phase commit: `b4c2161` — `feat(ultra): add transactional AST edit`
+- Current phase: 10 — DAP Debug Engine
+- Last completed phase commit: `fa1043e` — `feat(ultra): guard transactional writes with LSP`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -49,6 +49,10 @@
 - Added lazy first-use binary attestation for exact version, tracked Linux-x64 SHA-256, ownership/link/executable state, and stable device/inode/size/time identity; ordinary Pi startup and command discovery launch no AST subprocess.
 - Integrated conditional `transactional_ast_edit` selection for semantic structural intent, retained the plugin rewrite only as a governed fallback, and kept search-only, Tester, reviewers, and Council non-mutating.
 - Added strict contract separation between exact and AST transactions, metadata-only match/pattern/rewrite evidence, zero-model `/ast-edit`, package guards, real-CLI adversarial tests, and a real-Pi duplicate-match/stale-race benchmark.
+- Implemented a clean-room internal LSP write guard over the existing exact and AST transaction schemas: baseline and exact candidate bytes are evaluated through the lazy pinned overlay path before mutation, with multiplicity-aware semantic regression classification and language/backend/project binding.
+- Added deterministic TypeScript/JavaScript overlay verification through the existing pinned TypeScript LanguageService after a VTSLS synchronization barrier, eliminating false-green empty-diagnostic timeouts without changing the read-only server contract.
+- Extended atomic apply so the real post-rename filesystem state is diagnosed before receipt publication, then revalidated at the receipt boundary; divergence or new blocking diagnostics trigger conflict-safe rollback and concurrent external work is preserved.
+- Added explicit unsupported/managed-unavailable/runtime-failure policy, metadata-only validation receipts/traces, zero-model `/lsp-write`, package guards, real server crash recovery, focused adversarial tests, and a real-Pi accepted/rejected diagnostic benchmark with no new model-facing schema.
 
 ## Current validation
 
@@ -88,6 +92,10 @@
 - Phase 8 Tool Governor real-Pi rerun: PASS; simple edit 4 tools/2,128 schema characters, search-only 7/3,481 with no mutation, structural edit 8/3,996 with `transactional_ast_edit` and no plugin rewrite, explicit CLI preserved; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 8 transactional AST real-Pi benchmark: PASS on Pi 0.85.1; two identical calls previewed and applied atomically, preview/apply race denied as `STALE_EDIT` while preserving external content, mode-0400 metadata-only `ast-grep-v1` receipt, zero staged residue, `/ast-edit` registered, sentinel proved no eager AST process; eight deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
 - Phase 8 full `npm run check`: 304/304 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 9 focused/adversarial tests: exact/AST transaction regressions plus clean, unchanged, improved, multiplicity-regressed, unsupported, disabled, missing-server, crash, post-divergence, receipt-order, metadata-privacy, real VTSLS overlay, pinned TypeScript verifier, and receipt-boundary TOCTOU cases PASS.
+- Phase 9 real-Pi benchmark: PASS on Pi 0.85.1; a safe TypeScript edit was checked against exact candidate bytes, atomically installed, rechecked from the final filesystem, and issued one mode-0400 metadata-only validation receipt; TS2322 was classified `REGRESSED` and blocked before write with no receipt or residue; `/lsp-write` registered without provider turn or eager server start; seven deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
+- Phase 9 Phase 7/8 real-Pi regressions: PASS; unsupported text remains explicit fail-soft, AST candidates are guarded without changing contract or tool surface, stale races preserve external work, receipts remain private, and cleanup remains complete.
+- Phase 9 full `npm run check`: 317/317 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -108,10 +116,11 @@
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 - Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
 - Pi 0.85.1 exposes no safe in-flight API for changing the active target after final context assembly. The Context Governor therefore blocks an irreducible payload and requires explicit compaction/handoff or an already-policy-compatible target instead of silently changing routing.
-- Edit Engine V2 now owns exact and bounded single-file AST transactions and pre-validates JSON only. Managed LSP-on-write is Phase 9, multi-file structural transactions remain intentionally absent, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- Edit Engine V2 now owns exact and bounded single-file AST transactions, JSON pre-validation, and Phase 9 pre/post managed diagnostics. Multi-file structural/rename/file-move transactions remain intentionally absent, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- Phase 9 validates the edited file within its bound project and does not grant server-originated workspace mutation. Genuinely unsupported file types skip by explicit policy; a configured managed server that is absent/unpinned or a runtime failure blocks the guarded transaction. Multi-file rename/import/file-move control remains deferred until it can be atomic and rollback-safe.
 - The tracked AST binary digest is intentionally Linux-x64-specific, matching the existing package platform contract. First use hashes the 52.4 MB binary, so the measured cold AST path includes that one-time integrity cost; subsequent uses revalidate filesystem identity before using the cache.
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
 
 ## Exact next action
 
-Inspect only the existing managed LSP mux, semantic tool contract, Edit Engine receipt boundary, and the relevant pinned OMP write-through actions. Build the smallest Phase 9 pre/post-write diagnostics layer that binds language/project identity to an edit transaction, classifies mutation-bearing LSP actions, permits only explicitly reviewed safe actions, fails closed on stale or new blocking diagnostics, and preserves lazy server lifecycle, read-only navigation, routing, role permissions, and atomic rollback semantics.
+Inspect the pinned OMP DAP architecture, current Pi extension/tool lifecycle, existing safe-exec/worktree/runtime isolation, Artifact Store, Task/Tool Governor debug intent, and host adapter availability. Build the smallest Phase 10 lazy single-session DAP engine with an explicit adapter allowlist, bounded metadata/artifact output, deterministic timeout/kill/cleanup, no ambient secrets/network, no routing/role changes, no eager process, and no large always-on schema.
