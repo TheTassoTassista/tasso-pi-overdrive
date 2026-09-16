@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 7 — Edit Engine V2
-- Last completed phase commit: `1ad5272` — `feat(ultra): add fail-closed context governor`
+- Current phase: 8 — Transactional AST Edit
+- Last completed phase commit: `1da7da3` — `feat(ultra): add transactional edit engine`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -41,6 +41,10 @@
 - Implemented one clean-room Context Governor as the final package extension, accounting for the assembled prompt, active schemas, conversation, memory, artifacts, summaries, tool output, reserved output, safety margin, and authoritative model/reported context limits.
 - Added fixed-order evidence-preserving reductions, provider proof attestation, fail-closed abort semantics, a separately gated direct `/handoff` path, zero-model `/context-fit`, metadata-only traces, and the gate in every fresh subagent role.
 - Added package guards, 11 adversarial regressions, a deterministic real-Pi fit/block benchmark, handoff regression coverage, and explicit documentation of the safe in-flight route-switch limitation.
+- Implemented clean-room Edit Engine V2 with session-local read snapshots, exact seen-range evidence, unique/disjoint anchored replacements, mandatory preview/apply separation, bounded deterministic relocation, and fail-closed stale/ambiguous behavior.
+- Added descriptor-anchored target/parent identity checks, protected/symlink/hard-link/binary/size defenses, durable adjacent staging, atomic rename, directory fsync, immutable metadata receipts, rollback after receipt failure, and rollback-conflict preservation of external work.
+- Integrated the conditional `transactional_edit` schema with normal reads, exact SmartRead ranges, repository ResourceFS reads, the Tool Governor, Worker profile, safety hooks, metadata-only tracing, zero-model `/edit-engine`, and the separately governed Pi exact-edit fallback.
+- Added package guards, 12 focused/adversarial tests, Tool Governor fallback regressions, and a real-Pi safe-recovery/stale-race benchmark with no external/provider/paid calls.
 
 ## Current validation
 
@@ -73,6 +77,9 @@
 - Phase 6 Context Governor real-Pi benchmark: PASS on Pi 0.85.1; the third request reduced 3,268 to 2,183 estimated input tokens against 2,480 usable by removing one redundant artifact preview (1,085 tokens saved), preserving reopenable references and both critical diagnostics. An irreducible 39,216-token current request was BLOCKED before provider entry; three deterministic local turns, zero network/external-provider/paid calls, cost zero, `/context-fit` and cleanup PASS.
 - Phase 6 direct handoff real-Pi regression: PASS; canonical notebook state survived distillation, the new session was genuinely empty, and no routing/auth/provider configuration changed.
 - Phase 6 full `npm run check`: 283/283 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 7 focused/adversarial tests: 12/12 Edit Engine cases PASS; preview/apply, seen ranges, ambiguity, conservative relocation, stale content, file/parent TOCTOU, rollback, rollback conflict, protected links, JSON syntax, BOM/CRLF, expiry and malformed policy are covered. Tool Governor and compact-surface regressions PASS.
+- Phase 7 real-Pi benchmark: PASS on Pi 0.85.1; safe relocation preserves an external insertion and applies the anchored replacement, preview is non-mutating, a preview/apply race returns `STALE_EDIT` without a receipt, the applied receipt is mode 0400 and metadata-only, no staged residue remains, `/edit-engine` is registered with zero provider turns; eight deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
+- Phase 7 full `npm run check`: 296/296 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The nested-runner control failed only the five expected sandbox-dependent LSP/socket/Bubblewrap files; the authoritative host run passed all 296.
 
 ## Dirty files
 
@@ -93,7 +100,9 @@
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 - Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
 - Pi 0.85.1 exposes no safe in-flight API for changing the active target after final context assembly. The Context Governor therefore blocks an irreducible payload and requires explicit compaction/handoff or an already-policy-compatible target instead of silently changing routing.
+- Edit Engine V2 currently owns exact UTF-8 replacement and pre-validates JSON only. Transactional AST mutation is Phase 8, managed LSP-on-write is Phase 9, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
 
 ## Exact next action
 
-Inspect Pi's exact-string edit lifecycle, read/edit concurrency semantics, tool hooks, ResourceFS/SmartRead evidence identity, LSP validation paths, workflow worktree boundaries, and OMP's pinned hashline edit implementation/tests. Define the smallest transactional Edit Engine V2 with read-bound anchors, stale/ambiguous rejection, preview/apply separation, snapshots, bounded rollback, and exact-string fallback without exposing another broad mutation path.
+Inspect the pinned ast-grep package/API and OMP AST edit transaction only as needed. Build the smallest Phase 8 adapter that converts a bounded structural query/rewrite into an explicit preview with match counts/ranges, binds it to Edit Engine snapshots, denies broad or changed match sets, applies atomically through the existing transaction/receipt path, and retains `ast_grep_rewrite` only as a governed fallback without widening search-only or reviewer permissions.
