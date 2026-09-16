@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 8 — Transactional AST Edit
-- Last completed phase commit: `1da7da3` — `feat(ultra): add transactional edit engine`
+- Current phase: 9 — LSP-on-write / IDE-like edits
+- Last completed phase commit: `b4c2161` — `feat(ultra): add transactional AST edit`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -45,6 +45,10 @@
 - Added descriptor-anchored target/parent identity checks, protected/symlink/hard-link/binary/size defenses, durable adjacent staging, atomic rename, directory fsync, immutable metadata receipts, rollback after receipt failure, and rollback-conflict preservation of external work.
 - Integrated the conditional `transactional_edit` schema with normal reads, exact SmartRead ranges, repository ResourceFS reads, the Tool Governor, Worker profile, safety hooks, metadata-only tracing, zero-model `/edit-engine`, and the separately governed Pi exact-edit fallback.
 - Added package guards, 12 focused/adversarial tests, Tool Governor fallback regressions, and a real-Pi safe-recovery/stale-race benchmark with no external/provider/paid calls.
+- Implemented a clean-room `ast-grep-v1` adapter that runs the pinned CLI only against private exact-snapshot bytes, requires an explicit bounded match count, validates UTF-8 byte ranges/replacement text, and delegates the complete result to Edit Engine V2 for atomic apply and metadata receipts.
+- Added lazy first-use binary attestation for exact version, tracked Linux-x64 SHA-256, ownership/link/executable state, and stable device/inode/size/time identity; ordinary Pi startup and command discovery launch no AST subprocess.
+- Integrated conditional `transactional_ast_edit` selection for semantic structural intent, retained the plugin rewrite only as a governed fallback, and kept search-only, Tester, reviewers, and Council non-mutating.
+- Added strict contract separation between exact and AST transactions, metadata-only match/pattern/rewrite evidence, zero-model `/ast-edit`, package guards, real-CLI adversarial tests, and a real-Pi duplicate-match/stale-race benchmark.
 
 ## Current validation
 
@@ -80,6 +84,10 @@
 - Phase 7 focused/adversarial tests: 12/12 Edit Engine cases PASS; preview/apply, seen ranges, ambiguity, conservative relocation, stale content, file/parent TOCTOU, rollback, rollback conflict, protected links, JSON syntax, BOM/CRLF, expiry and malformed policy are covered. Tool Governor and compact-surface regressions PASS.
 - Phase 7 real-Pi benchmark: PASS on Pi 0.85.1; safe relocation preserves an external insertion and applies the anchored replacement, preview is non-mutating, a preview/apply race returns `STALE_EDIT` without a receipt, the applied receipt is mode 0400 and metadata-only, no staged residue remains, `/edit-engine` is registered with zero provider turns; eight deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
 - Phase 7 full `npm run check`: 296/296 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The nested-runner control failed only the five expected sandbox-dependent LSP/socket/Bubblewrap files; the authoritative host run passed all 296.
+- Phase 8 focused/adversarial tests: real pinned ast-grep duplicate matches after a multibyte prefix, exact UTF-8 range conversion, non-mutating preview, atomic apply, expected-count mismatch, unseen ranges, stale source, overlap, malformed/failed runner output, exact/AST contract confusion, and policy bounds PASS. Edit Engine, Tool Governor, compact surface, TypeScript, and package regressions PASS.
+- Phase 8 Tool Governor real-Pi rerun: PASS; simple edit 4 tools/2,128 schema characters, search-only 7/3,481 with no mutation, structural edit 8/3,996 with `transactional_ast_edit` and no plugin rewrite, explicit CLI preserved; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 8 transactional AST real-Pi benchmark: PASS on Pi 0.85.1; two identical calls previewed and applied atomically, preview/apply race denied as `STALE_EDIT` while preserving external content, mode-0400 metadata-only `ast-grep-v1` receipt, zero staged residue, `/ast-edit` registered, sentinel proved no eager AST process; eight deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
+- Phase 8 full `npm run check`: 304/304 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -100,9 +108,10 @@
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 - Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
 - Pi 0.85.1 exposes no safe in-flight API for changing the active target after final context assembly. The Context Governor therefore blocks an irreducible payload and requires explicit compaction/handoff or an already-policy-compatible target instead of silently changing routing.
-- Edit Engine V2 currently owns exact UTF-8 replacement and pre-validates JSON only. Transactional AST mutation is Phase 8, managed LSP-on-write is Phase 9, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- Edit Engine V2 now owns exact and bounded single-file AST transactions and pre-validates JSON only. Managed LSP-on-write is Phase 9, multi-file structural transactions remain intentionally absent, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- The tracked AST binary digest is intentionally Linux-x64-specific, matching the existing package platform contract. First use hashes the 52.4 MB binary, so the measured cold AST path includes that one-time integrity cost; subsequent uses revalidate filesystem identity before using the cache.
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
 
 ## Exact next action
 
-Inspect the pinned ast-grep package/API and OMP AST edit transaction only as needed. Build the smallest Phase 8 adapter that converts a bounded structural query/rewrite into an explicit preview with match counts/ranges, binds it to Edit Engine snapshots, denies broad or changed match sets, applies atomically through the existing transaction/receipt path, and retains `ast_grep_rewrite` only as a governed fallback without widening search-only or reviewer permissions.
+Inspect only the existing managed LSP mux, semantic tool contract, Edit Engine receipt boundary, and the relevant pinned OMP write-through actions. Build the smallest Phase 9 pre/post-write diagnostics layer that binds language/project identity to an edit transaction, classifies mutation-bearing LSP actions, permits only explicitly reviewed safe actions, fails closed on stale or new blocking diagnostics, and preserves lazy server lifecycle, read-only navigation, routing, role permissions, and atomic rollback semantics.
