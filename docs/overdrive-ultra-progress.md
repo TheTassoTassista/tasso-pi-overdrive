@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 6 — Context Governor
-- Last completed phase commit: `d07a118` — `feat(ultra): add content-addressed artifact store`
+- Current phase: 7 — Edit Engine V2
+- Last completed phase commit: `1ad5272` — `feat(ultra): add fail-closed context governor`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -38,6 +38,9 @@
 - Enforced owner-only directories/files, atomic durable writes, `O_NOFOLLOW`, owner/link/mode/inode checks, content-hash verification, complete private-key and credential redaction, terminal-control sanitization, and pre-redaction quota enforcement.
 - Added separate bounded artifact expiry/orphan retention, `/artifacts` metadata-only inspection, metadata-only tracing, package guards, adversarial regressions, and a real-Pi success/error/deduplication benchmark.
 - Repaired the interrupted benchmark so plain Node owns its deterministic generator while Pi loads the virtual-runtime fixture, and added the provider fixture to syntax validation so duplicate declarations fail the normal gate.
+- Implemented one clean-room Context Governor as the final package extension, accounting for the assembled prompt, active schemas, conversation, memory, artifacts, summaries, tool output, reserved output, safety margin, and authoritative model/reported context limits.
+- Added fixed-order evidence-preserving reductions, provider proof attestation, fail-closed abort semantics, a separately gated direct `/handoff` path, zero-model `/context-fit`, metadata-only traces, and the gate in every fresh subagent role.
+- Added package guards, 11 adversarial regressions, a deterministic real-Pi fit/block benchmark, handoff regression coverage, and explicit documentation of the safe in-flight route-switch limitation.
 
 ## Current validation
 
@@ -66,6 +69,10 @@
 - Phase 5 Artifact Store real-Pi benchmark: PASS on Pi 0.85.1; 46,070 raw tool-result characters to a 5,352-character preview (88.38% reduction), exact lines 419–421 reopened, true tool-error `isError` preserved, critical `ERROR` retained, duplicate payload deduplicated to one private object, and `/artifacts` plus `/resources` registered; four deterministic local provider turns, zero network/external-provider/paid calls, cost zero, temporary cleanup PASS.
 - Phase 5 ResourceFS and Tool Governor real-Pi regressions: PASS; ResourceFS read/secret denial and conditional schema surfaces remain intact, explicit CLI remains authoritative, and the simple edit remains four tools/2,799 schema characters.
 - Phase 5 full `npm run check`: 272/272 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The expected unconfigured worktree run was 270/272 solely because ignored Rust/Go managed binaries are absent; no installation or source change was made.
+- Phase 6 focused Context Governor tests: 11/11 PASS; complete accounting, fixed reduction order, tool-result pairing, critical diagnostics regardless of position, SmartRead/Second Brain/compaction-summary semantics, reported-usage adjustment, authoritative context bounds, non-disclosure, and fail-closed malformed/oversized inputs.
+- Phase 6 Context Governor real-Pi benchmark: PASS on Pi 0.85.1; the third request reduced 3,268 to 2,183 estimated input tokens against 2,480 usable by removing one redundant artifact preview (1,085 tokens saved), preserving reopenable references and both critical diagnostics. An irreducible 39,216-token current request was BLOCKED before provider entry; three deterministic local turns, zero network/external-provider/paid calls, cost zero, `/context-fit` and cleanup PASS.
+- Phase 6 direct handoff real-Pi regression: PASS; canonical notebook state survived distillation, the new session was genuinely empty, and no routing/auth/provider configuration changed.
+- Phase 6 full `npm run check`: 283/283 PASS plus syntax, Ultra fixture syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -84,7 +91,9 @@
 - ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
+- Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
+- Pi 0.85.1 exposes no safe in-flight API for changing the active target after final context assembly. The Context Governor therefore blocks an irreducible payload and requires explicit compaction/handoff or an already-policy-compatible target instead of silently changing routing.
 
 ## Exact next action
 
-Inspect Pi's pre-provider context assembly, compaction hooks, model context metadata, existing Token/Task Governor budgets, SmartRead, Shared Memory Pack, tool schemas, artifact previews, and OMP's pinned compaction/context-note paths. Define one deterministic Context Fit Gate that accounts for current conversation, reserved output, active schemas, memory, artifacts, and target-model usable context before a request; reduce in the mandated order and fail closed or use only an already-policy-compatible route when fit cannot be proven.
+Inspect Pi's exact-string edit lifecycle, read/edit concurrency semantics, tool hooks, ResourceFS/SmartRead evidence identity, LSP validation paths, workflow worktree boundaries, and OMP's pinned hashline edit implementation/tests. Define the smallest transactional Edit Engine V2 with read-bound anchors, stale/ambiguous rejection, preview/apply separation, snapshots, bounded rollback, and exact-string fallback without exposing another broad mutation path.
