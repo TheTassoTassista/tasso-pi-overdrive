@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "binaryVersion": "ast-grep 0.45.3",
+  "binarySha256": "7a5ab30160186184c0bf8bffc87da4af25123c183964cd98c11b0b354137db0a",
+  "maxMatches": 32,
+  "maxPatternChars": 4096,
+  "maxRewriteChars": 4096,
+  "maxCliOutputBytes": 2097152,
+  "timeoutMs": 30000
+}

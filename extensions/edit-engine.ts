@@ -1,6 +1,11 @@
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { EditEngine, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
+import { readAstEditPolicy, TransactionalAstEdit } from "../lib/ast-edit-engine.mjs";
+import { AST_EDIT_CONTRACT, EDIT_CONTRACT, EditEngine, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
 
 const Action = Type.Union([Type.Literal("preview"), Type.Literal("apply")]);
 const Replacement = Type.Object({
@@ -11,6 +16,23 @@ const Replacement = Type.Object({
 function safeCode(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String((error as EditEngineError).code) : error instanceof Error ? error.message : "EDIT_ENGINE_FAILED";
   return /^[A-Z][A-Z0-9_]{2,63}$/u.test(code) ? code : "EDIT_ENGINE_FAILED";
+}
+
+function astGrepBinary(): { path: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number } {
+  const configured = process.env.PI_OVERDRIVE_AST_GREP_BIN?.trim();
+  const candidate = configured || path.join(homedir(), ".local", "share", "pi-overdrive", "lsp-node", "node_modules", "@ast-grep", "cli", "ast-grep");
+  if (!path.isAbsolute(candidate)) throw new Error("AST_BINARY_INVALID");
+  const canonical = fs.realpathSync(candidate);
+  const stat = fs.lstatSync(canonical);
+  if (!stat.isFile() || stat.isSymbolicLink() || (typeof process.getuid === "function" && stat.uid !== process.getuid()) || stat.nlink !== 1 || (stat.mode & 0o111) === 0) throw new Error("AST_BINARY_UNSAFE");
+  return { path: canonical, dev: stat.dev, ino: stat.ino, size: stat.size, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs };
+}
+
+type AstEditPolicy = NonNullable<ReturnType<typeof readAstEditPolicy>>;
+function loadAstEditPolicy(): AstEditPolicy {
+  const policy = readAstEditPolicy();
+  if (!policy) throw new Error("AST_POLICY_UNREADABLE");
+  return policy;
 }
 
 function smartReadEvidence(event: any): { source: string; seenAll?: boolean; seenRanges?: Array<{ start: number; end: number }> } | undefined {
@@ -56,7 +78,24 @@ function evidenceFor(event: any) {
 
 export default function editEngineExtension(pi: ExtensionAPI): void {
   let engine: EditEngine | undefined;
+  let astEngine: TransactionalAstEdit | undefined;
   let initializationError: string | undefined;
+  let astInitializationError: string | undefined;
+  let astVersion: string | undefined;
+  let astBinaryIdentity: { path: string; dev: number; ino: number; size: number; mtimeMs: number; ctimeMs: number } | undefined;
+
+  const ensureAstRuntime = async (cwd: string, policy: AstEditPolicy, signal?: AbortSignal) => {
+    const identity = astGrepBinary();
+    if (astBinaryIdentity?.path === identity.path && astBinaryIdentity.dev === identity.dev && astBinaryIdentity.ino === identity.ino && astBinaryIdentity.size === identity.size && astBinaryIdentity.mtimeMs === identity.mtimeMs && astBinaryIdentity.ctimeMs === identity.ctimeMs && astVersion === policy.binaryVersion) return identity.path;
+    const digest = createHash("sha256").update(fs.readFileSync(identity.path)).digest("hex");
+    if (digest !== policy.binarySha256) throw new Error("AST_BINARY_DIGEST_MISMATCH");
+    const check = await pi.exec(identity.path, ["--version"], { cwd, timeout: 5000, ...(signal ? { signal } : {}) });
+    const version = check.stdout.trim();
+    if (check.code !== 0 || check.killed || version !== policy.binaryVersion) throw new Error("AST_BINARY_VERSION_MISMATCH");
+    astBinaryIdentity = identity;
+    astVersion = version;
+    return identity.path;
+  };
 
   pi.on("session_start", (_event, ctx) => {
     try {
@@ -66,6 +105,23 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       engine = undefined;
       initializationError = safeCode(error);
       pi.events.emit("pi-overdrive:edit-metadata", { kind: "edit_engine", status: "DEGRADED", errorCode: initializationError });
+    }
+    if (!engine) return;
+    try {
+      const astPolicy = loadAstEditPolicy();
+      astEngine = new TransactionalAstEdit({
+        editEngine: engine,
+        policy: astPolicy,
+        runner: async (args: string[], options: { signal?: AbortSignal; timeoutMs: number }) => {
+          const binary = await ensureAstRuntime(ctx.cwd, astPolicy, options.signal);
+          return pi.exec(binary, args, { cwd: ctx.cwd, timeout: options.timeoutMs, ...(options.signal ? { signal: options.signal } : {}) });
+        },
+      });
+      astInitializationError = undefined;
+    } catch (error) {
+      astEngine = undefined;
+      astInitializationError = safeCode(error);
+      pi.events.emit("pi-overdrive:edit-metadata", { kind: "ast_edit_engine", status: "DEGRADED", errorCode: astInitializationError });
     }
   });
 
@@ -123,7 +179,7 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
         }
         if (!parameters.transactionId || parameters.snapshotId !== undefined || parameters.edits !== undefined) throw new Error("EDIT_INPUT_INVALID");
         if (signal?.aborted) throw new Error("Transactional edit aborted before mutation.");
-        const result = engine.apply({ transactionId: parameters.transactionId });
+        const result = engine.apply({ transactionId: parameters.transactionId, expectedContract: EDIT_CONTRACT });
         pi.events.emit("pi-overdrive:edit-metadata", {
           kind: "edit_apply", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
           beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount,
@@ -138,8 +194,75 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
     },
   });
 
+  pi.registerTool({
+    name: "transactional_ast_edit",
+    label: "Transactional AST Edit",
+    description: "Preview and atomically apply one bounded ast-grep pattern rewrite against the exact snapshot content previously observed. Match count is explicit; changed, unseen, overlapping, excessive, stale, or malformed match sets fail closed.",
+    promptSnippet: "Use transactional_ast_edit for bounded structural rewrites after an exact read; preview and verify the match count before apply",
+    promptGuidelines: [
+      "Read every target range first and use its EDIT SNAPSHOT id; structural summaries do not authorize mutation.",
+      "Call preview with one ast-grep pattern/rewrite pair and the exact expectedMatches count. Review every returned hunk before apply.",
+      "Apply only the returned transaction id. Any source change after the read or preview requires a new read and preview.",
+      "Use the separately governed ast_grep_rewrite only as a fallback; this transactional contract is intentionally single-file and capped.",
+    ],
+    parameters: Type.Object({
+      action: Action,
+      snapshotId: Type.Optional(Type.String({ minLength: 36, maxLength: 36, description: "Snapshot id from a prior exact read; required for preview." })),
+      transactionId: Type.Optional(Type.String({ minLength: 36, maxLength: 36, description: "AST transaction id returned by preview; required for apply." })),
+      pattern: Type.Optional(Type.String({ minLength: 1, maxLength: 4096, description: "One ast-grep structural pattern." })),
+      rewrite: Type.Optional(Type.String({ maxLength: 4096, description: "Replacement template using the pattern's meta variables." })),
+      lang: Type.Optional(Type.String({ minLength: 1, maxLength: 32, description: "Optional ast-grep language alias; otherwise inferred from the snapshotted file extension." })),
+      expectedMatches: Type.Optional(Type.Integer({ minimum: 1, maximum: 32, description: "Exact number of replacements expected; mismatch fails closed." })),
+    }, { additionalProperties: false }),
+    async execute(_toolCallId, parameters, signal) {
+      if (!astEngine) throw new Error(`Transactional AST edit unavailable (${astInitializationError ?? "AST_ENGINE_UNAVAILABLE"}).`);
+      if (signal?.aborted) throw new Error("Transactional AST edit aborted before mutation.");
+      try {
+        if (parameters.action === "preview") {
+          if (!parameters.snapshotId || !parameters.pattern || parameters.rewrite === undefined || !parameters.expectedMatches || parameters.transactionId !== undefined) throw new Error("AST_INPUT_INVALID");
+          const result = await astEngine.preview({ snapshotId: parameters.snapshotId, pattern: parameters.pattern, rewrite: parameters.rewrite, lang: parameters.lang, expectedMatches: parameters.expectedMatches }, signal);
+          pi.events.emit("pi-overdrive:edit-metadata", {
+            kind: "ast_edit_preview", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
+            beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount, matchCount: result.matchCount,
+            patternDigest: result.patternDigest, rewriteDigest: result.rewriteDigest, syntaxStatus: result.syntaxStatus,
+          });
+          return { content: [{ type: "text", text: `${result.preview}\n[AST preview only; ${result.matchCount} matches, no file changed. Apply transaction ${result.transactionId} after review.]` }], details: result };
+        }
+        if (!parameters.transactionId || parameters.snapshotId !== undefined || parameters.pattern !== undefined || parameters.rewrite !== undefined || parameters.lang !== undefined || parameters.expectedMatches !== undefined) throw new Error("AST_INPUT_INVALID");
+        const result = astEngine.apply({ transactionId: parameters.transactionId });
+        pi.events.emit("pi-overdrive:edit-metadata", {
+          kind: "ast_edit_apply", status: result.status, contract: result.contract, pathDigest: result.pathDigest,
+          beforeDigest: result.beforeDigest, afterDigest: result.afterDigest, editCount: result.editCount,
+          syntaxStatus: result.syntaxStatus, receiptDigest: result.receipt.sha256,
+        });
+        return { content: [{ type: "text", text: `APPLIED AST transaction ${result.transactionId}; immutable receipt ${result.receipt.sha256}.` }], details: result };
+      } catch (error) {
+        const errorCode = safeCode(error);
+        pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "ast_edit_apply" : "ast_edit_preview", status: "FAIL", contract: AST_EDIT_CONTRACT, errorCode });
+        throw new Error(errorCode === "STALE_EDIT" ? "STALE_EDIT: source changed; read all structural target ranges again." : `Transactional AST edit denied (${errorCode}).`);
+      }
+    },
+  });
+
   pi.registerCommand("edit-engine", {
     description: "Show Edit Engine V2 snapshot/transaction/receipt counters without a model call",
     handler: async (_args, ctx) => ctx.ui.notify(engine ? JSON.stringify(engine.status(), null, 2) : `Edit Engine unavailable (${initializationError ?? "not initialized"}).`, engine ? "info" : "error"),
+  });
+
+  pi.registerCommand("ast-edit", {
+    description: "Show transactional AST edit status without a model call",
+    handler: async (_args, ctx) => {
+      if (!astEngine) {
+        ctx.ui.notify(`Transactional AST edit unavailable (${astInitializationError ?? "not initialized"}).`, "error");
+        return;
+      }
+      try {
+        const astPolicy = loadAstEditPolicy();
+        await ensureAstRuntime(ctx.cwd, astPolicy);
+        ctx.ui.notify(JSON.stringify({ ...astEngine.status(), binaryVersion: astVersion }, null, 2), "info");
+      } catch (error) {
+        ctx.ui.notify(`Transactional AST edit unavailable (${safeCode(error)}).`, "error");
+      }
+    },
   });
 }

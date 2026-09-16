@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-16T16:58:35.272Z",
+  "recordedAt": "2026-09-16T17:12:56.871Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-deterministic-local-provider",
   "piVersion": "0.85.1",
   "overdriveUltra": {
     "recovery": {
       "status": "COMPLETE",
-      "elapsedMs": 258.775,
+      "elapsedMs": 283.244,
       "timedOut": false,
       "exitCode": 0,
       "providerTurns": 4,
@@ -42,11 +42,12 @@
           "editCount": 1,
           "recovered": true,
           "syntaxStatus": "NOT_APPLICABLE_PHASE9",
-          "receiptDigest": "338d29f86122c7dac50ff10fe2a6a217b8555876aaf1a868beed5ef7251d9262"
+          "receiptDigest": "94ce458bcb2c24c0a69a49f5f25e2e28d0642a95eba2a842a4f0db50118f7038"
         }
       ],
       "finalPayload": {
         "scenario": "recovery",
+        "mode": "exact",
         "toolResults": 3,
         "snapshotBound": true,
         "previewStatus": "SAFE_RECOVERY",
@@ -60,7 +61,7 @@
       "receipts": [
         {
           "mode": 256,
-          "digest": "338d29f86122c7dac50ff10fe2a6a217b8555876aaf1a868beed5ef7251d9262",
+          "digest": "94ce458bcb2c24c0a69a49f5f25e2e28d0642a95eba2a842a4f0db50118f7038",
           "containsRawData": false
         }
       ],
@@ -70,7 +71,7 @@
     },
     "stale": {
       "status": "COMPLETE",
-      "elapsedMs": 305.854,
+      "elapsedMs": 290.223,
       "timedOut": false,
       "exitCode": 0,
       "providerTurns": 4,
@@ -103,6 +104,7 @@
       ],
       "finalPayload": {
         "scenario": "stale",
+        "mode": "exact",
         "toolResults": 3,
         "snapshotBound": true,
         "previewStatus": "READY",

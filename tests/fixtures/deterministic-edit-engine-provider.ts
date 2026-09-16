@@ -70,8 +70,9 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 			const results = context.messages.filter((message) => message.role === "toolResult");
 			const completed = results.length;
 			const scenario = process.env.PI_OVERDRIVE_EDIT_AUDIT_SCENARIO ?? "recovery";
+			const mode = process.env.PI_OVERDRIVE_EDIT_AUDIT_MODE ?? "exact";
 			const target = fixturePath();
-			appendReceipt({ kind: "provider_turn", provider: model.provider, model: model.id, completedTools: completed, scenario, fixtureDigest: digestFile(target) });
+			appendReceipt({ kind: "provider_turn", provider: model.provider, model: model.id, completedTools: completed, scenario, mode, fixtureDigest: digestFile(target) });
 			if (completed === 0) {
 				emitToolCall(stream, output, 1, "read", { path: path.relative(process.cwd(), target) });
 				return;
@@ -79,8 +80,9 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 			if (completed === 1) {
 				const snapshotId = textOf(results[0]).match(/\[EDIT SNAPSHOT\]\s+id=([0-9a-f-]{36})/iu)?.[1];
 				if (!snapshotId) throw new Error("edit_audit_snapshot_missing");
-				if (scenario === "recovery") fs.writeFileSync(target, `external prefix\n${fs.readFileSync(target, "utf8")}`);
-				emitToolCall(stream, output, 2, "transactional_edit", { action: "preview", snapshotId, edits: [{ oldText: "anchor old", newText: "anchor new" }] });
+				if (scenario === "recovery" && mode === "exact") fs.writeFileSync(target, `external prefix\n${fs.readFileSync(target, "utf8")}`);
+				if (mode === "ast") emitToolCall(stream, output, 2, "transactional_ast_edit", { action: "preview", snapshotId, pattern: "legacy($X)", rewrite: "modern($X)", lang: "javascript", expectedMatches: 2 });
+				else emitToolCall(stream, output, 2, "transactional_edit", { action: "preview", snapshotId, edits: [{ oldText: "anchor old", newText: "anchor new" }] });
 				return;
 			}
 			if (completed === 2) {
@@ -88,21 +90,21 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				const transactionId = preview.match(/Apply transaction ([0-9a-f-]{36})/iu)?.[1];
 				if (!transactionId) throw new Error("edit_audit_transaction_missing");
 				const current = fs.readFileSync(target, "utf8");
-				previewNonMutating = current.includes("anchor old") && !current.includes("anchor new");
+				previewNonMutating = mode === "ast" ? current.includes("legacy(value)") && !current.includes("modern(value)") : current.includes("anchor old") && !current.includes("anchor new");
 				if (scenario === "stale") fs.writeFileSync(target, "external after preview\n");
-				emitToolCall(stream, output, 3, "transactional_edit", { action: "apply", transactionId });
+				emitToolCall(stream, output, 3, mode === "ast" ? "transactional_ast_edit" : "transactional_edit", { action: "apply", transactionId });
 				return;
 			}
 			const previewText = textOf(results[1]);
 			const applyText = textOf(results[2]);
 			emitText(stream, output, JSON.stringify({
-				scenario,
+				scenario, mode,
 				toolResults: completed,
 				snapshotBound: /\[EDIT SNAPSHOT\]/u.test(textOf(results[0])),
 				previewStatus: previewText.includes("status=SAFE_RECOVERY") ? "SAFE_RECOVERY" : previewText.includes("status=READY") ? "READY" : "UNKNOWN",
 				previewNonMutating,
 				applyIsError: (results[2] as any)?.isError === true,
-				applyStatus: /APPLIED transaction/u.test(applyText) ? "APPLIED" : /STALE_EDIT/u.test(applyText) ? "STALE_EDIT" : "UNKNOWN",
+				applyStatus: /APPLIED(?: AST)? transaction/u.test(applyText) ? "APPLIED" : /STALE_EDIT/u.test(applyText) ? "STALE_EDIT" : "UNKNOWN",
 				finalDigest: digestFile(target),
 			}));
 		} catch (error) {

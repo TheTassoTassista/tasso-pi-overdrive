@@ -13,7 +13,7 @@ import {
 
 const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
-  "transactional_edit", "edit", "write", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
+  "transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
   "verification_gate", "secure_coding_workflow", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
   "resource_fs", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
@@ -41,10 +41,18 @@ test("debugging task exposes required current tools and reports future tools una
 test("structural AST rewrite requires semantic transformation intent", () => {
   const structural = policyFor("Replace every call expression to legacyApi with modernApi across TypeScript source files.");
   assert.equal(structural.taskPolicy.classification.signals.structuralEdit, true);
-  assert.ok(structural.toolPolicy.activeTools.includes("ast_grep_rewrite"));
+  assert.ok(structural.toolPolicy.activeTools.includes("transactional_ast_edit"));
+  assert.equal(structural.toolPolicy.activeTools.includes("ast_grep_rewrite"), false);
   const superficial = policyFor("Use ast_grep_rewrite to change one string value.");
   assert.equal(superficial.taskPolicy.classification.signals.structuralEdit, false);
+  assert.equal(superficial.toolPolicy.activeTools.includes("transactional_ast_edit"), false);
   assert.equal(superficial.toolPolicy.activeTools.includes("ast_grep_rewrite"), false);
+});
+
+test("the plugin structural rewrite remains a fallback when the transactional AST tool is unavailable", () => {
+  const fallback = policyFor("Replace every call expression to legacyApi with modernApi across TypeScript source files.", available.filter((name) => name !== "transactional_ast_edit"));
+  assert.ok(fallback.toolPolicy.activeTools.includes("ast_grep_rewrite"));
+  assert.equal(fallback.toolPolicy.activeTools.includes("transactional_ast_edit"), false);
 });
 
 test("ResourceFS schema is conditional on a supported URI", () => {
@@ -63,7 +71,7 @@ test("search-only tasks do not expose mutation tools", () => {
   const { taskPolicy, toolPolicy } = policyFor("Find every function call matching deprecatedApi without changing files.");
   assert.equal(taskPolicy.classification.signals.mutating, false);
   for (const name of ["ffgrep", "fffind", "ast_grep_run"]) assert.ok(toolPolicy.activeTools.includes(name), name);
-  for (const name of ["transactional_edit", "edit", "write", "ast_grep_rewrite", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
+  for (const name of ["transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
 });
 
 test("research activates memory and web but never browser or hidden integrations by accident", () => {
@@ -111,6 +119,7 @@ test("manual mode can reveal classified rare tools but not raw controller tools"
 test("classification distinguishes all four supported visibility tiers", () => {
   assert.equal(classifyTool("read").tier, "always-essential");
   assert.equal(classifyTool("transactional_edit").tier, "conditional");
+  assert.equal(classifyTool("transactional_ast_edit").tier, "conditional");
   assert.equal(classifyTool("semantic_nav").tier, "conditional");
   assert.equal(classifyTool("agent_browser").tier, "high-risk-conditional");
   assert.equal(classifyTool("safe_exec").tier, "hidden-on-demand");

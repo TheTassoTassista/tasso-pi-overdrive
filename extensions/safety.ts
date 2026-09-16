@@ -45,7 +45,7 @@ export default function (pi: ExtensionAPI) {
       if (!policy.allowed) return { block: true, reason: `AST workspace policy denied (${"reason" in policy ? policy.reason : "policy"})` };
     }
 
-    if ((event.toolName === "write" || event.toolName === "edit" || event.toolName === "transactional_edit" || event.toolName === "ast_grep_rewrite") && candidate) {
+    if ((event.toolName === "write" || event.toolName === "edit" || event.toolName === "transactional_edit" || event.toolName === "transactional_ast_edit" || event.toolName === "ast_grep_rewrite") && candidate) {
       if (isAlwaysProtectedWritePath(candidate)) {
         return { block: true, reason: `Protected path cannot be modified: ${candidate}` };
       }

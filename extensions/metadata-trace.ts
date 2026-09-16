@@ -267,8 +267,11 @@ export default function (pi: ExtensionAPI) {
       seenRangeCount: scalar("seenRangeCount") as number | undefined,
       totalLines: scalar("totalLines") as number | undefined,
       editCount: scalar("editCount") as number | undefined,
+      matchCount: scalar("matchCount") as number | undefined,
       recovered: scalar("recovered") as boolean | undefined,
       syntaxStatus: scalar("syntaxStatus") as string | undefined,
+      patternDigest: scalar("patternDigest") as string | undefined,
+      rewriteDigest: scalar("rewriteDigest") as string | undefined,
     });
   });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));

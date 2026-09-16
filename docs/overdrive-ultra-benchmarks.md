@@ -52,21 +52,21 @@ The local smoke initially failed only because its expected documentation-directo
 
 ## Phase 2 Tool Governor
 
-`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The current Phase 4 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The Phase 8 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
 
 | Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
 |---|---:|---:|---:|---|
-| Starting Overdrive core | 7 | 4,171 | 1,043 | Control |
-| Ultra simple string edit | 4 | 2,799 | 700 | read/edit/LSP/verification; no write/AST/web/browser/controller |
+| Starting Overdrive core | 7 | 3,500 | 875 | Control |
+| Ultra simple string edit | 4 | 2,128 | 532 | read/transactional edit/LSP/verification; no write/AST/web/browser/controller |
 | Ultra search-only | 7 | 3,481 | 871 | FFF + AST search + SmartRead; no mutation |
-| Ultra structural edit | 8 | 4,649 | 1,163 | semantic `structural-edit` activates AST rewrite; SmartRead inspects source |
+| Ultra structural edit | 8 | 3,996 | 999 | semantic `structural-edit` activates transactional AST; plugin rewrite hidden; SmartRead inspects source |
 | Ultra explicit resource URI | 3 | 1,620 | 405 | read + ResourceFS + memory notebook; ResourceFS absent otherwise |
-| Ultra debugging | 11 | 6,056 | 1,514 | focused search/edit/SmartRead/LSP/memory/verify/workflow |
+| Ultra debugging | 11 | 5,385 | 1,347 | focused search/edit/SmartRead/LSP/memory/verify/workflow |
 | Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
 | Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
 | Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
 
-The simple-edit fixture reduces serialized schema size by 32.9% relative to the former seven-tool core. This is an isolated schema-selection benchmark, not a provider billing-token claim and not a claim that every production task will have fewer than seven tools. Hard debugging correctly expands above the old core. `/tools` registration and every visibility/security assertion passed. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product winner is declared.
+The simple-edit fixture reduces serialized schema size by 39.2% relative to the seven-tool control. This is an isolated schema-selection benchmark, not a provider billing-token claim and not a claim that every production task will have fewer than seven tools. Hard debugging correctly expands above the control. `/tools` registration and every visibility/security assertion passed. OMP stays `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product winner is declared.
 
 ## Phase 3 ResourceFS
 
@@ -139,4 +139,20 @@ These are conservative local estimates aligned with Pi's four-character approxim
 | `/edit-engine` registration | PASS | Extension command discovered with zero provider turns |
 | Temporary cleanup | PASS | Benchmark root removed in PASS and FAIL paths |
 
-The recorded recovery and stale scenarios completed in 258.775 ms and 305.854 ms respectively. These are single-host lifecycle measurements, not a latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no cross-product success or performance claim is inferred.
+The current Phase 8 regression rerun recorded recovery and stale scenarios at 283.244 ms and 290.223 ms respectively. These are single-host lifecycle measurements, not a latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no cross-product success or performance claim is inferred.
+
+## Phase 8 Transactional AST Edit
+
+`npm run benchmark:ultra:ast-edit` launches official Pi 0.85.1 with the actual read tool, Edit Engine V2, and lazy pinned ast-grep adapter. Two independent scenarios use eight deterministic local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Duplicate structural matches | PASS | Exact snapshot plus expected count 2; both `legacy(value)` call expressions previewed and replaced by `modern(value)` |
+| Preview isolation | PASS | Live fixture remained unchanged through structural query and transaction creation |
+| Atomic AST apply and receipt | PASS | Final digest matched; one mode-0400 `ast-grep-v1` metadata-only receipt; no staged residue |
+| Preview/apply race | PASS (blocked) | External post-preview content remained intact; apply returned `STALE_EDIT`; no receipt or staged residue |
+| Metadata trace contract | PASS | Only status/counts/digests recorded; no fixture path, pattern/rewrite text, or source body |
+| `/ast-edit` registration | PASS | Zero provider turns; sentinel executable proves session startup/discovery does not launch the lazy runtime |
+| Temporary cleanup | PASS | Benchmark root and private snapshot directories removed in PASS and FAIL paths |
+
+The recorded success and stale scenarios completed in 474.905 ms and 344.731 ms respectively. These are single-host lifecycle measurements, not a latency comparison. The exact pinned CLI and first-use SHA-256 attestation are part of the measurement; OMP remains `NOT_RUN` because Bun >=1.4 is unavailable, so no cross-product success or performance claim is inferred.

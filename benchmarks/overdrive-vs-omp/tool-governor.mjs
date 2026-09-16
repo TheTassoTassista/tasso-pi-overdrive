@@ -96,11 +96,11 @@ try {
   const measurements = [starting, simple, search, structural, resource, debugging, research, browser, explicit];
   const required = {
     allPiRunsComplete: measurements.every((entry) => entry.status === "PASS"),
-    simpleRequiredAccessible: ["read", "edit", "semantic_nav", "verification_gate"].every((name) => simple.toolNames.includes(name)),
+    simpleRequiredAccessible: ["read", "transactional_edit", "semantic_nav", "verification_gate"].every((name) => simple.toolNames.includes(name)) && !simple.toolNames.includes("edit"),
     simpleSchemaReduced: simple.toolCount < starting.toolCount && simple.toolSchemaCharacters < starting.toolSchemaCharacters,
-    simpleHighRiskHidden: ["write", "ast_grep_rewrite", "web_research", "safe_web_fetch", "agent_browser", "safe_exec", "mcp", "subagent", "safe_remove_file"].every((name) => !simple.toolNames.includes(name)),
-    searchOnlyNonMutating: ["ffgrep", "fffind", "ast_grep_run"].every((name) => search.toolNames.includes(name)) && ["grep", "find", "ls", "ast_grep_scan", "edit", "write", "ast_grep_rewrite", "secure_coding_workflow"].every((name) => !search.toolNames.includes(name)),
-    structuralRewriteSemantic: structural.toolNames.includes("ast_grep_rewrite") && !simple.toolNames.includes("ast_grep_rewrite"),
+    simpleHighRiskHidden: ["write", "transactional_ast_edit", "ast_grep_rewrite", "web_research", "safe_web_fetch", "agent_browser", "safe_exec", "mcp", "subagent", "safe_remove_file"].every((name) => !simple.toolNames.includes(name)),
+    searchOnlyNonMutating: ["ffgrep", "fffind", "ast_grep_run"].every((name) => search.toolNames.includes(name)) && ["grep", "find", "ls", "ast_grep_scan", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "secure_coding_workflow"].every((name) => !search.toolNames.includes(name)),
+    structuralRewriteSemantic: structural.toolNames.includes("transactional_ast_edit") && !structural.toolNames.includes("ast_grep_rewrite") && !simple.toolNames.includes("transactional_ast_edit"),
     resourceUriConditional: resource.toolNames.includes("resource_fs") && !simple.toolNames.includes("resource_fs") && !search.toolNames.includes("resource_fs"),
     debuggingFocused: ["fffind", "ast_grep_run", "task_notebook", "secure_coding_workflow"].every((name) => debugging.toolNames.includes(name)) && !debugging.toolNames.includes("agent_browser"),
     researchFocused: ["task_notebook", "web_research", "safe_web_fetch"].every((name) => research.toolNames.includes(name)) && !research.toolNames.includes("agent_browser"),

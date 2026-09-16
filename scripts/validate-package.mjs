@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -75,6 +75,12 @@ try {
 const editEngineExtension = await readFile(path.join(root, 'extensions/edit-engine.ts'), 'utf8');
 for (const marker of ['name: "transactional_edit"', 'action=preview', 'action=apply', 'registerCommand("edit-engine"', 'pi.on("tool_result"']) if (!editEngineExtension.includes(marker)) failures.push(`Edit Engine public integration marker is missing: ${marker}`);
 try {
+  const astEdit = await import(path.join(root, 'lib/ast-edit-engine.mjs'));
+  const policy = astEdit.validateAstEditPolicy(JSON.parse(await readFile(path.join(root, 'config/ast-edit.json'), 'utf8')));
+  if (policy.binaryVersion !== 'ast-grep 0.45.3' || policy.binarySha256 !== '7a5ab30160186184c0bf8bffc87da4af25123c183964cd98c11b0b354137db0a' || policy.maxMatches > 32 || policy.maxCliOutputBytes > 2 * 1024 * 1024) failures.push('Transactional AST edit binary identity or hard bounds changed');
+} catch (error) { failures.push(`Transactional AST edit validation failed: ${error.message}`); }
+for (const marker of ['name: "transactional_ast_edit"', 'expectedMatches', 'ensureAstRuntime', 'AST_BINARY_DIGEST_MISMATCH', 'registerCommand("ast-edit"']) if (!editEngineExtension.includes(marker)) failures.push(`Transactional AST edit integration marker is missing: ${marker}`);
+try {
   const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
   artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));
   if (!artifacts.ARTIFACT_ID.test('a'.repeat(64)) || artifacts.ARTIFACT_ID.test('../escape')) failures.push('Artifact Store ID policy is not path-safe');
@@ -95,7 +101,7 @@ const handoffExtension = await readFile(path.join(root, 'extensions/handoff.ts')
 if (!handoffExtension.includes('governContext({') || handoffExtension.indexOf('governContext({') > handoffExtension.indexOf('ctx.modelRegistry.complete(')) failures.push('/handoff direct provider path is not gated before model completion');
 const metadataTraceExtension = await readFile(path.join(root, 'extensions/metadata-trace.ts'), 'utf8');
 if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.push('Context Governor metadata-only tracing listener is missing');
-if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata')) failures.push('Edit Engine metadata-only tracing listener is missing');
+if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
@@ -175,12 +181,12 @@ for (const name of expectedAgents) {
   const text = await readFile(path.join(root, 'agents', `${name}.md`), 'utf8').catch(() => '');
   if (!text) failures.push(`missing agent ${name}`);
   if (!text.includes('../extensions/context-governor.ts')) failures.push(`${name} does not load the Context Fit Gate in its fresh subagent process`);
-  if (name === 'tester' && /^tools:.*\b(?:bash|safe_exec|transactional_edit|edit|write)\b/mu.test(text)) failures.push('Tester has mutation or general command capability');
+  if (name === 'tester' && /^tools:.*\b(?:bash|safe_exec|transactional_edit|transactional_ast_edit|ast_grep_rewrite|edit|write)\b/mu.test(text)) failures.push('Tester has mutation or general command capability');
   if (name === 'worker' && /^tools:.*\bbash\b/mu.test(text)) failures.push('Worker has free-shell capability');
-  if (name === 'worker' && (!/^tools:.*\btransactional_edit\b/mu.test(text) || !/^tools:.*\bedit\b/mu.test(text) || !text.includes('../extensions/edit-engine.ts'))) failures.push('Worker does not load the governed transactional editor and exact fallback');
+  if (name === 'worker' && (!/^tools:.*\btransactional_edit\b/mu.test(text) || !/^tools:.*\btransactional_ast_edit\b/mu.test(text) || !/^tools:.*\bedit\b/mu.test(text) || !/^tools:.*\bast_grep_rewrite\b/mu.test(text) || !text.includes('../extensions/edit-engine.ts'))) failures.push('Worker does not load transactional editors and both governed fallbacks');
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
-  if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|transactional_edit|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);
+  if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|transactional_edit|transactional_ast_edit|ast_grep_rewrite|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);
   if (name.startsWith('council-') && !/^completionGuard: false$/mu.test(text)) failures.push(`${name} council role must disable implementation-mutation completion semantics`);
 }
 

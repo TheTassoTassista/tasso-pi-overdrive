@@ -1,25 +1,25 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-14T15:15:49.870Z",
+  "recordedAt": "2026-09-16T17:13:50.554Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-deterministic-local-provider",
   "piVersion": "0.85.1",
   "startingOverdrive": {
     "id": "starting-overdrive-core",
     "status": "PASS",
-    "elapsedMs": 391.893,
+    "elapsedMs": 350.937,
     "toolCount": 7,
     "toolNames": [
       "read",
-      "edit",
+      "transactional_edit",
       "write",
       "secure_coding_workflow",
       "mcp",
       "task_notebook",
       "verification_gate"
     ],
-    "toolSchemaCharacters": 4171,
-    "estimatedToolSchemaTokens": 1043,
+    "toolSchemaCharacters": 3500,
+    "estimatedToolSchemaTokens": 875,
     "exitCode": 0,
     "error": null,
     "stderr": ""
@@ -29,16 +29,16 @@
       {
         "id": "ultra-simple-edit",
         "status": "PASS",
-        "elapsedMs": 288.722,
+        "elapsedMs": 283.659,
         "toolCount": 4,
         "toolNames": [
           "read",
-          "edit",
+          "transactional_edit",
           "semantic_nav",
           "verification_gate"
         ],
-        "toolSchemaCharacters": 2799,
-        "estimatedToolSchemaTokens": 700,
+        "toolSchemaCharacters": 2128,
+        "estimatedToolSchemaTokens": 532,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -46,7 +46,7 @@
       {
         "id": "ultra-search-only",
         "status": "PASS",
-        "elapsedMs": 326.842,
+        "elapsedMs": 284.536,
         "toolCount": 7,
         "toolNames": [
           "read",
@@ -66,20 +66,20 @@
       {
         "id": "ultra-structural-edit",
         "status": "PASS",
-        "elapsedMs": 318.469,
+        "elapsedMs": 321.23,
         "toolCount": 8,
         "toolNames": [
           "read",
-          "edit",
+          "transactional_edit",
           "write",
-          "ast_grep_rewrite",
+          "transactional_ast_edit",
           "smart_read",
           "semantic_nav",
           "task_notebook",
           "verification_gate"
         ],
-        "toolSchemaCharacters": 4649,
-        "estimatedToolSchemaTokens": 1163,
+        "toolSchemaCharacters": 3996,
+        "estimatedToolSchemaTokens": 999,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -87,7 +87,7 @@
       {
         "id": "ultra-resource-uri",
         "status": "PASS",
-        "elapsedMs": 400.908,
+        "elapsedMs": 290.442,
         "toolCount": 3,
         "toolNames": [
           "read",
@@ -103,14 +103,14 @@
       {
         "id": "ultra-debugging",
         "status": "PASS",
-        "elapsedMs": 318.383,
+        "elapsedMs": 301.136,
         "toolCount": 11,
         "toolNames": [
           "read",
           "ffgrep",
           "fffind",
           "ast_grep_run",
-          "edit",
+          "transactional_edit",
           "write",
           "smart_read",
           "semantic_nav",
@@ -118,8 +118,8 @@
           "verification_gate",
           "secure_coding_workflow"
         ],
-        "toolSchemaCharacters": 6056,
-        "estimatedToolSchemaTokens": 1514,
+        "toolSchemaCharacters": 5385,
+        "estimatedToolSchemaTokens": 1347,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -127,7 +127,7 @@
       {
         "id": "ultra-research",
         "status": "PASS",
-        "elapsedMs": 344.097,
+        "elapsedMs": 295.584,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -144,7 +144,7 @@
       {
         "id": "ultra-browser",
         "status": "PASS",
-        "elapsedMs": 345.242,
+        "elapsedMs": 285.357,
         "toolCount": 2,
         "toolNames": [
           "read",
@@ -159,7 +159,7 @@
       {
         "id": "explicit-cli-preserved",
         "status": "PASS",
-        "elapsedMs": 286.823,
+        "elapsedMs": 267.796,
         "toolCount": 2,
         "toolNames": [
           "read",

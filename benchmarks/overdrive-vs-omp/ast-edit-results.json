@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-16T17:22:49.514Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "success": {
+      "status": "COMPLETE",
+      "elapsedMs": 474.905,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 4,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "440e601dfb81bb8892f1fb315bbeb3baf8c3a86fbb133e1befa521ec240a5a9b",
+          "contentDigest": "ae7435fa8cb12fbe08a70fd02a45c999f96b126f58d0a033b0fdbc0ee95f4976",
+          "seenRangeCount": 1,
+          "totalLines": 3
+        },
+        {
+          "kind": "ast_edit_preview",
+          "status": "READY",
+          "contract": "ast-grep-v1",
+          "pathDigest": "440e601dfb81bb8892f1fb315bbeb3baf8c3a86fbb133e1befa521ec240a5a9b",
+          "beforeDigest": "ae7435fa8cb12fbe08a70fd02a45c999f96b126f58d0a033b0fdbc0ee95f4976",
+          "afterDigest": "6a2479552f21a3b49a4a4a326e19ac7d3f02a5c0dd0a8f95d501c49f323b16ed",
+          "editCount": 2,
+          "matchCount": 2,
+          "patternDigest": "368c01fa8471e332ddc465d79c7238e3a2f60f59452e9ab290c7e4c05ba9616e",
+          "rewriteDigest": "353bbfdfc0f0dc580d791a2cc475db0246b184abb9082c7976c841432c44d000",
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9"
+        },
+        {
+          "kind": "ast_edit_apply",
+          "status": "APPLIED",
+          "contract": "ast-grep-v1",
+          "pathDigest": "440e601dfb81bb8892f1fb315bbeb3baf8c3a86fbb133e1befa521ec240a5a9b",
+          "beforeDigest": "ae7435fa8cb12fbe08a70fd02a45c999f96b126f58d0a033b0fdbc0ee95f4976",
+          "afterDigest": "6a2479552f21a3b49a4a4a326e19ac7d3f02a5c0dd0a8f95d501c49f323b16ed",
+          "editCount": 2,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9",
+          "receiptDigest": "f8f181c83672906f69c5a7983294d6d38ed49e2942b8a4f847c47286d8c9fc10"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "success",
+        "mode": "ast",
+        "toolResults": 3,
+        "snapshotBound": true,
+        "previewStatus": "READY",
+        "previewNonMutating": true,
+        "applyIsError": false,
+        "applyStatus": "APPLIED",
+        "finalDigest": "6a2479552f21a3b49a4a4a326e19ac7d3f02a5c0dd0a8f95d501c49f323b16ed"
+      },
+      "finalContents": "const first = modern(value);\nconst second = modern(value);\n",
+      "receipts": [
+        {
+          "mode": 256,
+          "digest": "f8f181c83672906f69c5a7983294d6d38ed49e2942b8a4f847c47286d8c9fc10",
+          "contract": "ast-grep-v1",
+          "containsRawData": false
+        }
+      ],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "stale": {
+      "status": "COMPLETE",
+      "elapsedMs": 344.731,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 4,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "440e601dfb81bb8892f1fb315bbeb3baf8c3a86fbb133e1befa521ec240a5a9b",
+          "contentDigest": "ae7435fa8cb12fbe08a70fd02a45c999f96b126f58d0a033b0fdbc0ee95f4976",
+          "seenRangeCount": 1,
+          "totalLines": 3
+        },
+        {
+          "kind": "ast_edit_preview",
+          "status": "READY",
+          "contract": "ast-grep-v1",
+          "pathDigest": "440e601dfb81bb8892f1fb315bbeb3baf8c3a86fbb133e1befa521ec240a5a9b",
+          "beforeDigest": "ae7435fa8cb12fbe08a70fd02a45c999f96b126f58d0a033b0fdbc0ee95f4976",
+          "afterDigest": "6a2479552f21a3b49a4a4a326e19ac7d3f02a5c0dd0a8f95d501c49f323b16ed",
+          "editCount": 2,
+          "matchCount": 2,
+          "patternDigest": "368c01fa8471e332ddc465d79c7238e3a2f60f59452e9ab290c7e4c05ba9616e",
+          "rewriteDigest": "353bbfdfc0f0dc580d791a2cc475db0246b184abb9082c7976c841432c44d000",
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9"
+        },
+        {
+          "kind": "ast_edit_apply",
+          "status": "FAIL",
+          "contract": "ast-grep-v1",
+          "errorCode": "STALE_EDIT"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "stale",
+        "mode": "ast",
+        "toolResults": 3,
+        "snapshotBound": true,
+        "previewStatus": "READY",
+        "previewNonMutating": true,
+        "applyIsError": true,
+        "applyStatus": "STALE_EDIT",
+        "finalDigest": "b9e17bc4c0200b816c4b8987aa426807f852186dc5c36f8402c4e01ac6e85cc7"
+      },
+      "finalContents": "external after preview\n",
+      "receipts": [],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "runtimeInvoked": false,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiAstCompleted": true,
+      "duplicateMatchesPreviewed": true,
+      "atomicAstApply": true,
+      "immutableAstReceipt": true,
+      "staleApplyFailedClosed": true,
+      "metadataOnly": true,
+      "noStagedResidue": true,
+      "commandRegisteredWithoutProviderCall": true,
+      "astRuntimeLazyAtSessionStart": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 8,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}
