@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { CORE_TOOLS, selectInitialToolSurface } from "../extensions/tool-surface.ts";
 
 test("default surface is reduced to the compact core plus one MCP proxy", () => {
-  const all = [...CORE_TOOLS, "bash", "fffind", "agent_browser", "subagent"];
+  const all = [...CORE_TOOLS, "edit", "bash", "fffind", "agent_browser", "subagent"];
   assert.deepEqual(selectInitialToolSurface(all, all, ["--offline"]), [...CORE_TOOLS]);
+  assert.equal(CORE_TOOLS.includes("edit"), false);
+  assert.ok(CORE_TOOLS.includes("transactional_edit"));
 });
 
 test("explicit CLI tool policies are never overridden", () => {

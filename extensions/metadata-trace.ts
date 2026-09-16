@@ -250,6 +250,27 @@ export default function (pi: ExtensionAPI) {
       proofDigest: scalar("proofDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:edit-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "edit_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      contract: scalar("contract") as string | undefined,
+      pathDigest: scalar("pathDigest") as string | undefined,
+      contentDigest: scalar("contentDigest") as string | undefined,
+      beforeDigest: scalar("beforeDigest") as string | undefined,
+      afterDigest: scalar("afterDigest") as string | undefined,
+      receiptDigest: scalar("receiptDigest") as string | undefined,
+      seenRangeCount: scalar("seenRangeCount") as number | undefined,
+      totalLines: scalar("totalLines") as number | undefined,
+      editCount: scalar("editCount") as number | undefined,
+      recovered: scalar("recovered") as boolean | undefined,
+      syntaxStatus: scalar("syntaxStatus") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

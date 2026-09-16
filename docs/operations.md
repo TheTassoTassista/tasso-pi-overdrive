@@ -14,6 +14,7 @@
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
 - Session-scoped Artifact Store: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/artifacts/` (owner-only, content-addressed, sanitized, default retention seven days).
+- Session-scoped Edit Engine receipts: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/edit-receipts/` (owner-only scope directories; immutable mode-0400 metadata receipts; no source path or body).
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 - Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/`.
 - Second Brain service runtimes/state: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services/`; user units live under `${XDG_CONFIG_HOME:-~/.config}/systemd/user/`. Their complete Python dependency graphs are tracked in deterministic lock files, and the embedding snapshot is revision- and checksum-pinned. Embeddings/OpenViking/Hindsight bind only `127.0.0.1:1934`, `:1933`, and `:8889`.
@@ -28,6 +29,8 @@ apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
 Artifact retention is intentionally separate. Pi runs a bounded expiry/orphan pass at session startup. Preview it with `npm run artifacts:retention`; apply only after reviewing the summary with `node scripts/artifact-retention.mjs --apply`. `/artifacts` shows current-session manifest metadata and counters without a model call. Reopen a reported `artifact://<sha256>` through `resource_fs` using a bounded line range or literal search; artifact IDs never map to arbitrary paths and do not cross session/workspace scope.
 
 The Context Governor runs automatically as the final extension before every normal provider request and inside each fresh subagent. Use `/context-fit` for a zero-model-call report of the active provider/model window, reserved output/safety budget, component estimates, and applied reductions. A BLOCKED report means the latest request was not sent; compact or hand off the session, or explicitly choose a route already allowed by policy with a large enough context window. The governor never changes routing automatically. `/handoff` performs the same fit check before its direct distillation request.
+
+Edit Engine V2 runs automatically for exact read-bound changes. Read the exact target range, use `transactional_edit` preview, inspect `READY` or `SAFE_RECOVERY`, then apply the returned transaction. `STALE_EDIT` requires a fresh exact read; do not reuse or guess the old anchor. `/edit-engine` reports current snapshot/transaction/receipt counters without a model call. Pi's built-in exact editor remains a separately governed fallback; AST and rename/LSP write-through use their own later-phase contracts.
 
 ## Daily Pi startup
 

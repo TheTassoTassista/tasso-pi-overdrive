@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-16T16:58:35.272Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "recovery": {
+      "status": "COMPLETE",
+      "elapsedMs": 258.775,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 4,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "76578afc74fc2031c86ab31f7dc02ba00040c4411a0153682c574a492ddf407e",
+          "contentDigest": "bfe25f6b4c7b8b0fe4387eb4d7b46cd9dcef3ba63a3f862e99de06aa57cad527",
+          "seenRangeCount": 1,
+          "totalLines": 4
+        },
+        {
+          "kind": "edit_preview",
+          "status": "SAFE_RECOVERY",
+          "contract": "hash-replace-v1",
+          "pathDigest": "76578afc74fc2031c86ab31f7dc02ba00040c4411a0153682c574a492ddf407e",
+          "beforeDigest": "edf757f13b395435ff4a5b2625ce1bd0673e1850cf5d2062b19dc6a19d4ce828",
+          "afterDigest": "80c28abf3c147d6b36af8dde0703a45cd11205f09ff89155050330485806b7e0",
+          "editCount": 1,
+          "recovered": true,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9"
+        },
+        {
+          "kind": "edit_apply",
+          "status": "APPLIED",
+          "contract": "hash-replace-v1",
+          "pathDigest": "76578afc74fc2031c86ab31f7dc02ba00040c4411a0153682c574a492ddf407e",
+          "beforeDigest": "edf757f13b395435ff4a5b2625ce1bd0673e1850cf5d2062b19dc6a19d4ce828",
+          "afterDigest": "80c28abf3c147d6b36af8dde0703a45cd11205f09ff89155050330485806b7e0",
+          "editCount": 1,
+          "recovered": true,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9",
+          "receiptDigest": "338d29f86122c7dac50ff10fe2a6a217b8555876aaf1a868beed5ef7251d9262"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "recovery",
+        "toolResults": 3,
+        "snapshotBound": true,
+        "previewStatus": "SAFE_RECOVERY",
+        "previewNonMutating": true,
+        "applyIsError": false,
+        "applyStatus": "APPLIED",
+        "finalDigest": "80c28abf3c147d6b36af8dde0703a45cd11205f09ff89155050330485806b7e0"
+      },
+      "finalContents": "external prefix\nheader\nanchor new\ntail\n",
+      "finalDigest": "80c28abf3c147d6b36af8dde0703a45cd11205f09ff89155050330485806b7e0",
+      "receipts": [
+        {
+          "mode": 256,
+          "digest": "338d29f86122c7dac50ff10fe2a6a217b8555876aaf1a868beed5ef7251d9262",
+          "containsRawData": false
+        }
+      ],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "stale": {
+      "status": "COMPLETE",
+      "elapsedMs": 305.854,
+      "timedOut": false,
+      "exitCode": 0,
+      "providerTurns": 4,
+      "editMetadata": [
+        {
+          "kind": "edit_snapshot",
+          "status": "PASS",
+          "contract": "hash-replace-v1",
+          "pathDigest": "76578afc74fc2031c86ab31f7dc02ba00040c4411a0153682c574a492ddf407e",
+          "contentDigest": "bfe25f6b4c7b8b0fe4387eb4d7b46cd9dcef3ba63a3f862e99de06aa57cad527",
+          "seenRangeCount": 1,
+          "totalLines": 4
+        },
+        {
+          "kind": "edit_preview",
+          "status": "READY",
+          "contract": "hash-replace-v1",
+          "pathDigest": "76578afc74fc2031c86ab31f7dc02ba00040c4411a0153682c574a492ddf407e",
+          "beforeDigest": "bfe25f6b4c7b8b0fe4387eb4d7b46cd9dcef3ba63a3f862e99de06aa57cad527",
+          "afterDigest": "ce0d6c0eb3b8cb3b0e6d63545c53c186738489e8be9bb5198ea9d6581ac35959",
+          "editCount": 1,
+          "recovered": false,
+          "syntaxStatus": "NOT_APPLICABLE_PHASE9"
+        },
+        {
+          "kind": "edit_apply",
+          "status": "FAIL",
+          "errorCode": "STALE_EDIT"
+        }
+      ],
+      "finalPayload": {
+        "scenario": "stale",
+        "toolResults": 3,
+        "snapshotBound": true,
+        "previewStatus": "READY",
+        "previewNonMutating": true,
+        "applyIsError": true,
+        "applyStatus": "STALE_EDIT",
+        "finalDigest": "b9e17bc4c0200b816c4b8987aa426807f852186dc5c36f8402c4e01ac6e85cc7"
+      },
+      "finalContents": "external after preview\n",
+      "finalDigest": "b9e17bc4c0200b816c4b8987aa426807f852186dc5c36f8402c4e01ac6e85cc7",
+      "receipts": [],
+      "stagedFiles": 0,
+      "stderrBytes": 0,
+      "stderrDigest": null
+    },
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiRecoveryCompleted": true,
+      "snapshotBoundAndPreviewed": true,
+      "safeRecoveryApplied": true,
+      "immutableMetadataReceipt": true,
+      "staleRunCompleted": true,
+      "staleApplyFailedClosed": true,
+      "noStagedResidue": true,
+      "metadataOnly": true,
+      "commandRegisteredWithoutProviderCall": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 8,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

@@ -13,7 +13,7 @@ import {
 
 const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
-  "edit", "write", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
+  "transactional_edit", "edit", "write", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
   "verification_gate", "secure_coding_workflow", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
   "resource_fs", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
@@ -23,16 +23,17 @@ function policyFor(task, availableTools = available) {
   return { taskPolicy, toolPolicy: resolveToolPolicy({ taskPolicy, availableTools }) };
 }
 
-test("simple edit gets read/edit/LSP/verification without search or controller surfaces", () => {
+test("simple edit gets the transactional editor, LSP, and verification without fallback or controller surfaces", () => {
   const { toolPolicy } = policyFor("Change one string value.");
-  for (const name of ["read", "edit", "semantic_nav", "verification_gate"]) assert.ok(toolPolicy.activeTools.includes(name), name);
-  for (const name of ["grep", "fffind", "write", "ast_grep_rewrite", "web_research", "agent_browser", "safe_exec", "mcp", "bash", "subagent", "safe_remove_file", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
+  for (const name of ["read", "transactional_edit", "semantic_nav", "verification_gate"]) assert.ok(toolPolicy.activeTools.includes(name), name);
+  for (const name of ["edit", "grep", "fffind", "write", "ast_grep_rewrite", "web_research", "agent_browser", "safe_exec", "mcp", "bash", "subagent", "safe_remove_file", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
   assert.ok(toolPolicy.activeTools.length < available.length / 2);
 });
 
 test("debugging task exposes required current tools and reports future tools unavailable", () => {
   const { toolPolicy } = policyFor("Find and fix the intermittent race condition under load in src/queue.ts.");
-  for (const name of ["read", "ffgrep", "fffind", "ast_grep_run", "edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow"]) assert.ok(toolPolicy.activeTools.includes(name), name);
+  for (const name of ["read", "ffgrep", "fffind", "ast_grep_run", "transactional_edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow"]) assert.ok(toolPolicy.activeTools.includes(name), name);
+  assert.equal(toolPolicy.activeTools.includes("edit"), false);
   for (const name of ["grep", "find", "ls", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
   assert.deepEqual(toolPolicy.unavailableCapabilities.filter((entry) => ["debug", "eval", "sentinel"].includes(entry)), ["debug", "eval", "sentinel"]);
 });
@@ -62,7 +63,7 @@ test("search-only tasks do not expose mutation tools", () => {
   const { taskPolicy, toolPolicy } = policyFor("Find every function call matching deprecatedApi without changing files.");
   assert.equal(taskPolicy.classification.signals.mutating, false);
   for (const name of ["ffgrep", "fffind", "ast_grep_run"]) assert.ok(toolPolicy.activeTools.includes(name), name);
-  for (const name of ["edit", "write", "ast_grep_rewrite", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
+  for (const name of ["transactional_edit", "edit", "write", "ast_grep_rewrite", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
 });
 
 test("research activates memory and web but never browser or hidden integrations by accident", () => {
@@ -85,6 +86,14 @@ test("missing tools are reported rather than invented", () => {
   assert.deepEqual(toolPolicy.unavailableCapabilities, ["edit", "lsp", "verify"]);
 });
 
+test("the built-in exact editor remains an automatic fallback when the transactional editor is unavailable", () => {
+  const withoutTransactional = available.filter((name) => name !== "transactional_edit");
+  const { toolPolicy } = policyFor("Change one string value.", withoutTransactional);
+  assert.ok(toolPolicy.activeTools.includes("edit"));
+  assert.equal(toolPolicy.activeTools.includes("transactional_edit"), false);
+  assert.equal(toolPolicy.activeTools.includes("write"), false);
+});
+
 test("explicit CLI selection forms remain authoritative", () => {
   for (const argv of [["--tools", "read"], ["--tools=read"], ["-t", "read"], ["--no-tools"], ["--exclude-tools=write"], ["-xt", "write"]]) assert.equal(hasExplicitToolCliPolicy(argv), true, argv.join(" "));
   assert.equal(hasExplicitToolCliPolicy(["--offline"]), false);
@@ -101,6 +110,7 @@ test("manual mode can reveal classified rare tools but not raw controller tools"
 
 test("classification distinguishes all four supported visibility tiers", () => {
   assert.equal(classifyTool("read").tier, "always-essential");
+  assert.equal(classifyTool("transactional_edit").tier, "conditional");
   assert.equal(classifyTool("semantic_nav").tier, "conditional");
   assert.equal(classifyTool("agent_browser").tier, "high-risk-conditional");
   assert.equal(classifyTool("safe_exec").tier, "hidden-on-demand");

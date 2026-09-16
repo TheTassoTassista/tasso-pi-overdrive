@@ -124,3 +124,19 @@ The recorded run completed the tool sequence in 383.318 ms. Using the declared f
 | Temporary cleanup | PASS | benchmark root removed in both PASS and FAIL paths |
 
 These are conservative local estimates aligned with Pi's four-character approximation, not provider billing tokens. The benchmark proves pre-provider behavior and preservation properties; it does not claim an automatic model switch or cross-product superiority. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable.
+
+## Phase 7 Edit Engine V2
+
+`npm run benchmark:ultra:edit-engine` launches official Pi 0.85.1 with the actual read tool and Edit Engine V2. Two independent scenarios use eight deterministic local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Read-bound safe relocation | PASS | Snapshot footer observed; one-line external insertion preserved; preview reports `SAFE_RECOVERY`; apply produces the intended anchored replacement |
+| Preview isolation | PASS | Fixture still contains `anchor old` after preview and before apply |
+| Atomic apply and receipt | PASS | Final content digest matches; one mode-0400 metadata-only receipt; no path/source text; no staged residue |
+| Preview/apply race | PASS (blocked) | External replacement made after preview remains intact; apply returns `STALE_EDIT`; no receipt or staged residue |
+| Metadata trace contract | PASS | Snapshot/preview/apply records contain only status, counts and digests; no fixture path or source text |
+| `/edit-engine` registration | PASS | Extension command discovered with zero provider turns |
+| Temporary cleanup | PASS | Benchmark root removed in PASS and FAIL paths |
+
+The recorded recovery and stale scenarios completed in 258.775 ms and 305.854 ms respectively. These are single-host lifecycle measurements, not a latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no cross-product success or performance claim is inferred.

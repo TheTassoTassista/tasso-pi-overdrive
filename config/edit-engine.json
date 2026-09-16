@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "maxFileBytes": 4194304,
+  "maxSnapshots": 128,
+  "maxTransactions": 64,
+  "snapshotTtlMs": 1800000,
+  "maxEditsPerTransaction": 32,
+  "maxEditChars": 1048576,
+  "maxPreviewChars": 12000,
+  "recoveryMaxLineShift": 64,
+  "recoveryContextChars": 160,
+  "maxReceiptsPerSession": 256
+}

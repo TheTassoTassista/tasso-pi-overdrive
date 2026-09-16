@@ -13,7 +13,7 @@ import {
 
 export const CORE_TOOLS = Object.freeze([
   "read",
-  "edit",
+  "transactional_edit",
   "write",
   "secure_coding_workflow",
   "mcp",
