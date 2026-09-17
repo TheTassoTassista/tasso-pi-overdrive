@@ -305,6 +305,37 @@ export default function (pi: ExtensionAPI) {
       variableCount: scalar("variableCount") as number | undefined,
     });
   });
+  pi.events.on("pi-overdrive:eval-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "eval_metadata",
+      kind: scalar("kind") as string | undefined,
+      language: scalar("language") as string | undefined,
+      dialect: scalar("dialect") as string | undefined,
+      action: scalar("action") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      state: scalar("state") as string | undefined,
+      sandboxed: scalar("sandboxed") as boolean | undefined,
+      network: scalar("network") as boolean | undefined,
+      projectWorkspaceMounted: scalar("projectWorkspaceMounted") as boolean | undefined,
+      hostUserFilesystem: scalar("hostUserFilesystem") as boolean | undefined,
+      systemRuntimeReadOnly: scalar("systemRuntimeReadOnly") as boolean | undefined,
+      subprocessBridge: scalar("subprocessBridge") as boolean | undefined,
+      persistent: scalar("persistent") as boolean | undefined,
+      activeKernels: scalar("activeKernels") as number | undefined,
+      durationMs: scalar("durationMs") as number | undefined,
+      outputBytes: scalar("outputBytes") as number | undefined,
+      outputTruncated: scalar("outputTruncated") as boolean | undefined,
+      valueTruncated: scalar("valueTruncated") as boolean | undefined,
+      starts: scalar("starts") as number | undefined,
+      executions: scalar("executions") as number | undefined,
+      timeouts: scalar("timeouts") as number | undefined,
+      crashes: scalar("crashes") as number | undefined,
+      cleanups: scalar("cleanups") as number | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

@@ -14,7 +14,7 @@ import {
 const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
   "transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
-  "verification_gate", "secure_coding_workflow", "debug_engine", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
+  "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
   "resource_fs", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
 
@@ -30,12 +30,19 @@ test("simple edit gets the transactional editor, LSP, and verification without f
   assert.ok(toolPolicy.activeTools.length < available.length / 2);
 });
 
-test("debugging task exposes the governed DAP engine and reports later phases unavailable", () => {
+test("debugging task exposes the governed DAP and eval engines and reports later phases unavailable", () => {
   const { toolPolicy } = policyFor("Find and fix the intermittent race condition under load in src/queue.ts.");
-  for (const name of ["read", "ffgrep", "fffind", "ast_grep_run", "transactional_edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow", "debug_engine"]) assert.ok(toolPolicy.activeTools.includes(name), name);
+  for (const name of ["read", "ffgrep", "fffind", "ast_grep_run", "transactional_edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript"]) assert.ok(toolPolicy.activeTools.includes(name), name);
   assert.equal(toolPolicy.activeTools.includes("edit"), false);
   for (const name of ["grep", "find", "ls", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
-  assert.deepEqual(toolPolicy.unavailableCapabilities.filter((entry) => ["debug", "eval", "sentinel"].includes(entry)), ["eval", "sentinel"]);
+  assert.deepEqual(toolPolicy.unavailableCapabilities.filter((entry) => ["debug", "eval", "sentinel"].includes(entry)), ["sentinel"]);
+});
+
+test("explicit computation receives eval without exposing mutation or debugger authority", () => {
+  const { taskPolicy, toolPolicy } = policyFor("Use persistent Python to calculate statistics for this JSON dataset.");
+  assert.equal(taskPolicy.needs.eval, true);
+  for (const name of ["persistent_python", "persistent_javascript"]) assert.ok(toolPolicy.activeTools.includes(name), name);
+  for (const name of ["transactional_edit", "write", "debug_engine", "safe_exec", "bash"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
 });
 
 test("structural AST rewrite requires semantic transformation intent", () => {
@@ -122,6 +129,8 @@ test("classification distinguishes all four supported visibility tiers", () => {
   assert.equal(classifyTool("transactional_ast_edit").tier, "conditional");
   assert.equal(classifyTool("semantic_nav").tier, "conditional");
   assert.equal(classifyTool("debug_engine").tier, "conditional");
+  assert.equal(classifyTool("persistent_python").tier, "conditional");
+  assert.equal(classifyTool("persistent_javascript").tier, "conditional");
   assert.equal(classifyTool("agent_browser").tier, "high-risk-conditional");
   assert.equal(classifyTool("safe_exec").tier, "hidden-on-demand");
   assert.equal(classifyTool("ast_grep_scan").tier, "hidden-on-demand");

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-17T13:52:04.098Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-persistent-python-javascript-bubblewrap",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 2570.554,
+    "providerTurns": 9,
+    "toolResults": 8,
+    "evalMetadataEvents": 8,
+    "pythonKernelStable": true,
+    "javascriptKernelStable": true,
+    "modelFacingOutputChars": 3886,
+    "artifactMetadataEvents": 1,
+    "artifactManifests": 1,
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "kernelProcessFound": false,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiWorkflowCompleted": true,
+      "pythonStatePersisted": true,
+      "javascriptAndTypeScriptStatePersisted": true,
+      "isolationEnforced": true,
+      "largeOutputExternalized": true,
+      "metadataOnly": true,
+      "deterministicCleanup": true,
+      "lazyCommandSurface": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 9,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "temporaryProcessResidue": false,
+    "hostFixtureUnchanged": true,
+    "temporaryRemoved": true
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderrDigest": null
+}

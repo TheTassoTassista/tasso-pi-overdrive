@@ -69,6 +69,7 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 
 export default function registerSingleToolProvider(pi: ExtensionAPI): void {
 	pi.events.on("pi-overdrive:dap-metadata", (value) => appendAudit({ auditKind: "dap_metadata", ...(value as object) }));
+	pi.events.on("pi-overdrive:eval-metadata", (value) => appendAudit({ auditKind: "eval_metadata", ...(value as object) }));
 	pi.events.on("pi-overdrive:artifact-metadata", (value) => appendAudit({ auditKind: "artifact_metadata", ...(value as object) }));
 	pi.registerProvider("pi-overdrive-tool-audit", {
 		baseUrl: "http://127.0.0.1.invalid",

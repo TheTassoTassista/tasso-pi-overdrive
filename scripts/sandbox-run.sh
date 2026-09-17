@@ -8,6 +8,7 @@ database=
 schema=
 relative_cwd=.
 workspace_read_only=0
+minimal_runtime=0
 tool_root=${PI_OVERDRIVE_TOOL_ROOT:-"$HOME/.local/share/pi-overdrive/lsp-node"}
 
 while [[ $# -gt 0 ]]; do
@@ -18,6 +19,7 @@ while [[ $# -gt 0 ]]; do
     --database) database=${2:-}; shift 2 ;;
     --schema) schema=${2:-}; shift 2 ;;
     --workspace-read-only) workspace_read_only=1; shift ;;
+    --minimal-runtime) minimal_runtime=1; shift ;;
     *) break ;;
   esac
 done
@@ -53,38 +55,40 @@ runtime_args=()
 tool_args=()
 protected_args=()
 tool_path=/usr/bin:/bin
-if [[ -d "$tool_root/node_modules/.bin" ]]; then
-  tool_root=$(realpath -e -- "$tool_root")
-  tool_args+=(
-    --ro-bind "$tool_root" /opt/pi-overdrive-tools
-    --setenv PI_OVERDRIVE_TYPESCRIPT /opt/pi-overdrive-tools/node_modules/typescript/lib/typescript.js
-  )
-  tool_path=/opt/pi-overdrive-tools/node_modules/.bin:/usr/bin:/bin
-fi
-if [[ -x "$tool_root/managed/bin/rust-analyzer" || -x "$tool_root/managed/bin/gopls" ]]; then
-  if [[ ${tool_args[*]} != *"/opt/pi-overdrive-tools"* ]]; then
+if (( minimal_runtime == 0 )); then
+  if [[ -d "$tool_root/node_modules/.bin" ]]; then
     tool_root=$(realpath -e -- "$tool_root")
-    tool_args+=(--ro-bind "$tool_root" /opt/pi-overdrive-tools)
-  fi
-  tool_path=/opt/pi-overdrive-tools/managed/bin:/opt/pi-overdrive-tools/managed/go/bin:$tool_path
-  if [[ -d "$tool_root/managed/rust-src/lib/rustlib/src/rust/library" ]]; then
     tool_args+=(
-      --setenv RUST_SRC_PATH /opt/pi-overdrive-tools/managed/rust-src/lib/rustlib/src/rust/library
-      --setenv CARGO_HOME /tmp/cargo-home
-      --setenv CARGO_TARGET_DIR /tmp/cargo-target
-      --setenv CARGO_NET_OFFLINE true
+      --ro-bind "$tool_root" /opt/pi-overdrive-tools
+      --setenv PI_OVERDRIVE_TYPESCRIPT /opt/pi-overdrive-tools/node_modules/typescript/lib/typescript.js
     )
+    tool_path=/opt/pi-overdrive-tools/node_modules/.bin:/usr/bin:/bin
   fi
-  if [[ -x "$tool_root/managed/go/bin/go" ]]; then
-    tool_args+=(
-      --setenv GOROOT /opt/pi-overdrive-tools/managed/go
-      --setenv GOPATH /tmp/go
-      --setenv GOCACHE /tmp/go-cache
-      --setenv GOMODCACHE /tmp/go-mod-cache
-      --setenv GOTOOLCHAIN local
-      --setenv GOPROXY off
-      --setenv GOSUMDB off
-    )
+  if [[ -x "$tool_root/managed/bin/rust-analyzer" || -x "$tool_root/managed/bin/gopls" ]]; then
+    if [[ ${tool_args[*]} != *"/opt/pi-overdrive-tools"* ]]; then
+      tool_root=$(realpath -e -- "$tool_root")
+      tool_args+=(--ro-bind "$tool_root" /opt/pi-overdrive-tools)
+    fi
+    tool_path=/opt/pi-overdrive-tools/managed/bin:/opt/pi-overdrive-tools/managed/go/bin:$tool_path
+    if [[ -d "$tool_root/managed/rust-src/lib/rustlib/src/rust/library" ]]; then
+      tool_args+=(
+        --setenv RUST_SRC_PATH /opt/pi-overdrive-tools/managed/rust-src/lib/rust/library
+        --setenv CARGO_HOME /tmp/cargo-home
+        --setenv CARGO_TARGET_DIR /tmp/cargo-target
+        --setenv CARGO_NET_OFFLINE true
+      )
+    fi
+    if [[ -x "$tool_root/managed/go/bin/go" ]]; then
+      tool_args+=(
+        --setenv GOROOT /opt/pi-overdrive-tools/managed/go
+        --setenv GOPATH /tmp/go
+        --setenv GOCACHE /tmp/go-cache
+        --setenv GOMODCACHE /tmp/go-mod-cache
+        --setenv GOTOOLCHAIN local
+        --setenv GOPROXY off
+        --setenv GOSUMDB off
+      )
+    fi
   fi
 fi
 
@@ -108,7 +112,7 @@ if [[ -e "$root/.git" || -L "$root/.git" ]]; then
   protected_args+=(--ro-bind "$root/.git" /workspace/.git)
 fi
 pi_args=()
-if command -v pi >/dev/null 2>&1; then
+if (( minimal_runtime == 0 )) && command -v pi >/dev/null 2>&1; then
   pi_entry=$(realpath -e -- "$(command -v pi)")
   pi_root=$(realpath -e -- "$(dirname -- "$pi_entry")/../..")
   if [[ -f "$pi_root/package.json" ]]; then

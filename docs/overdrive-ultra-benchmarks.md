@@ -44,7 +44,7 @@ The benchmark tree is `benchmarks/overdrive-vs-omp/`. Later results must use the
 | Intermittent race under load | PASS; Planner/memory/debug/eval/Sentinel/reviewer | 9 | 5 |
 | Critical production migration | PASS; Planner/reviewer/Council | 3 | 11 |
 
-Timing is a local microbenchmark and not a cross-product superiority claim. OMP remains `NOT_RUN` because its required Bun runtime is unavailable. The DAP intent now resolves to the bounded Phase 10 engine; eval and Sentinel intents remain policy decisions rather than claims that those later tools already exist.
+Timing is a local microbenchmark and not a cross-product superiority claim. OMP remains `NOT_RUN` because its required Bun runtime is unavailable. DAP and eval intents now resolve to the bounded Phase 10 and Phase 11 engines; Sentinel remains a policy decision rather than a claim that the later tool already exists.
 
 ## Known baseline finding
 
@@ -52,7 +52,7 @@ The local smoke initially failed only because its expected documentation-directo
 
 ## Phase 2 Tool Governor
 
-`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The Phase 10 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The Phase 11 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
 
 | Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
 |---|---:|---:|---:|---|
@@ -61,7 +61,7 @@ The local smoke initially failed only because its expected documentation-directo
 | Ultra search-only | 7 | 3,481 | 871 | FFF + AST search + SmartRead; no mutation |
 | Ultra structural edit | 8 | 3,996 | 999 | semantic `structural-edit` activates transactional AST; plugin rewrite hidden; SmartRead inspects source |
 | Ultra explicit resource URI | 3 | 1,620 | 405 | read + ResourceFS + memory notebook; ResourceFS absent otherwise |
-| Ultra debugging | 12 | 5,860 | 1,465 | focused search/edit/SmartRead/LSP/memory/DAP/verify/workflow |
+| Ultra debugging | 14 | 6,852 | 1,713 | focused search/edit/SmartRead/LSP/memory/DAP/Python+JS eval/verify/workflow |
 | Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
 | Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
 | Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
@@ -188,3 +188,19 @@ The recorded safe and rejected scenarios completed in 2,078.088 ms and 1,970.364
 | Cleanup | PASS | No adapter/debuggee process residue, no workspace write residue, and the temporary root is removed |
 
 The complete sequence finished in 534.824 ms on this host. It is a lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 11 persistent eval
+
+`npm run benchmark:ultra:persistent-eval` launches official Pi 0.85.1 with the actual conditional eval extension, exact pinned Python 3.14.7 and Node 26.8.1 runtimes, Bubblewrap, Artifact Store, and a deterministic local provider. Eight real tool calls use nine local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Python retained state | PASS | First cell stores 40; a later cell returns 42 from the same kernel |
+| JavaScript/TypeScript retained state | PASS | JavaScript stores 40; TypeScript consumes the same state and returns 42 |
+| Project/filesystem/process/network isolation | PASS | Project workspace and user home are absent; Python direct imports/open/subprocess/socket are denied; JavaScript has no process/require/fetch/Buffer/string code generation |
+| Large eval output | PASS | A 24 KiB long line is externalized by Artifact Store; the complete bounded sequence exposes 3,886 model-facing characters with one manifest |
+| Metadata contract | PASS | Eight eval metadata events contain only language/action/status/isolation/count/timing data; no code, output, value, prompt, path, or secret |
+| Lazy command | PASS | `/eval-engine` is registered, uses zero provider turns, and starts no kernel process |
+| Cleanup | PASS | Explicit termination leaves no kernel process, host-fixture change, or private temporary root |
+
+The complete sequence finished in 2,570.554 ms on this host. It is a lifecycle/security observation, not a cross-product latency comparison. Language-level restrictions are defense in depth: the security boundary measured here is the networkless minimal Bubblewrap sandbox with no project/user-home/owner-local-tool mount and a pinned process limit that leaves the Node runtime functional but denies additional process creation. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.

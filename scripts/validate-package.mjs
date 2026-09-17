@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -35,6 +35,7 @@ if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('Res
 if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/edit-engine.ts')) failures.push('Edit Engine V2 extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/debug-engine.ts')) failures.push('sandboxed DAP Debug Engine extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/persistent-eval.ts')) failures.push('sandboxed Persistent Eval extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
 if (!(pkg.pi.extensions.indexOf('./extensions/smart-read.ts') < pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') && pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('Edit Engine must observe reads after SmartRead and before Artifact Store rewriting');
 if (pkg.pi.extensions.at(-1) !== './extensions/context-governor.ts') failures.push('Context Governor must be the final extension so it sees the complete model payload');
@@ -98,8 +99,26 @@ try {
 } catch (error) { failures.push(`DAP Debug Engine validation failed: ${error.message}`); }
 const dapExtension = await readFile(path.join(root, 'extensions/debug-engine.ts'), 'utf8');
 for (const marker of ['name: "debug_engine"', 'registerCommand("debug-engine"', 'session_shutdown', 'No attach']) if (!dapExtension.includes(marker)) failures.push(`DAP Debug Engine integration marker is missing: ${marker}`);
+try {
+  const evalEngine = await import(path.join(root, 'lib/persistent-eval.mjs'));
+  const policy = evalEngine.validateEvalPolicy(JSON.parse(await readFile(path.join(root, 'config/eval-engine.json'), 'utf8')));
+  if (!policy.enabled || policy.platform !== 'linux-x64' || policy.runtimes.python.binaryPath !== '/usr/bin/python3.14' || policy.runtimes.python.binaryVersion !== 'Python 3.14.7' || policy.runtimes.python.binarySha256 !== 'dd65a07e8f535525443d63e2bd6dd10efbf22bf22e0b6d65e634266acc7ac976') failures.push('Persistent Python identity is not the exact reviewed host binary');
+  if (policy.runtimes.javascript.binaryPath !== '/usr/bin/node' || policy.runtimes.javascript.binaryVersion !== 'v26.8.1' || policy.runtimes.javascript.binarySha256 !== 'f595d3d6e782e7524d5cd73214048a7f3dd9b28a6b4c0f486fdd87d94891f239' || policy.runtimes.javascript.typescriptCompiler?.version !== '6.0.3' || policy.runtimes.javascript.typescriptCompiler?.sha256 !== '569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39') failures.push('Persistent JavaScript/TypeScript identity is not the exact reviewed runtime');
+  if (policy.processLimiter?.binaryPath !== '/usr/bin/prlimit' || policy.processLimiter?.binaryVersion !== 'prlimit from util-linux 2.42.3' || policy.processLimiter?.binarySha256 !== '2a563aca66c05649e310c9582a79d31195cddc2fa5e441ac758c8357106fc491' || JSON.stringify(policy.processLimiter?.arguments) !== JSON.stringify(['--nproc=8', '--'])) failures.push('Persistent Eval process limiter is not the exact reviewed runtime');
+  if (JSON.stringify(policy.runtimes.python.arguments) !== JSON.stringify(['-I', '-B', '-u']) || JSON.stringify(policy.runtimes.javascript.arguments) !== JSON.stringify(['--no-addons', '--disable-proto=throw', '--max-old-space-size=192']) || policy.maxExecutionTimeoutMs > 15000 || policy.maxOutputBytes > 256 * 1024 || policy.maxCodeChars > 65536) failures.push('Persistent Eval runtime arguments or hard bounds changed');
+} catch (error) { failures.push(`Persistent Eval validation failed: ${error.message}`); }
+const evalExtension = await readFile(path.join(root, 'extensions/persistent-eval.ts'), 'utf8');
+for (const marker of ['register("persistent_python"', 'register("persistent_javascript"', 'registerCommand("eval-engine"', 'session_shutdown', 'No project mount']) if (!evalExtension.includes(marker)) failures.push(`Persistent Eval integration marker is missing: ${marker}`);
+for (const [relative, markers] of [
+  ['runtime/eval/python-runner.py', ['RLIMIT_NPROC', 'EVAL_IMPORT_DENIED', '_DENIED_BUILTINS']],
+  ['runtime/eval/javascript-runner.mjs', ['codeGeneration: { strings: false, wasm: false }', '"process", "require", "module", "Buffer", "fetch"', 'EVAL_TYPESCRIPT_UNAVAILABLE']],
+]) {
+  const source = await readFile(path.join(root, relative), 'utf8').catch(() => '');
+  if (!source || markers.some((marker) => !source.includes(marker))) failures.push(`Persistent Eval runner boundary is missing from ${relative}`);
+}
 const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
 for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
+for (const marker of ['--minimal-runtime', 'minimal_runtime == 0']) if (!sandboxSource.includes(marker)) failures.push(`Persistent Eval minimal sandbox marker is missing: ${marker}`);
 try {
   const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
   artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));
@@ -123,6 +142,7 @@ const metadataTraceExtension = await readFile(path.join(root, 'extensions/metada
 if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.push('Context Governor metadata-only tracing listener is missing');
 if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
 if (!metadataTraceExtension.includes('pi-overdrive:dap-metadata') || /expression|variableValue|sourcePath/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:dap-metadata')))) failures.push('DAP metadata-only tracing listener is missing or admits debugger content');
+if (!metadataTraceExtension.includes('pi-overdrive:eval-metadata') || /scalar\("(?:code|stdout|stderr|value|prompt|path)"\)/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:eval-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"')))) failures.push('Persistent Eval metadata-only tracing listener is missing or admits evaluated content');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
@@ -207,6 +227,8 @@ for (const name of expectedAgents) {
   if (name === 'worker' && (!/^tools:.*\btransactional_edit\b/mu.test(text) || !/^tools:.*\btransactional_ast_edit\b/mu.test(text) || !/^tools:.*\bedit\b/mu.test(text) || !/^tools:.*\bast_grep_rewrite\b/mu.test(text) || !text.includes('../extensions/edit-engine.ts'))) failures.push('Worker does not load transactional editors and both governed fallbacks');
   if (name === 'worker' && (!/^tools:.*\bdebug_engine\b/mu.test(text) || !text.includes('../extensions/debug-engine.ts'))) failures.push('Worker does not load the sandboxed DAP Debug Engine');
   if (name !== 'worker' && /^tools:.*\bdebug_engine\b/mu.test(text)) failures.push(`${name} unexpectedly receives debugger execution capability`);
+  if (name === 'worker' && (!/^tools:.*\bpersistent_python\b/mu.test(text) || !/^tools:.*\bpersistent_javascript\b/mu.test(text) || !text.includes('../extensions/persistent-eval.ts'))) failures.push('Worker does not load both sandboxed Persistent Eval kernels');
+  if (name !== 'worker' && /^tools:.*\b(?:persistent_python|persistent_javascript)\b/mu.test(text)) failures.push(`${name} unexpectedly receives Persistent Eval execution capability`);
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
   if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|transactional_edit|transactional_ast_edit|ast_grep_rewrite|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);

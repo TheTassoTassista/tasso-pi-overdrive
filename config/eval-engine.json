@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "enabled": true,
+  "platform": "linux-x64",
+  "runtimes": {
+    "python": {
+      "binaryPath": "/usr/bin/python3.14",
+      "binaryVersion": "Python 3.14.7",
+      "binarySha256": "dd65a07e8f535525443d63e2bd6dd10efbf22bf22e0b6d65e634266acc7ac976",
+      "runner": "runtime/eval/python-runner.py",
+      "arguments": ["-I", "-B", "-u"]
+    },
+    "javascript": {
+      "binaryPath": "/usr/bin/node",
+      "binaryVersion": "v26.8.1",
+      "binarySha256": "f595d3d6e782e7524d5cd73214048a7f3dd9b28a6b4c0f486fdd87d94891f239",
+      "runner": "runtime/eval/javascript-runner.mjs",
+      "arguments": ["--no-addons", "--disable-proto=throw", "--max-old-space-size=192"],
+      "typescriptCompiler": {
+        "relativePath": "runtime/lsp/node_modules/typescript/lib/typescript.js",
+        "version": "6.0.3",
+        "sha256": "569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39"
+      }
+    }
+  },
+  "processLimiter": {
+    "binaryPath": "/usr/bin/prlimit",
+    "binaryVersion": "prlimit from util-linux 2.42.3",
+    "binarySha256": "2a563aca66c05649e310c9582a79d31195cddc2fa5e441ac758c8357106fc491",
+    "arguments": ["--nproc=8", "--"]
+  },
+  "startupTimeoutMs": 5000,
+  "executionTimeoutMs": 5000,
+  "maxExecutionTimeoutMs": 15000,
+  "idleTimeoutMs": 300000,
+  "shutdownGraceMs": 1000,
+  "maxCodeChars": 65536,
+  "maxFrameBytes": 1048576,
+  "maxOutputBytes": 262144,
+  "maxStderrBytes": 16384,
+  "maxValueChars": 8192
+}

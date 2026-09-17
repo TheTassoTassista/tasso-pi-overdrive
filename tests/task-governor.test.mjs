@@ -27,6 +27,15 @@ test("intermittent race under load activates focused debugging capabilities", ()
   assert.ok(policy.reviewNeed.roles.includes("correctness"));
 });
 
+test("bounded calculation activates eval while a trivial edit remains eval-free", () => {
+  const calculation = resolveTaskPolicy({ task: "Use persistent TypeScript to parse JSON and calculate a histogram." });
+  assert.equal(calculation.needs.eval, true);
+  assert.ok(calculation.toolNeed.capabilities.includes("eval"));
+  const trivial = resolveTaskPolicy({ task: "Change one string value." });
+  assert.equal(trivial.needs.eval, false);
+  assert.equal(trivial.toolNeed.capabilities.includes("eval"), false);
+});
+
 test("structural edit intent is semantic and cannot be activated by a tool name alone", () => {
   const structural = resolveTaskPolicy({ task: "Replace every call expression to legacyApi with modernApi across TypeScript source files." });
   assert.equal(structural.classification.signals.structuralEdit, true);

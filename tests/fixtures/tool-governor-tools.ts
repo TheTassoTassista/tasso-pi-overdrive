@@ -3,7 +3,7 @@ import { Type } from "typebox";
 
 const names = [
   "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query", "transactional_ast_edit", "ast_grep_rewrite",
-  "transactional_edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow", "debug_engine", "agent_browser", "web_research", "safe_web_fetch",
+  "transactional_edit", "semantic_nav", "task_notebook", "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript", "agent_browser", "web_research", "safe_web_fetch",
   "resource_fs", "smart_read", "safe_exec", "mcp", "subagent", "safe_remove_file", "third_party_unknown",
 ];
 
