@@ -32,7 +32,7 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 			const completedResults = context.messages.filter((message) => message.role === "toolResult");
 			const completedTools = completedResults.length;
 			const lastToolText = completedResults.length ? (completedResults.at(-1)?.content ?? []).filter((block: any) => block?.type === "text").map((block: any) => block.text ?? "").join("\n") : "";
-			appendAudit({ kind: "provider_turn", provider: model.provider, model: model.id, completedTools, modelFacingLastToolChars: lastToolText.length, modelFacingLastToolArtifact: /artifact:\/\/[0-9a-f]{64}/u.test(lastToolText) });
+			appendAudit({ kind: "provider_turn", provider: model.provider, model: model.id, completedTools, modelFacingLastToolChars: lastToolText.length, modelFacingLastToolArtifact: /artifact:\/\/[0-9a-f]{64}/u.test(lastToolText), modelFacingLastToolStreamGuard: /ERROR \[STREAMGUARD\]/u.test(lastToolText) });
 			const sequenceValue = process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS_SEQUENCE;
 			const sequence = sequenceValue ? JSON.parse(sequenceValue) : null;
 			const hasNextSequenceTool = Array.isArray(sequence) && completedTools < sequence.length;
@@ -70,6 +70,7 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 export default function registerSingleToolProvider(pi: ExtensionAPI): void {
 	pi.events.on("pi-overdrive:dap-metadata", (value) => appendAudit({ auditKind: "dap_metadata", ...(value as object) }));
 	pi.events.on("pi-overdrive:eval-metadata", (value) => appendAudit({ auditKind: "eval_metadata", ...(value as object) }));
+	pi.events.on("pi-overdrive:streamguard-metadata", (value) => appendAudit({ auditKind: "stream_guard_metadata", ...(value as object) }));
 	pi.events.on("pi-overdrive:artifact-metadata", (value) => appendAudit({ auditKind: "artifact_metadata", ...(value as object) }));
 	pi.registerProvider("pi-overdrive-tool-audit", {
 		baseUrl: "http://127.0.0.1.invalid",

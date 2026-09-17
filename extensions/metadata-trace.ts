@@ -336,6 +336,25 @@ export default function (pi: ExtensionAPI) {
       cleanups: scalar("cleanups") as number | undefined,
     });
   });
+  pi.events.on("pi-overdrive:streamguard-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "stream_guard_metadata",
+      kind: scalar("kind") as string | undefined,
+      version: scalar("version") as number | undefined,
+      status: scalar("status") as string | undefined,
+      reservationId: scalar("reservationId") as string | undefined,
+      reservationDigest: scalar("reservationDigest") as string | undefined,
+      rule: scalar("rule") as string | undefined,
+      ruleDigest: scalar("ruleDigest") as string | undefined,
+      source: scalar("source") as string | undefined,
+      toolName: scalar("toolName") as string | undefined,
+      streamKeyDigest: scalar("streamKeyDigest") as string | undefined,
+      turnSerial: scalar("turnSerial") as number | undefined,
+      outcome: scalar("outcome") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

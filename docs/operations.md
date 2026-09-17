@@ -44,6 +44,8 @@ Persistent eval appears only for calculation, parsing, bounded experiment, data/
 
 Eval has no project workspace, user home, network, ResourceFS/tool, shell, or subprocess bridge. Read repository or artifact evidence through normal governed tools and pass only the required data into the cell. Python imports and risky builtins and JavaScript host globals/string code generation are restricted as defense in depth; Bubblewrap isolation and the absent project/user mounts are the security boundary. Output is capped at 256 KiB before Artifact Store processing, so artifacts retain the bounded full result rather than bytes beyond that cap. JavaScript is synchronous, TypeScript is transpile-only, and package installation, top-level await, timers, rich display/image output, and filesystem persistence are intentionally unavailable.
 
+StreamGuard runs automatically and exposes no model tool. It recognizes only the reviewed controller-owned rule set while complete tool arguments are streaming, persists a metadata-only reservation, and waits for the normal governing safety decision. If safety independently blocks the same session/tool call, the concise correction is placed in that same blocked result; otherwise the reservation expires. It never retries, aborts, schedules a timer, queues a prompt, starts a runtime, or adds a model call. Use `/stream-guard` to inspect local reservation/delivery/expiry counters. A missing or failed StreamGuard leaves the safety barrier unchanged.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

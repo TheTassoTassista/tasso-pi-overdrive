@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "enabled": true,
+  "maxBufferedArgumentChars": 16384,
+  "maxReservationsPerSession": 8,
+  "maxReservationsPerTurn": 1,
+  "cooldownTurns": 2,
+  "rules": {
+    "protected-path-intent": {
+      "enabled": true,
+      "reminder": "ERROR [STREAMGUARD] The governing tool policy blocked a protected credential, secret, Git-metadata, or dependency path. Do not retry through another tool or indirection; use non-secret fixtures and governed workspace evidence."
+    },
+    "destructive-shell-intent": {
+      "enabled": true,
+      "reminder": "ERROR [STREAMGUARD] The governing tool policy blocked a destructive or bootstrap-pipe shell trajectory. Do not retry through shell indirection; use allowlisted sandboxed tools and narrow explicit targets."
+    },
+    "safe-exec-bypass-intent": {
+      "enabled": true,
+      "reminder": "ERROR [STREAMGUARD] The governed command tool rejected an authority-broadening argument pattern. Use a pinned repository script or a permitted read-only argument vector; do not switch to raw shell or inline interpreters."
+    }
+  }
+}

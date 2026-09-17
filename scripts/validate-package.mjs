@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -36,8 +36,10 @@ if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('Sm
 if (!pkg.pi.extensions.includes('./extensions/edit-engine.ts')) failures.push('Edit Engine V2 extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/debug-engine.ts')) failures.push('sandboxed DAP Debug Engine extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/persistent-eval.ts')) failures.push('sandboxed Persistent Eval extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/stream-guard.ts')) failures.push('StreamGuard extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
 if (!(pkg.pi.extensions.indexOf('./extensions/smart-read.ts') < pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') && pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('Edit Engine must observe reads after SmartRead and before Artifact Store rewriting');
+if (!(pkg.pi.extensions.indexOf('./extensions/safety.ts') < pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') && pkg.pi.extensions.indexOf('./extensions/safe-exec.ts') < pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') && pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('StreamGuard must load after governing execution policy and before model-facing result processing');
 if (pkg.pi.extensions.at(-1) !== './extensions/context-governor.ts') failures.push('Context Governor must be the final extension so it sees the complete model payload');
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
@@ -116,6 +118,17 @@ for (const [relative, markers] of [
   const source = await readFile(path.join(root, relative), 'utf8').catch(() => '');
   if (!source || markers.some((marker) => !source.includes(marker))) failures.push(`Persistent Eval runner boundary is missing from ${relative}`);
 }
+try {
+  const streamGuard = await import(path.join(root, 'lib/stream-guard.mjs'));
+  const policy = streamGuard.validateStreamGuardPolicy(JSON.parse(await readFile(path.join(root, 'config/stream-guard.json'), 'utf8')));
+  if (!policy.enabled || policy.maxBufferedArgumentChars > 16384 || policy.maxReservationsPerSession > 8 || policy.maxReservationsPerTurn !== 1 || policy.cooldownTurns < 2) failures.push('StreamGuard controller bounds changed or weakened');
+  if (!['protected-path-intent', 'destructive-shell-intent', 'safe-exec-bypass-intent'].every((rule) => policy.rules[rule]?.reminder.startsWith('ERROR [STREAMGUARD]'))) failures.push('StreamGuard reviewed rule/reminder set changed');
+} catch (error) { failures.push(`StreamGuard validation failed: ${error.message}`); }
+const streamGuardExtension = await readFile(path.join(root, 'extensions/stream-guard.ts'), 'utf8');
+for (const marker of ['pi.on("message_update"', 'registerStreamGuardSession(', 'registerCommand("stream-guard"', 'session_shutdown']) if (!streamGuardExtension.includes(marker)) failures.push(`StreamGuard lifecycle marker is missing: ${marker}`);
+if (/\b(?:setTimeout|setInterval|sendMessage|sendUserMessage|registerTool|ctx\.abort)\b/u.test(streamGuardExtension) || streamGuardExtension.includes('pi.on("tool_result"')) failures.push('StreamGuard must not add timers, prompts, tools, abort/retry, or a blocked-result-bypassed tool_result hook');
+const safetyExtension = await readFile(path.join(root, 'extensions/safety.ts'), 'utf8');
+if (!safetyExtension.includes('consumeBlockedStreamGuard(') || !safetyExtension.includes('Blocked by governing safety policy:')) failures.push('Safety does not own same-blocked-result StreamGuard correction attachment');
 const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
 for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
 for (const marker of ['--minimal-runtime', 'minimal_runtime == 0']) if (!sandboxSource.includes(marker)) failures.push(`Persistent Eval minimal sandbox marker is missing: ${marker}`);
@@ -143,6 +156,8 @@ if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.
 if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
 if (!metadataTraceExtension.includes('pi-overdrive:dap-metadata') || /expression|variableValue|sourcePath/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:dap-metadata')))) failures.push('DAP metadata-only tracing listener is missing or admits debugger content');
 if (!metadataTraceExtension.includes('pi-overdrive:eval-metadata') || /scalar\("(?:code|stdout|stderr|value|prompt|path)"\)/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:eval-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"')))) failures.push('Persistent Eval metadata-only tracing listener is missing or admits evaluated content');
+const streamTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:streamguard-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"'));
+if (!streamTrace.includes('pi-overdrive:streamguard-metadata') || /scalar\("(?:command|arguments|args|path|prompt|content|output|reminder)"\)/iu.test(streamTrace)) failures.push('StreamGuard metadata-only tracing listener is missing or admits model/tool content');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');

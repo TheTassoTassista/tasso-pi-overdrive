@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-17T18:22:15.701Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-stream-reservation-safety-block-correction",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 285.449,
+    "providerTurns": 2,
+    "toolResults": 1,
+    "streamGuardMetadataEvents": 2,
+    "metadataStatuses": [
+      "RESERVED",
+      "DELIVERED"
+    ],
+    "command": {
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiWorkflowCompleted": true,
+      "safetyBlockedBeforeExecution": true,
+      "reservationBeforeDelivery": true,
+      "correctionReachedNormalNextTurn": true,
+      "safetyReasonRetained": true,
+      "sameBlockedToolBound": true,
+      "deltaAndFinalDeduplicated": true,
+      "metadataOnly": true,
+      "zeroExtraProviderTurn": true,
+      "lazyCommandSurface": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 2,
+    "guardAddedProviderTurns": 0,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "sentinelUnchanged": true,
+    "temporaryRemoved": true
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderrDigest": null
+}

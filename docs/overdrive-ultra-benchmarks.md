@@ -204,3 +204,18 @@ The complete sequence finished in 534.824 ms on this host. It is a lifecycle/sec
 | Cleanup | PASS | Explicit termination leaves no kernel process, host-fixture change, or private temporary root |
 
 The complete sequence finished in 2,570.554 ms on this host. It is a lifecycle/security observation, not a cross-product latency comparison. Language-level restrictions are defense in depth: the security boundary measured here is the networkless minimal Bubblewrap sandbox with no project/user-home/owner-local-tool mount and a pinned process limit that leaves the Node runtime functional but denies additional process creation. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 12 StreamGuard
+
+`npm run benchmark:ultra:stream-guard` launches official Pi 0.85.1 with the actual streaming observer, governing safety hook, built-in Bash tool, and deterministic local provider. One prohibited call plus the normal continuation use two local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Stream reservation | PASS | Fragmented arguments produce exactly one `RESERVED` receipt before final-call replay |
+| Governing block | PASS | Existing safety blocks before execution; the sentinel remains unchanged |
+| Same-result correction | PASS | The matching reservation becomes `DELIVERED` with outcome `SAME_BLOCKED_TOOL_RESULT`; the immediate error starts with `ERROR [STREAMGUARD]` and retains the safety reason |
+| Normal continuation | PASS | The second provider turn sees the corrected tool result; StreamGuard adds zero provider turns |
+| Metadata contract | PASS | Exactly two events contain statuses, rule/tool identity, bounded counters, and digests only; no command, path, prompt, output, or reminder body |
+| Lazy command and cleanup | PASS | `/stream-guard` is registered without a provider turn; the temporary root is removed and no runtime/process is created |
+
+The recorded passing sequence finished in 285.449 ms on this host. It is a Pi lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
