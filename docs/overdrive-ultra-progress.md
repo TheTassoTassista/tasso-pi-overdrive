@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 11 — Persistent Eval
-- Last completed phase commit: `6a03894` — `feat(ultra): add sandboxed DAP debug engine`
+- Current phase: 12 — StreamGuard
+- Last completed phase commit: `97c60be` — `feat(ultra): add sandboxed persistent eval`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -57,6 +57,10 @@
 - Ran the adapter and debuggee in one networkless Bubblewrap sandbox with a cleared environment and read-only workspace; program/source paths are descriptor checked, the executable is revalidated before configuration resumes, reverse requests fail closed, and process-group timeout/idle/shutdown cleanup is deterministic.
 - Integrated the conditional `debug_engine` schema with debugging intent, Worker, Artifact Store, safety guards, metadata-only tracing, zero-model `/debug-engine`, package validation, and a long-line output envelope that cannot bypass Artifact Store externalization.
 - Added focused fake-adapter and real GDB/C adversarial tests plus a real-Pi launch/breakpoint/stack/exit/output benchmark that proves secret removal, workspace write denial, bounded model-facing output, lazy command discovery, and residue-free cleanup at zero network/provider/paid cost.
+- Implemented clean-room, lazy session-local Python and JavaScript/TypeScript eval kernels with exact Linux-x64 Python, Node, TypeScript compiler, and process-limiter pins; code/frame/output/value/memory/time bounds; retained per-language state; and deterministic timeout/crash/reset/idle/shutdown restart and cleanup.
+- Added a minimal Bubblewrap mode that omits the project, user home, owner-local tool runtime, and Pi runtime; copies only the attested runner/compiler into a private read-only root; clears the environment/network; and saturates the pinned Node process budget so additional process creation fails while Python independently denies it.
+- Integrated conditional `persistent_python` and `persistent_javascript` schemas with explicit computation/debug intent, Worker only, Artifact Store long-line externalization, metadata-only tracing, zero-model `/eval-engine`, package validation, and unchanged routing/retry/Council/Tester authority.
+- Added policy, mount/process, direct/introspective escape, state isolation, output, timeout, crash/restart, metadata, real-Pi and cleanup regressions proving bounded persistent computation with no project/resource/tool/network/subprocess bridge and zero external/provider/paid cost.
 
 ## Current validation
 
@@ -105,6 +109,11 @@
 - Phase 10 Tool Governor real-Pi rerun: PASS; ordinary simple edit remains 4 tools/2,128 schema characters and debugging intent alone receives `debug_engine`, for 12 tools/5,860 characters; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 10 DAP real-Pi benchmark: PASS on Pi 0.85.1 with GNU GDB 17.2 and Bubblewrap; 8/8 tool results over nine deterministic local turns, real `main`/`helper` stops and stack, exit 0, secret absent, workspace write denied, 24 KiB long-line output externalized to a 4,249-character model-facing preview, `/debug-engine` zero-call/lazy, no process or workspace residue, cost zero.
 - Phase 10 full `npm run check`: 323/323 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The earlier owner-local runtime control lacked the ignored managed Rust/Go binaries; the authoritative stable-runtime run passed all 323.
+- Phase 11 focused/adversarial selection: 38/38 PASS; exact policy/runtime pins, minimal mounts, process denial, Python and JavaScript/TypeScript persistence, direct and introspective escape controls, cross-session isolation, output bounds, timeout/crash restart, Task Policy activation, and Tool Policy visibility are covered.
+- Phase 11 agent-policy regression: all 12 role profiles PASS; Worker gains only the two governed eval tools, while Tester, Council, reviewers, and every other role retain their existing non-eval/non-mutating authority.
+- Phase 11 Tool Governor real-Pi rerun: PASS; ordinary simple edit remains 4 tools/2,128 schema characters and debugging intent receives DAP plus both eval schemas for 14 tools/6,852 characters; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 11 persistent-eval real-Pi benchmark: PASS on Pi 0.85.1; Python 40→42 and JavaScript/TypeScript 40→42 reuse stable kernels, isolation denials hold, 24 KiB output externalizes to a 3,886-character model-facing result, `/eval-engine` is zero-call/lazy, and cleanup leaves no process, host-fixture change, or private root; eight tool results over nine deterministic local turns, cost zero.
+- Phase 11 full `npm run check`: 332/332 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -119,7 +128,7 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Eval and Sentinel capabilities remain honestly unavailable until their respective phases land.
+- Sentinel remains honestly unavailable until its phase lands.
 - ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
@@ -130,7 +139,8 @@
 - The tracked AST binary digest is intentionally Linux-x64-specific, matching the existing package platform contract. First use hashes the 52.4 MB binary, so the measured cold AST path includes that one-time integrity cost; subsequent uses revalidate filesystem identity before using the cache.
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
 - Phase 10 is intentionally Linux-x64/GDB-only. Debug sessions are memory-only and single-session; attach, core files, expression/function evaluation, memory operations, watchpoints, disassembly, remote targets, arbitrary adapter commands, and other adapters remain unavailable. Source breakpoints can remain pending until symbols load.
+- Phase 11 is intentionally pinned to the reviewed Linux-x64 Python/Node/TypeScript/prlimit files. Host runtime upgrades require a reviewed policy update. Eval state is memory-only; JavaScript is synchronous; TypeScript is transpile-only; and top-level await, timers, async host APIs, dynamic/package imports, rich display/images, tool/resource bridges, project/user files, and filesystem persistence remain unavailable. Kernel output is capped at 256 KiB before Artifact Store processing.
 
 ## Exact next action
 
-Inspect the pinned OMP eval architecture and termination-race history, current Pi extension/tool lifecycle, Task/Tool Governor eval intent, ResourceFS and Artifact Store boundaries, sandbox runner, and locally available Python/Node runtimes. Build the smallest Phase 11 session-scoped persistent Python and JavaScript/TypeScript kernels with bounded state/output/runtime/memory, no ambient secrets/network/host filesystem/subprocess escape, deterministic timeout/crash/restart/cleanup, conditional schema exposure, controlled read-only resource access only if it can preserve existing policy, and no routing/role changes or eager processes.
+Inspect the pinned OMP TTSR coordinator/stream-rule implementation and issue #12057, then inspect Pi 0.85.1 streaming/event lifecycle and the existing Context Governor, Artifact Store, notebook/workflow, and metadata trace boundaries. Build the smallest controller-owned Phase 12 StreamGuard that reserves before deferred injection, deduplicates by digest, enforces bounded cooldown/count/size, never stores raw prompts or tool output, cannot inject after terminal/session changes, emits metadata-only receipts, starts no model/tool/runtime by itself, and leaves routing, retry, role authority, Council, Second Brain, and critical diagnostic preservation unchanged.
