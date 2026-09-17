@@ -282,6 +282,29 @@ export default function (pi: ExtensionAPI) {
       postDiagnosticDigest: scalar("postDiagnosticDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:dap-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "dap_metadata",
+      kind: scalar("kind") as string | undefined,
+      action: scalar("action") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      adapter: scalar("adapter") as string | undefined,
+      state: scalar("state") as string | undefined,
+      sandboxed: scalar("sandboxed") as boolean | undefined,
+      network: scalar("network") as boolean | undefined,
+      workspaceReadOnly: scalar("workspaceReadOnly") as boolean | undefined,
+      programDigest: scalar("programDigest") as string | undefined,
+      breakpointCount: scalar("breakpointCount") as number | undefined,
+      outputBytes: scalar("outputBytes") as number | undefined,
+      outputTruncated: scalar("outputTruncated") as boolean | undefined,
+      frameCount: scalar("frameCount") as number | undefined,
+      scopeCount: scalar("scopeCount") as number | undefined,
+      variableCount: scalar("variableCount") as number | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

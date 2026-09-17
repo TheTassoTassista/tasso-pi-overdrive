@@ -23,6 +23,16 @@ export default function (pi: ExtensionAPI) {
     const input = event.input as Record<string, unknown>;
     const candidate = inputPath(input);
 
+    if (event.toolName === "debug_engine") {
+      for (const key of ["program", "file"] as const) {
+        const requested = input[key];
+        if (requested === undefined) continue;
+        if (typeof requested !== "string" || isSecretPath(requested) || isAlwaysProtectedWritePath(requested)) return { block: true, reason: `Debugger workspace path denied: ${key}` };
+        const inspected = inspectWorkspacePath(ctx.cwd, requested, { mustExist: true });
+        if (!inspected.allowed || !("stat" in inspected) || !inspected.stat?.isFile() || isSecretPath(inspected.canonical) || isAlwaysProtectedWritePath(inspected.canonical)) return { block: true, reason: `Debugger workspace path denied: ${key}` };
+      }
+    }
+
     if (["ffgrep", "fffind"].includes(event.toolName) && candidate) {
       const inspected = inspectWorkspaceConstraint(ctx.cwd, candidate);
       if (!inspected.allowed) return { block: true, reason: `FFF workspace constraint denied (${"reason" in inspected ? inspected.reason : "policy"}): ${candidate}` };

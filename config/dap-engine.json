@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "enabled": true,
+  "platform": "linux-x64",
+  "adapter": {
+    "id": "gdb",
+    "binaryPath": "/usr/bin/gdb",
+    "binaryVersion": "GNU gdb (GDB) 17.2",
+    "binarySha256": "5a159b8868d53a85bee261bc35dc59437800b1d139d0389d83e4fdee5a24945d",
+    "arguments": [
+      "-q",
+      "-nx",
+      "-nh",
+      "-iex",
+      "set auto-load off",
+      "-iex",
+      "set debuginfod enabled off",
+      "-i",
+      "dap"
+    ]
+  },
+  "startupTimeoutMs": 15000,
+  "requestTimeoutMs": 10000,
+  "idleTimeoutMs": 300000,
+  "shutdownGraceMs": 1000,
+  "maxMessageBytes": 1048576,
+  "maxOutputBytes": 131072,
+  "maxStderrBytes": 16384,
+  "maxArguments": 64,
+  "maxArgumentChars": 4096,
+  "maxProgramBytes": 268435456,
+  "maxSourceBytes": 8388608,
+  "maxBreakpoints": 32,
+  "maxStackFrames": 32,
+  "maxVariables": 100,
+  "maxValueChars": 4096
+}

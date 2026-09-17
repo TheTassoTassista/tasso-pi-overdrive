@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-16T17:13:50.554Z",
+  "recordedAt": "2026-09-16T22:47:40.272Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-deterministic-local-provider",
   "piVersion": "0.85.1",
   "startingOverdrive": {
     "id": "starting-overdrive-core",
     "status": "PASS",
-    "elapsedMs": 350.937,
+    "elapsedMs": 246.62,
     "toolCount": 7,
     "toolNames": [
       "read",
@@ -29,7 +29,7 @@
       {
         "id": "ultra-simple-edit",
         "status": "PASS",
-        "elapsedMs": 283.659,
+        "elapsedMs": 251.297,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -46,7 +46,7 @@
       {
         "id": "ultra-search-only",
         "status": "PASS",
-        "elapsedMs": 284.536,
+        "elapsedMs": 255.933,
         "toolCount": 7,
         "toolNames": [
           "read",
@@ -66,7 +66,7 @@
       {
         "id": "ultra-structural-edit",
         "status": "PASS",
-        "elapsedMs": 321.23,
+        "elapsedMs": 253.379,
         "toolCount": 8,
         "toolNames": [
           "read",
@@ -87,7 +87,7 @@
       {
         "id": "ultra-resource-uri",
         "status": "PASS",
-        "elapsedMs": 290.442,
+        "elapsedMs": 252.551,
         "toolCount": 3,
         "toolNames": [
           "read",
@@ -103,8 +103,8 @@
       {
         "id": "ultra-debugging",
         "status": "PASS",
-        "elapsedMs": 301.136,
-        "toolCount": 11,
+        "elapsedMs": 257.951,
+        "toolCount": 12,
         "toolNames": [
           "read",
           "ffgrep",
@@ -116,10 +116,11 @@
           "semantic_nav",
           "task_notebook",
           "verification_gate",
-          "secure_coding_workflow"
+          "secure_coding_workflow",
+          "debug_engine"
         ],
-        "toolSchemaCharacters": 5385,
-        "estimatedToolSchemaTokens": 1347,
+        "toolSchemaCharacters": 5860,
+        "estimatedToolSchemaTokens": 1465,
         "exitCode": 0,
         "error": null,
         "stderr": ""
@@ -127,7 +128,7 @@
       {
         "id": "ultra-research",
         "status": "PASS",
-        "elapsedMs": 295.584,
+        "elapsedMs": 255.893,
         "toolCount": 4,
         "toolNames": [
           "read",
@@ -144,7 +145,7 @@
       {
         "id": "ultra-browser",
         "status": "PASS",
-        "elapsedMs": 285.357,
+        "elapsedMs": 249.807,
         "toolCount": 2,
         "toolNames": [
           "read",
@@ -159,7 +160,7 @@
       {
         "id": "explicit-cli-preserved",
         "status": "PASS",
-        "elapsedMs": 267.796,
+        "elapsedMs": 246.277,
         "toolCount": 2,
         "toolNames": [
           "read",

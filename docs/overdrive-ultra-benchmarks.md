@@ -44,7 +44,7 @@ The benchmark tree is `benchmarks/overdrive-vs-omp/`. Later results must use the
 | Intermittent race under load | PASS; Planner/memory/debug/eval/Sentinel/reviewer | 9 | 5 |
 | Critical production migration | PASS; Planner/reviewer/Council | 3 | 11 |
 
-Timing is a local microbenchmark and not a cross-product superiority claim. OMP remains `NOT_RUN` because its required Bun runtime is unavailable. Capability intents for future tools are policy decisions, not claims that DAP, eval, or Sentinel already exist.
+Timing is a local microbenchmark and not a cross-product superiority claim. OMP remains `NOT_RUN` because its required Bun runtime is unavailable. The DAP intent now resolves to the bounded Phase 10 engine; eval and Sentinel intents remain policy decisions rather than claims that those later tools already exist.
 
 ## Known baseline finding
 
@@ -52,7 +52,7 @@ The local smoke initially failed only because its expected documentation-directo
 
 ## Phase 2 Tool Governor
 
-`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The Phase 8 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
+`npm run benchmark:ultra:tool-governor` launches fresh official Pi 0.85.1 RPC processes with a deterministic local context provider and a bounded non-executing tool registry. The provider reports the exact active tool names and serialized schema characters received for each prompt. The Phase 10 rerun made nine deterministic local turns, zero network or external-provider calls, zero paid calls, and cost zero.
 
 | Task surface | Tools | Schema characters | Estimated schema tokens | Required assertion |
 |---|---:|---:|---:|---|
@@ -61,7 +61,7 @@ The local smoke initially failed only because its expected documentation-directo
 | Ultra search-only | 7 | 3,481 | 871 | FFF + AST search + SmartRead; no mutation |
 | Ultra structural edit | 8 | 3,996 | 999 | semantic `structural-edit` activates transactional AST; plugin rewrite hidden; SmartRead inspects source |
 | Ultra explicit resource URI | 3 | 1,620 | 405 | read + ResourceFS + memory notebook; ResourceFS absent otherwise |
-| Ultra debugging | 11 | 5,385 | 1,347 | focused search/edit/SmartRead/LSP/memory/verify/workflow |
+| Ultra debugging | 12 | 5,860 | 1,465 | focused search/edit/SmartRead/LSP/memory/DAP/verify/workflow |
 | Ultra web research | 4 | 2,104 | 526 | memory + safe web; no browser |
 | Ultra browser inspection | 2 | 1,148 | 287 | read + isolated browser only |
 | Explicit CLI control | 2 | 1,136 | 284 | exact `read,safe_exec` preserved |
@@ -172,3 +172,19 @@ The recorded success and stale scenarios completed in 474.905 ms and 344.731 ms 
 | Temporary cleanup | PASS | Benchmark root removed in PASS and FAIL paths |
 
 The recorded safe and rejected scenarios completed in 2,078.088 ms and 1,970.364 ms. These are single-host lifecycle observations, not an OMP latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable.
+
+## Phase 10 DAP debug engine
+
+`npm run benchmark:ultra:debug-engine` launches official Pi 0.85.1 with the actual conditional debug extension, GNU GDB 17.2, Bubblewrap, Artifact Store, and a deterministic local provider. Eight real tool calls use nine local provider turns, zero network/external-provider/paid calls, and cost zero.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Lazy launch and configuration | PASS | GDB starts only on `launch`; one workspace executable; read-only workspace, cleared environment, and no network |
+| Breakpoints and execution | PASS | Source breakpoint at `main`, continued stop in `helper`, real stack frame observed, final exit code 0 |
+| Debuggee isolation | PASS | Fixture confirms the ambient secret is absent and its attempted `/workspace` write is denied |
+| Large debug output | PASS | A 24 KiB single long line is externalized by Artifact Store; model-facing preview is 4,249 characters with one manifest |
+| Metadata contract | PASS | Eight DAP metadata events contain only bounded status/isolation/count/digest data; no prompt, path, source, variable value, or output body |
+| Lazy command | PASS | `/debug-engine` is registered, uses zero provider turns, and starts no GDB process |
+| Cleanup | PASS | No adapter/debuggee process residue, no workspace write residue, and the temporary root is removed |
+
+The complete sequence finished in 534.824 ms on this host. It is a lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.

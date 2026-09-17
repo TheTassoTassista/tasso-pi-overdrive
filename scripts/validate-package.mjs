@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -34,6 +34,7 @@ if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('
 if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/edit-engine.ts')) failures.push('Edit Engine V2 extension is missing');
+if (!pkg.pi.extensions.includes('./extensions/debug-engine.ts')) failures.push('sandboxed DAP Debug Engine extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
 if (!(pkg.pi.extensions.indexOf('./extensions/smart-read.ts') < pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') && pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('Edit Engine must observe reads after SmartRead and before Artifact Store rewriting');
 if (pkg.pi.extensions.at(-1) !== './extensions/context-governor.ts') failures.push('Context Governor must be the final extension so it sees the complete model payload');
@@ -90,6 +91,16 @@ const editEngineSource = await readFile(path.join(root, 'lib/edit-engine.mjs'), 
 const lspManagerSource = await readFile(path.join(root, 'lib/lsp-manager.mjs'), 'utf8');
 if (!editEngineSource.includes('applyValidated(') || !lspManagerSource.includes('executeLspOverlay(')) failures.push('LSP write-guard atomic validation or diagnostic-overlay path is missing');
 try {
+  const dapEngine = await import(path.join(root, 'lib/dap-engine.mjs'));
+  const policy = dapEngine.validateDapPolicy(JSON.parse(await readFile(path.join(root, 'config/dap-engine.json'), 'utf8')));
+  if (!policy.enabled || policy.platform !== 'linux-x64' || policy.adapter.id !== 'gdb' || policy.adapter.binaryPath !== '/usr/bin/gdb' || policy.adapter.binaryVersion !== 'GNU gdb (GDB) 17.2' || policy.adapter.binarySha256 !== '5a159b8868d53a85bee261bc35dc59437800b1d139d0389d83e4fdee5a24945d') failures.push('DAP adapter identity is not the exact reviewed host binary');
+  if (JSON.stringify(policy.adapter.arguments) !== JSON.stringify(['-q', '-nx', '-nh', '-iex', 'set auto-load off', '-iex', 'set debuginfod enabled off', '-i', 'dap']) || policy.maxVariables > 100 || policy.maxBreakpoints > 32 || policy.maxOutputBytes > 128 * 1024) failures.push('DAP security arguments or hard bounds changed');
+} catch (error) { failures.push(`DAP Debug Engine validation failed: ${error.message}`); }
+const dapExtension = await readFile(path.join(root, 'extensions/debug-engine.ts'), 'utf8');
+for (const marker of ['name: "debug_engine"', 'registerCommand("debug-engine"', 'session_shutdown', 'No attach']) if (!dapExtension.includes(marker)) failures.push(`DAP Debug Engine integration marker is missing: ${marker}`);
+const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
+for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
+try {
   const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
   artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));
   if (!artifacts.ARTIFACT_ID.test('a'.repeat(64)) || artifacts.ARTIFACT_ID.test('../escape')) failures.push('Artifact Store ID policy is not path-safe');
@@ -111,6 +122,7 @@ if (!handoffExtension.includes('governContext({') || handoffExtension.indexOf('g
 const metadataTraceExtension = await readFile(path.join(root, 'extensions/metadata-trace.ts'), 'utf8');
 if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.push('Context Governor metadata-only tracing listener is missing');
 if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
+if (!metadataTraceExtension.includes('pi-overdrive:dap-metadata') || /expression|variableValue|sourcePath/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:dap-metadata')))) failures.push('DAP metadata-only tracing listener is missing or admits debugger content');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');
@@ -193,6 +205,8 @@ for (const name of expectedAgents) {
   if (name === 'tester' && /^tools:.*\b(?:bash|safe_exec|transactional_edit|transactional_ast_edit|ast_grep_rewrite|edit|write)\b/mu.test(text)) failures.push('Tester has mutation or general command capability');
   if (name === 'worker' && /^tools:.*\bbash\b/mu.test(text)) failures.push('Worker has free-shell capability');
   if (name === 'worker' && (!/^tools:.*\btransactional_edit\b/mu.test(text) || !/^tools:.*\btransactional_ast_edit\b/mu.test(text) || !/^tools:.*\bedit\b/mu.test(text) || !/^tools:.*\bast_grep_rewrite\b/mu.test(text) || !text.includes('../extensions/edit-engine.ts'))) failures.push('Worker does not load transactional editors and both governed fallbacks');
+  if (name === 'worker' && (!/^tools:.*\bdebug_engine\b/mu.test(text) || !text.includes('../extensions/debug-engine.ts'))) failures.push('Worker does not load the sandboxed DAP Debug Engine');
+  if (name !== 'worker' && /^tools:.*\bdebug_engine\b/mu.test(text)) failures.push(`${name} unexpectedly receives debugger execution capability`);
   if (['worker', 'tester'].includes(name) && /^tools:.*\b(?:web_search|web_fetch|web_research|safe_web_fetch)\b/mu.test(text)) failures.push(`${name} must not receive autonomous network tools`);
   if (name !== 'worker' && /\n\s*(?:edit|write): allow\b/u.test(text)) failures.push(`${name} overrides mutation permission`);
   if (name.startsWith('council-') && /^tools:.*\b(?:bash|safe_exec|safe_remove_file|transactional_edit|transactional_ast_edit|ast_grep_rewrite|edit|write|subagent)\b/mu.test(text)) failures.push(`${name} council role is not read-only and non-delegating`);

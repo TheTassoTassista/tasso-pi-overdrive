@@ -7,6 +7,12 @@ import {
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import fs from "node:fs";
+
+function appendAudit(value: object): void {
+	const file = process.env.PI_OVERDRIVE_AUDIT_EVENT_FILE;
+	if (file) fs.appendFileSync(file, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+}
 
 function streamSingleTool(model: Model<any>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
 	const stream = createAssistantMessageEventStream();
@@ -23,7 +29,10 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 		};
 		try {
 			stream.push({ type: "start", partial: output });
-			const completedTools = context.messages.filter((message) => message.role === "toolResult").length;
+			const completedResults = context.messages.filter((message) => message.role === "toolResult");
+			const completedTools = completedResults.length;
+			const lastToolText = completedResults.length ? (completedResults.at(-1)?.content ?? []).filter((block: any) => block?.type === "text").map((block: any) => block.text ?? "").join("\n") : "";
+			appendAudit({ kind: "provider_turn", provider: model.provider, model: model.id, completedTools, modelFacingLastToolChars: lastToolText.length, modelFacingLastToolArtifact: /artifact:\/\/[0-9a-f]{64}/u.test(lastToolText) });
 			const sequenceValue = process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS_SEQUENCE;
 			const sequence = sequenceValue ? JSON.parse(sequenceValue) : null;
 			const hasNextSequenceTool = Array.isArray(sequence) && completedTools < sequence.length;
@@ -59,6 +68,8 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 }
 
 export default function registerSingleToolProvider(pi: ExtensionAPI): void {
+	pi.events.on("pi-overdrive:dap-metadata", (value) => appendAudit({ auditKind: "dap_metadata", ...(value as object) }));
+	pi.events.on("pi-overdrive:artifact-metadata", (value) => appendAudit({ auditKind: "artifact_metadata", ...(value as object) }));
 	pi.registerProvider("pi-overdrive-tool-audit", {
 		baseUrl: "http://127.0.0.1.invalid",
 		apiKey: "$PI_OVERDRIVE_TOOL_AUDIT_KEY",

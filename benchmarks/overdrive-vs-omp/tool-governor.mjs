@@ -102,7 +102,7 @@ try {
     searchOnlyNonMutating: ["ffgrep", "fffind", "ast_grep_run"].every((name) => search.toolNames.includes(name)) && ["grep", "find", "ls", "ast_grep_scan", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "secure_coding_workflow"].every((name) => !search.toolNames.includes(name)),
     structuralRewriteSemantic: structural.toolNames.includes("transactional_ast_edit") && !structural.toolNames.includes("ast_grep_rewrite") && !simple.toolNames.includes("transactional_ast_edit"),
     resourceUriConditional: resource.toolNames.includes("resource_fs") && !simple.toolNames.includes("resource_fs") && !search.toolNames.includes("resource_fs"),
-    debuggingFocused: ["fffind", "ast_grep_run", "task_notebook", "secure_coding_workflow"].every((name) => debugging.toolNames.includes(name)) && !debugging.toolNames.includes("agent_browser"),
+    debuggingFocused: ["fffind", "ast_grep_run", "task_notebook", "secure_coding_workflow", "debug_engine"].every((name) => debugging.toolNames.includes(name)) && !debugging.toolNames.includes("agent_browser"),
     researchFocused: ["task_notebook", "web_research", "safe_web_fetch"].every((name) => research.toolNames.includes(name)) && !research.toolNames.includes("agent_browser"),
     browserExplicitOnly: browser.toolNames.includes("agent_browser") && !simple.toolNames.includes("agent_browser") && !research.toolNames.includes("agent_browser"),
     explicitCliPreserved: JSON.stringify(explicit.toolNames) === JSON.stringify(["read", "safe_exec"]),

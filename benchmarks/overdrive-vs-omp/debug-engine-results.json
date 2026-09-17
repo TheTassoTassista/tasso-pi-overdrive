@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-16T22:47:19.397Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-real-gdb-bubblewrap",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 534.824,
+    "providerTurns": 9,
+    "toolResults": 8,
+    "dapMetadataEvents": 8,
+    "adapter": "gdb",
+    "adapterVersion": "GNU gdb (GDB) 17.2",
+    "finalState": "EXITED",
+    "exitCode": 0,
+    "sessionOutputDigest": "2aca89a5ce40827931b17c6cb6f53df526091105d2e6962f0bf5396f0bfcf77d",
+    "sessionOutputChars": 4249,
+    "modelFacingOutputChars": 4249,
+    "artifactMetadataEvents": 1,
+    "artifactManifests": 1,
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "adapterProcessFound": false,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiWorkflowCompleted": true,
+      "launchWasIsolated": true,
+      "breakpointAndStopsWorked": true,
+      "realStackReachedHelper": true,
+      "debuggeeIsolationEnforced": true,
+      "largeOutputExternalized": true,
+      "metadataOnly": true,
+      "deterministicCleanup": true,
+      "lazyCommandSurface": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 9,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "temporaryProcessResidue": false,
+    "workspaceWriteResidue": false,
+    "temporaryRemoved": true
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderrDigest": null
+}
