@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 10 — DAP Debug Engine
-- Last completed phase commit: `fa1043e` — `feat(ultra): guard transactional writes with LSP`
+- Current phase: 11 — Persistent Eval
+- Last completed phase commit: `6a03894` — `feat(ultra): add sandboxed DAP debug engine`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -53,6 +53,10 @@
 - Added deterministic TypeScript/JavaScript overlay verification through the existing pinned TypeScript LanguageService after a VTSLS synchronization barrier, eliminating false-green empty-diagnostic timeouts without changing the read-only server contract.
 - Extended atomic apply so the real post-rename filesystem state is diagnosed before receipt publication, then revalidated at the receipt boundary; divergence or new blocking diagnostics trigger conflict-safe rollback and concurrent external work is preserved.
 - Added explicit unsupported/managed-unavailable/runtime-failure policy, metadata-only validation receipts/traces, zero-model `/lsp-write`, package guards, real server crash recovery, focused adversarial tests, and a real-Pi accepted/rejected diagnostic benchmark with no new model-facing schema.
+- Implemented a clean-room, lazy GDB-only DAP engine with one session, an exact Linux-x64 adapter path/version/argument/SHA-256 allowlist, first-use binary attestation, bounded framing/requests/output/state, and no attach, raw command, evaluation, memory, custom-request, or remote-adapter authority.
+- Ran the adapter and debuggee in one networkless Bubblewrap sandbox with a cleared environment and read-only workspace; program/source paths are descriptor checked, the executable is revalidated before configuration resumes, reverse requests fail closed, and process-group timeout/idle/shutdown cleanup is deterministic.
+- Integrated the conditional `debug_engine` schema with debugging intent, Worker, Artifact Store, safety guards, metadata-only tracing, zero-model `/debug-engine`, package validation, and a long-line output envelope that cannot bypass Artifact Store externalization.
+- Added focused fake-adapter and real GDB/C adversarial tests plus a real-Pi launch/breakpoint/stack/exit/output benchmark that proves secret removal, workspace write denial, bounded model-facing output, lazy command discovery, and residue-free cleanup at zero network/provider/paid cost.
 
 ## Current validation
 
@@ -96,6 +100,11 @@
 - Phase 9 real-Pi benchmark: PASS on Pi 0.85.1; a safe TypeScript edit was checked against exact candidate bytes, atomically installed, rechecked from the final filesystem, and issued one mode-0400 metadata-only validation receipt; TS2322 was classified `REGRESSED` and blocked before write with no receipt or residue; `/lsp-write` registered without provider turn or eager server start; seven deterministic local turns, zero network/external-provider/paid calls, cost zero, cleanup PASS.
 - Phase 9 Phase 7/8 real-Pi regressions: PASS; unsupported text remains explicit fail-soft, AST candidates are guarded without changing contract or tool surface, stale races preserve external work, receipts remain private, and cleanup remains complete.
 - Phase 9 full `npm run check`: 317/317 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 10 focused/adversarial tests: 6/6 DAP cases PASS; complete fake workflow, reverse request, limits, timeout/malformed protocol cleanup, configuration-time executable replacement, policy denial, and real pinned GDB/C execution inside Bubblewrap are covered. DAP/Tool Governor/tool-surface/safety regression selection is 35/35 PASS.
+- Phase 10 agent-policy regression: all 12 role profiles PASS; Worker retains no shell and gains only the governed debug tool, while Tester, Council, and reviewers remain non-mutating/read-only as applicable.
+- Phase 10 Tool Governor real-Pi rerun: PASS; ordinary simple edit remains 4 tools/2,128 schema characters and debugging intent alone receives `debug_engine`, for 12 tools/5,860 characters; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
+- Phase 10 DAP real-Pi benchmark: PASS on Pi 0.85.1 with GNU GDB 17.2 and Bubblewrap; 8/8 tool results over nine deterministic local turns, real `main`/`helper` stops and stack, exit 0, secret absent, workspace write denied, 24 KiB long-line output externalized to a 4,249-character model-facing preview, `/debug-engine` zero-call/lazy, no process or workspace residue, cost zero.
+- Phase 10 full `npm run check`: 323/323 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The earlier owner-local runtime control lacked the ignored managed Rust/Go binaries; the authoritative stable-runtime run passed all 323.
 
 ## Dirty files
 
@@ -110,7 +119,7 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Debug, eval, and Sentinel capabilities remain honestly unavailable until their respective phases land.
+- Eval and Sentinel capabilities remain honestly unavailable until their respective phases land.
 - ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
@@ -120,7 +129,8 @@
 - Phase 9 validates the edited file within its bound project and does not grant server-originated workspace mutation. Genuinely unsupported file types skip by explicit policy; a configured managed server that is absent/unpinned or a runtime failure blocks the guarded transaction. Multi-file rename/import/file-move control remains deferred until it can be atomic and rollback-safe.
 - The tracked AST binary digest is intentionally Linux-x64-specific, matching the existing package platform contract. First use hashes the 52.4 MB binary, so the measured cold AST path includes that one-time integrity cost; subsequent uses revalidate filesystem identity before using the cache.
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
+- Phase 10 is intentionally Linux-x64/GDB-only. Debug sessions are memory-only and single-session; attach, core files, expression/function evaluation, memory operations, watchpoints, disassembly, remote targets, arbitrary adapter commands, and other adapters remain unavailable. Source breakpoints can remain pending until symbols load.
 
 ## Exact next action
 
-Inspect the pinned OMP DAP architecture, current Pi extension/tool lifecycle, existing safe-exec/worktree/runtime isolation, Artifact Store, Task/Tool Governor debug intent, and host adapter availability. Build the smallest Phase 10 lazy single-session DAP engine with an explicit adapter allowlist, bounded metadata/artifact output, deterministic timeout/kill/cleanup, no ambient secrets/network, no routing/role changes, no eager process, and no large always-on schema.
+Inspect the pinned OMP eval architecture and termination-race history, current Pi extension/tool lifecycle, Task/Tool Governor eval intent, ResourceFS and Artifact Store boundaries, sandbox runner, and locally available Python/Node runtimes. Build the smallest Phase 11 session-scoped persistent Python and JavaScript/TypeScript kernels with bounded state/output/runtime/memory, no ambient secrets/network/host filesystem/subprocess escape, deterministic timeout/crash/restart/cleanup, conditional schema exposure, controlled read-only resource access only if it can preserve existing policy, and no routing/role changes or eager processes.
