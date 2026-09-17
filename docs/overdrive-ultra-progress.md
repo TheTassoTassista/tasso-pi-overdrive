@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 13 — Sentinel / Advisor
-- Last completed phase commit: `c21616d` — `feat(ultra): add reservation-first stream guard`
+- Current phase: 14 — metadata-first Agent Hub
+- Last completed phase commit: `ec6cdb1` — `feat(ultra): add bounded sentinel advisor`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -65,6 +65,10 @@
 - Kept `safety.ts` as the authoritative execution barrier. After the real Pi lifecycle proved pre-hook blocks bypass `tool_result`, the safety hook was narrowly integrated to consume only an exact session/tool reservation after independently deciding to block and attach the correction to that same immediate result.
 - Added fail-closed session replacement, wrong-tool, replay, receipt-persistence, terminal-state, turn-end, settled-agent, and shutdown handling; no abort/retry, timer, prompt queue, runtime, provider, routing, role, or permission change was introduced.
 - Added metadata-only tracing, `/stream-guard`, package invariants, eight focused/adversarial cases, a real Pi same-result benchmark, operations/design/benchmark documentation, and the Phase 12 implementation note.
+- Inspected OMP's advisor/watchdog runtime, emission/loop guards, tool roster, lifecycle, and issue-derived risks at the pinned reference without copying source.
+- Implemented a clean-room explicit Sentinel that activates only for a deterministic hard/critical debugging policy and reuses the exact existing Oracle route without adding a role, fallback, workflow stage, Council path, or model-facing schema.
+- Enforced zero tools, zero automatic retries, one invocation per session, reservation-before-call persistence, resume suppression, context/output/time/cost limits, exact route/thinking attestation, and strict secret-free structured advice rendered as untrusted data without a new main-agent turn.
+- Added metadata-only Sentinel receipts/tracing, `/sentinel status`, package invariants, ten focused/adversarial cases, a real Pi deterministic local Oracle benchmark, operations/design/benchmark documentation, and the Phase 13 implementation note.
 
 ## Current validation
 
@@ -124,6 +128,11 @@
 - Phase 12 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
 - Phase 12 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
 - Phase 12 full `npm run check`: 340/340 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 13 focused/adversarial tests: 10/10 PASS; deterministic task gate, Oracle route/price attestation, hard budgets, strict JSON, secret/control/oversize rejection, delimiter escaping, reservation ordering, provider-thinking/cost mismatch, resume/corrupt-state suppression, and metadata privacy are covered.
+- Phase 13 Sentinel real-Pi benchmark: PASS on Pi 0.85.1; status and simple-task denial make zero calls, one hard-debug task makes exactly one deterministic local `openai-codex/gpt-6-astra:high` completion with zero tools/retries, reservation precedes completion, advice is published without another agent turn, repeat is blocked before context/provider entry, routing is unchanged, and cleanup completes at zero network/external/paid cost.
+- Phase 13 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 13 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 13 full `npm run check`: 350/350 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -138,7 +147,7 @@
 - OMP comparisons are source/architecture-only until an isolated executable reference can be provided without changing either product's data.
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
-- Sentinel remains honestly unavailable until its phase lands.
+- Sentinel is intentionally explicit rather than a background watchdog. It sees only the bounded task supplied to `/sentinel`, not the transcript or workspace, and permits exactly one call per session. A selected Oracle route with missing price metadata is blocked rather than silently rerouted.
 - ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
@@ -151,7 +160,8 @@
 - Phase 10 is intentionally Linux-x64/GDB-only. Debug sessions are memory-only and single-session; attach, core files, expression/function evaluation, memory operations, watchpoints, disassembly, remote targets, arbitrary adapter commands, and other adapters remain unavailable. Source breakpoints can remain pending until symbols load.
 - Phase 11 is intentionally pinned to the reviewed Linux-x64 Python/Node/TypeScript/prlimit files. Host runtime upgrades require a reviewed policy update. Eval state is memory-only; JavaScript is synchronous; TypeScript is transpile-only; and top-level await, timers, async host APIs, dynamic/package imports, rich display/images, tool/resource bridges, project/user files, and filesystem persistence remain unavailable. Kernel output is capped at 256 KiB before Artifact Store processing.
 - Phase 12 deliberately recognizes only three conservative controller-owned intent classes and only after complete structured arguments exist. It does not predict every unsafe trajectory and never replaces safety, safe execution, sandboxing, or Tool Governor enforcement. Pi 0.85.1's blocked pre-hook lifecycle requires the narrow safety integration documented in the implementation note; a failed reservation or persistence path simply omits the correction while the governing block remains effective.
+- Phase 13 does not continuously watch, capture transcripts, steer, mutate, execute tools, spawn, retry, or replace Oracle/reviewers/Council. Its USD ceiling relies on registered price metadata and therefore fails closed when a selected route has unknown pricing; provider-reported thinking may remain honestly marked unreported when the adapter does not expose it.
 
 ## Exact next action
 
-Inspect the pinned OMP advisor/watchdog implementation and documentation, then map it against Task Policy, the existing Oracle/reviewer/Council stages, model-callability/routing enforcement, context fit, receipt accounting, and Pi 0.85.1 lifecycle. Build the smallest read-only, task-policy-gated Sentinel that has no edit/write/shell/subagent authority, cannot bypass workflow roles or Council independence, has a hard local invocation/cost/context budget, emits metadata-only evidence, and degrades honestly without affecting ordinary Pi startup. Do not grant a provider call until deterministic gating, lifecycle ownership, and zero-call negative paths are proven locally.
+Inspect the pinned OMP task-subagent and Agent Hub implementation/documentation, then map it against the existing pi-subagents event bridge, secure-workflow receipts/journal/evidence, spawn-budget accounting, runtime/worktree ownership, and Council isolation. Build the smallest metadata-first, read-only Agent Hub that reports authoritative role/status/route/usage/lifecycle state without raw prompts, transcripts, file content, tool output, or Council-member cross-contamination. It must make zero model calls, expose no steering/revive/kill/spawn authority unless a controller-owned safe lifecycle can be proven, preserve concurrency=3/depth=1/spawn budget=42, and degrade without affecting Pi startup or the existing workflow.
