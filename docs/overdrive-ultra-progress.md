@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 12 — StreamGuard
-- Last completed phase commit: `97c60be` — `feat(ultra): add sandboxed persistent eval`
+- Current phase: 13 — Sentinel / Advisor
+- Last completed phase commit: `c21616d` — `feat(ultra): add reservation-first stream guard`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -61,6 +61,10 @@
 - Added a minimal Bubblewrap mode that omits the project, user home, owner-local tool runtime, and Pi runtime; copies only the attested runner/compiler into a private read-only root; clears the environment/network; and saturates the pinned Node process budget so additional process creation fails while Python independently denies it.
 - Integrated conditional `persistent_python` and `persistent_javascript` schemas with explicit computation/debug intent, Worker only, Artifact Store long-line externalization, metadata-only tracing, zero-model `/eval-engine`, package validation, and unchanged routing/retry/Council/Tester authority.
 - Added policy, mount/process, direct/introspective escape, state isolation, output, timeout, crash/restart, metadata, real-Pi and cleanup regressions proving bounded persistent computation with no project/resource/tool/network/subprocess bridge and zero external/provider/paid cost.
+- Implemented a clean-room controller-owned StreamGuard that observes bounded incremental tool arguments, confirms only complete structured input, persists a metadata-only reservation before use, and enforces per-turn/session/cooldown limits without a model-facing schema.
+- Kept `safety.ts` as the authoritative execution barrier. After the real Pi lifecycle proved pre-hook blocks bypass `tool_result`, the safety hook was narrowly integrated to consume only an exact session/tool reservation after independently deciding to block and attach the correction to that same immediate result.
+- Added fail-closed session replacement, wrong-tool, replay, receipt-persistence, terminal-state, turn-end, settled-agent, and shutdown handling; no abort/retry, timer, prompt queue, runtime, provider, routing, role, or permission change was introduced.
+- Added metadata-only tracing, `/stream-guard`, package invariants, eight focused/adversarial cases, a real Pi same-result benchmark, operations/design/benchmark documentation, and the Phase 12 implementation note.
 
 ## Current validation
 
@@ -114,6 +118,12 @@
 - Phase 11 Tool Governor real-Pi rerun: PASS; ordinary simple edit remains 4 tools/2,128 schema characters and debugging intent receives DAP plus both eval schemas for 14 tools/6,852 characters; nine deterministic local turns, zero network/external-provider/paid calls, cost zero.
 - Phase 11 persistent-eval real-Pi benchmark: PASS on Pi 0.85.1; Python 40→42 and JavaScript/TypeScript 40→42 reuse stable kernels, isolation denials hold, 24 KiB output externalizes to a 3,886-character model-facing result, `/eval-engine` is zero-call/lazy, and cleanup leaves no process, host-fixture change, or private root; eight tool results over nine deterministic local turns, cost zero.
 - Phase 11 full `npm run check`: 332/332 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 12 focused/adversarial tests: 8/8 PASS; fragmented argument streams, reservation-before-delivery, exact session/tool ownership, metadata privacy, safe/incomplete/malformed input, persistence failure, session replacement, cooldown/count limits, restore suppression, and shutdown expiry are covered.
+- Phase 12 StreamGuard real-Pi benchmark: PASS on Pi 0.85.1; one prohibited Bash attempt is reserved then blocked by the existing safety hook, the same immediate result carries the concise correction and governing reason, the next normal turn sees it, the sentinel is unchanged, `/stream-guard` is lazy, cleanup completes, and two deterministic provider turns include zero StreamGuard-added/network/external/paid calls at cost zero.
+- Phase 12 focused regression selection: safety, output optimizer, trace retention, Task Governor, Tool Governor, and tool surface PASS; critical diagnostics remain retained regardless of position.
+- Phase 12 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 12 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 12 full `npm run check`: 340/340 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -140,7 +150,8 @@
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
 - Phase 10 is intentionally Linux-x64/GDB-only. Debug sessions are memory-only and single-session; attach, core files, expression/function evaluation, memory operations, watchpoints, disassembly, remote targets, arbitrary adapter commands, and other adapters remain unavailable. Source breakpoints can remain pending until symbols load.
 - Phase 11 is intentionally pinned to the reviewed Linux-x64 Python/Node/TypeScript/prlimit files. Host runtime upgrades require a reviewed policy update. Eval state is memory-only; JavaScript is synchronous; TypeScript is transpile-only; and top-level await, timers, async host APIs, dynamic/package imports, rich display/images, tool/resource bridges, project/user files, and filesystem persistence remain unavailable. Kernel output is capped at 256 KiB before Artifact Store processing.
+- Phase 12 deliberately recognizes only three conservative controller-owned intent classes and only after complete structured arguments exist. It does not predict every unsafe trajectory and never replaces safety, safe execution, sandboxing, or Tool Governor enforcement. Pi 0.85.1's blocked pre-hook lifecycle requires the narrow safety integration documented in the implementation note; a failed reservation or persistence path simply omits the correction while the governing block remains effective.
 
 ## Exact next action
 
-Inspect the pinned OMP TTSR coordinator/stream-rule implementation and issue #12057, then inspect Pi 0.85.1 streaming/event lifecycle and the existing Context Governor, Artifact Store, notebook/workflow, and metadata trace boundaries. Build the smallest controller-owned Phase 12 StreamGuard that reserves before deferred injection, deduplicates by digest, enforces bounded cooldown/count/size, never stores raw prompts or tool output, cannot inject after terminal/session changes, emits metadata-only receipts, starts no model/tool/runtime by itself, and leaves routing, retry, role authority, Council, Second Brain, and critical diagnostic preservation unchanged.
+Inspect the pinned OMP advisor/watchdog implementation and documentation, then map it against Task Policy, the existing Oracle/reviewer/Council stages, model-callability/routing enforcement, context fit, receipt accounting, and Pi 0.85.1 lifecycle. Build the smallest read-only, task-policy-gated Sentinel that has no edit/write/shell/subagent authority, cannot bypass workflow roles or Council independence, has a hard local invocation/cost/context budget, emits metadata-only evidence, and degrades honestly without affecting ordinary Pi startup. Do not grant a provider call until deterministic gating, lifecycle ownership, and zero-call negative paths are proven locally.
