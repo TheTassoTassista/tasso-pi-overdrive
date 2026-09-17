@@ -355,6 +355,36 @@ export default function (pi: ExtensionAPI) {
       outcome: scalar("outcome") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:sentinel-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "sentinel_metadata",
+      kind: scalar("kind") as string | undefined,
+      version: scalar("version") as number | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      provider: scalar("provider") as string | undefined,
+      model: scalar("model") as string | undefined,
+      thinking: scalar("thinking") as string | undefined,
+      thinkingSource: scalar("thinkingSource") as string | undefined,
+      launchStatus: scalar("launchStatus") as string | undefined,
+      modelCalls: scalar("modelCalls") as number | undefined,
+      inputChars: scalar("inputChars") as number | undefined,
+      inputTokensEstimate: scalar("inputTokensEstimate") as number | undefined,
+      maxOutputTokens: scalar("maxOutputTokens") as number | undefined,
+      estimatedCostCeilingUsd: scalar("estimatedCostCeilingUsd") as number | undefined,
+      usageStatus: scalar("usageStatus") as string | undefined,
+      actualCostUsd: scalar("actualCostUsd") as number | undefined,
+      outputChars: scalar("outputChars") as number | undefined,
+      evidenceCount: scalar("evidenceCount") as number | undefined,
+      taskPolicyDigest: scalar("taskPolicyDigest") as string | undefined,
+      modelPolicyDigest: scalar("modelPolicyDigest") as string | undefined,
+      adviceDigest: scalar("adviceDigest") as string | undefined,
+      receiptDigest: scalar("receiptDigest") as string | undefined,
+      parentReceiptDigest: scalar("parentReceiptDigest") as string | undefined,
+    });
+  });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));
 
   pi.registerCommand("trace-path", {

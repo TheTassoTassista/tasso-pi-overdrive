@@ -219,3 +219,18 @@ The complete sequence finished in 2,570.554 ms on this host. It is a lifecycle/s
 | Lazy command and cleanup | PASS | `/stream-guard` is registered without a provider turn; the temporary root is removed and no runtime/process is created |
 
 The recorded passing sequence finished in 285.449 ms on this host. It is a Pi lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 13 Sentinel
+
+`npm run benchmark:ultra:sentinel` launches official Pi 0.85.1 with the actual Sentinel command and a deterministic in-memory catalog that provides the existing direct Oracle identities. Status, a simple-task denial, one hard-debug review, and a repeated-call denial run in one Pi session.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Command and negative paths | PASS | `/sentinel` is registered; status and simple-task denial use zero provider calls |
+| Exact route and authority | PASS | exactly one `openai-codex/gpt-6-astra:high` completion; zero tools, `maxRetries=0`, 768 output tokens |
+| Context/cost gate | PASS | one direct Sentinel context proof passes with zero schemas; advertised worst-case cost is reserved before launch |
+| Durable lifecycle | PASS | exactly one `RESERVED` precedes one `COMPLETED`; the repeated invocation is blocked before another context/provider path |
+| Advice boundary | PASS | strict JSON is published as untrusted data with no extra main-agent turn |
+| Privacy/routing/cleanup | PASS | task/advice text is absent from metadata, persistent routing is byte-identical, temporary root is removed, and no runtime/process is created |
+
+The recorded passing sequence finished in 694.637 ms on this host. It used one deterministic local provider call and zero network, external-provider, paid-model, or billable calls at cost zero. It is a Pi lifecycle/security observation, not a cross-product quality or latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.

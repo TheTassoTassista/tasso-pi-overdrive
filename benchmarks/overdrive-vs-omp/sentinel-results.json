@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-17T18:48:45.766Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-oracle-direct-completion",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 694.637,
+    "providerCalls": 1,
+    "sentinelMetadataEvents": 4,
+    "statuses": [
+      "BLOCKED",
+      "RESERVED",
+      "COMPLETED",
+      "BLOCKED"
+    ],
+    "contextEvents": [
+      {
+        "status": "PASS",
+        "toolCount": 0,
+        "kind": "context_fit_direct_sentinel"
+      }
+    ],
+    "assertions": {
+      "realPiCommandRegistered": true,
+      "statusAndNegativePathsZeroCall": true,
+      "oneExactOracleCall": true,
+      "noToolsNoRetry": true,
+      "contextGatePassed": true,
+      "reservationBeforeCompletion": true,
+      "repeatSuppressed": true,
+      "advicePublishedWithoutAgentTurn": true,
+      "metadataOnly": true,
+      "routingUnchanged": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderCalls": 1,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "noRuntimeOrProcessCreated": true,
+    "temporaryRemoved": true
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderrDigest": null
+}

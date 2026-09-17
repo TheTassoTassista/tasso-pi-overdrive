@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "enabled": true,
+  "routeRole": "oracle",
+  "maxInvocationsPerSession": 1,
+  "maxTaskChars": 6000,
+  "maxInputTokens": 4096,
+  "maxOutputTokens": 768,
+  "maxAdviceChars": 3000,
+  "maxEvidenceItems": 4,
+  "maxEvidenceChars": 500,
+  "timeoutMs": 45000,
+  "maxEstimatedCostUsd": 0.05
+}

@@ -46,6 +46,8 @@ Eval has no project workspace, user home, network, ResourceFS/tool, shell, or su
 
 StreamGuard runs automatically and exposes no model tool. It recognizes only the reviewed controller-owned rule set while complete tool arguments are streaming, persists a metadata-only reservation, and waits for the normal governing safety decision. If safety independently blocks the same session/tool call, the concise correction is placed in that same blocked result; otherwise the reservation expires. It never retries, aborts, schedules a timer, queues a prompt, starts a runtime, or adds a model call. Use `/stream-guard` to inspect local reservation/delivery/expiry counters. A missing or failed StreamGuard leaves the safety barrier unchanged.
 
+Sentinel is explicit and optional. Use `/sentinel status` to inspect its local one-call budget without inference. Use `/sentinel TASK` only for hard/critical debugging work; the Task Governor rejects other tasks before any provider call. A successful invocation reuses the current policy's Oracle route, runs once with no tools and no retry, and appends one visibly untrusted advisory message without starting another agent turn. The reservation consumes the session budget even if the call fails. Missing price metadata, context overflow, an unavailable route, invalid JSON, a tool call, timeout, route/thinking mismatch, or cost excess fails closed and leaves the ordinary Pi workflow unchanged. Start a genuinely new Pi session for a new Sentinel budget; do not edit session receipts.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a
