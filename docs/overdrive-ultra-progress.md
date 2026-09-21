@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 16 — Subagent Isolation V2
-- Last completed phase commit: `786f654` — `feat(ultra): add bounded director mode`
+- Current phase: 17 — model harness profiles
+- Last completed phase commit: `c6ae2a5` — `feat(ultra): harden runtime isolation v2`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -77,6 +77,10 @@
 - Implemented clean-room `/director TASK` as an explicit one-task Task-Policy gate. Read-only work, direct small edits, and work without existing delegation value are denied before provider entry; the normal small path remains unchanged.
 - Restricted the primary agent to an allowlisted inspection/delegation/verification surface, required the real `secure_coding_workflow` and verification gate, and added an independent runtime barrier that blocks direct mutation, shell, raw subagents, browser mutation, destructive operations, and unknown tools even if they are exposed late.
 - Added automatic surface restoration, digest-only lifecycle tracing, package invariants, ten focused/adversarial tests, and a real Pi deterministic benchmark proving late write denial, zero residue, exact one-run exit, no parallel controller, and zero external/network/paid calls.
+- Inspected OMP's copy/reflink/overlay/worktree ownership, capture, apply, and teardown lifecycle at the pinned reference; retained the single native Git worktree because correction rounds intentionally share state and alternative backends add a second ownership/apply lifecycle.
+- Upgraded new runtime records to canonical `git-worktree-v2` allocations. Worktree/state roots are private, non-symlinked, mutually independent, and outside the source repository; allocation and port records are owner-only, single-link files opened with `O_NOFOLLOW`.
+- Bound list, lookup, resume, release, recovery, and cleanup to exact UUID-derived branch, worktree, state, browser-profile, port-lock, database, and schema identities plus the existing PID/boot/start-time owner. Tampered or symlinked evidence fails closed before cleanup authority.
+- Added two adversarial runtime-boundary cases, package invariants, documentation, and a local 256-file benchmark. Native worktree materialization/cleanup passed, ignored private state stayed absent, reflink was actually unavailable, and overlay remained explicitly `NOT_RUN`.
 
 ## Current validation
 
@@ -153,6 +157,13 @@
 - Phase 15 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
 - Phase 15 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
 - Phase 15 full `npm run check`: 371/371 PASS plus syntax, Ultra/Agent-Hub/Director/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 16 focused isolation/recovery/workflow regression: 28/28 PASS; three runtime tests cover independent allocation/resume/cleanup, symlink/root-overlap denial, and tampered/symlinked allocation evidence, while evidence, SIGKILL recovery, correction, concurrency, depth, Council/Judge, and spawn-budget tests remain green.
+- Phase 16 isolation benchmark: PASS; production `git-worktree-v2` materialized the 256-file fixture in 24.749 ms, excluded ignored private state, recorded independent runtime identities, and removed worktree/branch/allocation/port state. Reflink was `UNAVAILABLE`; overlay was `NOT_RUN`; external/provider/paid/network calls and cost were zero.
+- Phase 16 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 16 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 16 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
+- Phase 16 full `npm run check`: 373/373 PASS plus syntax, Ultra/Agent-Hub/Director/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 16 runtime audit: zero allocations, invalid records, orphan ports, or orphan worktrees after all tests and benchmarks.
 
 ## Dirty files
 
@@ -183,7 +194,8 @@
 - Phase 13 does not continuously watch, capture transcripts, steer, mutate, execute tools, spawn, retry, or replace Oracle/reviewers/Council. Its USD ceiling relies on registered price metadata and therefore fails closed when a selected route has unknown pricing; provider-reported thinking may remain honestly marked unreported when the adapter does not expose it.
 - Phase 14 is session-local and projects only secure-workflow role attempts. It does not discover arbitrary direct subagent jobs, search historical runs, expose role content, or provide steer/cancel/revive/spawn/message controls. Running duration and usage remain unavailable until authoritative lifecycle/receipt evidence exists. The same-process event bus is inside the installed package trust boundary; the Hub adds no authority if another executable extension is compromised.
 - Phase 15 is deliberately one task and non-persistent. It does not split work into independently steerable workers, retain worker transcripts, or provide send/steer/revive/kill controls; the existing isolated Worker/correction sequence remains the sole implementation path. A task-aware read-only MCP proxy or bounded web tool is retained only when the Tool Governor already enabled it for the exact task.
+- Phase 16 remains Linux/Git-specific and requires a clean source repository. Reflink is unavailable on this filesystem and overlay was intentionally not mounted. Node lacks a complete descriptor-relative `openat2`/`renameat2` lifecycle, so a hostile same-UID directory-replacement race cannot be claimed impossible; private roots, canonical checks, atomic records, Git registration, and post-cleanup checks reduce and expose that risk.
 
 ## Exact next action
 
-Inspect the pinned OMP task-isolation implementation and compare snapshot, reflink, overlay, copy, worktree, ownership, and apply semantics against Ultra's existing native Git worktree, unique runtime allocation, Bubblewrap, immutable receipts, and deterministic cleanup. Add only a measured capability that materially improves isolation or startup/cleanup behavior; retain the current strong worktree/Bubblewrap path as the safe default, do not add a second task controller, and do not weaken path, mutation, routing, concurrency, depth, correction, spawn-budget, Council/Judge, retry, or zero-extra-cost invariants.
+Inspect the pinned OMP model compatibility/harness profiles and compare them with Ultra's current provider/model/thinking policy, native structured-output contracts, tool schemas, edit engines, and callability attestations. Introduce only deterministic data-only contract adaptations that are justified by an actual model capability mismatch; never change provider routes, Council/Judge strength, quality overlays, retry policy, role permissions, or zero-extra-cost defaults, and never classify an unprobed model as callable.
