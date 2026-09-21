@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { pruneKnownTraceLogs, resolveRetentionDays } from "../lib/trace-retention.mjs";
+import { agentHubTraceMetadata } from "../lib/agent-hub.mjs";
 
 interface TraceRow {
   timestamp: string;
@@ -383,6 +384,34 @@ export default function (pi: ExtensionAPI) {
       adviceDigest: scalar("adviceDigest") as string | undefined,
       receiptDigest: scalar("receiptDigest") as string | undefined,
       parentReceiptDigest: scalar("parentReceiptDigest") as string | undefined,
+    });
+  });
+  pi.events.on("pi-overdrive:agent-hub-metadata", async (value) => {
+    let data: Record<string, unknown>;
+    try { data = agentHubTraceMetadata(value) as Record<string, unknown>; }
+    catch {
+      await record({ event: "agent_hub_metadata", status: "REJECTED_INVALID_EVENT" });
+      return;
+    }
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "agent_hub_metadata",
+      kind: scalar("kind") as string | undefined,
+      source: scalar("source") as string | undefined,
+      runId: scalar("runId") as string | undefined,
+      taskDigest: scalar("taskDigest") as string | undefined,
+      checkpointSequence: scalar("checkpointSequence") as number | undefined,
+      lifecycleStatus: scalar("lifecycleStatus") as string | undefined,
+      workflowStatus: scalar("workflowStatus") as string | undefined,
+      currentPhase: scalar("currentPhase") as string | undefined,
+      role: scalar("role") as string | undefined,
+      sequence: scalar("sequence") as number | undefined,
+      attempt: scalar("attempt") as number | undefined,
+      status: scalar("status") as string | undefined,
+      provider: scalar("provider") as string | undefined,
+      model: scalar("model") as string | undefined,
+      thinking: scalar("thinking") as string | undefined,
+      receiptDigest: scalar("receiptDigest") as string | undefined,
     });
   });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));

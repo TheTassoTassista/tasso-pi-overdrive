@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "enabled": true,
+  "maxRoleAttempts": 42,
+  "maxRenderedRoleAttempts": 42
+}

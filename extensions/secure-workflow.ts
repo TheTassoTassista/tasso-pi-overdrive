@@ -20,8 +20,10 @@ import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
 import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
 import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
+import { AGENT_HUB_EVENT, roleReceiptMetadata, roleReservationMetadata, roleStartedMetadata, workflowJournalMetadata } from "../lib/agent-hub.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
+const STARTED_EVENT = "prompt-template:subagent:started";
 const RESPONSE_EVENT = "prompt-template:subagent:response";
 const CANCEL_EVENT = "prompt-template:subagent:cancel";
 const verifyScript = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
@@ -196,6 +198,19 @@ export default function (pi: ExtensionAPI) {
       let receiptSequence = 0;
       let protocolNonce = taskDigest(randomUUID());
       let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
+      const publishHub = (value: Record<string, unknown>) => {
+        try { pi.events.emit(AGENT_HUB_EVENT, value); } catch {}
+      };
+      const publishJournal = () => {
+        if (!journal) return;
+        try { publishHub(workflowJournalMetadata(journal, configuredSpawnLimit)); } catch {}
+      };
+      const checkpointJournal = (update: Record<string, unknown>) => {
+        if (!evidenceRun || !journal) throw new Error("workflow journal is unavailable");
+        journal = checkpointWorkflowJournal(evidenceRun, journal, update);
+        publishJournal();
+        return journal;
+      };
       const availableModels = ctx.modelRegistry.getAvailable();
       const registeredModels = ctx.modelRegistry.getAll();
       const modelCapabilityOptions = { registeredModels };
@@ -253,15 +268,43 @@ export default function (pi: ExtensionAPI) {
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
         const nodeId = `${String(sequence += 1).padStart(2, "0")}-${agent}`;
+        let hubReservation: Record<string, unknown> | undefined;
+        try {
+          const reservationMetadata = roleReservationMetadata({
+            runId: evidenceRun?.runId,
+            taskDigest: digest,
+            executionId,
+            sequence: assignedReceiptSequence,
+            role: agent,
+            round,
+            iteration,
+            attempt,
+            nodeId,
+            route,
+            callNumber,
+            retryCount: attempt - 1,
+            spawnBudgetUsed: spawnBudgetGuard.snapshot().used,
+            maxRoleAttempts: configuredSpawnLimit,
+          });
+          hubReservation = reservationMetadata;
+          publishHub(reservationMetadata);
+        } catch {}
         let settled = false;
         const finish = (callback: (value: any) => void, value: any) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
+          unsubscribeStarted();
           unsubscribe();
           signal?.removeEventListener("abort", abort);
           callback(value);
         };
+        const unsubscribeStarted = pi.events.on(STARTED_EVENT, (data) => {
+          const started = data as Record<string, unknown>;
+          if (started?.requestId === requestId && started?.ownerRunId === ownerRunId && started?.nodeId === nodeId && hubReservation) {
+            try { publishHub(roleStartedMetadata(hubReservation)); } catch {}
+          }
+        });
         const unsubscribe = pi.events.on(RESPONSE_EVENT, (data) => {
           const response = data as Record<string, unknown>;
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
@@ -271,6 +314,7 @@ export default function (pi: ExtensionAPI) {
               const receiptResponse = { ...canonicalResponse, provider: canonicalResponse.routeAttested === true ? route.provider : null };
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: receiptResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              try { publishHub(roleReceiptMetadata(receipt, reference)); } catch {}
               const normalized = { ...canonicalResponse, status: receipt.status, provider: route.provider, usage: receipt.usage, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
               delegationAudit.push({ agent, role: policyRole, attempt, retryCount: attempt - 1, callNumber, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, fallbackIndex: route.fallbackIndex, preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
@@ -295,6 +339,7 @@ export default function (pi: ExtensionAPI) {
               const failureCategory = classifyDelegationFailure({ status, error: message });
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message, failureCategory, launchStatus: "launched" } });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              try { publishHub(roleReceiptMetadata(receipt, reference)); } catch {}
               delegationAudit.push({ agent, attempt, status, failureCategory, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
               receiptRecorded = true;
             }
@@ -405,14 +450,18 @@ export default function (pi: ExtensionAPI) {
             allocation = await resumeRuntimeResources(journal.allocation_id);
             latestState.allocation = allocation;
           }
-          journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), allocation_id: allocation?.allocationId ?? journal.allocation_id });
+          checkpointJournal({ ...journalUpdate(latestState), allocation_id: allocation?.allocationId ?? journal.allocation_id });
+          for (const entry of priorRoleReceipts) {
+            try { publishHub(roleReceiptMetadata(entry.receipt, entry)); } catch {}
+          }
         } else {
           evidenceRun = createEvidenceRun();
           roleReceiptStore = openRoleReceiptStore(evidenceRun);
           journal = initialWorkflowJournal(evidenceRun, { taskDigest: digest, protocolNonce, workflowVersion: WORKFLOW_VERSION, sourceRepository, ownerRunId });
           writeWorkflowJournal(evidenceRun, journal);
+          publishJournal();
           allocation = await createRuntimeWorktree(ctx.cwd, { evidenceRunId: evidenceRun.runId, ownerRunId });
-          journal = checkpointWorkflowJournal(evidenceRun, journal, { allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
+          checkpointJournal({ allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
         }
         if (resumable) {
           const priorBudget = latestState?.spawnBudget;
@@ -469,7 +518,7 @@ export default function (pi: ExtensionAPI) {
               policyReview: ({ cwd }: { cwd: string }) => localReviewPolicy(cwd),
               onCheckpoint: (checkpoint: any) => {
                 latestState = checkpoint;
-                journal = checkpointWorkflowJournal(evidenceRun!, journal, journalUpdate(checkpoint));
+                checkpointJournal(journalUpdate(checkpoint));
               },
             });
             latestState = state;
@@ -492,7 +541,7 @@ export default function (pi: ExtensionAPI) {
             if (!execution) {
               latestState ??= { workflowVersion: WORKFLOW_VERSION, status: "FAIL", ownerRunId, allocation };
               latestState.evidenceStatus = "RUNNING";
-              if (journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
+              if (journal) checkpointJournal({ ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
               const safeState = sanitizeState(latestState);
               if (workflowError) safeState.status = "FAIL";
               execution = {
@@ -512,7 +561,7 @@ export default function (pi: ExtensionAPI) {
               executionSha256 = createHash("sha256").update(fs.readFileSync(evidenceRun.executionFile)).digest("hex");
               evidenceStatus = "PASS";
               latestState.evidenceStatus = "EXECUTION_WRITTEN";
-              if (journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
+              if (journal) checkpointJournal({ ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
             }
           } catch (error) {
             workflowError ??= error;
@@ -524,7 +573,7 @@ export default function (pi: ExtensionAPI) {
           try {
             if (latestState) {
               latestState.cleanupStatus = "RUNNING";
-              if (evidenceRun && journal) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "CLEANUP" });
+              if (evidenceRun && journal) checkpointJournal({ ...journalUpdate(latestState), current_phase: "CLEANUP" });
             }
             if (process.env.PI_OVERDRIVE_CLEANUP_WORKFLOW === "1") {
               const allocationRoot = path.dirname(allocation.stateDir);
@@ -537,7 +586,7 @@ export default function (pi: ExtensionAPI) {
               cleanup = { status: "RELEASED", mode: "retain-worktree", resourcesAbsent: !fs.existsSync(allocation.portReservation) };
             }
             if (latestState) latestState.cleanupStatus = cleanup.status;
-            if (evidenceRun && journal && latestState) journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState), current_phase: "CLEANUP" });
+            if (evidenceRun && journal && latestState) checkpointJournal({ ...journalUpdate(latestState), current_phase: "CLEANUP" });
           } catch (error) {
             cleanup = { status: "FAIL", mode: process.env.PI_OVERDRIVE_CLEANUP_WORKFLOW === "1" ? "destroy" : "retain-worktree", resourcesAbsent: false };
             workflowError ??= error;
@@ -563,7 +612,7 @@ export default function (pi: ExtensionAPI) {
             if (latestState && journal) {
               latestState.cleanupStatus = cleanup.status;
               latestState.evidenceStatus = "PASS";
-              journal = checkpointWorkflowJournal(evidenceRun, journal, { ...journalUpdate(latestState, finalReceipt.status === "PASS" ? "COMPLETED" : "FAILED", true), current_phase: "FINALIZED" });
+              checkpointJournal({ ...journalUpdate(latestState, finalReceipt.status === "PASS" ? "COMPLETED" : "FAILED", true), current_phase: "FINALIZED" });
             }
           } catch (error) {
             workflowError ??= error;
@@ -571,7 +620,7 @@ export default function (pi: ExtensionAPI) {
             if (latestState && journal && evidenceRun) {
               try {
                 latestState.evidenceStatus = "FAIL";
-                journal = checkpointWorkflowJournal(evidenceRun, journal, journalUpdate(latestState, "FAILED", true));
+                checkpointJournal(journalUpdate(latestState, "FAILED", true));
               } catch {}
             }
           }

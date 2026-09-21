@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -142,6 +142,16 @@ try {
 const sentinelExtension = await readFile(path.join(root, 'extensions/sentinel.ts'), 'utf8');
 for (const marker of ['registerCommand("sentinel"', 'ledger.assertAvailable()', 'resolveTaskPolicy(', 'roles[policy.routeRole]', 'tools: []', 'maxRetries: 0', 'AbortSignal.timeout(', 'ctx.modelRegistry.complete(', 'triggerTurn: false', 'session_shutdown']) if (!sentinelExtension.includes(marker)) failures.push(`Sentinel integration marker is missing: ${marker}`);
 if (/\b(?:registerTool|sendUserMessage|sendUserMessage|spawn|execFile|node:child_process)\b/u.test(sentinelExtension)) failures.push('Sentinel must not expose a model tool, launch a subagent/process, or create an extra main-agent turn');
+try {
+  const agentHub = await import(path.join(root, 'lib/agent-hub.mjs'));
+  const policy = agentHub.validateAgentHubPolicy(JSON.parse(await readFile(path.join(root, 'config/agent-hub.json'), 'utf8')));
+  if (!policy.enabled || policy.maxRoleAttempts !== 42 || policy.maxRenderedRoleAttempts !== 42) failures.push('Agent Hub bounds must remain aligned with the immutable 42-attempt workflow budget');
+} catch (error) { failures.push(`Agent Hub validation failed: ${error.message}`); }
+const agentHubExtension = await readFile(path.join(root, 'extensions/agent-hub.ts'), 'utf8');
+for (const marker of ['registerCommand("agents"', 'AgentHubProjection', 'AGENT_HUB_EVENT', 'READ_ONLY_METADATA', 'session_shutdown']) if (!agentHubExtension.includes(marker)) failures.push(`Agent Hub read-only integration marker is missing: ${marker}`);
+if (/pi\.registerTool|pi\.sendMessage|pi\.sendUserMessage|ctx\.modelRegistry|pi\.exec|execFile|node:child_process|ctx\.abort|prompt-template:subagent:cancel/u.test(agentHubExtension)) failures.push('Agent Hub must not add a model schema, provider call, process, steering, cancellation, or reassignment authority');
+const workflowSource = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
+for (const marker of ['workflowJournalMetadata(', 'roleReservationMetadata(', 'roleStartedMetadata(', 'roleReceiptMetadata(', 'writeRoleReceipt(roleReceiptStore, receipt)']) if (!workflowSource.includes(marker)) failures.push(`secure workflow Agent Hub projection marker is missing: ${marker}`);
 const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
 for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
 for (const marker of ['--minimal-runtime', 'minimal_runtime == 0']) if (!sandboxSource.includes(marker)) failures.push(`Persistent Eval minimal sandbox marker is missing: ${marker}`);
@@ -173,6 +183,8 @@ const streamTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf(
 if (!streamTrace.includes('pi-overdrive:streamguard-metadata') || /scalar\("(?:command|arguments|args|path|prompt|content|output|reminder)"\)/iu.test(streamTrace)) failures.push('StreamGuard metadata-only tracing listener is missing or admits model/tool content');
 const sentinelTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:sentinel-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"'));
 if (!sentinelTrace.includes('pi-overdrive:sentinel-metadata') || /scalar\("(?:task|prompt|content|output|summary|evidence|recommendation|advice)"\)/iu.test(sentinelTrace)) failures.push('Sentinel metadata-only tracing listener is missing or admits task/advice content');
+const agentHubTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:agent-hub-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"'));
+if (!agentHubTrace.includes('pi-overdrive:agent-hub-metadata') || /scalar\("(?:transcript|prompt|reasoning|toolArgs|toolResult|content|output|councilOutput|secret|credential|path)"\)/iu.test(agentHubTrace)) failures.push('Agent Hub metadata-only tracing listener is missing or admits protected agent content');
 const secondBrain = JSON.parse(await readFile(path.join(root, 'config/second-brain.json'), 'utf8'));
 if (secondBrain.version !== 1 || secondBrain.enabled !== true || secondBrain.openViking?.apiContract !== '0.4.19' || secondBrain.hindsight?.reviewedRelease !== '0.9.2' || secondBrain.hindsight?.apiContract !== '0.9.0' || secondBrain.openViking?.endpoint !== 'http://127.0.0.1:1933' || secondBrain.hindsight?.endpoint !== 'http://127.0.0.1:8889') failures.push('Second Brain must pin reviewed releases/API contracts and default to enabled, lazy, loopback-only backends');
 if (secondBrain.hindsight?.reflect !== 'explicit-only' || secondBrain.openViking?.mode !== 'auto' || secondBrain.hindsight?.mode !== 'auto') failures.push('Second Brain backend/Reflect policy is not fail-soft and explicit');

@@ -19,6 +19,7 @@ npm run benchmark:ultra:ast-edit
 npm run benchmark:ultra:lsp-write
 npm run benchmark:ultra:stream-guard
 npm run benchmark:ultra:sentinel
+npm run benchmark:ultra:agent-hub
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -32,5 +33,7 @@ npm run benchmark:ultra:sentinel
 `stream-guard.mjs` drives real Pi through fragmented tool-argument streaming, controller reservation, the existing governing safety block, and the next normal deterministic provider turn. It proves reservation-before-delivery, one same-tool correction, no execution, metadata-only receipts, no extra provider turn, lazy command discovery, and cleanup. It performs no network, external-provider, paid-model, or billable call.
 
 `sentinel.mjs` drives the real `/sentinel` command through status, a denied simple task, one accepted hard-debug task, and a repeated invocation. It proves exact Oracle routing, zero tools/retries, context fit, reservation-before-completion, structured untrusted advice, single-use suppression, metadata privacy, unchanged routing, and cleanup. Its one inference is an in-memory deterministic local provider call; it performs no network, external-provider, paid-model, or billable call.
+
+`agent-hub.mjs` drives real Pi through production controller journal, reservation/start correlation, and durable role-receipt projection. It proves compact `/agents` discovery, receipt-only terminal accounting, honest unavailable live/missing usage, exact hard limits, forbidden-content exclusion, no control authority, malformed-event fail-soft behavior, private receipts, and process/state cleanup. A trap provider proves the Hub makes zero provider turns; it performs no network, external-provider, paid-model, or billable call.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

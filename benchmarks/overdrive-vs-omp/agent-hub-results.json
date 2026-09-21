@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-21T15:59:48.692Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-controller-events-and-durable-receipts",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 286.097,
+    "rosterEntries": 3,
+    "activeEntries": 1,
+    "terminalEntries": 2,
+    "persistedRoleReceipts": 2,
+    "assertions": {
+      "realPiCommandRegistered": true,
+      "controllerFixtureCompleted": true,
+      "completedReceiptProjected": true,
+      "runningUsageUnavailable": true,
+      "failedMissingUsageUnavailable": true,
+      "accountingUsesReceipts": true,
+      "hardLimitsVisibleAndUnchanged": true,
+      "protectedContentAbsent": true,
+      "noControlAuthority": true,
+      "malformedEventFailsSoft": true,
+      "durablePrivateReceipts": true,
+      "zeroProviderTurns": true
+    }
+  },
+  "accounting": {
+    "hubModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "authority": {
+    "steering": false,
+    "cancellation": false,
+    "spawning": false,
+    "mutation": false
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderr": "",
+  "cleanup": {
+    "temporaryRemoved": true,
+    "residualProcesses": 0
+  }
+}

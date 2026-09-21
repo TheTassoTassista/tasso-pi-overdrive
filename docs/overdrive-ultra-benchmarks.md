@@ -234,3 +234,18 @@ The recorded passing sequence finished in 285.449 ms on this host. It is a Pi li
 | Privacy/routing/cleanup | PASS | task/advice text is absent from metadata, persistent routing is byte-identical, temporary root is removed, and no runtime/process is created |
 
 The recorded passing sequence finished in 694.637 ms on this host. It used one deterministic local provider call and zero network, external-provider, paid-model, or billable calls at cost zero. It is a Pi lifecycle/security observation, not a cross-product quality or latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 14 Agent Hub
+
+`npm run benchmark:ultra:agent-hub` launches official Pi 0.85.1 with the actual Agent Hub and a deterministic controller fixture. The fixture uses production workflow-journal and role-receipt writers, emits the production metadata events, and registers a provider that fails if Pi attempts to invoke it.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Command and lifecycle | PASS | `/agents` projects three exact controller identities: one completed Worker, one running Tester, and one failed reviewer |
+| Durable accounting | PASS | Worker tokens/cost come from its private mode-0400 receipt; running and missing usage remain `UNAVAILABLE` |
+| Privacy and Council boundary | PASS | prompt, transcript, reasoning, tool data, file content, credentials, and role output are absent from schemas and rendered state |
+| Authority and policy | PASS | no steering/cancel/spawn/mutation/model/tool operation exists; concurrency 3, depth 1, correction rounds 2, and budget 42 are unchanged |
+| Fail-soft behavior | PASS | an event with a forbidden field degrades only the projection and does not affect the controller or Pi process |
+| Calls and cleanup | PASS | zero provider turns, network calls, external calls, and cost; temporary state removed with zero residual processes |
+
+The recorded passing sequence finished in 286.097 ms on this host with three roster entries and two persisted terminal receipts. It is a Pi lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
