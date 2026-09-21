@@ -66,6 +66,7 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/stream-guard` | Show metadata-only streamed correction counters without a model call |
 | `/sentinel [status\|TASK]` | Inspect Sentinel locally or request one bounded read-only second opinion for a hard debugging task |
 | `/agents` | Show the current secure-workflow roster, lifecycle, route, and receipt-backed usage without agent content or a model call |
+| `/director TASK` | Run one non-trivial policy-eligible task with the primary agent restricted to read/plan/delegate/verify and all repository mutation routed through the secure workflow |
 | `/trace-path` | Show the current metadata-only JSONL trace |
 | `/memory` / `/memory-status` | Show compact/detailed fail-soft memory state |
 | `/memory-search QUERY` | Search curated/OpenViking/Hindsight/ACE context without a Pi model call |

@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-21T16:20:13.697Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-explicit-director-tool-clamp-and-runtime-barrier",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 485.188,
+    "providerTurns": 2,
+    "metadataStatuses": [
+      "INELIGIBLE",
+      "ACTIVATED",
+      "STARTED",
+      "DIRECT_TOOL_BLOCKED",
+      "COMPLETED"
+    ],
+    "assertions": {
+      "realPiCommandRegistered": true,
+      "statusAndTinyTaskZeroCall": true,
+      "explicitEligibleActivation": true,
+      "actualControllerToolsVisible": true,
+      "directorPromptInjected": true,
+      "lateMutationSurfaceBlocked": true,
+      "repositoryMutationAbsent": true,
+      "automaticExit": true,
+      "priorSurfaceRestored": true,
+      "metadataOnly": true,
+      "exactlyTwoLocalTurns": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderCalls": 2,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "authority": {
+    "directMutationFallback": false,
+    "parallelWorkerRegistryAdded": false,
+    "existingSecureWorkflowController": true
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderr": "",
+  "cleanup": {
+    "temporaryRemoved": true,
+    "residualProcesses": 0
+  }
+}

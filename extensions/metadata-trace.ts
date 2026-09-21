@@ -5,6 +5,7 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { pruneKnownTraceLogs, resolveRetentionDays } from "../lib/trace-retention.mjs";
 import { agentHubTraceMetadata } from "../lib/agent-hub.mjs";
+import { directorTraceMetadata } from "../lib/director-mode.mjs";
 
 interface TraceRow {
   timestamp: string;
@@ -412,6 +413,25 @@ export default function (pi: ExtensionAPI) {
       model: scalar("model") as string | undefined,
       thinking: scalar("thinking") as string | undefined,
       receiptDigest: scalar("receiptDigest") as string | undefined,
+    });
+  });
+  pi.events.on("pi-overdrive:director-metadata", async (value) => {
+    let data: Record<string, unknown>;
+    try { data = directorTraceMetadata(value) as Record<string, unknown>; }
+    catch {
+      await record({ event: "director_metadata", status: "REJECTED_INVALID_EVENT" });
+      return;
+    }
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "director_metadata",
+      status: scalar("status") as string | undefined,
+      reasonCode: scalar("reasonCode") as string | undefined,
+      sessionDigest: scalar("sessionDigest") as string | undefined,
+      taskDigest: scalar("taskDigest") as string | undefined,
+      taskPolicyDigest: scalar("taskPolicyDigest") as string | undefined,
+      activeToolCount: scalar("activeToolCount") as number | undefined,
+      blockedTool: scalar("blockedTool") as string | undefined,
     });
   });
   pi.on("session_shutdown", async () => record({ event: "session_shutdown" }));

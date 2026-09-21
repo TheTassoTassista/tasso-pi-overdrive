@@ -249,3 +249,18 @@ The recorded passing sequence finished in 694.637 ms on this host. It used one d
 | Calls and cleanup | PASS | zero provider turns, network calls, external calls, and cost; temporary state removed with zero residual processes |
 
 The recorded passing sequence finished in 286.097 ms on this host with three roster entries and two persisted terminal receipts. It is a Pi lifecycle/security observation, not a cross-product latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 15 Director Mode
+
+`npm run benchmark:ultra:director` launches official Pi 0.85.1 with the actual Director extension, actual `secure_coding_workflow` registration, actual verification gate, and a deterministic local provider. A late fixture deliberately re-adds the built-in write schema after Director's normal tool clamp, so the runtime barrier is tested independently of schema hiding.
+
+| Real Pi operation | Result | Evidence |
+|---|---:|---|
+| Command and eligibility | PASS | `/director` is registered; status and a direct small edit use zero provider turns; one hard mutating task activates |
+| Primary surface | PASS | the provider sees read, the real secure workflow controller, and verification plus the bounded Director system instruction |
+| Defense in depth | PASS | a late-resurfaced write call returns a Director error before execution; the sentinel file is absent |
+| Existing authority | PASS | no worker registry/control tool or mutation fallback is added; workflow limits, routing, receipts, isolation, reviewers, and Council remain external owners |
+| Lifecycle/privacy | PASS | `INELIGIBLE → ACTIVATED → STARTED → DIRECT_TOOL_BLOCKED → COMPLETED`; metadata contains digests/counts/tool name only and the prior surface is restored |
+| Calls and cleanup | PASS | two deterministic local turns, one agent run, zero external/network/paid calls, cost zero, temporary state removed, zero residual processes |
+
+The recorded passing sequence finished in 485.188 ms on this host. The deliberate blocked tool requires the second local turn; Director Mode itself adds no provider turn beyond processing the submitted task. This is a Pi lifecycle/security observation, not a cross-product quality or latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.

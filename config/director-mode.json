@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "enabled": true,
+  "activation": "explicit-task-only",
+  "autoExit": "agent-settled",
+  "directMutationFallback": false,
+  "maxTaskChars": 16000,
+  "requiredTools": [
+    "read",
+    "secure_coding_workflow",
+    "verification_gate"
+  ],
+  "allowedTools": [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "ffgrep",
+    "fffind",
+    "ast_grep_run",
+    "ast_grep_scan",
+    "ast_grep_outline",
+    "ast_grep_debug_query",
+    "resource_fs",
+    "smart_read",
+    "semantic_nav",
+    "ts_definition",
+    "ts_references",
+    "ts_diagnostics",
+    "task_notebook",
+    "verification_gate",
+    "secure_coding_workflow",
+    "mcp",
+    "web_research",
+    "safe_web_fetch"
+  ]
+}
