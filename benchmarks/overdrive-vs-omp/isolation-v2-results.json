@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-21T16:33:18.733Z",
+  "status": "PASS",
+  "measurementMode": "local-native-worktree-and-reflink-capability-probe",
+  "overdriveUltra": {
+    "backend": "git-worktree-v2",
+    "allocationVersion": 2,
+    "materializeMs": 24.749,
+    "assertions": {
+      "nativeWorktreeCreated": true,
+      "exactBackendRecorded": true,
+      "ignoredPrivateStateExcluded": true,
+      "independentRuntimeIdentifiers": true,
+      "cleanupComplete": true,
+      "reflinkNeverSelected": true
+    }
+  },
+  "reflinkProbe": {
+    "status": "UNAVAILABLE",
+    "materializeMs": null,
+    "copiedIgnoredPrivateState": false,
+    "selected": false,
+    "reason": "A repository reflink clone copies ignored/project-local state and needs a second Git ownership/apply/cleanup lifecycle; speed alone cannot replace the registered clean Git worktree boundary."
+  },
+  "overlayProbe": {
+    "status": "NOT_RUN",
+    "selected": false,
+    "reason": "Mount-backed isolation would add privileged mount ownership and teardown failure modes without replacing the existing Bubblewrap execution boundary."
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "accounting": {
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "temporaryRemoved": true,
+    "residualProcesses": 0
+  }
+}

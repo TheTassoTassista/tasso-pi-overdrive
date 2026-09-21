@@ -21,6 +21,7 @@ npm run benchmark:ultra:stream-guard
 npm run benchmark:ultra:sentinel
 npm run benchmark:ultra:agent-hub
 npm run benchmark:ultra:director
+npm run benchmark:ultra:isolation
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -38,5 +39,7 @@ npm run benchmark:ultra:director
 `agent-hub.mjs` drives real Pi through production controller journal, reservation/start correlation, and durable role-receipt projection. It proves compact `/agents` discovery, receipt-only terminal accounting, honest unavailable live/missing usage, exact hard limits, forbidden-content exclusion, no control authority, malformed-event fail-soft behavior, private receipts, and process/state cleanup. A trap provider proves the Hub makes zero provider turns; it performs no network, external-provider, paid-model, or billable call.
 
 `director-mode.mjs` drives real Pi through a zero-call status, denied tiny task, explicit eligible activation, dynamic Director prompt, bounded read/delegate/verify surface, and automatic exit. A later fixture intentionally re-adds `write`; the independent runtime allowlist blocks it before the sentinel file can be created. The real secure-workflow and verification registrations remain visible, the prior surface is restored, and the two required deterministic local turns perform no network, external-provider, paid-model, or billable call.
+
+`isolation-v2.mjs` materializes and destroys a production `git-worktree-v2` allocation from a 256-file local fixture, checks the versioned canonical record and independent runtime identifiers, and proves ignored private state is absent. It probes `cp --reflink=always` without selecting it and records mount-backed overlay as `NOT_RUN`; neither alternative can silently replace the single registered Git worktree lifecycle.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

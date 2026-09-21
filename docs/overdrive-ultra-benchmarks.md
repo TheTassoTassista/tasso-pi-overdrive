@@ -264,3 +264,18 @@ The recorded passing sequence finished in 286.097 ms on this host with three ros
 | Calls and cleanup | PASS | two deterministic local turns, one agent run, zero external/network/paid calls, cost zero, temporary state removed, zero residual processes |
 
 The recorded passing sequence finished in 485.188 ms on this host. The deliberate blocked tool requires the second local turn; Director Mode itself adds no provider turn beyond processing the submitted task. This is a Pi lifecycle/security observation, not a cross-product quality or latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; no OMP result is inferred.
+
+## Phase 16 Subagent Isolation V2
+
+`npm run benchmark:ultra:isolation` creates a 256-file local Git fixture with an ignored private marker, materializes and destroys one production runtime allocation, and performs a non-selecting reflink capability probe.
+
+| Local operation | Result | Evidence |
+|---|---:|---|
+| Native worktree V2 | PASS | `version: 2`, `git-worktree-v2`, independent port/state/profile/database/schema identities |
+| Private-state boundary | PASS | ignored private fixture absent from the worktree |
+| Canonical cleanup | PASS | worktree, branch, allocation root, and port reservation absent after cleanup |
+| Reflink | UNAVAILABLE | `cp --reflink=always` unsupported on this filesystem; never selected |
+| Overlay | NOT RUN | no privileged mount probe; existing Bubblewrap boundary retained |
+| Calls | PASS | zero network, external-provider, paid-model, or billable calls |
+
+The native worktree materialized in 24.749 ms on this host. This single local observation is not a cross-product performance claim. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; source inspection is never reported as execution evidence.

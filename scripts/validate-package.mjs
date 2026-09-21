@@ -168,6 +168,9 @@ if (!(extensionOrder.indexOf('./extensions/tool-surface.ts') < extensionOrder.in
 const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
 for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
 for (const marker of ['--minimal-runtime', 'minimal_runtime == 0']) if (!sandboxSource.includes(marker)) failures.push(`Persistent Eval minimal sandbox marker is missing: ${marker}`);
+const runtimeIsolationSource = await readFile(path.join(root, 'lib/runtime-isolation.mjs'), 'utf8');
+for (const marker of ['RUNTIME_ALLOCATION_VERSION = 2', 'RUNTIME_ISOLATION_BACKEND = "git-worktree-v2"', 'assertNoSymlinkComponents(', 'fs.constants.O_NOFOLLOW', 'runtime roots must be independent', 'runtime allocation canonical identity rejected']) if (!runtimeIsolationSource.includes(marker)) failures.push(`Isolation V2 boundary marker is missing: ${marker}`);
+if (/isoStart|overlayfs|reflink|copyFileSync|cpSync/u.test(runtimeIsolationSource)) failures.push('Isolation V2 runtime must retain the single native Git worktree backend rather than add copy or mount lifecycle');
 try {
   const artifacts = await import(path.join(root, 'lib/artifact-store.mjs'));
   artifacts.validateArtifactPolicy(JSON.parse(await readFile(path.join(root, 'config/artifacts.json'), 'utf8')));

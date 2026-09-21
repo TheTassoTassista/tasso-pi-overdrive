@@ -52,6 +52,8 @@ Agent Hub is a read-only projection of the active secure workflow. Use `/agents`
 
 Director Mode is an explicit one-task entry point, not a persistent autonomy preset. Run `/director TASK` only for a non-trivial mutating task; the deterministic Task Governor rejects read-only requests, direct small edits, and work without justified Planner/reviewer/Council value before any provider call. During the task, the primary agent receives a bounded read/plan/delegate/verify surface and must route every repository mutation through `secure_coding_workflow`. A separate runtime allowlist blocks direct edit/write, shell, `safe_exec`, raw subagents, browser mutation, and unknown tools even if another extension exposes one late. The existing workflow still owns routing, worktree/runtime isolation, the 42-attempt budget, concurrency 3, depth 1, two correction rounds, role receipts, verification, reviewers, Council/Judge, evidence, and cleanup. The prior tool surface is restored on `agent_settled`; `/director status` and a policy denial make no model call. There is no direct-mutation fallback.
 
+Workflow isolation uses one canonical `git-worktree-v2` allocation. Its worktree and runtime roots must be private, non-symlinked, mutually independent, and outside the clean source repository. The allocation record binds the exact branch, worktree, state directory, browser profile, port lock, database identifier, schema identifier, and PID/boot/start-time owner. `list`, lookup, resume, release, recovery, and cleanup reject a mismatched or symlinked record instead of acting on an untrusted path. Reflink/copy and overlay mounts are not fallback backends.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

@@ -11,6 +11,7 @@ Guardrails:
 - Free-form `bash` is blocked for all guarded calls. `safe_exec` accepts only a fixed program enum plus an argument vector, rejects destructive Git, inline Node/Python and ad-hoc package execution, and requires an Overdrive allocation for executable/mutating commands.
 - ast-grep cannot enable symlink following; its target, config, and rule-file paths are constrained to canonical non-secret workspace files before the subprocess runs.
 - Autonomous Worker/Tester runs are accepted only in an isolated worktree. Worker has no shell and may delete only a canonical, single-linked regular file through `safe_remove_file`; Tester has no edit/write/general command tool.
+- Runtime allocations use the single `git-worktree-v2` backend. Private canonical roots deny symlink components and repository overlap; owner-only single-link records are opened with `O_NOFOLLOW`, and every lifecycle operation reconstructs the exact branch/worktree/runtime identity before it can resume, release, recover, or clean anything.
 - Third-party search/fetch and browser tools were selected for explicit SSRF/output/redaction controls.
 - Metadata tracing never stores prompt text, argument values, tool output, URLs, environment values, or authentication material.
 
