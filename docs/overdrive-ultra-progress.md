@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 14 — metadata-first Agent Hub
-- Last completed phase commit: `ec6cdb1` — `feat(ultra): add bounded sentinel advisor`
+- Current phase: 15 — optional Director Mode
+- Last completed phase commit: `7a20872` — `feat(ultra): add receipt-backed agent hub`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -69,6 +69,10 @@
 - Implemented a clean-room explicit Sentinel that activates only for a deterministic hard/critical debugging policy and reuses the exact existing Oracle route without adding a role, fallback, workflow stage, Council path, or model-facing schema.
 - Enforced zero tools, zero automatic retries, one invocation per session, reservation-before-call persistence, resume suppression, context/output/time/cost limits, exact route/thinking attestation, and strict secret-free structured advice rendered as untrusted data without a new main-agent turn.
 - Added metadata-only Sentinel receipts/tracing, `/sentinel status`, package invariants, ten focused/adversarial cases, a real Pi deterministic local Oracle benchmark, operations/design/benchmark documentation, and the Phase 13 implementation note.
+- Implemented a clean-room Agent Hub as an ephemeral read-only projection of the secure-workflow journal, controller reservations, exactly correlated started events, and durably persisted terminal role receipts rather than a second orchestration registry.
+- Added exact allowlisted lifecycle schemas that structurally exclude prompts, transcripts, reasoning, tool payloads, paths, credentials, file content, and Council-member output; malformed metadata degrades only the view and never the workflow.
+- Reused the existing normalized receipt aggregate for terminal tokens/cost, retained `UNAVAILABLE` for live or missing accounting, and validated the immutable concurrency 3, depth 1, correction-round 2, and spawn-budget 42 envelope without granting any control authority.
+- Added the schema-free `/agents` command, metadata-only trace projection, package invariants, eleven focused/adversarial cases, a real Pi controller/receipt benchmark, operations/design/benchmark documentation, and the Phase 14 implementation note.
 
 ## Current validation
 
@@ -133,6 +137,12 @@
 - Phase 13 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
 - Phase 13 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
 - Phase 13 full `npm run check`: 350/350 PASS plus syntax, Ultra syntax, memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 14 focused/adversarial tests: 11/11 PASS; fixed policy bounds, reservation/start correlation, durable terminal accounting, honest unavailable usage, negative process exit metadata, exact forbidden-field rejection, Council content isolation, stale/ambiguous lifecycle denial, resume replay, fail-soft behavior, schema absence, and Judge sequencing are covered.
+- Phase 14 Agent Hub real-Pi benchmark: PASS on Pi 0.85.1; three controller-owned role entries, one active and two terminal, two private mode-0400 receipts, receipt-backed Worker usage/cost, unavailable live/missing usage, forbidden-field fail-soft degradation, no protected content or control authority, zero provider/model/network/paid calls, cost zero, and complete temporary/process cleanup.
+- Phase 14 agent-policy regression: all 12 roles discovered; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 14 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 14 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
+- Phase 14 full `npm run check`: 361/361 PASS plus syntax, Ultra/Agent-Hub/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -161,7 +171,8 @@
 - Phase 11 is intentionally pinned to the reviewed Linux-x64 Python/Node/TypeScript/prlimit files. Host runtime upgrades require a reviewed policy update. Eval state is memory-only; JavaScript is synchronous; TypeScript is transpile-only; and top-level await, timers, async host APIs, dynamic/package imports, rich display/images, tool/resource bridges, project/user files, and filesystem persistence remain unavailable. Kernel output is capped at 256 KiB before Artifact Store processing.
 - Phase 12 deliberately recognizes only three conservative controller-owned intent classes and only after complete structured arguments exist. It does not predict every unsafe trajectory and never replaces safety, safe execution, sandboxing, or Tool Governor enforcement. Pi 0.85.1's blocked pre-hook lifecycle requires the narrow safety integration documented in the implementation note; a failed reservation or persistence path simply omits the correction while the governing block remains effective.
 - Phase 13 does not continuously watch, capture transcripts, steer, mutate, execute tools, spawn, retry, or replace Oracle/reviewers/Council. Its USD ceiling relies on registered price metadata and therefore fails closed when a selected route has unknown pricing; provider-reported thinking may remain honestly marked unreported when the adapter does not expose it.
+- Phase 14 is session-local and projects only secure-workflow role attempts. It does not discover arbitrary direct subagent jobs, search historical runs, expose role content, or provide steer/cancel/revive/spawn/message controls. Running duration and usage remain unavailable until authoritative lifecycle/receipt evidence exists. The same-process event bus is inside the installed package trust boundary; the Hub adds no authority if another executable extension is compromised.
 
 ## Exact next action
 
-Inspect the pinned OMP task-subagent and Agent Hub implementation/documentation, then map it against the existing pi-subagents event bridge, secure-workflow receipts/journal/evidence, spawn-budget accounting, runtime/worktree ownership, and Council isolation. Build the smallest metadata-first, read-only Agent Hub that reports authoritative role/status/route/usage/lifecycle state without raw prompts, transcripts, file content, tool output, or Council-member cross-contamination. It must make zero model calls, expose no steering/revive/kill/spawn authority unless a controller-owned safe lifecycle can be proven, preserve concurrency=3/depth=1/spawn budget=42, and degrade without affecting Pi startup or the existing workflow.
+Inspect the pinned OMP Vibe/Director implementation and map only its useful bounded-delegation concepts against the existing Task Governor, Tool Governor, secure workflow, spawn-budget guard, runtime/worktree isolation, immutable role receipts, Agent Hub projection, verification/reviewer correction loop, and Council escalation. Implement an optional explicit Director Mode in which the primary orchestrator reads, plans, delegates mutating work to the already-isolated Worker path, and verifies evidence before acceptance. It must not be the default for tiny tasks, create a parallel state machine, bypass approval/security/routing limits, grant the primary orchestrator hidden mutation, add uncontrolled workers, or change concurrency 3, depth 1, corrections 2, budget 42, Council/Judge sequencing, retry policy, or zero-extra-cost defaults.
