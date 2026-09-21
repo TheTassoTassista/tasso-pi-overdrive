@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 15 — optional Director Mode
-- Last completed phase commit: `7a20872` — `feat(ultra): add receipt-backed agent hub`
+- Current phase: 16 — Subagent Isolation V2
+- Last completed phase commit: `786f654` — `feat(ultra): add bounded director mode`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -73,6 +73,10 @@
 - Added exact allowlisted lifecycle schemas that structurally exclude prompts, transcripts, reasoning, tool payloads, paths, credentials, file content, and Council-member output; malformed metadata degrades only the view and never the workflow.
 - Reused the existing normalized receipt aggregate for terminal tokens/cost, retained `UNAVAILABLE` for live or missing accounting, and validated the immutable concurrency 3, depth 1, correction-round 2, and spawn-budget 42 envelope without granting any control authority.
 - Added the schema-free `/agents` command, metadata-only trace projection, package invariants, eleven focused/adversarial cases, a real Pi controller/receipt benchmark, operations/design/benchmark documentation, and the Phase 14 implementation note.
+- Inspected OMP's Vibe runtime at the pinned reference and retained only the bounded top-level read/plan/delegate/verify concept; persistent worker sessions, transcript retention, steering, revival, kill controls, and a second lifecycle registry were rejected.
+- Implemented clean-room `/director TASK` as an explicit one-task Task-Policy gate. Read-only work, direct small edits, and work without existing delegation value are denied before provider entry; the normal small path remains unchanged.
+- Restricted the primary agent to an allowlisted inspection/delegation/verification surface, required the real `secure_coding_workflow` and verification gate, and added an independent runtime barrier that blocks direct mutation, shell, raw subagents, browser mutation, destructive operations, and unknown tools even if they are exposed late.
+- Added automatic surface restoration, digest-only lifecycle tracing, package invariants, ten focused/adversarial tests, and a real Pi deterministic benchmark proving late write denial, zero residue, exact one-run exit, no parallel controller, and zero external/network/paid calls.
 
 ## Current validation
 
@@ -143,6 +147,12 @@
 - Phase 14 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
 - Phase 14 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
 - Phase 14 full `npm run check`: 361/361 PASS plus syntax, Ultra/Agent-Hub/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 15 focused regression selection: Director Mode, Task Governor, Tool Governor, workflow-state, and Agent Hub files PASS; the Director file contains 10/10 focused/adversarial cases.
+- Phase 15 Director real-Pi benchmark: PASS on Pi 0.85.1; zero-call status and tiny-task denial, one explicit eligible run, required production controller schemas, turn-local Director prompt, late-resurfaced write blocked before execution, sentinel absent, automatic exit, prior surface restored, metadata-only evidence, two deterministic local turns, zero external/network/paid calls, cost zero, and complete cleanup.
+- Phase 15 agent-policy regression: all 12 role profiles PASS; Worker remains shell-free, Tester remains read-only, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 15 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 15 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
+- Phase 15 full `npm run check`: 371/371 PASS plus syntax, Ultra/Agent-Hub/Director/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 
 ## Dirty files
 
@@ -172,7 +182,8 @@
 - Phase 12 deliberately recognizes only three conservative controller-owned intent classes and only after complete structured arguments exist. It does not predict every unsafe trajectory and never replaces safety, safe execution, sandboxing, or Tool Governor enforcement. Pi 0.85.1's blocked pre-hook lifecycle requires the narrow safety integration documented in the implementation note; a failed reservation or persistence path simply omits the correction while the governing block remains effective.
 - Phase 13 does not continuously watch, capture transcripts, steer, mutate, execute tools, spawn, retry, or replace Oracle/reviewers/Council. Its USD ceiling relies on registered price metadata and therefore fails closed when a selected route has unknown pricing; provider-reported thinking may remain honestly marked unreported when the adapter does not expose it.
 - Phase 14 is session-local and projects only secure-workflow role attempts. It does not discover arbitrary direct subagent jobs, search historical runs, expose role content, or provide steer/cancel/revive/spawn/message controls. Running duration and usage remain unavailable until authoritative lifecycle/receipt evidence exists. The same-process event bus is inside the installed package trust boundary; the Hub adds no authority if another executable extension is compromised.
+- Phase 15 is deliberately one task and non-persistent. It does not split work into independently steerable workers, retain worker transcripts, or provide send/steer/revive/kill controls; the existing isolated Worker/correction sequence remains the sole implementation path. A task-aware read-only MCP proxy or bounded web tool is retained only when the Tool Governor already enabled it for the exact task.
 
 ## Exact next action
 
-Inspect the pinned OMP Vibe/Director implementation and map only its useful bounded-delegation concepts against the existing Task Governor, Tool Governor, secure workflow, spawn-budget guard, runtime/worktree isolation, immutable role receipts, Agent Hub projection, verification/reviewer correction loop, and Council escalation. Implement an optional explicit Director Mode in which the primary orchestrator reads, plans, delegates mutating work to the already-isolated Worker path, and verifies evidence before acceptance. It must not be the default for tiny tasks, create a parallel state machine, bypass approval/security/routing limits, grant the primary orchestrator hidden mutation, add uncontrolled workers, or change concurrency 3, depth 1, corrections 2, budget 42, Council/Judge sequencing, retry policy, or zero-extra-cost defaults.
+Inspect the pinned OMP task-isolation implementation and compare snapshot, reflink, overlay, copy, worktree, ownership, and apply semantics against Ultra's existing native Git worktree, unique runtime allocation, Bubblewrap, immutable receipts, and deterministic cleanup. Add only a measured capability that materially improves isolation or startup/cleanup behavior; retain the current strong worktree/Bubblewrap path as the safe default, do not add a second task controller, and do not weaken path, mutation, routing, concurrency, depth, correction, spawn-budget, Council/Judge, retry, or zero-extra-cost invariants.
