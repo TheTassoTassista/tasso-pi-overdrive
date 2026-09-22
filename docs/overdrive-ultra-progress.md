@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 18 — Git / GitHub resource model
-- Last completed phase commit: `5beda78` — `feat(ultra): add model harness profiles`
+- Current phase: 19 — Atomic commit planner
+- Last completed phase commit: `538a0ca` — `feat(ultra): add immutable git resources`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -85,6 +85,9 @@
 - Implemented a clean-room post-route Model Harness Profile resolver that composes existing routing identity/family, Pi registry metadata, callability receipts, and a versioned family/provider/exact override registry with explicit `DECLARED`/`VERIFIED`/`BENCHMARKED`/`INFERRED`/`UNKNOWN` evidence.
 - Integrated profiles as a one-way constraint on Tool Governor, a bounded transactional Edit Engine contract selector, and a non-increasing Context Governor metadata view; unknown providers use `generic-safe-v1`, no profile can expose a hidden tool, and only one already-available edit fallback is retained.
 - Added metadata-only workflow propagation/tracing, zero-call `/model-profile`, owner-only fixture profile overrides, package guards, 22 focused/adversarial cases, deterministic benchmark evidence, and real-Pi Tool Governor/command regressions without changing routing, role, quality, retry, Council/Judge, or spawn policy.
+- Implemented clean-room immutable `git://repo` and `conflict://repo` handlers inside the existing ResourceFS schema. The reviewed surface covers status, bounded log/branches, exact full-OID commit metadata, scoped worktree/staged diff, conflict catalog, and base/ours/theirs bytes; search, arbitrary argv, write, mutate, execute, staging, commit, reset, network, and publish authority are absent.
+- Added a Linux-x64 pinned Git policy and lazy runner attestation for exact path/version/SHA-256 plus per-call filesystem identity checks, strict exact repository-root checks, generated argv, cleared environment, disabled hooks/pagers/fsmonitor/external diff/file/ext transports, timeout, hard combined-output kill ceiling, protected-path rejection, UTF-8/control validation, and pre/post repository identity checks.
+- Integrated explicit `git://`/`conflict://` Task/Tool Governor activation, `/resources` catalog discovery, metadata-only tracing through the existing ResourceFS path, package guards, adversarial tests, operations/design/gap documentation, and a real-Pi benchmark. GitHub `pr://`/`issue://` remain intentionally unregistered because no authenticated read-only client is available; no credential or network probe was made.
 
 ## Current validation
 
@@ -173,6 +176,10 @@
 - Phase 17 real-Pi Tool Governor regression: PASS; the fixture-only provider profile preserved all prior task surfaces, ordinary edit remained four tools/2,128 schema characters, structural intent retained AST plus one exact fallback, explicit CLI remained authoritative, nine deterministic local turns used zero network/external/paid calls, and temporary cleanup passed.
 - Phase 17 real-Pi model-policy smoke: 11/11 PASS; `/model-profile --json` registered and resolved the unknown deterministic driver to `generic-safe-v1` with zero inference/provider execution.
 - Phase 17 full `npm run check`: 395/395 PASS plus syntax, Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. A control run without `PI_OVERDRIVE_LSP_RUNTIME` produced only the documented missing ignored Rust/Go runtime failures; the authoritative run used the already-verified stable runtime and passed all 395.
+- Phase 18 focused/adversarial Git-resource tests: 11/11 PASS; immutable catalog, status/log/branches/commit/diff, argv injection, protected paths, exact root and symlink denial, conflict parsing/sides, malformed/oversize output, exact runtime policy, real binary attestation, cleared environment, and hard output termination are covered. Task/Tool Governor regressions remained green (42 combined focused cases).
+- Phase 18 real-Pi benchmark: PASS on Pi 0.85.1; status, worktree/staged diff, conflict list/side, mutation-surface denial, immutable trust metadata, `/resources` registration, and cleanup passed through the production pinned runner. Twelve deterministic local provider turns used zero network/external-provider/paid calls and cost zero; GitHub was honestly `NOT_RUN` without probing credentials.
+- Phase 18 full `npm run check`: 406/406 PASS plus syntax, Git-Resource/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 18 runtime audit: zero allocations, invalid records, orphan ports, orphan worktrees, or temporary Git-resource fixture directories after tests and benchmark.
 
 ## Dirty files
 
@@ -188,7 +195,7 @@
 - Tool-schema numbers use a bounded non-executing registry inside real Pi; production counts vary with installed tools, while the live selection and denial behavior is the code path under test.
 - Pi 0.85.1 has no native OMP-style extended/discoverable namespace; `/tools` provides name/tier discovery without placing rare schemas in the prompt.
 - Sentinel is intentionally explicit rather than a background watchdog. It sees only the bounded task supplied to `/sentinel`, not the transcript or workspace, and permits exactly one call per session. A selected Oracle route with missing price metadata is blocked rather than silently rerouted.
-- ResourceFS currently supports Linux descriptor traversal and only immutable repository/memory/artifact resources; additional schemes remain deferred to their owning phases.
+- ResourceFS now supports immutable repository/memory/artifact/local-Git/conflict resources. The local Git runner remains Linux-x64 and repository-root-only. GitHub `pr://`/`issue://` are intentionally absent until authenticated read-only access can be proven without changing credentials; remote mutation and publishing remain unavailable.
 - SmartRead deliberately supports source/text only; archive, database, document, and image parsing remain outside its reviewed surface. Cold LSP startup adds latency even though it materially reduces context.
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 - Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
@@ -208,4 +215,4 @@
 
 ## Exact next action
 
-Inspect the existing ResourceFS registration boundary and pinned OMP Git/GitHub resources. Define the smallest immutable Phase 18 URI set with strict canonical parsing, local Git descriptor/process safety, bounded output, explicit trust/provenance, zero hidden network access, and no publish/mutation authority. Keep GitHub optional and fail-soft when authenticated read-only access is unavailable; do not add a broad Git shell proxy.
+Inspect the existing workflow receipts, Edit Engine receipts, immutable Git ResourceFS views, and pinned OMP commit-planning pipeline. Define the smallest deterministic Phase 19 proposal format that groups only explicitly owned changed hunks, excludes unrelated/user/protected work, binds every proposed group to current file/index digests, and cannot stage, commit, amend, reset, publish, or invoke a model by default. Add an explicit transaction/approval boundary only if it composes with existing safety and immutable evidence without creating a second mutation controller.
