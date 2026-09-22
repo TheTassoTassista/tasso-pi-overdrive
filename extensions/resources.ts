@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { AtomicCommitPlanner, commitPlanMetadata, readCommitPlannerPolicy } from "../lib/commit-planner.mjs";
 import { createConflictResourceDefinition, createGitResourceDefinition, createPinnedGitRunner, readGitResourcePolicy } from "../lib/git-resources.mjs";
 import { readModelPolicy } from "../lib/model-policy.mjs";
 import {
@@ -15,6 +16,16 @@ import { getSessionQuality } from "../lib/routing-session.mjs";
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
 
 const Operations = Type.Union([Type.Literal("describe"), Type.Literal("read"), Type.Literal("search")]);
+const CommitPlanAction = Type.Union([Type.Literal("inspect"), Type.Literal("propose")]);
+const CommitPlanScope = Type.Union([Type.Literal("worktree"), Type.Literal("staged")]);
+const CommitPlanChange = Type.Object({
+  path: Type.String({ minLength: 1, maxLength: 2048 }),
+  hunks: Type.Optional(Type.Array(Type.Integer({ minimum: 1, maximum: 200 }), { minItems: 1, maxItems: 200 })),
+}, { additionalProperties: false });
+const CommitPlanGroup = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-z0-9][a-z0-9._-]{0,63}$" }),
+  changes: Type.Array(CommitPlanChange, { minItems: 1, maxItems: 50 }),
+}, { additionalProperties: false });
 
 function policyCoordinates(): { preset: string; quality: string; effectiveQuality: string } {
   const stored = readModelPolicy();
@@ -28,13 +39,15 @@ function policyCoordinates(): { preset: string; quality: string; effectiveQualit
 
 function safeErrorCode(error: unknown): string {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "resource_access_failed";
-  return /^(?:resource|artifact)_[a-z0-9_]+$/u.test(code) ? code : "resource_access_failed";
+  return /^(?:resource|artifact|commit_plan)_[a-z0-9_]+$/u.test(code) ? code : "resource_access_failed";
 }
 
 export default function resourcesExtension(pi: ExtensionAPI): void {
   let memoryRuntime: any;
   let memoryKey = "";
   let artifactStore: any;
+  let commitPlanner: AtomicCommitPlanner | undefined;
+  let commitPlannerInitializationError: string | undefined;
   const gitPolicy = readGitResourcePolicy();
   const runGit = createPinnedGitRunner(gitPolicy);
   const runtimeFor = (cwd: string): any => {
@@ -71,6 +84,14 @@ export default function resourcesExtension(pi: ExtensionAPI): void {
         cwd: ctx.cwd,
       });
     } catch { artifactStore = undefined; }
+    try {
+      commitPlanner = new AtomicCommitPlanner({ cwd: ctx.cwd, runGit, gitPolicy, policy: readCommitPlannerPolicy() });
+      commitPlannerInitializationError = undefined;
+    } catch (error) {
+      commitPlanner = undefined;
+      commitPlannerInitializationError = safeErrorCode(error);
+      pi.events.emit("pi-overdrive:commit-plan-metadata", { kind: "commit_plan", status: "DEGRADED", errorCode: commitPlannerInitializationError });
+    }
   });
 
   pi.registerTool({
@@ -117,8 +138,50 @@ export default function resourcesExtension(pi: ExtensionAPI): void {
     },
   });
 
+  pi.registerTool({
+    name: "commit_plan",
+    label: "Atomic Commit Plan",
+    description: "Inspect explicitly named changed files and propose digest-bound atomic hunk groups. This is proposal-only: it cannot stage, commit, amend, reset, publish, run arbitrary Git, or invoke a model.",
+    promptSnippet: "Use commit_plan only for explicit commit-planning intent; inspect exact paths before proposing groups",
+    promptGuidelines: [
+      "Pass only paths whose ownership is explicit. Unselected and protected changes remain excluded and are counted.",
+      "Use inspect first to obtain current hunk indices/digests, then propose disjoint groups against the returned source state.",
+      "A plan is not authorization and cannot be applied. Any later Git mutation requires a separate human-approved workflow not provided by this tool.",
+    ],
+    parameters: Type.Object({
+      action: CommitPlanAction,
+      scope: CommitPlanScope,
+      paths: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 2048 }), { minItems: 1, maxItems: 50 })),
+      groups: Type.Optional(Type.Array(CommitPlanGroup, { minItems: 1, maxItems: 20 })),
+    }, { additionalProperties: false }),
+    async execute(_toolCallId, parameters, signal) {
+      if (!commitPlanner) throw new Error(`Commit planner unavailable (${commitPlannerInitializationError ?? "commit_plan_unavailable"}).`);
+      try {
+        let result;
+        if (parameters.action === "inspect") {
+          if (!parameters.paths || parameters.groups !== undefined) throw Object.assign(new Error("commit_plan_input_invalid"), { code: "commit_plan_input_invalid" });
+          result = await commitPlanner.inspect({ scope: parameters.scope, paths: parameters.paths, signal });
+        } else {
+          if (!parameters.groups || parameters.paths !== undefined) throw Object.assign(new Error("commit_plan_input_invalid"), { code: "commit_plan_input_invalid" });
+          result = await commitPlanner.propose({ scope: parameters.scope, groups: parameters.groups, signal });
+        }
+        const metadata = commitPlanMetadata(result);
+        pi.events.emit("pi-overdrive:commit-plan-metadata", metadata);
+        return { content: [{ type: "text", text: `[COMMIT PLAN — PROPOSAL ONLY; NO GIT MUTATION]\n${JSON.stringify(result, null, 2)}` }], details: metadata };
+      } catch (error) {
+        const errorCode = safeErrorCode(error);
+        pi.events.emit("pi-overdrive:commit-plan-metadata", { kind: "commit_plan", status: "FAIL", operation: parameters.action.toUpperCase(), scope: parameters.scope, errorCode });
+        throw new Error(`Commit planner denied the request (${errorCode}).`);
+      }
+    },
+  });
+
   pi.registerCommand("resources", {
     description: "Show ResourceFS schemes, capabilities, trust, and immutability without a model call",
     handler: async (_args, ctx) => ctx.ui.notify(JSON.stringify(await resources.access({ operation: "DESCRIBE" }), null, 2), "info"),
+  });
+  pi.registerCommand("commit-plan", {
+    description: "Show proposal-only commit planner status without a model call",
+    handler: async (_args, ctx) => ctx.ui.notify(JSON.stringify(commitPlanner?.status() ?? { version: 1, enabled: false, authority: "NONE", errorCode: commitPlannerInitializationError ?? "commit_plan_unavailable" }, null, 2), "info"),
   });
 }

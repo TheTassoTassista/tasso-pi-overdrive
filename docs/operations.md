@@ -58,6 +58,8 @@ Model Harness Profiles resolve only after Pi and the existing policy select a mo
 
 Local Git inspection is available through the existing conditional `resource_fs` tool. Use `git://repo/status`, `git://repo/log`, `git://repo/branches`, `git://repo/commit/<full-oid>`, `git://repo/diff/worktree[/path]`, or `git://repo/diff/staged[/path]`. During a merge conflict use `conflict://repo/list` and `conflict://repo/{base|ours|theirs}/<path>`. These are immutable views of the exact repository root: there is no arbitrary Git argument, staging, commit, reset, merge, conflict resolution, network, or publish operation. `/resources` shows the active catalog without a model call. `pr://` and `issue://` are not registered while an authenticated read-only GitHub client is unavailable; use the separately governed web/MCP paths only when their existing policy explicitly enables them.
 
+For explicit atomic-commit planning, call `commit_plan` with `action: "inspect"`, one scope (`worktree` or `staged`), and only paths whose ownership is known. Use the returned hunk indices and digests in a later `action: "propose"` request with disjoint named groups. The plan is evidence, not authorization: it cannot stage, commit, amend, reset, publish, or invoke a model, and it never selects unrelated or protected files for you. Reinspect after any source or index change. `/commit-plan` shows the local proposal-only status and counters without a model call.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

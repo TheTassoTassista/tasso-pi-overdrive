@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-22T14:23:10.920Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-pinned-git-proposal-only",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "run": {
+      "status": "PASS",
+      "elapsedMs": 337.278,
+      "providerTurns": 3,
+      "exitCode": 0,
+      "stderr": "",
+      "results": [
+        {
+          "isError": false,
+          "details": {
+            "kind": "commit_plan",
+            "version": 1,
+            "status": "PASS",
+            "operation": "INSPECT",
+            "scope": "worktree",
+            "decisionModelCalls": 0,
+            "changedFileCount": 3,
+            "protectedChangedFileCount": 1,
+            "selectedFileCount": 1,
+            "excludedChangedFileCount": 2,
+            "groupCount": 0,
+            "snapshotDigest": "f1c92de440a7ff97d44e9bcf7579764434ebcd07a0e1fbaebdd99018417f52ff"
+          }
+        },
+        {
+          "isError": false,
+          "details": {
+            "kind": "commit_plan",
+            "version": 1,
+            "status": "PASS",
+            "operation": "PROPOSE",
+            "scope": "worktree",
+            "decisionModelCalls": 0,
+            "changedFileCount": 3,
+            "protectedChangedFileCount": 1,
+            "selectedFileCount": 1,
+            "excludedChangedFileCount": 2,
+            "groupCount": 2,
+            "snapshotDigest": "f1c92de440a7ff97d44e9bcf7579764434ebcd07a0e1fbaebdd99018417f52ff",
+            "planDigest": "998b1d15c1584a7eb777c0dbcebaa200a13b5a6314b027a1ad167aaf682447ba"
+          }
+        }
+      ]
+    },
+    "command": {
+      "status": "PASS",
+      "source": "extension",
+      "exitCode": 0
+    },
+    "assertions": {
+      "piRunComplete": true,
+      "explicitOwnershipOnly": true,
+      "realTwoHunkSnapshot": true,
+      "atomicGroupsProposed": true,
+      "proposalHasNoAuthority": true,
+      "digestBound": true,
+      "metadataOnly": true,
+      "zeroDecisionModelCalls": true,
+      "repositoryByteInvariant": true,
+      "commandRegistered": true,
+      "deterministicTurnCount": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 3,
+    "decisionModelCalls": 0,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryFixtureRemoved": true
+  }
+}

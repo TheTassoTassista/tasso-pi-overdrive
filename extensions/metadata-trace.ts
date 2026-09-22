@@ -168,6 +168,26 @@ export default function (pi: ExtensionAPI) {
       uriDigest: scalar("uriDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:commit-plan-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "commit_plan_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      operation: scalar("operation") as string | undefined,
+      scope: scalar("scope") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      decisionModelCalls: scalar("decisionModelCalls") as number | undefined,
+      changedFileCount: scalar("changedFileCount") as number | undefined,
+      protectedChangedFileCount: scalar("protectedChangedFileCount") as number | undefined,
+      selectedFileCount: scalar("selectedFileCount") as number | undefined,
+      excludedChangedFileCount: scalar("excludedChangedFileCount") as number | undefined,
+      groupCount: scalar("groupCount") as number | undefined,
+      snapshotDigest: scalar("snapshotDigest") as string | undefined,
+      planDigest: scalar("planDigest") as string | undefined,
+    });
+  });
   pi.events.on("pi-overdrive:smart-read-metadata", async (value) => {
     const data = value as Record<string, unknown>;
     const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;

@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'config/commit-planner.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -82,6 +82,14 @@ try {
 const resourcesExtension = await readFile(path.join(root, 'extensions/resources.ts'), 'utf8');
 if (!resourcesExtension.includes('Type.Literal("describe"), Type.Literal("read"), Type.Literal("search")') || !resourcesExtension.includes('registerCommand("resources"')) failures.push('ResourceFS public tool/command surface changed');
 for (const marker of ['createPinnedGitRunner(', 'createGitResourceDefinition(', 'createConflictResourceDefinition(', 'there is no Git shell, mutation, network, or publish operation']) if (!resourcesExtension.includes(marker)) failures.push(`Git ResourceFS integration marker is missing: ${marker}`);
+try {
+  const commitPlanner = await import(path.join(root, 'lib/commit-planner.mjs'));
+  const policy = commitPlanner.validateCommitPlannerPolicy(JSON.parse(await readFile(path.join(root, 'config/commit-planner.json'), 'utf8')));
+  if (policy.maxSelectedFiles > policy.maxChangedFiles || policy.maxGroups > 20 || policy.maxUntrackedBytes > 1024 * 1024) failures.push('Atomic Commit Planner hard bounds changed');
+  const source = await readFile(path.join(root, 'lib/commit-planner.mjs'), 'utf8');
+  if (!source.includes('status: "PROPOSAL_ONLY"') || !source.includes('canStage: false') || !source.includes('canCommit: false') || !source.includes('canPublish: false') || /\b(?:git\s+add|git\s+commit|git\s+push)\b/iu.test(source)) failures.push('Atomic Commit Planner acquired mutation or publish authority');
+} catch (error) { failures.push(`Atomic Commit Planner validation failed: ${error.message}`); }
+for (const marker of ['name: "commit_plan"', 'registerCommand("commit-plan"', 'PROPOSAL ONLY; NO GIT MUTATION', 'cannot stage, commit, amend, reset, publish']) if (!resourcesExtension.includes(marker)) failures.push(`Atomic Commit Planner integration marker is missing: ${marker}`);
 try {
   const smartRead = await import(path.join(root, 'lib/smart-read.mjs'));
   const fixture = path.join(root, 'lib/task-governor.mjs');
@@ -210,6 +218,8 @@ if (!handoffExtension.includes('governContext({') || handoffExtension.indexOf('g
 const metadataTraceExtension = await readFile(path.join(root, 'extensions/metadata-trace.ts'), 'utf8');
 if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.push('Context Governor metadata-only tracing listener is missing');
 if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
+const commitPlanTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:commit-plan-metadata'), metadataTraceExtension.indexOf('pi-overdrive:smart-read-metadata'));
+if (!commitPlanTrace.includes('pi-overdrive:commit-plan-metadata') || /scalar\("(?:path|content|diff|hunk|prompt|secret|credential)"\)/iu.test(commitPlanTrace)) failures.push('Atomic Commit Planner metadata-only tracing listener is missing or admits repository content');
 if (!metadataTraceExtension.includes('pi-overdrive:dap-metadata') || /expression|variableValue|sourcePath/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:dap-metadata')))) failures.push('DAP metadata-only tracing listener is missing or admits debugger content');
 if (!metadataTraceExtension.includes('pi-overdrive:eval-metadata') || /scalar\("(?:code|stdout|stderr|value|prompt|path)"\)/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:eval-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"')))) failures.push('Persistent Eval metadata-only tracing listener is missing or admits evaluated content');
 const streamTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:streamguard-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"'));

@@ -15,7 +15,7 @@ const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
   "transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
   "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
-  "resource_fs", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
+  "resource_fs", "commit_plan", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
 
 function policyFor(task, availableTools = available) {
@@ -69,6 +69,14 @@ test("ResourceFS schema is conditional on a supported URI", () => {
   assert.ok(policyFor(`Inspect artifact://${"a".repeat(64)} without changing files.`).toolPolicy.activeTools.includes("resource_fs"));
   assert.ok(policyFor("Inspect git://repo/status without changing files.").toolPolicy.activeTools.includes("resource_fs"));
   assert.ok(policyFor("Inspect conflict://repo/list without changing files.").toolPolicy.activeTools.includes("resource_fs"));
+});
+
+test("atomic commit planning exposes only the proposal tool and read surfaces", () => {
+  const { taskPolicy, toolPolicy } = policyFor("Plan atomic commits for these explicit changed files.");
+  assert.equal(taskPolicy.classification.signals.commitPlan, true);
+  assert.equal(taskPolicy.classification.signals.mutating, false);
+  assert.ok(toolPolicy.activeTools.includes("commit_plan"));
+  for (const name of ["transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "safe_exec", "bash", "subagent", "safe_remove_file"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
 });
 
 test("SmartRead schema follows source-inspection policy without affecting direct edits", () => {
@@ -129,6 +137,7 @@ test("classification distinguishes all four supported visibility tiers", () => {
   assert.equal(classifyTool("read").tier, "always-essential");
   assert.equal(classifyTool("transactional_edit").tier, "conditional");
   assert.equal(classifyTool("transactional_ast_edit").tier, "conditional");
+  assert.equal(classifyTool("commit_plan").tier, "conditional");
   assert.equal(classifyTool("semantic_nav").tier, "conditional");
   assert.equal(classifyTool("debug_engine").tier, "conditional");
   assert.equal(classifyTool("persistent_python").tier, "conditional");

@@ -72,6 +72,7 @@ export default function registerSingleToolProvider(pi: ExtensionAPI): void {
 	pi.events.on("pi-overdrive:eval-metadata", (value) => appendAudit({ auditKind: "eval_metadata", ...(value as object) }));
 	pi.events.on("pi-overdrive:streamguard-metadata", (value) => appendAudit({ auditKind: "stream_guard_metadata", ...(value as object) }));
 	pi.events.on("pi-overdrive:artifact-metadata", (value) => appendAudit({ auditKind: "artifact_metadata", ...(value as object) }));
+	pi.events.on("pi-overdrive:commit-plan-metadata", (value) => appendAudit({ auditKind: "commit_plan_metadata", ...(value as object) }));
 	pi.registerProvider("pi-overdrive-tool-audit", {
 		baseUrl: "http://127.0.0.1.invalid",
 		apiKey: "$PI_OVERDRIVE_TOOL_AUDIT_KEY",

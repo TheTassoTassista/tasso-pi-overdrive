@@ -24,6 +24,7 @@ npm run benchmark:ultra:director
 npm run benchmark:ultra:isolation
 npm run benchmark:ultra:model-harness
 npm run benchmark:ultra:git-resources
+npm run benchmark:ultra:commit-planner
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -47,5 +48,7 @@ npm run benchmark:ultra:git-resources
 `model-harness-profile.mjs` exercises the production post-route resolver and Tool/Edit Governor composition for receipt-backed and unknown model fixtures. It proves deterministic provenance, generic-safe degradation, bounded edit fallback, and the no-tool-escalation invariant over 10,000 local decisions. It makes no model, provider, network, or paid call.
 
 `git-resources.mjs` drives real Pi against a temporary local repository through the production pinned Git runner. It verifies status, worktree/staged diffs, conflict catalog and conflict-side reads, mutation-surface denial, immutable trust metadata, command discovery, and cleanup. Six operations use twelve deterministic in-memory provider turns and zero network, external-provider, paid-model, or billable calls. GitHub is honestly `NOT_RUN` because no authenticated read-only client is available; the benchmark does not probe credentials or the network.
+
+`commit-planner.mjs` drives real Pi through an explicit one-file inspection and a two-group hunk proposal while unrelated and protected changes coexist. It proves exact changed/excluded counts, digest binding, metadata privacy, zero staging/commit/publish authority, `/commit-plan` discovery, byte-identical HEAD/index/worktree state, deterministic cleanup, and exactly three in-memory provider turns with zero decision-model, network, external-provider, paid-model, or billable calls.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

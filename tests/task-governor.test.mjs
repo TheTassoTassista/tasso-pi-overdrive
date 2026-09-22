@@ -64,6 +64,16 @@ test("ResourceFS activates only for an explicit supported URI", () => {
   assert.ok(artifact.toolNeed.capabilities.includes("resources"));
 });
 
+test("atomic commit planning is deterministic, proposal-only policy intent", () => {
+  const policy = resolveTaskPolicy({ task: "Plan atomic commits for these explicit changed files." });
+  assert.equal(policy.classification.signals.commitPlan, true);
+  assert.equal(policy.classification.signals.mutating, false);
+  assert.ok(policy.toolNeed.capabilities.includes("commit-plan"));
+  assert.equal(policy.toolNeed.capabilities.includes("edit"), false);
+  assert.equal(policy.needs.verification, false);
+  assert.equal(policy.decisionModelCalls, 0);
+});
+
 test("SmartRead is selected for source inspection but omitted for a direct small edit", () => {
   const inspection = resolveTaskPolicy({ task: "Inspect src/router.ts and explain the implementation." });
   assert.equal(inspection.needs.smartRead, true);

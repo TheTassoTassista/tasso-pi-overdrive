@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "maxChangedFiles": 100,
+  "maxSelectedFiles": 50,
+  "maxGroups": 20,
+  "maxChangesPerGroup": 50,
+  "maxHunksPerFile": 200,
+  "maxUntrackedBytes": 1048576
+}
