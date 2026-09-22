@@ -285,3 +285,18 @@ The native worktree materialized in 24.749 ms on this host. This single local ob
 `npm run benchmark:ultra:model-harness` resolves 10,000 alternating known/unknown and ordinary/structural fixtures through the production resolver and Tool/Edit Governor composition. The recorded run completed in 516.522 ms total, 0.051652 ms mean per decision. Receipt-backed direct Terra resolves to `openai-codex-native-v1`; an unknown provider resolves to `generic-safe-v1` and retains only bounded read/search tools from the supplied surface.
 
 All nine assertions passed: route identity preservation, receipt-backed evidence, hash/replace order, AST/hash order, one-fallback bound, no tool escalation, unknown-provider restriction, deterministic receipt, and zero decision calls. The run made zero network, external-provider, paid-model, or billable calls at cost zero. The real-Pi Tool Governor regression also passed after declaring its deterministic fixture provider through a private fixture-only profile; production configuration was not widened. OMP remains `NOT_RUN`, and its source compatibility declarations are not treated as Ultra benchmark evidence.
+
+## Phase 20 Config / Rule Interoperability
+
+`npm run benchmark:ultra:rules` launches official Pi 0.85.1 with the production Rule Pack path in the final Context Governor and a deterministic local provider that records metadata/booleans only. The fixture contains a native root instruction, one applicable scoped rule, one unrelated rule, an unrelated 45 KiB rule, a malicious lower-priority paragraph, and a same-name Cursor/GitHub conflict.
+
+| Real Pi observation | Result | Evidence |
+|---|---:|---|
+| Native and applicable context | PASS | Root native marker and applicable frontend rule reach the provider exactly through one Rule Pack boundary |
+| Scope and prompt tax | PASS | Backend and 45 KiB unrelated rules are absent; final system prompt is 4,080 characters / approximately 1,020 tokens |
+| Injection boundary | PASS | Malicious override paragraph is absent; one override attempt is counted; no tools are exposed |
+| Conflict/precedence | PASS | Both different same-name rules remain explicit conflict evidence in deterministic Cursor-before-GitHub order |
+| Context and metadata | PASS | Rule Pack is 2,045 characters, Context Governor reports PASS, and receipts contain only counts/digests/status |
+| Local control/cost/cleanup | PASS | `/rules` registers with zero provider turns; one deterministic local turn, zero decision/external/network/paid calls, cost zero, fixture removed |
+
+The recorded run completed in 269.179 ms on this host. It is a Pi context/security observation, not a cross-product quality or latency comparison. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; its inspected rulebook design is not reported as runtime evidence.

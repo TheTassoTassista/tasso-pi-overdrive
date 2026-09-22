@@ -14,6 +14,7 @@ Guardrails:
 - Runtime allocations use the single `git-worktree-v2` backend. Private canonical roots deny symlink components and repository overlap; owner-only single-link records are opened with `O_NOFOLLOW`, and every lifecycle operation reconstructs the exact branch/worktree/runtime identity before it can resume, release, recover, or clean anything.
 - Third-party search/fetch and browser tools were selected for explicit SSRF/output/redaction controls.
 - Metadata tracing never stores prompt text, argument values, tool output, URLs, environment values, or authentication material.
+- Imported project rules are fixed-location, bounded, scope-matched, digest-cached, and sanitized before entering the model context. They are explicitly lower authority than controller/current-task policy and cannot change tools, routing, Council/Judge, cost, spawn, sandbox, approval, verification, receipt, or Git/publish policy. `rule://project` is digest-bound and read-only.
 
 Limitations:
 
@@ -22,6 +23,7 @@ Limitations:
 - There remains a narrow same-user TOCTOU window between a guard hook approving a path and a Pi built-in opening it. Existing path components are canonicalized with symlinks denied, new parents are canonicalized, and multi-linked writes are denied. `safe_remove_file` now holds an `O_NOFOLLOW` descriptor across final device/inode/link validation and unlink, then admits success only if that exact inode reaches link count zero. Trace retention similarly anchors known directories through held descriptors and verifies the opened inode after unlink. The built-in Pi file APIs still do not expose an `openat`/directory-FD seam for complete race elimination.
 - Credential hiding recognizes conventional names and key extensions. A secret stored under an arbitrary ordinary source filename is not distinguishable from source and can be read by repository code executed in the sandbox.
 - Project trust authorizes code loading; it does not provide filesystem or network containment.
+- Prompt-injection filtering is a defense-in-depth classifier, not a proof that arbitrary prose is semantically harmless. The hard guarantee is that project rules have no direct execution/configuration API and all requested actions still pass the existing deterministic governors and enforcement boundaries. Pi core still loads root `AGENTS.md`; Ultra does not duplicate or replace that native loader.
 - Successful large outputs may omit low-signal lines. Every line classified ERROR/FATAL/failure is retained regardless of position or count; failed tool results are never compacted.
 
 Exact execution boundary:

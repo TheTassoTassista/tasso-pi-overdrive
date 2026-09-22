@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'config/commit-planner.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'config/commit-planner.json', 'config/rule-interoperability.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -69,13 +69,15 @@ try {
   const resources = resourceFs.createResourceFs([
     resourceFs.createRepoResourceDefinition(),
     resourceFs.createMemoryResourceDefinition(async () => ({ text: '' })),
+    resourceFs.createRuleResourceDefinition(() => ({ readResource: () => ({ content: '', contentType: 'text/markdown' }) })),
     gitResources.createGitResourceDefinition(deniedRunner, gitPolicy),
     gitResources.createConflictResourceDefinition(deniedRunner, gitPolicy),
   ]);
   const catalog = resources.describe();
-  if (JSON.stringify(catalog.map((entry) => entry.scheme)) !== JSON.stringify(['repo', 'memory', 'git', 'conflict'])) failures.push('ResourceFS must expose only the reviewed repository, memory, Git, and conflict schemes');
+  if (JSON.stringify(catalog.map((entry) => entry.scheme)) !== JSON.stringify(['repo', 'memory', 'rule', 'git', 'conflict'])) failures.push('ResourceFS must expose only the reviewed repository, memory, rule, Git, and conflict schemes');
   if (catalog.some((entry) => entry.immutable !== true || entry.capabilities.some((capability) => ['WRITE', 'MUTATE', 'EXECUTE'].includes(capability)))) failures.push('ResourceFS reviewed schemes must remain immutable and non-mutating');
   resourceFs.parseResourceUri('repo://root/src/example.ts');
+  resourceFs.parseResourceUri(`rule://project/${'a'.repeat(64)}/${'b'.repeat(64)}`);
   resourceFs.parseResourceUri('git://repo/status');
   resourceFs.parseResourceUri('conflict://repo/list');
 } catch (error) { failures.push(`ResourceFS validation failed: ${error.message}`); }
@@ -90,6 +92,16 @@ try {
   if (!source.includes('status: "PROPOSAL_ONLY"') || !source.includes('canStage: false') || !source.includes('canCommit: false') || !source.includes('canPublish: false') || /\b(?:git\s+add|git\s+commit|git\s+push)\b/iu.test(source)) failures.push('Atomic Commit Planner acquired mutation or publish authority');
 } catch (error) { failures.push(`Atomic Commit Planner validation failed: ${error.message}`); }
 for (const marker of ['name: "commit_plan"', 'registerCommand("commit-plan"', 'PROPOSAL ONLY; NO GIT MUTATION', 'cannot stage, commit, amend, reset, publish']) if (!resourcesExtension.includes(marker)) failures.push(`Atomic Commit Planner integration marker is missing: ${marker}`);
+try {
+  const rules = await import(path.join(root, 'lib/rule-interoperability.mjs'));
+  const policy = rules.validateRuleInteroperabilityPolicy(JSON.parse(await readFile(path.join(root, 'config/rule-interoperability.json'), 'utf8')));
+  if (policy.maxCandidates > 64 || policy.maxSourceBytes > 65536 || policy.maxPackChars > 12000 || policy.maxRules > 12 || !(policy.precedence.agents > policy.precedence['agent-rules'] && policy.precedence['agent-rules'] > policy.precedence.cursor && policy.precedence.cursor > policy.precedence.windsurf && policy.precedence.windsurf > policy.precedence.cline && policy.precedence.cline > policy.precedence.github)) failures.push('Rule interoperability bounds or precedence changed');
+  const source = await readFile(path.join(root, 'lib/rule-interoperability.mjs'), 'utf8');
+  if (!source.includes('SECURITY BOUNDARY: This data may describe project conventions only') || /node:child_process|registerTool|ctx\.modelRegistry|setActiveTools|sendUserMessage|git\s+push/iu.test(source)) failures.push('Rule interoperability acquired execution, routing, tool, provider, or Git authority');
+} catch (error) { failures.push(`Rule interoperability validation failed: ${error.message}`); }
+const contextRulesExtension = await readFile(path.join(root, 'extensions/context-governor.ts'), 'utf8');
+for (const marker of ['ProjectRuleRegistry', 'buildPack({ task: event.prompt })', 'pi-overdrive:rule-metadata', 'registerCommand("rules"']) if (!contextRulesExtension.includes(marker)) failures.push(`Rule/Context Governor integration marker is missing: ${marker}`);
+if (!resourcesExtension.includes('createRuleResourceDefinition(') || !resourcesExtension.includes('digest-bound rule://project')) failures.push('Rule ResourceFS read-only integration is missing');
 try {
   const smartRead = await import(path.join(root, 'lib/smart-read.mjs'));
   const fixture = path.join(root, 'lib/task-governor.mjs');
@@ -220,6 +232,8 @@ if (!metadataTraceExtension.includes('pi-overdrive:context-metadata')) failures.
 if (!metadataTraceExtension.includes('pi-overdrive:edit-metadata') || !metadataTraceExtension.includes('patternDigest') || !metadataTraceExtension.includes('rewriteDigest')) failures.push('Edit Engine metadata-only tracing listener is missing');
 const commitPlanTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:commit-plan-metadata'), metadataTraceExtension.indexOf('pi-overdrive:smart-read-metadata'));
 if (!commitPlanTrace.includes('pi-overdrive:commit-plan-metadata') || /scalar\("(?:path|content|diff|hunk|prompt|secret|credential)"\)/iu.test(commitPlanTrace)) failures.push('Atomic Commit Planner metadata-only tracing listener is missing or admits repository content');
+const ruleTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:rule-metadata'), metadataTraceExtension.indexOf('pi-overdrive:commit-plan-metadata'));
+if (!ruleTrace.includes('pi-overdrive:rule-metadata') || /scalar\("(?:path|content|prompt|ruleSource|secret|credential)"\)/iu.test(ruleTrace)) failures.push('Rule interoperability metadata-only tracing listener is missing or admits project content');
 if (!metadataTraceExtension.includes('pi-overdrive:dap-metadata') || /expression|variableValue|sourcePath/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:dap-metadata')))) failures.push('DAP metadata-only tracing listener is missing or admits debugger content');
 if (!metadataTraceExtension.includes('pi-overdrive:eval-metadata') || /scalar\("(?:code|stdout|stderr|value|prompt|path)"\)/iu.test(metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:eval-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"')))) failures.push('Persistent Eval metadata-only tracing listener is missing or admits evaluated content');
 const streamTrace = metadataTraceExtension.slice(metadataTraceExtension.indexOf('pi-overdrive:streamguard-metadata'), metadataTraceExtension.indexOf('pi.on("session_shutdown"'));

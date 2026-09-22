@@ -60,6 +60,8 @@ Local Git inspection is available through the existing conditional `resource_fs`
 
 For explicit atomic-commit planning, call `commit_plan` with `action: "inspect"`, one scope (`worktree` or `staged`), and only paths whose ownership is known. Use the returned hunk indices and digests in a later `action: "propose"` request with disjoint named groups. The plan is evidence, not authorization: it cannot stage, commit, amend, reset, publish, or invoke a model, and it never selects unrelated or protected files for you. Reinspect after any source or index change. `/commit-plan` shows the local proposal-only status and counters without a model call.
 
+Project rule interoperability runs automatically before Context Governor for the top-level Pi session and every fresh role. Supported project-only sources are root/task-ancestor `AGENTS.md`, `.agent/rules`, `.agents/rules`, `.cursor/rules`, `.windsurf/rules`, `.clinerules`, `.github/copilot-instructions.md`, and `.github/instructions/**/*.instructions.md`. Only fixed locations are scanned, scopes must match task file paths, and large/unrelated rules are excluded. Imported content is sanitized and wrapped as untrusted guidance; it cannot expose a tool or authorize execution, routing, network/browser access, Council changes, extra spend, or Git publication. Use `/rules` to inspect local bounds/cache counters. A Rule Pack reference can be reopened only with its exact digest-bound `rule://project/...` URI through ResourceFS `READ`; changed sources make old URIs stale.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

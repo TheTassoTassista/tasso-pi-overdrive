@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-22T22:20:10.764Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-rule-context",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 269.179,
+    "exitCode": 0,
+    "modelFacing": {
+      "kind": "model_facing_rule_audit",
+      "systemPromptChars": 4080,
+      "estimatedSystemPromptTokens": 1020,
+      "toolNames": [],
+      "rootRule": true,
+      "applicableRule": true,
+      "unrelatedRule": false,
+      "maliciousOverride": false,
+      "giantUnrelatedRule": false,
+      "highPriorityConflict": true,
+      "lowPriorityConflict": true,
+      "authorityBoundary": true,
+      "rulePackCount": 1
+    },
+    "ruleMetadata": {
+      "auditKind": "rule_metadata",
+      "kind": "rule_pack",
+      "version": 1,
+      "decisionModelCalls": 0,
+      "registryDigest": "b6e1c4df62f048e56403691ccfabcfec0fd7bdc83373629551003540e389df79",
+      "packDigest": "2b0898672500833624cad2d803615be1f4a40a7aa0201408bea17c236364c6bd",
+      "candidateCount": 7,
+      "acceptedCount": 7,
+      "matchedCount": 5,
+      "deliveredCount": 4,
+      "nativeCount": 1,
+      "unrelatedCount": 2,
+      "duplicateCount": 0,
+      "conflictCount": 2,
+      "rejectedCount": 0,
+      "securityOverrideAttempts": 1,
+      "truncatedRuleCount": 0,
+      "omittedForBudget": 0,
+      "packChars": 2045,
+      "approximateTokens": 512,
+      "cacheHits": 0,
+      "cacheMisses": 7
+    },
+    "contextStatus": "PASS",
+    "command": {
+      "status": "PASS",
+      "exitCode": 0,
+      "providerTurns": 0
+    },
+    "assertions": {
+      "realPiRunComplete": true,
+      "rootInstructionPresentOnce": true,
+      "scopedApplicableOnly": true,
+      "maliciousOverrideAbsent": true,
+      "conflictPreserved": true,
+      "boundedRulePack": true,
+      "contextGovernorPassed": true,
+      "noAuthorityTools": true,
+      "metadataOnly": true,
+      "commandRegisteredWithoutProviderTurn": true,
+      "zeroDecisionCalls": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 1,
+    "decisionModelCalls": 0,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "cleanup": {
+    "temporaryFixtureRemoved": true
+  }
+}

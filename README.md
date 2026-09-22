@@ -62,6 +62,7 @@ The installed packages and the reason for every acceptance/rejection are in [pac
 | `/handoff <goal>` | Create an editable clean-session handoff |
 | `/notebook` | Show canonical compact task state |
 | `/context-health` | Show context pressure and next action |
+| `/rules` | Show bounded project-rule precedence, limits, and digest-cache counters without a model call |
 | `/output-stats` | Show shell-output reductions this session |
 | `/stream-guard` | Show metadata-only streamed correction counters without a model call |
 | `/sentinel [status\|TASK]` | Inspect Sentinel locally or request one bounded read-only second opinion for a hard debugging task |

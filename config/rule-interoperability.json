@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "enabled": true,
+  "maxCandidates": 64,
+  "maxDiscoveryDepth": 5,
+  "maxScannedDirectories": 32,
+  "maxDirectoryEntries": 128,
+  "maxSourceBytes": 65536,
+  "maxTaskPaths": 16,
+  "maxGlobsPerRule": 16,
+  "maxRuleChars": 2400,
+  "maxRules": 12,
+  "maxPackChars": 12000,
+  "precedence": {
+    "agents": 500,
+    "agent-rules": 400,
+    "cursor": 300,
+    "windsurf": 250,
+    "cline": 200,
+    "github": 150
+  }
+}

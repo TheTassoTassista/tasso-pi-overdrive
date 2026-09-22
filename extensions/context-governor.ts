@@ -2,6 +2,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { type ExtensionAPI, type ExtensionContext, sessionEntryToContextMessages } from "@earendil-works/pi-coding-agent";
 import { CONTEXT_FIT_STATUS, contextFitMetadata, governContext, readContextGovernorPolicy, renderContextFit } from "../lib/context-governor.mjs";
 import { contextModelForProfile, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
+import { ProjectRuleRegistry, renderRuleStatus, rulePackMetadata } from "../lib/rule-interoperability.mjs";
 
 interface FitProof {
   status: string;
@@ -33,6 +34,30 @@ function runGate(pi: ExtensionAPI, messages: AgentMessage[], ctx: ExtensionConte
 export default function contextGovernorExtension(pi: ExtensionAPI): void {
   let latest: ReturnType<typeof governContext> | undefined;
   let providerProof: FitProof | undefined;
+  let ruleRegistry: ProjectRuleRegistry | undefined;
+  let ruleRegistryCwd = "";
+  const rulesFor = (cwd: string): ProjectRuleRegistry => {
+    if (!ruleRegistry || ruleRegistryCwd !== cwd) {
+      ruleRegistry = new ProjectRuleRegistry({ cwd });
+      ruleRegistryCwd = cwd;
+    }
+    return ruleRegistry;
+  };
+
+  pi.on("before_agent_start", (event, ctx) => {
+    try {
+      const pack = rulesFor(ctx.cwd).buildPack({ task: event.prompt });
+      const metadata = rulePackMetadata(pack);
+      pi.events.emit("pi-overdrive:rule-metadata", metadata);
+      ctx.ui.setStatus("rule-pack", `rules: ${metadata.deliveredCount}/${metadata.matchedCount} (${metadata.packChars} chars)`);
+      return pack.text ? { systemPrompt: `${event.systemPrompt}\n\n${pack.text}` } : undefined;
+    } catch (error) {
+      const errorCode = error instanceof Error && /^rule_[a-z0-9_]+$/u.test(error.message) ? error.message : "rule_pack_failed";
+      pi.events.emit("pi-overdrive:rule-metadata", { kind: "rule_pack", version: 1, status: "DEGRADED", errorCode, decisionModelCalls: 0 });
+      ctx.ui.setStatus("rule-pack", "rules: degraded");
+      return undefined;
+    }
+  });
 
   pi.on("context", (event, ctx) => {
     try {
@@ -77,6 +102,13 @@ export default function contextGovernorExtension(pi: ExtensionAPI): void {
       } catch {
         ctx.ui.notify("Context Fit Gate report is unavailable; provider access remains fail-closed.", "error");
       }
+    },
+  });
+  pi.registerCommand("rules", {
+    description: "Show project-rule interoperability policy and cache counters without a model call",
+    handler: async (_args, ctx) => {
+      try { ctx.ui.notify(renderRuleStatus(rulesFor(ctx.cwd)), "info"); }
+      catch { ctx.ui.notify("Rule interoperability is unavailable; no imported rule authority was granted.", "error"); }
     },
   });
 }

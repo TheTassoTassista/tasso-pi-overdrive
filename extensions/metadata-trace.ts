@@ -168,6 +168,35 @@ export default function (pi: ExtensionAPI) {
       uriDigest: scalar("uriDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:rule-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
+    await record({
+      event: "rule_metadata",
+      kind: scalar("kind") as string | undefined,
+      status: scalar("status") as string | undefined,
+      errorCode: scalar("errorCode") as string | undefined,
+      decisionModelCalls: scalar("decisionModelCalls") as number | undefined,
+      candidateCount: scalar("candidateCount") as number | undefined,
+      acceptedCount: scalar("acceptedCount") as number | undefined,
+      matchedCount: scalar("matchedCount") as number | undefined,
+      deliveredCount: scalar("deliveredCount") as number | undefined,
+      nativeCount: scalar("nativeCount") as number | undefined,
+      unrelatedCount: scalar("unrelatedCount") as number | undefined,
+      duplicateCount: scalar("duplicateCount") as number | undefined,
+      conflictCount: scalar("conflictCount") as number | undefined,
+      rejectedCount: scalar("rejectedCount") as number | undefined,
+      securityOverrideAttempts: scalar("securityOverrideAttempts") as number | undefined,
+      truncatedRuleCount: scalar("truncatedRuleCount") as number | undefined,
+      omittedForBudget: scalar("omittedForBudget") as number | undefined,
+      packChars: scalar("packChars") as number | undefined,
+      approximateTokens: scalar("approximateTokens") as number | undefined,
+      cacheHits: scalar("cacheHits") as number | undefined,
+      cacheMisses: scalar("cacheMisses") as number | undefined,
+      registryDigest: scalar("registryDigest") as string | undefined,
+      packDigest: scalar("packDigest") as string | undefined,
+    });
+  });
   pi.events.on("pi-overdrive:commit-plan-metadata", async (value) => {
     const data = value as Record<string, unknown>;
     const scalar = (key: string) => ["string", "number", "boolean"].includes(typeof data[key]) ? data[key] as string | number | boolean : undefined;
