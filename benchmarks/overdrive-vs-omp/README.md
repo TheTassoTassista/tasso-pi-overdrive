@@ -22,6 +22,7 @@ npm run benchmark:ultra:sentinel
 npm run benchmark:ultra:agent-hub
 npm run benchmark:ultra:director
 npm run benchmark:ultra:isolation
+npm run benchmark:ultra:model-harness
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -41,5 +42,7 @@ npm run benchmark:ultra:isolation
 `director-mode.mjs` drives real Pi through a zero-call status, denied tiny task, explicit eligible activation, dynamic Director prompt, bounded read/delegate/verify surface, and automatic exit. A later fixture intentionally re-adds `write`; the independent runtime allowlist blocks it before the sentinel file can be created. The real secure-workflow and verification registrations remain visible, the prior surface is restored, and the two required deterministic local turns perform no network, external-provider, paid-model, or billable call.
 
 `isolation-v2.mjs` materializes and destroys a production `git-worktree-v2` allocation from a 256-file local fixture, checks the versioned canonical record and independent runtime identifiers, and proves ignored private state is absent. It probes `cp --reflink=always` without selecting it and records mount-backed overlay as `NOT_RUN`; neither alternative can silently replace the single registered Git worktree lifecycle.
+
+`model-harness-profile.mjs` exercises the production post-route resolver and Tool/Edit Governor composition for receipt-backed and unknown model fixtures. It proves deterministic provenance, generic-safe degradation, bounded edit fallback, and the no-tool-escalation invariant over 10,000 local decisions. It makes no model, provider, network, or paid call.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.

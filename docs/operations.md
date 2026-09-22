@@ -54,6 +54,8 @@ Director Mode is an explicit one-task entry point, not a persistent autonomy pre
 
 Workflow isolation uses one canonical `git-worktree-v2` allocation. Its worktree and runtime roots must be private, non-symlinked, mutually independent, and outside the clean source repository. The allocation record binds the exact branch, worktree, state directory, browser profile, port lock, database identifier, schema identifier, and PID/boot/start-time owner. `list`, lookup, resume, release, recovery, and cleanup reject a mismatched or symlinked record instead of acting on an untrusted path. Reflink/copy and overlay mounts are not fallback backends.
 
+Model Harness Profiles resolve only after Pi and the existing policy select a model. Use `/model-profile` for a compact local report or `/model-profile --json` for evidence/provenance and the currently compatible edit/tool selection. `UNKNOWN` is intentional when no receipt or authoritative metadata exists. `generic-safe-v1` keeps the session usable for inspection while removing mutation and high-risk schemas; do not add a provider override merely to make an unknown capability appear supported.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

@@ -16,6 +16,7 @@ const writeResults = process.argv.includes("--write-results");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-tool-governor-"));
 const agentDir = path.join(temporary, "agent");
 const modelPolicy = path.join(temporary, "model-policy.json");
+const harnessProfiles = path.join(temporary, "model-harness-profiles.json");
 
 function assistantText(events) {
   const ended = [...events].reverse().find((event) => event.type === "agent_end");
@@ -37,7 +38,7 @@ function measure(id, prompt, extraArgs = []) {
     ...extraArgs,
   ], {
     cwd: temporary,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: modelPolicy, PI_OVERDRIVE_CONTEXT_AUDIT_KEY: "audit-only" },
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: modelPolicy, PI_OVERDRIVE_MODEL_HARNESS_PROFILES: harnessProfiles, PI_OVERDRIVE_CONTEXT_AUDIT_KEY: "audit-only" },
     input: `${JSON.stringify({ id, type: "prompt", message: prompt })}\n`,
     encoding: "utf8",
     timeout: 45_000,
@@ -67,7 +68,7 @@ function inspectCommands() {
     "--provider", "pi-overdrive-context-audit", "--api-key", "audit-only", "--model", "context-driver", "--thinking", "low",
   ], {
     cwd: temporary,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: modelPolicy, PI_OVERDRIVE_CONTEXT_AUDIT_KEY: "audit-only" },
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: modelPolicy, PI_OVERDRIVE_MODEL_HARNESS_PROFILES: harnessProfiles, PI_OVERDRIVE_CONTEXT_AUDIT_KEY: "audit-only" },
     input: `${JSON.stringify({ id: "commands", type: "get_commands" })}\n`,
     encoding: "utf8",
     timeout: 45_000,
@@ -83,6 +84,13 @@ let report;
 try {
   fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
+  const trackedHarness = JSON.parse(fs.readFileSync(path.join(packageRoot, "config", "model-harness-profiles.json"), "utf8"));
+  trackedHarness.providers["pi-overdrive-context-audit"] = {
+    id: "deterministic-tool-governor-fixture-v1",
+    toolConstraints: { deniedTools: [] },
+    editContracts: { ordinary: ["HASH_ANCHORED", "REPLACE"], structural: ["AST_STRUCTURAL", "HASH_ANCHORED"], maxFallbacks: 1 },
+  };
+  fs.writeFileSync(harnessProfiles, `${JSON.stringify(trackedHarness, null, 2)}\n`, { mode: 0o600 });
   const starting = measure("starting-overdrive-core", "Change one string value.", ["--tools", CORE_TOOLS.join(",")]);
   const simple = measure("ultra-simple-edit", "Change one string value.");
   const search = measure("ultra-search-only", "Find every function call matching deprecatedApi without changing files.");

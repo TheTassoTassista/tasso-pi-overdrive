@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "generic": {
+    "id": "generic-safe-v1",
+    "toolConstraints": {
+      "deniedTools": [
+        "transactional_edit",
+        "edit",
+        "write",
+        "transactional_ast_edit",
+        "ast_grep_rewrite",
+        "debug_engine",
+        "persistent_python",
+        "persistent_javascript",
+        "agent_browser",
+        "web_research",
+        "safe_web_fetch",
+        "safe_exec",
+        "mcp"
+      ]
+    },
+    "editContracts": {
+      "ordinary": ["HASH_ANCHORED", "REPLACE"],
+      "structural": ["AST_STRUCTURAL", "HASH_ANCHORED"],
+      "maxFallbacks": 1
+    }
+  },
+  "families": {
+    "OpenAI": {
+      "id": "openai-family-v1"
+    }
+  },
+  "providers": {
+    "openai-codex": {
+      "id": "openai-codex-native-v1",
+      "toolConstraints": {
+        "deniedTools": []
+      },
+      "editContracts": {
+        "ordinary": ["HASH_ANCHORED", "REPLACE"],
+        "structural": ["AST_STRUCTURAL", "HASH_ANCHORED"],
+        "maxFallbacks": 1
+      },
+      "declaredCapabilities": {
+        "nativeTools": {
+          "level": "DECLARED",
+          "source": "pi-provider-adapter"
+        },
+        "structuredOutput": {
+          "level": "DECLARED",
+          "source": "native-json-schema-v1"
+        }
+      }
+    }
+  },
+  "models": {}
+}

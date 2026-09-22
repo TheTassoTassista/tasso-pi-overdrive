@@ -21,6 +21,7 @@ import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfig
 import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
 import { AGENT_HUB_EVENT, roleReceiptMetadata, roleReservationMetadata, roleStartedMetadata, workflowJournalMetadata } from "../lib/agent-hub.mjs";
+import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -263,7 +264,11 @@ export default function (pi: ExtensionAPI) {
         }
         spawnBudgetGuard.claimSpawn(agent, { retry: attempt > 1 });
         const callNumber = beforeSpawn.used + 1;
+        const selectedModel = availableModels.find((candidate: any) => `${candidate.provider}/${candidate.id}` === route.model);
+        const harnessProfile = resolveModelHarnessProfile({ model: selectedModel, identity: route.model, provider: route.provider, family: route.family, registeredModels, authenticatedModels: availableModels });
+        const harnessSelection = constrainToolsForModelProfile([], harnessProfile, { structural: activeTaskPolicy.classification.signals.structuralEdit === true });
         pi.events.emit("pi-overdrive:routing-metadata", { kind: "role-route", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, role: policyRole, provider: route.provider, model: route.model, effort: route.thinking, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1 });
+        pi.events.emit("pi-overdrive:routing-metadata", { ...modelHarnessProfileMetadata(harnessProfile, harnessSelection), role: policyRole });
         const requestId = randomUUID();
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
@@ -363,6 +368,7 @@ export default function (pi: ExtensionAPI) {
           thinking: route.thinking,
           timeoutMs: 18 * 60 * 1000,
           toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
+          harnessProfile: modelHarnessProfileMetadata(harnessProfile, harnessSelection),
           artifacts: false,
             result,
           });

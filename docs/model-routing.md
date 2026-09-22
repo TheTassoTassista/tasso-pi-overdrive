@@ -105,3 +105,7 @@ Normal handoffs are capped at 12,000 characters (10,000 evidence; 8,000 Council)
 Workflow evidence and metadata traces record only routing metadata: preset, requested/effective quality, difficulty, security flag, role, provider, exact model, effort, fallback index, call number, retry count, policy digest and model-call limit. Existing role receipts retain provider-reported input/output/cache usage and result/error digests. Prompts, raw model output, file contents, keys, cookies and bearer credentials are never added by the routing layer. Unknown OmniRoute pricing is reported as unavailable rather than zero; only catalog-reported pricing is exposed.
 
 The Council is model-family heterogeneous—OpenAI direct, DeepSeek through OmniRoute, Qwen through OmniRoute—with an Astra Judge. DeepSeek and Qwen share one gateway and therefore do **not** provide infrastructure independence.
+
+## Harness profiles are post-route
+
+Routing chooses the provider/model/thinking tuple first. `lib/model-harness-profile.mjs` then composes that exact identity with Pi registry metadata, the existing callability cache, and `config/model-harness-profiles.json`. It cannot select a model, modify a fallback chain, lower Council/Judge effort, or spend a provider call. The profile can only narrow the Tool Governor surface, choose among already-exposed transactional edit contracts, and supply non-increasing context metadata to the Context Governor. Use `/model-profile [--json]` to inspect the current profile and evidence locally.

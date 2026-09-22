@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-22T13:25:09.788Z",
+  "status": "PASS",
+  "measurementMode": "deterministic-post-route-profile-resolution-and-governor-composition",
+  "overdriveUltra": {
+    "iterations": 10000,
+    "totalMs": 516.522,
+    "meanDecisionMs": 0.051652,
+    "assertions": {
+      "postSelectionIdentityPreserved": true,
+      "receiptBackedEvidence": true,
+      "ordinaryHashAnchored": true,
+      "structuralAstThenHash": true,
+      "boundedFallback": true,
+      "noToolEscalation": true,
+      "unknownGenericSafe": true,
+      "deterministicReceipt": true,
+      "zeroDecisionCalls": true
+    }
+  },
+  "accounting": {
+    "decisionModelCalls": 0,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "authority": {
+    "changesRouting": false,
+    "canAddTools": false,
+    "maxEditFallbacks": 1,
+    "unknownProfile": "generic-safe-v1"
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  }
+}

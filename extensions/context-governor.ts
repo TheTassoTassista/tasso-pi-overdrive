@@ -1,6 +1,7 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { type ExtensionAPI, type ExtensionContext, sessionEntryToContextMessages } from "@earendil-works/pi-coding-agent";
 import { CONTEXT_FIT_STATUS, contextFitMetadata, governContext, readContextGovernorPolicy, renderContextFit } from "../lib/context-governor.mjs";
+import { contextModelForProfile, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 
 interface FitProof {
   status: string;
@@ -16,11 +17,12 @@ function toolsFor(pi: ExtensionAPI) {
 function runGate(pi: ExtensionAPI, messages: AgentMessage[], ctx: ExtensionContext, reserveOutputTokens?: number) {
   if (!ctx.model) throw new Error("context_model_unavailable");
   const usage = ctx.getContextUsage();
+  const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
   return governContext({
     messages,
     systemPrompt: ctx.getSystemPrompt(),
     ...toolsFor(pi),
-    model: ctx.model,
+    model: contextModelForProfile(ctx.model, profile),
     reserveOutputTokens,
     reportedUsageTokens: usage?.tokens ?? undefined,
     reportedContextWindow: usage?.contextWindow,

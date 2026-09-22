@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { readModelPolicy } from "../lib/model-policy.mjs";
 import { getSessionQuality } from "../lib/routing-session.mjs";
 import { availableContextFromPiUsage, resolveTaskPolicy } from "../lib/task-governor.mjs";
+import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import {
   classifyTool,
   hasExplicitToolCliPolicy,
@@ -74,11 +75,14 @@ export default function toolSurface(pi: ExtensionAPI): void {
       const routing = presetAndQuality();
       const taskPolicy = resolveTaskPolicy({ task: event.prompt, ...routing, availableContext: availableContextFromPiUsage(ctx.getContextUsage()) });
       const policy = resolveToolPolicy({ taskPolicy, availableTools: pi.getAllTools().map((tool) => tool.name) });
-      pi.setActiveTools([...policy.activeTools]);
+      const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
+      const selection = constrainToolsForModelProfile(policy.activeTools, profile, { structural: taskPolicy.classification.signals.structuralEdit === true });
+      pi.setActiveTools([...selection.activeTools]);
       lastTaskPolicy = taskPolicy;
       lastPolicy = policy;
       pi.events.emit("pi-overdrive:tool-metadata", toolPolicyMetadata(policy, taskPolicy));
-      ctx.ui.setStatus("tool-governor", `tools: auto ${policy.activeTools.length}/${policy.activeTools.length + policy.inactiveToolCount}`);
+      pi.events.emit("pi-overdrive:tool-metadata", modelHarnessProfileMetadata(profile, selection));
+      ctx.ui.setStatus("tool-governor", `tools: auto ${selection.activeTools.length}/${policy.activeTools.length + policy.inactiveToolCount}`);
     } catch {
       const available = new Set(pi.getAllTools().map((tool) => tool.name));
       pi.setActiveTools(available.has("read") ? ["read"] : []);

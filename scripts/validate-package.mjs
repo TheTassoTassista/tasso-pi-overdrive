@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -46,6 +46,15 @@ if (pkg.pi.extensions.at(-1) !== './extensions/context-governor.ts') failures.pu
 const modelPolicyExtension = await readFile(path.join(root, 'extensions/model-policy.ts'), 'utf8');
 const secureWorkflowExtension = await readFile(path.join(root, 'extensions/secure-workflow.ts'), 'utf8');
 for (const marker of ['registerCommand("task-policy"', 'resolveTaskPolicy(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Task Governor integration marker is missing: ${marker}`);
+for (const marker of ['registerCommand("model-profile"', 'resolveModelHarnessProfile(', 'constrainToolsForModelProfile(']) if (!modelPolicyExtension.includes(marker) && !secureWorkflowExtension.includes(marker)) failures.push(`Model Harness Profile integration marker is missing: ${marker}`);
+try {
+  const harness = await import(path.join(root, 'lib/model-harness-profile.mjs'));
+  harness.validateModelHarnessProfileConfig(JSON.parse(await readFile(path.join(root, 'config/model-harness-profiles.json'), 'utf8')));
+  const unknown = { provider: 'package-fixture', id: 'unknown', contextWindow: 8192, maxTokens: 1024 };
+  const profile = harness.resolveModelHarnessProfile({ model: unknown, registeredModels: [unknown], authenticatedModels: [unknown], callability: { version: 1, entries: {} } });
+  const selection = harness.constrainToolsForModelProfile(['read', 'write', 'safe_exec'], profile);
+  if (profile.id !== 'generic-safe-v1' || profile.decisionModelCalls !== 0 || JSON.stringify(selection.activeTools) !== JSON.stringify(['read'])) failures.push('Model Harness generic-safe or no-escalation invariant failed');
+} catch (error) { failures.push(`Model Harness Profile validation failed: ${error.message}`); }
 try {
   const taskGovernor = await import(path.join(root, 'lib/task-governor.mjs'));
   const simplePolicy = taskGovernor.resolveTaskPolicy({ task: 'Change one string value.', preset: 'normal', quality: 'auto' });

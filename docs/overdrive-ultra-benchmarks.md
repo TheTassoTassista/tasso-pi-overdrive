@@ -279,3 +279,9 @@ The recorded passing sequence finished in 485.188 ms on this host. The deliberat
 | Calls | PASS | zero network, external-provider, paid-model, or billable calls |
 
 The native worktree materialized in 24.749 ms on this host. This single local observation is not a cross-product performance claim. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable; source inspection is never reported as execution evidence.
+
+## Phase 17 Model Harness Profiles
+
+`npm run benchmark:ultra:model-harness` resolves 10,000 alternating known/unknown and ordinary/structural fixtures through the production resolver and Tool/Edit Governor composition. The recorded run completed in 516.522 ms total, 0.051652 ms mean per decision. Receipt-backed direct Terra resolves to `openai-codex-native-v1`; an unknown provider resolves to `generic-safe-v1` and retains only bounded read/search tools from the supplied surface.
+
+All nine assertions passed: route identity preservation, receipt-backed evidence, hash/replace order, AST/hash order, one-fallback bound, no tool escalation, unknown-provider restriction, deterministic receipt, and zero decision calls. The run made zero network, external-provider, paid-model, or billable calls at cost zero. The real-Pi Tool Governor regression also passed after declaring its deterministic fixture provider through a private fixture-only profile; production configuration was not widened. OMP remains `NOT_RUN`, and its source compatibility declarations are not treated as Ultra benchmark evidence.

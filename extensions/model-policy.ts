@@ -11,6 +11,7 @@ import { getSessionQuality, QUALITY_LEVELS, resetSessionQuality, setSessionQuali
 import { calculateRequiredSpawnBudget, EXTERNAL_SUBAGENT_QUOTA, readConfiguredSpawnLimit } from "../lib/workflow-spawn-budget.mjs";
 import { memoryPolicyTopology, resolveMemoryPolicy } from "../lib/memory-policy.mjs";
 import { availableContextFromPiUsage, renderTaskPolicy, resolveTaskPolicy } from "../lib/task-governor.mjs";
+import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -192,6 +193,29 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
   pi.registerCommand("models", {
     description: "List registered/authenticated models and public callability metadata",
     handler: async (_args, ctx) => { try { ctx.ui.notify(JSON.stringify(publicInventory(ctx), null, 2), "info"); } catch (error) { notifyError(ctx, error); } },
+  });
+  pi.registerCommand("model-profile", {
+    description: "Inspect the local harness profile for the already-selected model without making a model call",
+    handler: async (args, ctx) => {
+      try {
+        const action = args.trim();
+        if (action && action !== "--json") throw new Error("usage: /model-profile [--json]");
+        if (!ctx.model) throw new Error("model_profile_model_unavailable");
+        const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
+        const selected = constrainToolsForModelProfile(pi.getActiveTools(), profile);
+        if (action === "--json") { ctx.ui.notify(JSON.stringify({ ...profile, selection: selected }, null, 2), "info"); return; }
+        const metadata = modelHarnessProfileMetadata(profile, selected);
+        ctx.ui.notify([
+          `Harness profile: ${metadata.profileId}`,
+          `Selected model: ${metadata.identity}`,
+          `Runtime evidence: ${metadata.runtimeEvidence}`,
+          `Edit contract: ${metadata.editContract ?? "UNAVAILABLE"}`,
+          `Additional denied tools: ${metadata.deniedToolCount}`,
+          `Decision model calls: ${metadata.decisionModelCalls}`,
+          `Profile receipt: ${metadata.digest.slice(0, 16)}`,
+        ].join("\n"), "info");
+      } catch (error) { notifyError(ctx, error); }
+    },
   });
   pi.registerCommand("preset", {
     description: "Show or select persistent routing preset: /preset [normal|token-saver]",

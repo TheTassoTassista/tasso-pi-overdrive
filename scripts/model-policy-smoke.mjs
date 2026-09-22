@@ -46,7 +46,7 @@ try {
 
   const catalog = await run({ id: "commands", type: "get_commands" });
   const commands = catalog.events.find((event) => event.type === "response" && event.id === "commands")?.data?.commands ?? [];
-  check("routing-slash-commands-registered", ["preset", "quality", "ai-tree", "task-policy"].every((name) => commands.some((entry) => entry.name === name && entry.source === "extension")), { code: catalog.code, commands: commands.filter((entry) => ["preset", "quality", "ai-tree", "task-policy"].includes(entry.name)).map((entry) => ({ name: entry.name, source: entry.source })), stderr: catalog.stderr, signal: catalog.signal, error: catalog.error });
+  check("routing-slash-commands-registered", ["preset", "quality", "ai-tree", "task-policy", "model-profile"].every((name) => commands.some((entry) => entry.name === name && entry.source === "extension")), { code: catalog.code, commands: commands.filter((entry) => ["preset", "quality", "ai-tree", "task-policy", "model-profile"].includes(entry.name)).map((entry) => ({ name: entry.name, source: entry.source })), stderr: catalog.stderr, signal: catalog.signal, error: catalog.error });
 
   const initial = await run({ id: "preset-show", type: "prompt", message: "/preset" }, /Normal Work/u);
   check("preset-default-command", initial.code === 0 && notifications(initial).includes("Normal Work (normal)") && noModelCall(initial), notifications(initial) || initial.stderr || initial.events.slice(-10));
@@ -81,7 +81,12 @@ try {
   const taskPolicyText = notifications(taskPolicy);
   check("task-policy-command-deterministic-and-zero-model-calls", taskPolicy.code === 0 && noModelCall(taskPolicy) && taskPolicyText.includes("deterministic-v1; 0 model calls") && taskPolicyText.includes("Planner/Reviewer/Council: false / false / false") && taskPolicyText.includes("Capabilities: read, edit, lsp, verify"), taskPolicyText || taskPolicy.stderr);
 
-  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText].join("\n");
+  const modelProfile = await run({ id: "model-profile", type: "prompt", message: "/model-profile --json" });
+  let parsedProfile;
+  try { parsedProfile = JSON.parse(notifications(modelProfile)); } catch {}
+  check("model-profile-command-generic-safe-and-zero-model-calls", modelProfile.code === 0 && noModelCall(modelProfile) && parsedProfile?.id === "generic-safe-v1" && parsedProfile?.decisionModelCalls === 0 && parsedProfile?.match?.identity === "pi-overdrive-routing-audit/driver", parsedProfile ?? (notifications(modelProfile) || modelProfile.stderr));
+
+  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile)].join("\n");
   check("routing-command-output-secret-free", !/bearer\s+|api[_ -]?key\s*[:=]|cookie\s*[:=]|credential\s*[:=]/iu.test(secretScan), "metadata-only command output");
 } catch (error) {
   check("routing-smoke-harness", false, error instanceof Error ? error.message : String(error));
@@ -89,6 +94,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 10 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 11 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, modelInferenceCalls: 0, providerExecution: "NONE_COMMAND_HANDLERS_ONLY", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);
