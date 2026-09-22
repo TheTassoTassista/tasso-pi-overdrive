@@ -5,9 +5,9 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 20 — Config / Rule Interoperability
-- Last completed functional commit: `f4f862b` — `feat(ultra): add proposal-only commit planner`
-- Last bookkeeping checkpoint: Phase 19 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
+- Current phase: 21 — ACP / Editor Mode
+- Last completed functional commit: `ae9b154` — `feat(ultra): add bounded project rule interoperability`
+- Last bookkeeping checkpoint: Phase 20 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -92,6 +92,11 @@
 - Implemented a clean-room Atomic Commit Planner as a conditional proposal-only tool inside the existing ResourceFS extension. It inspects only explicit worktree/staged paths and groups only explicit disjoint hunks; there is no stage, commit, amend, reset, branch, publish, shell, network, or model-call authority.
 - Bound every proposal to exact HEAD, complete selected-scope inventory digest, protected/unselected counts, selected diff/content digests, hunk coordinates/digests, per-group digests, and a whole-plan digest. Selected sources are reread and HEAD plus the complete inventory are revalidated before return; concurrent selected, unrelated, index-scope, or HEAD change fails closed.
 - Reused the pinned Phase 18 Git runner and exact repository-root checks, denied protected paths and unsafe untracked files, exposed content-free trace metadata, added `/commit-plan`, Task/Tool Governor conditional activation, package invariants, focused/adversarial tests, operations/design/gap documentation, and a real-Pi benchmark. No executable approval boundary was added because it would create a second Git mutation controller.
+- Inspected OMP's rulebook discovery/matching pipeline at the pinned reference and retained only its project format vocabulary. User-home/environment sources, executable TTSR/conditions, permissive malformed parsing, name-only first-win deduplication, and advisory scope matching were rejected.
+- Implemented one clean-room project-only rule registry inside the existing Context Governor and ResourceFS extensions. Fixed-location discovery, real task-file glob matching, explicit source precedence, deterministic same-name conflict evidence, exact-content deduplication, parser/path/content digests, and bounded cache invalidation are controller-owned and make zero decision calls.
+- Added strict frontmatter and path policy, descriptor-bound final reads, symlink/hard-link/secret/binary/oversize/breadth denial, terminal/bidi and delimiter sanitization, and paragraph-level rejection of security overrides, secret access, authority grants, routing/Council/cost/spawn changes, and automatic publication.
+- Kept Pi-native root `AGENTS.md` native and non-duplicated. Imported guidance is wrapped in one bounded untrusted Rule Pack before the final Context Fit Gate; it cannot change tools, execution, routing, retry, Council/Judge, spend, spawn, approval, verification, receipts, sandboxing, or Git authority.
+- Added digest-bound read-only `rule://project`, zero-call `/rules`, metadata-only tracing, package invariants, 17 focused/adversarial tests, operations/design/gap documentation, and a real-Pi scope/conflict/injection/context benchmark with zero external/network/paid calls.
 
 ## Current validation
 
@@ -191,10 +196,17 @@
 - Phase 19 spawn-budget bridge regression: PASS with derived 39 + 3 = 42, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
 - Phase 19 authoritative `npm run check`: 417/417 PASS plus syntax, Git-Resource/Commit-Planner/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 - Phase 19 runtime audit: zero allocations, invalid records, orphan ports, orphan worktrees, or temporary commit-planner/guardrail fixture directories. Both protected audit hashes remain unchanged.
+- Phase 20 focused/adversarial rule tests: 17/17 PASS; native-root non-duplication, project/nested scopes, actual glob matching, traversal denial, exact deduplication, deterministic precedence/conflicts, malicious paragraph removal, fail-safe malicious-only input, authority non-grant, symlink/malformed/authority-metadata denial, breadth caps, cache invalidation, pack bounds, stale/read-only resources, metadata privacy, controls, and mixed protective/bypass language are covered.
+- Phase 20 real-Pi benchmark: PASS on Pi 0.85.1; native root plus only scoped sanitized guidance reached the deterministic provider, unrelated and 45 KiB rules stayed absent, one malicious override was removed, same-name conflicts remained visible in priority order, Context Governor passed, no tools were exposed, and `/rules` made zero turns. One deterministic local turn used zero decision/network/external-provider/paid calls at cost zero; cleanup passed.
+- Phase 20 agent-policy regression: all 12 roles discovered; Tester remains read-only, Worker remains shell-free, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 20 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 20 spawn-budget bridge regression: PASS with derived 39 + 3 = 42, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
+- Phase 20 authoritative `npm run check`: 434/434 PASS plus syntax, Rule/Git-Resource/Commit-Planner/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The expected control without `PI_OVERDRIVE_LSP_RUNTIME` failed only the two ignored Rust/Go runtime cases.
+- Phase 20 integrity audit: no broken symlinks or accidental absolute attachment/temp/secret material; both protected audit hashes remain unchanged. The worktree-local catalog control correctly did not claim the inactive development worktree as the configured stable Pi package; the real-Pi benchmark independently proved `/rules` registration from the temporary fixture configuration.
 
 ## Dirty files
 
-- Only this Phase 19 boundary ledger update is expected before its bookkeeping commit.
+- Only this Phase 20 boundary ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -224,7 +236,8 @@
 - Phase 15 is deliberately one task and non-persistent. It does not split work into independently steerable workers, retain worker transcripts, or provide send/steer/revive/kill controls; the existing isolated Worker/correction sequence remains the sole implementation path. A task-aware read-only MCP proxy or bounded web tool is retained only when the Tool Governor already enabled it for the exact task.
 - Phase 16 remains Linux/Git-specific and requires a clean source repository. Reflink is unavailable on this filesystem and overlay was intentionally not mounted. Node lacks a complete descriptor-relative `openat2`/`renameat2` lifecycle, so a hostile same-UID directory-replacement race cannot be claimed impossible; private roots, canonical checks, atomic records, Git registration, and post-cleanup checks reduce and expose that risk.
 - Phase 19 is deliberately proposal-only and requires explicit path/hunk ownership. It does not infer commit groups, persist source content, stage, commit, amend, reset, branch, publish, or authorize a later mutation. A future apply path would require a separate human-approved controller design; stale proposals are never silently regenerated.
+- Phase 20 is deliberately project-only and parses a strict compatibility subset. Scoped rules are omitted when no safe task file path is present; multiline YAML, brace/extglob patterns, executable conditions/TTSR, user-home and environment-selected rules are rejected. Pi core still loads root `AGENTS.md` natively, so Ultra can add a lower-authority boundary around imported rules but cannot replace that loader with its descriptor-relative reader.
 
 ## Exact next action
 
-Inspect the existing project-instruction loading, Pi/AGENTS/skills/project-template semantics, Context/Task/Tool Governor boundaries, ResourceFS path security, and the pinned OMP rulebook discovery/matching pipeline. Define the smallest deterministic Phase 20 rule-source registry, precedence/provenance model, scoped matcher, digest-bound cache, and bounded untrusted Rule Pack. Imported rules may guide style and already-authorized workflow only; they must not expose tools, change routing/cost/Council/spawn/security policy, authorize Git mutation/publish, escape the workspace, or become a new controller. Add focused injection/conflict/scope/cache tests and a real-Pi deterministic context benchmark before the full gate.
+Inspect Pi's current RPC/extension surfaces, the existing Task/Tool/Context Governor, approvals, receipts, session lifecycle, and the pinned OMP ACP mode/permission gate. Define the smallest Phase 21 editor bridge that preserves Overdrive as the sole authority: explicit local activation, one bounded project/session identity, exact request correlation, existing tool/approval policy, metadata-only receipts, cancellation/cleanup, and no bypass for mutation, routing, sandbox, Council, spend, or verification. Prefer an existing Pi protocol surface over another controller or permanent schema, add hostile-client/lifecycle regressions, and prove the real transport locally with deterministic zero-cost evidence before the full gate.
