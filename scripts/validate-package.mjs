@@ -6,7 +6,7 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
-const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
+const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }
   catch (error) { failures.push(`${relative}: invalid JSON (${error.message})`); }
@@ -63,17 +63,25 @@ try {
 } catch (error) { failures.push(`Task Governor validation failed: ${error.message}`); }
 try {
   const resourceFs = await import(path.join(root, 'lib/resource-fs.mjs'));
+  const gitResources = await import(path.join(root, 'lib/git-resources.mjs'));
+  const gitPolicy = gitResources.validateGitResourcePolicy(JSON.parse(await readFile(path.join(root, 'config/git-resources.json'), 'utf8')));
+  const deniedRunner = async () => ({ stdout: '', stderr: '', code: 1, killed: false });
   const resources = resourceFs.createResourceFs([
     resourceFs.createRepoResourceDefinition(),
     resourceFs.createMemoryResourceDefinition(async () => ({ text: '' })),
+    gitResources.createGitResourceDefinition(deniedRunner, gitPolicy),
+    gitResources.createConflictResourceDefinition(deniedRunner, gitPolicy),
   ]);
   const catalog = resources.describe();
-  if (JSON.stringify(catalog.map((entry) => entry.scheme)) !== JSON.stringify(['repo', 'memory'])) failures.push('ResourceFS must expose only the reviewed repo and memory schemes');
+  if (JSON.stringify(catalog.map((entry) => entry.scheme)) !== JSON.stringify(['repo', 'memory', 'git', 'conflict'])) failures.push('ResourceFS must expose only the reviewed repository, memory, Git, and conflict schemes');
   if (catalog.some((entry) => entry.immutable !== true || entry.capabilities.some((capability) => ['WRITE', 'MUTATE', 'EXECUTE'].includes(capability)))) failures.push('ResourceFS reviewed schemes must remain immutable and non-mutating');
   resourceFs.parseResourceUri('repo://root/src/example.ts');
+  resourceFs.parseResourceUri('git://repo/status');
+  resourceFs.parseResourceUri('conflict://repo/list');
 } catch (error) { failures.push(`ResourceFS validation failed: ${error.message}`); }
 const resourcesExtension = await readFile(path.join(root, 'extensions/resources.ts'), 'utf8');
 if (!resourcesExtension.includes('Type.Literal("describe"), Type.Literal("read"), Type.Literal("search")') || !resourcesExtension.includes('registerCommand("resources"')) failures.push('ResourceFS public tool/command surface changed');
+for (const marker of ['createPinnedGitRunner(', 'createGitResourceDefinition(', 'createConflictResourceDefinition(', 'there is no Git shell, mutation, network, or publish operation']) if (!resourcesExtension.includes(marker)) failures.push(`Git ResourceFS integration marker is missing: ${marker}`);
 try {
   const smartRead = await import(path.join(root, 'lib/smart-read.mjs'));
   const fixture = path.join(root, 'lib/task-governor.mjs');

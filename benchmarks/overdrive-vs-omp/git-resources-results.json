@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-22T13:51:41.130Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-pinned-git",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "runs": [
+      {
+        "id": "git-status",
+        "status": "PASS",
+        "elapsedMs": 425.082,
+        "details": {
+          "kind": "resource_access",
+          "version": 1,
+          "scheme": "git",
+          "operation": "READ",
+          "trust": "WORKSPACE_UNTRUSTED",
+          "immutable": true,
+          "contentChars": 33,
+          "contentBytes": 33,
+          "truncated": false,
+          "uriDigest": "274563e1d25042d061a9cb05bd8d7f24d7fec6f4f972232142730e35ba59692f"
+        },
+        "isError": false,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      },
+      {
+        "id": "git-worktree-diff",
+        "status": "PASS",
+        "elapsedMs": 280.462,
+        "details": {
+          "kind": "resource_access",
+          "version": 1,
+          "scheme": "git",
+          "operation": "READ",
+          "trust": "WORKSPACE_UNTRUSTED",
+          "immutable": true,
+          "contentChars": 123,
+          "contentBytes": 123,
+          "truncated": false,
+          "uriDigest": "283144b8ad328d2690cc8642ccef9f363be3b4e405a24979a1fb1d429fd64488"
+        },
+        "isError": false,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      },
+      {
+        "id": "git-staged-diff",
+        "status": "PASS",
+        "elapsedMs": 325.249,
+        "details": {
+          "kind": "resource_access",
+          "version": 1,
+          "scheme": "git",
+          "operation": "READ",
+          "trust": "WORKSPACE_UNTRUSTED",
+          "immutable": true,
+          "contentChars": 123,
+          "contentBytes": 123,
+          "truncated": false,
+          "uriDigest": "0c4b6a19008e6a0481e8960ef34b6b74e00aad0af107bea997494a757e32cc2a"
+        },
+        "isError": false,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      },
+      {
+        "id": "conflict-list",
+        "status": "PASS",
+        "elapsedMs": 286.97,
+        "details": {
+          "kind": "resource_access",
+          "version": 1,
+          "scheme": "conflict",
+          "operation": "READ",
+          "trust": "WORKSPACE_UNTRUSTED",
+          "immutable": true,
+          "contentChars": 52,
+          "contentBytes": 52,
+          "truncated": false,
+          "uriDigest": "7b435a5c87291d315b1d95a6162083fa7887676b8826b63b85db274523a8c69a"
+        },
+        "isError": false,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      },
+      {
+        "id": "conflict-ours",
+        "status": "PASS",
+        "elapsedMs": 299.674,
+        "details": {
+          "kind": "resource_access",
+          "version": 1,
+          "scheme": "conflict",
+          "operation": "READ",
+          "trust": "WORKSPACE_UNTRUSTED",
+          "immutable": true,
+          "contentChars": 5,
+          "contentBytes": 5,
+          "truncated": false,
+          "uriDigest": "ca18139f563b381e6f2b099e69ed8498cdcc154d3bcac0257e6e49958e002169"
+        },
+        "isError": false,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      },
+      {
+        "id": "git-reset-denied",
+        "status": "PASS",
+        "elapsedMs": 293.088,
+        "details": {},
+        "isError": true,
+        "providerTurns": 2,
+        "exitCode": 0,
+        "stderr": ""
+      }
+    ],
+    "command": {
+      "status": "PASS",
+      "source": "extension",
+      "exitCode": 0
+    },
+    "assertions": {
+      "allPiRunsComplete": true,
+      "statusObserved": true,
+      "worktreeDiffObserved": true,
+      "stagedDiffObserved": true,
+      "conflictCatalogObserved": true,
+      "conflictSideObserved": true,
+      "mutationSurfaceDenied": true,
+      "immutableWorkspaceTrust": true,
+      "commandRegistered": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 12,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "scope": {
+    "localGit": "RUN",
+    "github": "NOT_RUN",
+    "githubReason": "No authenticated read-only GitHub client is available; no network or credential probe was attempted."
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  }
+}

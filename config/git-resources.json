@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "enabled": true,
+  "platform": "linux-x64",
+  "binaryPath": "/usr/bin/git",
+  "binaryVersion": "git version 2.55.0",
+  "binarySha256": "c1bc685bd9f3ebfe851771325c39aac9fdcf82b333bca693b98e48ce7c1dfa9b",
+  "timeoutMs": 10000,
+  "maxOutputBytes": 262144,
+  "maxLogEntries": 100,
+  "maxConflictFiles": 100
+}

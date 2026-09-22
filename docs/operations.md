@@ -56,6 +56,8 @@ Workflow isolation uses one canonical `git-worktree-v2` allocation. Its worktree
 
 Model Harness Profiles resolve only after Pi and the existing policy select a model. Use `/model-profile` for a compact local report or `/model-profile --json` for evidence/provenance and the currently compatible edit/tool selection. `UNKNOWN` is intentional when no receipt or authoritative metadata exists. `generic-safe-v1` keeps the session usable for inspection while removing mutation and high-risk schemas; do not add a provider override merely to make an unknown capability appear supported.
 
+Local Git inspection is available through the existing conditional `resource_fs` tool. Use `git://repo/status`, `git://repo/log`, `git://repo/branches`, `git://repo/commit/<full-oid>`, `git://repo/diff/worktree[/path]`, or `git://repo/diff/staged[/path]`. During a merge conflict use `conflict://repo/list` and `conflict://repo/{base|ours|theirs}/<path>`. These are immutable views of the exact repository root: there is no arbitrary Git argument, staging, commit, reset, merge, conflict resolution, network, or publish operation. `/resources` shows the active catalog without a model call. `pr://` and `issue://` are not registered while an authenticated read-only GitHub client is unavailable; use the separately governed web/MCP paths only when their existing policy explicitly enables them.
+
 ## Daily Pi startup
 
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a

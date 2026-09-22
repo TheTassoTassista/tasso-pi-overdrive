@@ -23,6 +23,7 @@ npm run benchmark:ultra:agent-hub
 npm run benchmark:ultra:director
 npm run benchmark:ultra:isolation
 npm run benchmark:ultra:model-harness
+npm run benchmark:ultra:git-resources
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -44,5 +45,7 @@ npm run benchmark:ultra:model-harness
 `isolation-v2.mjs` materializes and destroys a production `git-worktree-v2` allocation from a 256-file local fixture, checks the versioned canonical record and independent runtime identifiers, and proves ignored private state is absent. It probes `cp --reflink=always` without selecting it and records mount-backed overlay as `NOT_RUN`; neither alternative can silently replace the single registered Git worktree lifecycle.
 
 `model-harness-profile.mjs` exercises the production post-route resolver and Tool/Edit Governor composition for receipt-backed and unknown model fixtures. It proves deterministic provenance, generic-safe degradation, bounded edit fallback, and the no-tool-escalation invariant over 10,000 local decisions. It makes no model, provider, network, or paid call.
+
+`git-resources.mjs` drives real Pi against a temporary local repository through the production pinned Git runner. It verifies status, worktree/staged diffs, conflict catalog and conflict-side reads, mutation-surface denial, immutable trust metadata, command discovery, and cleanup. Six operations use twelve deterministic in-memory provider turns and zero network, external-provider, paid-model, or billable calls. GitHub is honestly `NOT_RUN` because no authenticated read-only client is available; the benchmark does not probe credentials or the network.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.
