@@ -5,8 +5,9 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 19 — Atomic commit planner
-- Last completed phase commit: `538a0ca` — `feat(ultra): add immutable git resources`
+- Current phase: 20 — Config / Rule Interoperability
+- Last completed functional commit: `f4f862b` — `feat(ultra): add proposal-only commit planner`
+- Last bookkeeping checkpoint: Phase 19 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -88,6 +89,9 @@
 - Implemented clean-room immutable `git://repo` and `conflict://repo` handlers inside the existing ResourceFS schema. The reviewed surface covers status, bounded log/branches, exact full-OID commit metadata, scoped worktree/staged diff, conflict catalog, and base/ours/theirs bytes; search, arbitrary argv, write, mutate, execute, staging, commit, reset, network, and publish authority are absent.
 - Added a Linux-x64 pinned Git policy and lazy runner attestation for exact path/version/SHA-256 plus per-call filesystem identity checks, strict exact repository-root checks, generated argv, cleared environment, disabled hooks/pagers/fsmonitor/external diff/file/ext transports, timeout, hard combined-output kill ceiling, protected-path rejection, UTF-8/control validation, and pre/post repository identity checks.
 - Integrated explicit `git://`/`conflict://` Task/Tool Governor activation, `/resources` catalog discovery, metadata-only tracing through the existing ResourceFS path, package guards, adversarial tests, operations/design/gap documentation, and a real-Pi benchmark. GitHub `pr://`/`issue://` remain intentionally unregistered because no authenticated read-only client is available; no credential or network probe was made.
+- Implemented a clean-room Atomic Commit Planner as a conditional proposal-only tool inside the existing ResourceFS extension. It inspects only explicit worktree/staged paths and groups only explicit disjoint hunks; there is no stage, commit, amend, reset, branch, publish, shell, network, or model-call authority.
+- Bound every proposal to exact HEAD, complete selected-scope inventory digest, protected/unselected counts, selected diff/content digests, hunk coordinates/digests, per-group digests, and a whole-plan digest. Selected sources are reread and HEAD plus the complete inventory are revalidated before return; concurrent selected, unrelated, index-scope, or HEAD change fails closed.
+- Reused the pinned Phase 18 Git runner and exact repository-root checks, denied protected paths and unsafe untracked files, exposed content-free trace metadata, added `/commit-plan`, Task/Tool Governor conditional activation, package invariants, focused/adversarial tests, operations/design/gap documentation, and a real-Pi benchmark. No executable approval boundary was added because it would create a second Git mutation controller.
 
 ## Current validation
 
@@ -180,10 +184,17 @@
 - Phase 18 real-Pi benchmark: PASS on Pi 0.85.1; status, worktree/staged diff, conflict list/side, mutation-surface denial, immutable trust metadata, `/resources` registration, and cleanup passed through the production pinned runner. Twelve deterministic local provider turns used zero network/external-provider/paid calls and cost zero; GitHub was honestly `NOT_RUN` without probing credentials.
 - Phase 18 full `npm run check`: 406/406 PASS plus syntax, Git-Resource/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 - Phase 18 runtime audit: zero allocations, invalid records, orphan ports, orphan worktrees, or temporary Git-resource fixture directories after tests and benchmark.
+- Phase 19 focused/adversarial selection: 53/53 PASS across Atomic Commit Planner, Git ResourceFS, Task Governor, and Tool Governor. Nine planner cases cover explicit selection, two-hunk grouping, duplicate/missing/binary denial, staged/worktree separation, secret/symlink/binary rejection, selected-source race, HEAD/unrelated-inventory race, byte invariance, parser bounds, and policy closure.
+- Phase 19 real-Pi benchmark: PASS on Pi 0.85.1; one explicit owned file with two real hunks was inspected and proposed as two groups while one unrelated and one protected change remained excluded. Snapshot/plan digests, metadata privacy, non-executable authority, `/commit-plan`, exact three deterministic local turns, byte-identical HEAD/index/worktree state, and cleanup passed with zero decision-model/network/external-provider/paid calls and cost zero.
+- Phase 19 agent-policy regression: all 12 role profiles PASS; Tester remains read-only, Worker remains shell-free, autonomous roles remain network-free, and Council/Judge remain read-only and non-delegating.
+- Phase 19 guardrail regression: all 14 adversarial path/symlink/shell/safe-exec calls denied, no protected content leaked, outside inode and Git HEAD unchanged.
+- Phase 19 spawn-budget bridge regression: PASS with derived 39 + 3 = 42, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
+- Phase 19 authoritative `npm run check`: 417/417 PASS plus syntax, Git-Resource/Commit-Planner/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
+- Phase 19 runtime audit: zero allocations, invalid records, orphan ports, orphan worktrees, or temporary commit-planner/guardrail fixture directories. Both protected audit hashes remain unchanged.
 
 ## Dirty files
 
-- Only this phase-boundary ledger update is expected before its bookkeeping commit.
+- Only this Phase 19 boundary ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -212,7 +223,8 @@
 - Phase 14 is session-local and projects only secure-workflow role attempts. It does not discover arbitrary direct subagent jobs, search historical runs, expose role content, or provide steer/cancel/revive/spawn/message controls. Running duration and usage remain unavailable until authoritative lifecycle/receipt evidence exists. The same-process event bus is inside the installed package trust boundary; the Hub adds no authority if another executable extension is compromised.
 - Phase 15 is deliberately one task and non-persistent. It does not split work into independently steerable workers, retain worker transcripts, or provide send/steer/revive/kill controls; the existing isolated Worker/correction sequence remains the sole implementation path. A task-aware read-only MCP proxy or bounded web tool is retained only when the Tool Governor already enabled it for the exact task.
 - Phase 16 remains Linux/Git-specific and requires a clean source repository. Reflink is unavailable on this filesystem and overlay was intentionally not mounted. Node lacks a complete descriptor-relative `openat2`/`renameat2` lifecycle, so a hostile same-UID directory-replacement race cannot be claimed impossible; private roots, canonical checks, atomic records, Git registration, and post-cleanup checks reduce and expose that risk.
+- Phase 19 is deliberately proposal-only and requires explicit path/hunk ownership. It does not infer commit groups, persist source content, stage, commit, amend, reset, branch, publish, or authorize a later mutation. A future apply path would require a separate human-approved controller design; stale proposals are never silently regenerated.
 
 ## Exact next action
 
-Inspect the existing workflow receipts, Edit Engine receipts, immutable Git ResourceFS views, and pinned OMP commit-planning pipeline. Define the smallest deterministic Phase 19 proposal format that groups only explicitly owned changed hunks, excludes unrelated/user/protected work, binds every proposed group to current file/index digests, and cannot stage, commit, amend, reset, publish, or invoke a model by default. Add an explicit transaction/approval boundary only if it composes with existing safety and immutable evidence without creating a second mutation controller.
+Inspect the existing project-instruction loading, Pi/AGENTS/skills/project-template semantics, Context/Task/Tool Governor boundaries, ResourceFS path security, and the pinned OMP rulebook discovery/matching pipeline. Define the smallest deterministic Phase 20 rule-source registry, precedence/provenance model, scoped matcher, digest-bound cache, and bounded untrusted Rule Pack. Imported rules may guide style and already-authorized workflow only; they must not expose tools, change routing/cost/Council/spawn/security policy, authorize Git mutation/publish, escape the workspace, or become a new controller. Add focused injection/conflict/scope/cache tests and a real-Pi deterministic context benchmark before the full gate.
