@@ -5,8 +5,8 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 17 — model harness profiles
-- Last completed phase commit: `c6ae2a5` — `feat(ultra): harden runtime isolation v2`
+- Current phase: 18 — Git / GitHub resource model
+- Last completed phase commit: `5beda78` — `feat(ultra): add model harness profiles`
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -81,6 +81,10 @@
 - Upgraded new runtime records to canonical `git-worktree-v2` allocations. Worktree/state roots are private, non-symlinked, mutually independent, and outside the source repository; allocation and port records are owner-only, single-link files opened with `O_NOFOLLOW`.
 - Bound list, lookup, resume, release, recovery, and cleanup to exact UUID-derived branch, worktree, state, browser-profile, port-lock, database, and schema identities plus the existing PID/boot/start-time owner. Tampered or symlinked evidence fails closed before cleanup authority.
 - Added two adversarial runtime-boundary cases, package invariants, documentation, and a local 256-file benchmark. Native worktree materialization/cleanup passed, ignored private state stayed absent, reflink was actually unavailable, and overlay remained explicitly `NOT_RUN`.
+- Inspected OMP's compatibility catalog and kept provider wire-format concerns inside Pi rather than duplicating developer-role, thinking replay, tool-result naming, token-field, schema, or stream adaptations.
+- Implemented a clean-room post-route Model Harness Profile resolver that composes existing routing identity/family, Pi registry metadata, callability receipts, and a versioned family/provider/exact override registry with explicit `DECLARED`/`VERIFIED`/`BENCHMARKED`/`INFERRED`/`UNKNOWN` evidence.
+- Integrated profiles as a one-way constraint on Tool Governor, a bounded transactional Edit Engine contract selector, and a non-increasing Context Governor metadata view; unknown providers use `generic-safe-v1`, no profile can expose a hidden tool, and only one already-available edit fallback is retained.
+- Added metadata-only workflow propagation/tracing, zero-call `/model-profile`, owner-only fixture profile overrides, package guards, 22 focused/adversarial cases, deterministic benchmark evidence, and real-Pi Tool Governor/command regressions without changing routing, role, quality, retry, Council/Judge, or spawn policy.
 
 ## Current validation
 
@@ -164,6 +168,11 @@
 - Phase 16 spawn-budget bridge regression: PASS with the derived 39 + 3 = 42 envelope, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
 - Phase 16 full `npm run check`: 373/373 PASS plus syntax, Ultra/Agent-Hub/Director/memory fixture syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime.
 - Phase 16 runtime audit: zero allocations, invalid records, orphan ports, or orphan worktrees after all tests and benchmarks.
+- Phase 17 focused/adversarial tests: 22/22 cases PASS; deterministic known/unknown resolution, family/provider/exact precedence, evidence non-promotion, generic-safe degradation, bounded edit fallback, no tool escalation, Context Governor authority, provenance, metadata privacy, malformed config, and zero-call behavior are covered.
+- Phase 17 deterministic benchmark: PASS; 10,000 production resolver/governor compositions completed in 516.522 ms total (0.051652 ms mean), all nine assertions passed, and network/external-provider/paid/model decision calls and cost were zero.
+- Phase 17 real-Pi Tool Governor regression: PASS; the fixture-only provider profile preserved all prior task surfaces, ordinary edit remained four tools/2,128 schema characters, structural intent retained AST plus one exact fallback, explicit CLI remained authoritative, nine deterministic local turns used zero network/external/paid calls, and temporary cleanup passed.
+- Phase 17 real-Pi model-policy smoke: 11/11 PASS; `/model-profile --json` registered and resolved the unknown deterministic driver to `generic-safe-v1` with zero inference/provider execution.
+- Phase 17 full `npm run check`: 395/395 PASS plus syntax, Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. A control run without `PI_OVERDRIVE_LSP_RUNTIME` produced only the documented missing ignored Rust/Go runtime failures; the authoritative run used the already-verified stable runtime and passed all 395.
 
 ## Dirty files
 
@@ -184,7 +193,8 @@
 - Artifact Store Phase 5 supports UTF-8 text only. Binary images/browser captures remain deferred to the hardened browser phase, and critical-diagnostic preservation can intentionally make a pathological preview exceed its nominal character target rather than discard an error.
 - Context estimates deliberately follow Pi's conservative four-character approximation plus a 4,096-token safety reserve; they are not provider billing tokens. Critical diagnostics can force a BLOCKED result rather than be discarded.
 - Pi 0.85.1 exposes no safe in-flight API for changing the active target after final context assembly. The Context Governor therefore blocks an irreducible payload and requires explicit compaction/handoff or an already-policy-compatible target instead of silently changing routing.
-- Edit Engine V2 now owns exact and bounded single-file AST transactions, JSON pre-validation, and Phase 9 pre/post managed diagnostics. Multi-file structural/rename/file-move transactions remain intentionally absent, and evidence-based model/contract selection is Phase 17; these capabilities are not claimed early.
+- Edit Engine V2 owns exact and bounded single-file AST transactions, JSON pre-validation, and Phase 9 pre/post managed diagnostics. Phase 17 selects only among those already-governed contracts with one fallback; multi-file structural/rename/file-move transactions remain intentionally absent.
+- Model Harness Profiles currently contain only evidence-backed direct OpenAI/Pi declarations plus a restrictive generic profile. OmniRoute routes retain `UNKNOWN` harness capabilities until authoritative local metadata or reproducible evidence exists; no remote probing or adaptive learning was introduced.
 - Phase 9 validates the edited file within its bound project and does not grant server-originated workspace mutation. Genuinely unsupported file types skip by explicit policy; a configured managed server that is absent/unpinned or a runtime failure blocks the guarded transaction. Multi-file rename/import/file-move control remains deferred until it can be atomic and rollback-safe.
 - The tracked AST binary digest is intentionally Linux-x64-specific, matching the existing package platform contract. First use hashes the 52.4 MB binary, so the measured cold AST path includes that one-time integrity cost; subsequent uses revalidate filesystem identity before using the cache.
 - Edit snapshots/transactions are deliberately memory-only and expire after 30 minutes. Applied receipts are bounded per session and metadata-only but do not yet have a package-owned time-retention command.
@@ -198,4 +208,4 @@
 
 ## Exact next action
 
-Inspect the pinned OMP model compatibility/harness profiles and compare them with Ultra's current provider/model/thinking policy, native structured-output contracts, tool schemas, edit engines, and callability attestations. Introduce only deterministic data-only contract adaptations that are justified by an actual model capability mismatch; never change provider routes, Council/Judge strength, quality overlays, retry policy, role permissions, or zero-extra-cost defaults, and never classify an unprobed model as callable.
+Inspect the existing ResourceFS registration boundary and pinned OMP Git/GitHub resources. Define the smallest immutable Phase 18 URI set with strict canonical parsing, local Git descriptor/process safety, bounded output, explicit trust/provenance, zero hidden network access, and no publish/mutation authority. Keep GitHub optional and fail-soft when authenticated read-only access is unavailable; do not add a broad Git shell proxy.
