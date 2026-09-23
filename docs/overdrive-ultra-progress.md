@@ -7,7 +7,7 @@
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
 - Current phase: 22 — Browser Engine, PARTIAL (enforced network/origin boundary pending)
 - Last functional checkpoint commit: `58d96a5` — `feat(ultra): bound autonomous local browser actions`
-- Last bookkeeping checkpoint: Phase 22 partial boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
+- Last bookkeeping checkpoint: Phase 22 partial boundary and sandbox feasibility (this documentation commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -214,10 +214,11 @@
 - Phase 22 partial checkpoint: autonomous `agent_browser` calls are now command/flag/input-allowlisted to the assigned session, private profile, reserved loopback startup URL, bounded DOM actions, one private screenshot pathname, and close. The broad plugin modes for evaluation, CDP attach, auth/cookies/storage, file/external initial navigation, upload/download, network routing, arbitrary output and alternate sessions/profiles are pre-execution denials. Ordinary interactive Pi remains unchanged.
 - Phase 22 real-Pi/Chromium smoke: PASS with the Ultra package loaded from this worktree and the pinned installed browser plugin. One adversarial `eval` was blocked before profile materialization; eight allowed calls performed local open/snapshot/fill/click/wait/DOM read/screenshot/close; the PNG signature, private profile and runtime/worktree/port/process/temp cleanup all passed. Deterministic local provider only, no paid or external-provider calls.
 - Phase 22 authoritative `npm run check`: 455/455 PASS plus syntax (including the new browser fixture), installed-Pi TypeScript and package validation using the verified stable managed LSP runtime. The unprivileged sandbox run failed 11 existing integration suites on process/Git/loopback restrictions; the authorized local gate passed. Agent policy, 42-spawn-budget bridge and guardrail smokes PASS. Protected audit hashes and `git diff --check` unchanged/clean.
+- Phase 22 network-boundary feasibility: the pinned browser rejected `--allowed-domains` with a profile and a port-qualified allowlist did not match even its own port. Separately, exact installed `agent-browser@0.36.0` plus Chromium 152.0.7977.82 opened `about:blank` inside `bwrap --unshare-all --die-with-parent`; loopback was UP inside that namespace. This is a launch probe, not a persistent Pi/runner security result; the probe session was closed and created no project/auth changes.
 
 ## Dirty files
 
-- Only this Phase 22 partial-checkpoint ledger update is expected before its bookkeeping commit.
+- No dirty files are expected after this Phase 22 partial checkpoint; recheck `git status --short` before continuing.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -253,4 +254,4 @@
 
 ## Exact next action
 
-Continue Phase 22 from functional commit `58d96a5` and this ledger checkpoint. Find and prove an enforceable origin/network boundary compatible with isolated Chromium and an ephemeral controlled profile; do not treat the current first-URL validator as full containment. Inspect native `--allowed-domains` without `--profile`, its profile/session lifecycle and all loopback-port implications, or replace the adapter only if it provides a measurably stronger boundary without adding broad host authority. Then decide whether private screenshots can be ingested safely by Artifact Store and whether a bounded download path is actually supportable. Add adversarial navigation/SSRF/cleanup tests and a real local Pi benchmark before claiming Phase 22 complete or starting Phase 23. Preserve all prior routing, provider, Council, retry, role, memory and security invariants.
+Continue Phase 22 from functional commit `58d96a5` and this ledger checkpoint. The immediate candidate is a lazy persistent runner that keeps the exact pinned browser and Chromium inside one networkless Bubblewrap namespace for the full interaction, with only a bounded loopback fixture server reachable inside it. The direct launch/loopback probe passed, but Pi integration, profile confinement, interaction lifecycle, browser artifact ownership and teardown are unproven. Build and adversarially test those before switching the allocated tool path; do not treat the current first-URL validator as network containment. Then decide whether private screenshots can be ingested safely by Artifact Store and whether a bounded download path is supportable. Require a real local Pi benchmark and full gate before claiming Phase 22 complete or starting Phase 23. Preserve all prior routing, provider, Council, retry, role, memory and security invariants.
