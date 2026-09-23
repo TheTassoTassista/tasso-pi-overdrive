@@ -5,9 +5,9 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 21 — ACP / Editor Mode
-- Last completed functional commit: `ae9b154` — `feat(ultra): add bounded project rule interoperability`
-- Last bookkeeping checkpoint: Phase 20 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
+- Current phase: 22 — Browser Engine
+- Last completed functional commit: `92ff794` — `feat(ultra): add governed ACP editor bridge`
+- Last bookkeeping checkpoint: Phase 21 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -97,6 +97,10 @@
 - Added strict frontmatter and path policy, descriptor-bound final reads, symlink/hard-link/secret/binary/oversize/breadth denial, terminal/bidi and delimiter sanitization, and paragraph-level rejection of security overrides, secret access, authority grants, routing/Council/cost/spawn changes, and automatic publication.
 - Kept Pi-native root `AGENTS.md` native and non-duplicated. Imported guidance is wrapped in one bounded untrusted Rule Pack before the final Context Fit Gate; it cannot change tools, execution, routing, retry, Council/Judge, spend, spawn, approval, verification, receipts, sandboxing, or Git authority.
 - Added digest-bound read-only `rule://project`, zero-call `/rules`, metadata-only tracing, package invariants, 17 focused/adversarial tests, operations/design/gap documentation, and a real-Pi scope/conflict/injection/context benchmark with zero external/network/paid calls.
+- Inspected the pinned OMP ACP mode and official Pi 0.85.1 RPC/extension UI surfaces, then implemented a clean-room optional ACP v1 JSON-RPC/stdio adapter over Pi rather than a second execution controller.
+- Bound one ephemeral session to one canonical project root and held directory identity; denied root traversal/symlink/retarget, extra directories, client MCP/filesystem/terminal, direct route/model/thinking changes, slash commands, session reload and persistent grants.
+- Loaded the bridge-only approval extension once through an explicit Pi CLI path outside the package manifest. Mutating/executing tool approval is one-shot, active-call and argument-digest bound, rejects mismatched/replayed/late responses, and then resumes the ordinary Pi Overdrive hooks.
+- Added bounded metadata-only transport diagnostics, route/token/cost receipts, 30-day retention through the existing trace cleanup, package checks, 21 focused/adversarial cases, and a real Pi deterministic ACP write benchmark. Existing secure-workflow receipts remain the authoritative execution evidence.
 
 ## Current validation
 
@@ -203,10 +207,14 @@
 - Phase 20 spawn-budget bridge regression: PASS with derived 39 + 3 = 42, correction rounds 2, Council/Judge sequencing, structured-output retry bounds, prelaunch denial, atomic Council capacity, and cleanup unchanged.
 - Phase 20 authoritative `npm run check`: 434/434 PASS plus syntax, Rule/Git-Resource/Commit-Planner/Model-Harness/Ultra/Agent-Hub/Director/memory syntax, installed-Pi TypeScript, package and secret validation, using the verified stable managed LSP runtime. The expected control without `PI_OVERDRIVE_LSP_RUNTIME` failed only the two ignored Rust/Go runtime cases.
 - Phase 20 integrity audit: no broken symlinks or accidental absolute attachment/temp/secret material; both protected audit hashes remain unchanged. The worktree-local catalog control correctly did not claim the inactive development worktree as the configured stable Pi package; the real-Pi benchmark independently proved `/rules` registration from the temporary fixture configuration.
+- Phase 21 focused/adversarial ACP tests: 21/21 PASS; strict framing, one root/session, explicit handshake, no client authority, route drift, concurrency before route check, exact target digest, replay, malformed/late permission responses, cancellation, metadata privacy, and child arguments are covered.
+- Phase 21 real-Pi ACP benchmark: PASS on Pi 0.85.1; one prompt, one `write` only after one `allow_once`, two deterministic local provider turns, Context Fit Gate PASS, correct provider/model/thinking receipts, no external/network/paid calls, unchanged auth, zero residual processes and temporary cleanup PASS. The isolated worktree lacked its ignored MCP runtime, so Pi's supported package filter omitted only that unrelated proxy; a malformed benchmark-only profile override was removed rather than weakening policy.
+- Phase 21 authoritative `npm run check`: 455/455 PASS plus syntax, TypeScript, package and secret validation using the verified stable managed LSP runtime. Agent-policy, guardrail and 42-spawn-budget smokes PASS. The first unprivileged guardrail smoke failed only at sandbox-denied `git` spawn; the authorized local rerun passed all 14 adversarial calls.
+- Phase 21 integrity audit: protected Ultra and stable audit hashes unchanged, no broken symlinks, no accidental temporary Codex paths or secret-like values, staged diff checked, functional commit `92ff794` recorded locally.
 
 ## Dirty files
 
-- Only this Phase 20 boundary ledger update is expected before its bookkeeping commit.
+- Only this Phase 21 boundary ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -237,7 +245,8 @@
 - Phase 16 remains Linux/Git-specific and requires a clean source repository. Reflink is unavailable on this filesystem and overlay was intentionally not mounted. Node lacks a complete descriptor-relative `openat2`/`renameat2` lifecycle, so a hostile same-UID directory-replacement race cannot be claimed impossible; private roots, canonical checks, atomic records, Git registration, and post-cleanup checks reduce and expose that risk.
 - Phase 19 is deliberately proposal-only and requires explicit path/hunk ownership. It does not infer commit groups, persist source content, stage, commit, amend, reset, branch, publish, or authorize a later mutation. A future apply path would require a separate human-approved controller design; stale proposals are never silently regenerated.
 - Phase 20 is deliberately project-only and parses a strict compatibility subset. Scoped rules are omitted when no safe task file path is present; multiline YAML, brace/extglob patterns, executable conditions/TTSR, user-home and environment-selected rules are rejected. Pi core still loads root `AGENTS.md` natively, so Ultra can add a lower-authority boundary around imported rules but cannot replace that loader with its descriptor-relative reader.
+- Phase 21 implements only one local text ACP session/root and has no client MCP, filesystem, terminal, model/thinking switching, session reload, multi-client control, or persistent approval. Pi and trusted extensions retain their existing host permissions; ACP is an interface, not a new sandbox. The bridge journal is transport metadata, not workflow success evidence. The isolated benchmark excludes the unavailable ignored MCP runtime through an exact package filter while keeping security/context hooks; a full installed package still requires its pinned bootstrap runtime. Startup stderr is hashed/classified without raw preview because persisting it could leak secrets.
 
 ## Exact next action
 
-Inspect Pi's current RPC/extension surfaces, the existing Task/Tool/Context Governor, approvals, receipts, session lifecycle, and the pinned OMP ACP mode/permission gate. Define the smallest Phase 21 editor bridge that preserves Overdrive as the sole authority: explicit local activation, one bounded project/session identity, exact request correlation, existing tool/approval policy, metadata-only receipts, cancellation/cleanup, and no bypass for mutation, routing, sandbox, Council, spend, or verification. Prefer an existing Pi protocol surface over another controller or permanent schema, add hostile-client/lifecycle regressions, and prove the real transport locally with deterministic zero-cost evidence before the full gate.
+Inspect the pinned OMP browser architecture against the existing Overdrive `agent_browser`, `config/browser.json`, browser smoke, Tool/Task Governor, Artifact Store and runtime isolation. Keep Chromium isolated with its own controlled profile and no ambient personal browser authority. Define the smallest Phase 22 lazy browser subsystem that adds useful bounded navigate/click/type/DOM/screenshot/wait/download semantics without granting arbitrary filesystem, credentials or network control; implement focused and adversarial tests, a real local browser benchmark, the full gate, documentation and local commits before proceeding.
