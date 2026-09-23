@@ -107,6 +107,14 @@ test("browser schema appears only for an explicit browser capability", () => {
   assert.equal(policyFor("Inspect the browser DOM for the frontend page.").toolPolicy.activeTools.includes("browser_engine"), true);
 });
 
+test("unreviewed host computer tools remain hidden even for explicit desktop intent", () => {
+  const { toolPolicy } = policyFor("Take a desktop screenshot, inspect the window, then click and type into it.", ["read", "computer_use", "desktop_screenshot", "desktop_click", "desktop_type"]);
+  for (const name of ["computer_use", "desktop_screenshot", "desktop_click", "desktop_type"]) {
+    assert.equal(classifyTool(name).tier, "unclassified-denied");
+    assert.equal(toolPolicy.activeTools.includes(name), false);
+  }
+});
+
 test("missing tools are reported rather than invented", () => {
   const { toolPolicy } = policyFor("Change one string value.", ["read"]);
   assert.deepEqual(toolPolicy.activeTools, ["read"]);
