@@ -87,7 +87,8 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (event.toolName === "agent_browser") {
-      const policy = validateAllocatedBrowserCall(event.input, findRuntimeAllocation(ctx.cwd));
+      if (findRuntimeAllocation(ctx.cwd)) return block("Browser runtime isolation denied: autonomous allocations require browser_engine inside the networkless runner");
+      const policy = validateAllocatedBrowserCall(event.input, undefined);
       if (!policy.allowed) return block(`Browser runtime isolation denied: ${"reason" in policy ? policy.reason : "policy"}`);
     }
 

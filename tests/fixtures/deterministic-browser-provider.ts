@@ -21,7 +21,7 @@ function outputMessage(model: Model<any>): AssistantMessage {
 
 function addToolCall(stream: AssistantMessageEventStream, output: AssistantMessage, id: string, args: Record<string, unknown>): void {
   const contentIndex = output.content.length;
-  const toolCall = { type: "toolCall" as const, id, name: "agent_browser", arguments: args };
+  const toolCall = { type: "toolCall" as const, id, name: process.env.PI_OVERDRIVE_BROWSER_TOOL === "agent_browser" ? "agent_browser" : "browser_engine", arguments: args };
   output.content.push(toolCall);
   stream.push({ type: "toolcall_start", contentIndex, partial: output });
   stream.push({ type: "toolcall_delta", contentIndex, delta: JSON.stringify(args), partial: output });
@@ -57,10 +57,12 @@ function streamBrowser(model: Model<any>, context: Context, options?: SimpleStre
       else if (completed === 3) addToolCall(stream, output, "browser-click", { args: ["--session", session, "click", "#submit"], timeoutMs: 120000 });
       else if (completed === 4) addToolCall(stream, output, "browser-wait", { args: ["--session", session, "wait", "--text", "OVERDRIVE_BROWSER_SUBMITTED:Tasso"], timeoutMs: 120000 });
       else if (completed === 5) addToolCall(stream, output, "browser-dom", { args: ["--session", session, "get", "text", "#result"], timeoutMs: 120000 });
-      else if (completed === 6) addToolCall(stream, output, "browser-capture", { args: ["--session", session, "screenshot", capture], timeoutMs: 120000 });
-      else if (completed === 7) addToolCall(stream, output, "browser-close", { args: ["--session", session, "close"], timeoutMs: 120000 });
+      else if (completed === 6) addToolCall(stream, output, "browser-network-wait", { args: ["--session", session, "wait", "--text", "OVERDRIVE_NETWORK_BLOCKED"], timeoutMs: 120000 });
+      else if (completed === 7) addToolCall(stream, output, "browser-network-result", { args: ["--session", session, "get", "text", "#network-result"], timeoutMs: 120000 });
+      else if (completed === 8) addToolCall(stream, output, "browser-capture", { args: ["--session", session, "screenshot", capture], timeoutMs: 120000 });
+      else if (completed === 9) addToolCall(stream, output, "browser-close", { args: ["--session", session, "close"], timeoutMs: 120000 });
       else addText(stream, output, "BROWSER_AUDIT_DONE");
-      output.stopReason = completed >= (negative ? 1 : 8) ? "stop" : "toolUse";
+      output.stopReason = completed >= (negative ? 1 : 10) ? "stop" : "toolUse";
       stream.push({ type: "done", reason: output.stopReason, message: output });
       stream.end();
     } catch (error) {

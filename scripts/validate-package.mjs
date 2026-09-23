@@ -177,6 +177,13 @@ for (const marker of ['pi.on("message_update"', 'registerStreamGuardSession(', '
 if (/\b(?:setTimeout|setInterval|sendMessage|sendUserMessage|registerTool|ctx\.abort)\b/u.test(streamGuardExtension) || streamGuardExtension.includes('pi.on("tool_result"')) failures.push('StreamGuard must not add timers, prompts, tools, abort/retry, or a blocked-result-bypassed tool_result hook');
 const safetyExtension = await readFile(path.join(root, 'extensions/safety.ts'), 'utf8');
 if (!safetyExtension.includes('consumeBlockedStreamGuard(') || !safetyExtension.includes('Blocked by governing safety policy:')) failures.push('Safety does not own same-blocked-result StreamGuard correction attachment');
+const browserController = await readFile(path.join(root, 'lib/browser-engine.mjs'), 'utf8');
+const browserRunner = await readFile(path.join(root, 'runtime/browser/runner.py'), 'utf8');
+const browserTool = await readFile(path.join(root, 'extensions/browser-engine.ts'), 'utf8');
+const testerDefinition = await readFile(path.join(root, 'agents/tester.md'), 'utf8');
+for (const marker of ['--unshare-all', '--clearenv', '--die-with-parent', 'AGENT_BROWSER_EXECUTABLE_PATH', 'AGENT_BROWSER_PROFILE', 'captureProcessIdentity', 'validateAllocatedBrowserCall', 'browser-fixture.html', 'O_NOFOLLOW']) if (!browserController.includes(marker)) failures.push(`Confined browser controller marker missing: ${marker}`);
+for (const marker of ['HTTPServer', '127.0.0.1', 'subprocess.run(args', 'MAX_IMAGE', 'O_NOFOLLOW', 'ambientSecrets', 'hostHomeVisible']) if (!browserRunner.includes(marker)) failures.push(`Confined browser runner marker missing: ${marker}`);
+if (!browserTool.includes('name: "browser_engine"') || !testerDefinition.includes('../extensions/browser-engine.ts') || testerDefinition.includes('pi-agent-browser-native/') || !safetyExtension.includes('autonomous allocations require browser_engine')) failures.push('Autonomous Tester must use only the confined browser tool; native plugin must be blocked in allocations');
 try {
   const sentinel = await import(path.join(root, 'lib/sentinel.mjs'));
   const policy = sentinel.validateSentinelPolicy(JSON.parse(await readFile(path.join(root, 'config/sentinel.json'), 'utf8')));
@@ -202,7 +209,7 @@ try {
   const director = await import(path.join(root, 'lib/director-mode.mjs'));
   const policy = director.validateDirectorPolicy(JSON.parse(await readFile(path.join(root, 'config/director-mode.json'), 'utf8')));
   if (!policy.enabled || policy.activation !== 'explicit-task-only' || policy.autoExit !== 'agent-settled' || policy.directMutationFallback !== false || policy.maxTaskChars !== 16000) failures.push('Director Mode must remain explicit, task-bound, one-run, and without direct mutation fallback');
-  for (const forbidden of ['write', 'edit', 'transactional_edit', 'transactional_ast_edit', 'ast_grep_rewrite', 'safe_exec', 'bash', 'subagent', 'agent_browser', 'safe_remove_file']) if (policy.allowedTools.includes(forbidden)) failures.push(`Director Mode allows forbidden primary tool: ${forbidden}`);
+  for (const forbidden of ['write', 'edit', 'transactional_edit', 'transactional_ast_edit', 'ast_grep_rewrite', 'safe_exec', 'bash', 'subagent', 'agent_browser', 'browser_engine', 'safe_remove_file']) if (policy.allowedTools.includes(forbidden)) failures.push(`Director Mode allows forbidden primary tool: ${forbidden}`);
   for (const required of ['read', 'secure_coding_workflow', 'verification_gate']) if (!policy.requiredTools.includes(required)) failures.push(`Director Mode is missing required controller tool: ${required}`);
 } catch (error) { failures.push(`Director Mode validation failed: ${error.message}`); }
 const directorExtension = await readFile(path.join(root, 'extensions/director-mode.ts'), 'utf8');

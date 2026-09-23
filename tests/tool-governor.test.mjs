@@ -14,7 +14,7 @@ import {
 const available = [
   "read", "grep", "find", "ls", "ffgrep", "fffind", "ast_grep_run", "ast_grep_scan", "ast_grep_outline", "ast_grep_debug_query",
   "transactional_edit", "edit", "write", "transactional_ast_edit", "ast_grep_rewrite", "semantic_nav", "ts_definition", "ts_references", "ts_diagnostics", "task_notebook",
-  "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript", "agent_browser", "web_research", "safe_web_fetch", "safe_exec", "mcp",
+  "verification_gate", "secure_coding_workflow", "debug_engine", "persistent_python", "persistent_javascript", "agent_browser", "browser_engine", "web_research", "safe_web_fetch", "safe_exec", "mcp",
   "resource_fs", "commit_plan", "smart_read", "bash", "subagent", "safe_remove_file", "third_party_unknown",
 ];
 
@@ -26,7 +26,7 @@ function policyFor(task, availableTools = available) {
 test("simple edit gets the transactional editor, LSP, and verification without fallback or controller surfaces", () => {
   const { toolPolicy } = policyFor("Change one string value.");
   for (const name of ["read", "transactional_edit", "semantic_nav", "verification_gate"]) assert.ok(toolPolicy.activeTools.includes(name), name);
-  for (const name of ["edit", "grep", "fffind", "write", "ast_grep_rewrite", "web_research", "agent_browser", "safe_exec", "mcp", "bash", "subagent", "safe_remove_file", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
+  for (const name of ["edit", "grep", "fffind", "write", "ast_grep_rewrite", "web_research", "agent_browser", "browser_engine", "safe_exec", "mcp", "bash", "subagent", "safe_remove_file", "secure_coding_workflow"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
   assert.ok(toolPolicy.activeTools.length < available.length / 2);
 });
 
@@ -96,13 +96,15 @@ test("research activates memory and web but never browser or hidden integrations
   assert.equal(taskPolicy.needs.web, true);
   assert.equal(taskPolicy.needs.secondBrain, true);
   for (const name of ["read", "task_notebook", "web_research", "safe_web_fetch"]) assert.ok(toolPolicy.activeTools.includes(name), name);
-  for (const name of ["agent_browser", "safe_exec", "mcp", "bash", "subagent"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
+  for (const name of ["agent_browser", "browser_engine", "safe_exec", "mcp", "bash", "subagent"]) assert.equal(toolPolicy.activeTools.includes(name), false, name);
   assert.deepEqual(toolPolicy.highRiskActive, ["web_research", "safe_web_fetch"]);
 });
 
 test("browser schema appears only for an explicit browser capability", () => {
   assert.equal(policyFor("Inspect the repository structure.").toolPolicy.activeTools.includes("agent_browser"), false);
+  assert.equal(policyFor("Inspect the repository structure.").toolPolicy.activeTools.includes("browser_engine"), false);
   assert.equal(policyFor("Inspect the browser DOM for the frontend page.").toolPolicy.activeTools.includes("agent_browser"), true);
+  assert.equal(policyFor("Inspect the browser DOM for the frontend page.").toolPolicy.activeTools.includes("browser_engine"), true);
 });
 
 test("missing tools are reported rather than invented", () => {
@@ -143,6 +145,7 @@ test("classification distinguishes all four supported visibility tiers", () => {
   assert.equal(classifyTool("persistent_python").tier, "conditional");
   assert.equal(classifyTool("persistent_javascript").tier, "conditional");
   assert.equal(classifyTool("agent_browser").tier, "high-risk-conditional");
+  assert.equal(classifyTool("browser_engine").tier, "high-risk-conditional");
   assert.equal(classifyTool("safe_exec").tier, "hidden-on-demand");
   assert.equal(classifyTool("ast_grep_scan").tier, "hidden-on-demand");
   assert.equal(classifyTool("safe_remove_file").tier, "controller-only");

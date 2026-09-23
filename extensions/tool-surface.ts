@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { readModelPolicy } from "../lib/model-policy.mjs";
 import { getSessionQuality } from "../lib/routing-session.mjs";
 import { availableContextFromPiUsage, resolveTaskPolicy } from "../lib/task-governor.mjs";
+import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import {
   classifyTool,
@@ -74,7 +75,9 @@ export default function toolSurface(pi: ExtensionAPI): void {
     try {
       const routing = presetAndQuality();
       const taskPolicy = resolveTaskPolicy({ task: event.prompt, ...routing, availableContext: availableContextFromPiUsage(ctx.getContextUsage()) });
-      const policy = resolveToolPolicy({ taskPolicy, availableTools: pi.getAllTools().map((tool) => tool.name) });
+      const managedBrowser = !!findRuntimeAllocation(ctx.cwd);
+      const availableTools = pi.getAllTools().map((tool) => tool.name).filter((name) => managedBrowser ? name !== "agent_browser" : name !== "browser_engine");
+      const policy = resolveToolPolicy({ taskPolicy, availableTools });
       const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
       const selection = constrainToolsForModelProfile(policy.activeTools, profile, { structural: taskPolicy.classification.signals.structuralEdit === true });
       pi.setActiveTools([...selection.activeTools]);

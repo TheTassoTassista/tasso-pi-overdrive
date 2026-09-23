@@ -13,6 +13,7 @@
         "persistent_python",
         "persistent_javascript",
         "agent_browser",
+        "browser_engine",
         "web_research",
         "safe_web_fetch",
         "safe_exec",
