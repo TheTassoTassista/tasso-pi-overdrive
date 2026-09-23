@@ -115,6 +115,19 @@ test("unreviewed host computer tools remain hidden even for explicit desktop int
   }
 });
 
+test("unreviewed collaboration controls cannot be selected or manually enabled", () => {
+  const names = ["collaboration_relay", "collab_host", "collab_join", "collab_control"];
+  const { toolPolicy } = policyFor("Start a shared agent session and let a guest prompt or interrupt it.", ["read", ...names]);
+  for (const name of names) {
+    assert.equal(classifyTool(name).tier, "unclassified-denied");
+    assert.equal(toolPolicy.activeTools.includes(name), false);
+    assert.throws(
+      () => resolveManualToolChange({ action: "enable", name, activeTools: ["read"], availableTools: ["read", ...names] }),
+      /tool_unclassified_denied/u,
+    );
+  }
+});
+
 test("missing tools are reported rather than invented", () => {
   const { toolPolicy } = policyFor("Change one string value.", ["read"]);
   assert.deepEqual(toolPolicy.activeTools, ["read"]);
