@@ -5,9 +5,9 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra`
 - Branch: `feature/overdrive-ultra`
 - Base commit: `0f107b8670b69b214e478b8d854377956f7039be`
-- Current phase: 22 — Browser Engine
-- Last completed functional commit: `92ff794` — `feat(ultra): add governed ACP editor bridge`
-- Last bookkeeping checkpoint: Phase 21 boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
+- Current phase: 22 — Browser Engine, PARTIAL (enforced network/origin boundary pending)
+- Last functional checkpoint commit: `58d96a5` — `feat(ultra): bound autonomous local browser actions`
+- Last bookkeeping checkpoint: Phase 22 partial boundary (this ledger-only commit; resolve its hash with `git log -1 -- docs/overdrive-ultra-progress.md`)
 - OMP reference: `4267074ac91456866e95ed8de0b6353388f08502`, package 18.1.21, MIT
 - Paid/provider calls used by Ultra work: 0
 
@@ -211,10 +211,13 @@
 - Phase 21 real-Pi ACP benchmark: PASS on Pi 0.85.1; one prompt, one `write` only after one `allow_once`, two deterministic local provider turns, Context Fit Gate PASS, correct provider/model/thinking receipts, no external/network/paid calls, unchanged auth, zero residual processes and temporary cleanup PASS. The isolated worktree lacked its ignored MCP runtime, so Pi's supported package filter omitted only that unrelated proxy; a malformed benchmark-only profile override was removed rather than weakening policy.
 - Phase 21 authoritative `npm run check`: 455/455 PASS plus syntax, TypeScript, package and secret validation using the verified stable managed LSP runtime. Agent-policy, guardrail and 42-spawn-budget smokes PASS. The first unprivileged guardrail smoke failed only at sandbox-denied `git` spawn; the authorized local rerun passed all 14 adversarial calls.
 - Phase 21 integrity audit: protected Ultra and stable audit hashes unchanged, no broken symlinks, no accidental temporary Codex paths or secret-like values, staged diff checked, functional commit `92ff794` recorded locally.
+- Phase 22 partial checkpoint: autonomous `agent_browser` calls are now command/flag/input-allowlisted to the assigned session, private profile, reserved loopback startup URL, bounded DOM actions, one private screenshot pathname, and close. The broad plugin modes for evaluation, CDP attach, auth/cookies/storage, file/external initial navigation, upload/download, network routing, arbitrary output and alternate sessions/profiles are pre-execution denials. Ordinary interactive Pi remains unchanged.
+- Phase 22 real-Pi/Chromium smoke: PASS with the Ultra package loaded from this worktree and the pinned installed browser plugin. One adversarial `eval` was blocked before profile materialization; eight allowed calls performed local open/snapshot/fill/click/wait/DOM read/screenshot/close; the PNG signature, private profile and runtime/worktree/port/process/temp cleanup all passed. Deterministic local provider only, no paid or external-provider calls.
+- Phase 22 authoritative `npm run check`: 455/455 PASS plus syntax (including the new browser fixture), installed-Pi TypeScript and package validation using the verified stable managed LSP runtime. The unprivileged sandbox run failed 11 existing integration suites on process/Git/loopback restrictions; the authorized local gate passed. Agent policy, 42-spawn-budget bridge and guardrail smokes PASS. Protected audit hashes and `git diff --check` unchanged/clean.
 
 ## Dirty files
 
-- Only this Phase 21 boundary ledger update is expected before its bookkeeping commit.
+- Only this Phase 22 partial-checkpoint ledger update is expected before its bookkeeping commit.
 
 `docs/final-adversarial-audit.md` must not appear in this worktree's diff and the user's modified copy in the original worktree must retain SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`.
 
@@ -246,7 +249,8 @@
 - Phase 19 is deliberately proposal-only and requires explicit path/hunk ownership. It does not infer commit groups, persist source content, stage, commit, amend, reset, branch, publish, or authorize a later mutation. A future apply path would require a separate human-approved controller design; stale proposals are never silently regenerated.
 - Phase 20 is deliberately project-only and parses a strict compatibility subset. Scoped rules are omitted when no safe task file path is present; multiline YAML, brace/extglob patterns, executable conditions/TTSR, user-home and environment-selected rules are rejected. Pi core still loads root `AGENTS.md` natively, so Ultra can add a lower-authority boundary around imported rules but cannot replace that loader with its descriptor-relative reader.
 - Phase 21 implements only one local text ACP session/root and has no client MCP, filesystem, terminal, model/thinking switching, session reload, multi-client control, or persistent approval. Pi and trusted extensions retain their existing host permissions; ACP is an interface, not a new sandbox. The bridge journal is transport metadata, not workflow success evidence. The isolated benchmark excludes the unavailable ignored MCP runtime through an exact package filter while keeping security/context hooks; a full installed package still requires its pinned bootstrap runtime. Startup stderr is hashed/classified without raw preview because persisting it could leak secrets.
+- Phase 22 is not complete. The pinned `agent-browser` refuses `--allowed-domains` together with `--profile`, and its domain allowlist cannot bind the allocated port. The first URL is strictly local, but page-driven navigation and subresources are not network-confined; the browser process is not Bubblewrapped. A same-UID screenshot-path race is not eliminated by the private-directory check. Screenshots remain runtime-private binary files rather than Artifact Store objects; controlled downloads and bounded network metadata are absent. Do not use the allocated browser path for untrusted/credentialed/internal pages until these gaps are resolved.
 
 ## Exact next action
 
-Inspect the pinned OMP browser architecture against the existing Overdrive `agent_browser`, `config/browser.json`, browser smoke, Tool/Task Governor, Artifact Store and runtime isolation. Keep Chromium isolated with its own controlled profile and no ambient personal browser authority. Define the smallest Phase 22 lazy browser subsystem that adds useful bounded navigate/click/type/DOM/screenshot/wait/download semantics without granting arbitrary filesystem, credentials or network control; implement focused and adversarial tests, a real local browser benchmark, the full gate, documentation and local commits before proceeding.
+Continue Phase 22 from functional commit `58d96a5` and this ledger checkpoint. Find and prove an enforceable origin/network boundary compatible with isolated Chromium and an ephemeral controlled profile; do not treat the current first-URL validator as full containment. Inspect native `--allowed-domains` without `--profile`, its profile/session lifecycle and all loopback-port implications, or replace the adapter only if it provides a measurably stronger boundary without adding broad host authority. Then decide whether private screenshots can be ingested safely by Artifact Store and whether a bounded download path is actually supportable. Add adversarial navigation/SSRF/cleanup tests and a real local Pi benchmark before claiming Phase 22 complete or starting Phase 23. Preserve all prior routing, provider, Council, retry, role, memory and security invariants.
