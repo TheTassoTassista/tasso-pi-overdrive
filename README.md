@@ -33,6 +33,8 @@ Restart Pi after installation. Then check:
 /memory
 ```
 
+Optional ACP editor integration can be started with `npm run editor:bridge -- --cwd /absolute/project`. It binds one project/session, asks `allow_once` for each governed mutation, and keeps the existing Pi auth, routing and security hooks. See [Phase 21 editor bridge](docs/implementation-notes/phase-21-editor-bridge.md).
+
 Shell-level status is available with `./scripts/status.sh`.
 
 ## Everyday workflow

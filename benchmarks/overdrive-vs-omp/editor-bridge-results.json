@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-23T13:48:22.525Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-rpc-through-minimal-acp-editor-bridge-deterministic-local-provider",
+  "piVersion": "0.85.1",
+  "overdriveUltra": {
+    "elapsedMs": 597.207,
+    "exitCode": 0,
+    "signal": null,
+    "sessionCount": 1,
+    "promptCount": 1,
+    "permissionCount": 1,
+    "permissionOptions": [
+      "allow_once",
+      "reject_once"
+    ],
+    "providerTurns": 2,
+    "updateKinds": [
+      "tool_call",
+      "tool_call_update",
+      "agent_message_chunk",
+      "usage_update"
+    ],
+    "receiptKinds": [
+      "bridge_started",
+      "initialized",
+      "session_started",
+      "prompt_started",
+      "tool_started",
+      "permission_requested",
+      "permission_decided",
+      "tool_finished",
+      "prompt_finished",
+      "child_exit",
+      "session_closed",
+      "bridge_stopped"
+    ],
+    "routeReceipts": [
+      {
+        "version": 1,
+        "sequence": 3,
+        "at": "2026-09-23T13:48:22.488Z",
+        "kind": "session_started",
+        "sessionDigest": "7dccf4f5a18b5ffb70f5a27454360a79d6adcb1ce63e8c53f922205092769654",
+        "provider": "pi-overdrive-tool-audit",
+        "model": "single-tool-driver",
+        "thinking": "low"
+      },
+      {
+        "version": 1,
+        "sequence": 9,
+        "at": "2026-09-23T13:48:22.507Z",
+        "kind": "prompt_finished",
+        "requestDigest": "5a99fcd9ea54ea7baf190e67a445f6187d1c2ad8d8b52c38454b6666638bf8bf",
+        "stopReason": "end_turn",
+        "provider": "pi-overdrive-tool-audit",
+        "model": "single-tool-driver",
+        "thinking": "low",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "totalTokens": 0,
+        "cost": 0
+      }
+    ],
+    "errorReceipts": [],
+    "contextTrace": [
+      {
+        "kind": "context_fit",
+        "status": "PASS",
+        "reason": "CONTEXT_FITS_TARGET",
+        "contextWindow": 8192,
+        "usableInputTokens": 3072,
+        "finalInputTokens": 631,
+        "toolCount": 1
+      },
+      {
+        "kind": "context_fit",
+        "status": "PASS",
+        "reason": "CONTEXT_FITS_TARGET",
+        "contextWindow": 8192,
+        "usableInputTokens": 3072,
+        "finalInputTokens": 672,
+        "toolCount": 1
+      }
+    ],
+    "stderrBytes": 0,
+    "stderrDigest": null,
+    "assertions": {
+      "realPiTransportComplete": true,
+      "protocolConformant": true,
+      "clientAuthorityDenied": true,
+      "promptCompleted": true,
+      "actualMutationApproved": true,
+      "oneShotPermissionOnly": true,
+      "eventCorrelation": true,
+      "routeAttested": true,
+      "receiptsMetadataOnly": true,
+      "exactProviderTurns": true,
+      "authUnchanged": true,
+      "noResidualProcess": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 2,
+    "decisionModelCalls": 0,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "ompReference": {
+    "commit": "4267074ac91456866e95ed8de0b6353388f08502",
+    "version": "18.1.21",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is architecture evidence only."
+  },
+  "cleanup": {
+    "bridgeExited": true,
+    "residualProcesses": 0,
+    "temporaryFixtureRemoved": true
+  }
+}

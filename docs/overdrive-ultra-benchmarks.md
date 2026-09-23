@@ -1,5 +1,11 @@
 # Overdrive Ultra benchmark record
 
+## Phase 21 ACP editor bridge
+
+`npm run benchmark:ultra:editor` exercises the real Pi 0.85.1 RPC process through the bounded ACP stdio bridge. The recorded run passed in 597.207 ms: one session, one prompt, one `write` after one `allow_once`, two deterministic local provider turns, and zero paid/external-provider/network calls or cost. Context Fit Gate passed both local turns; route receipts showed the fixture provider/model/thinking as `pi-overdrive-tool-audit/single-tool-driver/low`. The editor could not inject MCP or change route, and the bridge emitted no prompt, path, mutation text or fake key into transport receipts. Auth hash, child exit, residual process and temporary cleanup checks passed.
+
+This benchmark intentionally omits only the unrelated MCP extension through Pi's package filter: the isolated Ultra worktree does not contain the ignored installed MCP runtime. It retains the normal package security/context hooks and actual built-in write. The earlier startup failure was `PACKAGE_LOAD` for that absent runtime; a separate pre-provider refusal came from an invalid benchmark-only profile override. Removing that override restored the tracked restrictive generic profile. Neither failure was counted as a product PASS. OMP remains `NOT_RUN` because Bun >=1.4 is unavailable. See [result JSON](../benchmarks/overdrive-vs-omp/editor-bridge-results.json).
+
 ## Phase 0 baseline
 
 Recorded 2026-09-14 from base commit `0f107b8670b69b214e478b8d854377956f7039be` with official Pi 0.85.1. All measurements used deterministic local fixtures and zero paid/provider calls.

@@ -10,6 +10,7 @@
 - Browser config: `~/.pi/config/pi-agent-browser-native/config.json`.
 - User-local tools: `~/.local/share/pi-overdrive/` with selected links in `~/.local/bin/`.
 - Metadata traces: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/traces/`.
+- Optional ACP editor transport logs: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/editor-bridge/` (owner-only metadata; 30-day default trace retention).
 - Workflow journals and immutable receipts: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/workflow-evidence/`.
 - Integrated E2E evidence: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/e2e-evidence/`.
 - Runtime allocations: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/runtime/`.
@@ -21,12 +22,16 @@
 - Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/`.
 - Second Brain service runtimes/state: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services/`; user units live under `${XDG_CONFIG_HOME:-~/.config}/systemd/user/`. Their complete Python dependency graphs are tracked in deterministic lock files, and the embedding snapshot is revision- and checksum-pinned. Embeddings/OpenViking/Hindsight bind only `127.0.0.1:1934`, `:1933`, and `:8889`.
 
-Metadata traces, MCP metadata traces, and dated launcher logs have automatic
+Metadata traces, ACP transport metadata, MCP metadata traces, and dated launcher logs have automatic
 owner-only retention at session startup. The default is 30 days; set
 `PI_OVERDRIVE_TRACE_RETENTION_DAYS` to an integer from 1 to 3650 to override
 it. Invalid values disable that cleanup run. Cleanup is flat, bounded, and
 never follows symlinks or accepts an arbitrary target directory. Inspect or
 apply it manually with `scripts/cleanup-traces.sh --dry-run` or `--apply`.
+
+## Optional ACP editor transport
+
+Launch from the trusted local project with `npm run editor:bridge -- --cwd /absolute/project`. Point the ACP client at that stdio command; initialize protocol v1, authenticate with method `agent`, then create one session with that exact canonical root. The bridge uses existing Pi credentials and package settings. It does not select a model or persist a session. Editor tool approval offers `allow_once` and `reject_once` only. For local validation use `npm run benchmark:ultra:editor`, which runs an offline deterministic provider and a temporary fixture. The benchmark filters out only MCP because the isolated Ultra worktree lacks the ignored installed MCP runtime; production package loading retains MCP when its pinned runtime has been bootstrapped.
 
 Artifact retention is intentionally separate. Pi runs a bounded expiry/orphan pass at session startup. Preview it with `npm run artifacts:retention`; apply only after reviewing the summary with `node scripts/artifact-retention.mjs --apply`. `/artifacts` shows current-session manifest metadata and counters without a model call. Reopen a reported `artifact://<sha256>` through `resource_fs` using a bounded line range or literal search; artifact IDs never map to arbitrary paths and do not cross session/workspace scope.
 

@@ -10,7 +10,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function createState() {
   const stateHome = mkdtempSync(path.join(tmpdir(), "pi-trace-retention-"));
   const overdrive = path.join(stateHome, "pi-overdrive");
-  for (const name of ["traces", "mcp-traces", "launcher"]) mkdirSync(path.join(overdrive, name), { recursive: true, mode: 0o700 });
+  for (const name of ["traces", "mcp-traces", "editor-bridge", "launcher"]) mkdirSync(path.join(overdrive, name), { recursive: true, mode: 0o700 });
   return { stateHome, overdrive };
 }
 
@@ -29,6 +29,7 @@ test("retention removes only old known trace/log files and keeps recent and exac
     const recentTrace = path.join(fixture.overdrive, "traces", "recent.jsonl");
     const cutoffTrace = path.join(fixture.overdrive, "traces", "cutoff.jsonl");
     const oldMcp = path.join(fixture.overdrive, "mcp-traces", "mcp.jsonl");
+    const oldEditor = path.join(fixture.overdrive, "editor-bridge", "123-00000000-0000-4000-8000-000000000000.jsonl");
     const oldLauncher = path.join(fixture.overdrive, "launcher", "omniroute-20260101.log");
     const foreignLog = path.join(fixture.overdrive, "launcher", "application.log");
     fileAt(oldTrace, '{"event":"old"}\n', nowMs - 31 * DAY_MS);
@@ -36,12 +37,13 @@ test("retention removes only old known trace/log files and keeps recent and exac
     fileAt(recentTrace, '{"event":"recent"}\n', nowMs - DAY_MS);
     fileAt(cutoffTrace, '{"event":"cutoff"}\n', nowMs - 30 * DAY_MS);
     fileAt(oldMcp, "{}\n", nowMs - 31 * DAY_MS);
+    fileAt(oldEditor, "{}\n", nowMs - 31 * DAY_MS);
     fileAt(oldLauncher, "old\n", nowMs - 31 * DAY_MS);
     fileAt(foreignLog, "foreign\n", nowMs - 31 * DAY_MS);
     const summary = await pruneKnownTraceLogs({ stateHome: fixture.stateHome, days: 30, nowMs });
     assert.equal(summary.status, "PASS");
-    assert.equal(summary.removed, 4);
-    for (const removed of [oldTrace, malformedTrace, oldMcp, oldLauncher]) assert.equal(existsSync(removed), false, removed);
+    assert.equal(summary.removed, 5);
+    for (const removed of [oldTrace, malformedTrace, oldMcp, oldEditor, oldLauncher]) assert.equal(existsSync(removed), false, removed);
     for (const kept of [recentTrace, cutoffTrace, foreignLog]) assert.equal(existsSync(kept), true, kept);
   } finally {
     rmSync(fixture.stateHome, { recursive: true, force: true });
