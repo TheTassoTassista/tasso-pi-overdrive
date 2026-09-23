@@ -46,12 +46,21 @@ function streamBrowser(model: Model<any>, context: Context, options?: SimpleStre
       const session = process.env.PI_OVERDRIVE_BROWSER_SESSION;
       const profile = process.env.PI_OVERDRIVE_BROWSER_PROFILE;
       const url = process.env.PI_OVERDRIVE_BROWSER_URL;
-      if (!session || !profile || !url) throw new Error("browser audit environment is incomplete");
-      if (completed === 0) addToolCall(stream, output, "browser-open", { args: ["--session", session, "--profile", profile, "open", url], sessionMode: "fresh", timeoutMs: 120000 });
+      const capture = process.env.PI_OVERDRIVE_BROWSER_CAPTURE;
+      if (!session || !profile || !url || !capture) throw new Error("browser audit environment is incomplete");
+      const negative = process.env.PI_OVERDRIVE_BROWSER_NEGATIVE === "1";
+      if (negative && completed === 0) addToolCall(stream, output, "browser-rejected-eval", { args: ["--session", session, "eval", "process.env"] });
+      else if (negative) addText(stream, output, "BROWSER_NEGATIVE_DONE");
+      else if (completed === 0) addToolCall(stream, output, "browser-open", { args: ["--session", session, "--profile", profile, "open", url], sessionMode: "fresh", timeoutMs: 120000 });
       else if (completed === 1) addToolCall(stream, output, "browser-snapshot", { args: ["--session", session, "snapshot", "-i"], timeoutMs: 120000 });
-      else if (completed === 2) addToolCall(stream, output, "browser-close", { args: ["--session", session, "close"], timeoutMs: 120000 });
+      else if (completed === 2) addToolCall(stream, output, "browser-fill", { args: ["--session", session, "fill", "#name", "Tasso"], timeoutMs: 120000 });
+      else if (completed === 3) addToolCall(stream, output, "browser-click", { args: ["--session", session, "click", "#submit"], timeoutMs: 120000 });
+      else if (completed === 4) addToolCall(stream, output, "browser-wait", { args: ["--session", session, "wait", "--text", "OVERDRIVE_BROWSER_SUBMITTED:Tasso"], timeoutMs: 120000 });
+      else if (completed === 5) addToolCall(stream, output, "browser-dom", { args: ["--session", session, "get", "text", "#result"], timeoutMs: 120000 });
+      else if (completed === 6) addToolCall(stream, output, "browser-capture", { args: ["--session", session, "screenshot", capture], timeoutMs: 120000 });
+      else if (completed === 7) addToolCall(stream, output, "browser-close", { args: ["--session", session, "close"], timeoutMs: 120000 });
       else addText(stream, output, "BROWSER_AUDIT_DONE");
-      output.stopReason = completed >= 3 ? "stop" : "toolUse";
+      output.stopReason = completed >= (negative ? 1 : 8) ? "stop" : "toolUse";
       stream.push({ type: "done", reason: output.stopReason, message: output });
       stream.end();
     } catch (error) {
@@ -67,7 +76,7 @@ function streamBrowser(model: Model<any>, context: Context, options?: SimpleStre
 export default function registerBrowserAuditProvider(pi: ExtensionAPI): void {
   pi.registerProvider(providerId, {
     baseUrl: "http://127.0.0.1.invalid", apiKey: "$PI_OVERDRIVE_BROWSER_AUDIT_KEY", api: "pi-overdrive-browser-audit-api",
-    models: [{ id: modelId, name: "Pi Overdrive deterministic browser driver", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 }],
+    models: [{ id: modelId, name: "Pi Overdrive deterministic browser driver", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 4096 }],
     streamSimple: streamBrowser,
   });
 }

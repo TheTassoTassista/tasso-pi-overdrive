@@ -135,13 +135,33 @@ test('subagent callers cannot override concurrency, depth, raw scripts, or write
   assert.equal(validateSubagentCall({ agent: 'worker', worktree: true }).allowed, true);
 });
 
-test('allocated browser calls must use the unique assigned profile/session', () => {
-  const allocation = { browserProfile: '/private/profile-1', browserSession: 'pi-session-1' };
-  assert.equal(validateAllocatedBrowserCall({ args: ['open', 'https://example.com'] }, allocation).allowed, false);
-  assert.equal(validateAllocatedBrowserCall({ args: ['--profile', '/private/profile-1', 'open', 'https://example.com'], sessionMode: 'fresh' }, allocation).allowed, false);
-  assert.equal(validateAllocatedBrowserCall({ args: ['--session', 'pi-session-1', '--profile', '/private/profile-1', 'open', 'https://example.com'], sessionMode: 'fresh' }, allocation).allowed, true);
-  assert.equal(validateAllocatedBrowserCall({ args: ['--session', 'pi-session-1', 'snapshot'] }, allocation).allowed, true);
-  assert.equal(validateAllocatedBrowserCall({ args: ['--profile', '/other', 'open'], sessionMode: 'fresh' }, allocation).allowed, false);
+test('allocated browser admits only bounded actions on its assigned local session', () => {
+  const stateDir = mkdtempSync(path.join(tmpdir(), 'pi-browser-policy-'));
+  const allocation = { browserProfile: path.join(stateDir, 'profile'), browserSession: 'pi-session-1', stateDir, port: 34217 };
+  const call = (tail, extra = {}) => validateAllocatedBrowserCall({ args: ['--session', allocation.browserSession, ...tail], ...extra }, allocation);
+  try {
+    assert.equal(call(['--profile', allocation.browserProfile, 'open', 'http://127.0.0.1:34217/'], { sessionMode: 'fresh' }).allowed, true);
+    for (const tail of [['snapshot', '-i'], ['click', '#submit'], ['fill', '#name', 'Tasso'], ['wait', '--text', 'Ready'], ['get', 'text', '#result'], ['get', 'url'], ['screenshot', path.join(stateDir, 'browser-capture.png')], ['close']]) assert.equal(call(tail).allowed, true, tail.join(' '));
+    for (const tail of [
+      ['eval', 'process.env'], ['connect', '9222'], ['upload', '#file', '/etc/passwd'],
+      ['download', '#link', '/tmp/file'], ['auth', 'list'], ['cookies', 'get'],
+      ['network', 'route', '*'], ['batch', '--bail'], ['close', '--all'],
+      ['--profile', '/other', 'open', 'http://127.0.0.1:34217/'],
+      ['--profile', allocation.browserProfile, 'open', 'file:///etc/passwd'],
+      ['--profile', allocation.browserProfile, 'open', 'http://127.0.0.1:34218/'],
+      ['screenshot', '/tmp/other.png'], ['click', 'a[href^="file:"]'],
+      ['wait', '--fn', 'fetch("http://127.0.0.1")'],
+    ]) assert.equal(call(tail, tail[0] === '--profile' ? { sessionMode: 'fresh' } : {}).allowed, false, tail.join(' '));
+    assert.equal(validateAllocatedBrowserCall({ args: ['--session', 'other', 'snapshot', '-i'] }, allocation).allowed, false);
+    assert.equal(call(['snapshot', '-i'], { script: 'browser({args:["eval","1"]})' }).allowed, false);
+    assert.equal(call(['snapshot', '-i'], { outputPath: '/tmp/leak' }).allowed, false);
+    assert.equal(call(['snapshot', '-i'], { timeoutMs: 999999 }).allowed, false);
+    assert.equal(call(['snapshot', '-i'], { sessionMode: 'fresh' }).allowed, false);
+    symlinkSync('/etc/passwd', path.join(stateDir, 'browser-capture.png'));
+    assert.equal(call(['screenshot', path.join(stateDir, 'browser-capture.png')]).allowed, false);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
 });
 
 test('ast-grep cannot follow nested symlinks or open auxiliary files outside the workspace', () => {
