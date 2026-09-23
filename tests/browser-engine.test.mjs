@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -166,6 +166,13 @@ test("missing fixture fails before Bubblewrap startup and a removed allocation c
     cleanupRuntimeResources(allocation.allocationId, options);
     await assert.rejects(engine.execute(open, "partial-owner"), /BROWSER_ENGINE_ALLOCATION_REJECTED/u);
     allocation = undefined;
+    allocation = await createRuntimeWorktree(repo, options);
+    const missingSandbox = new BrowserEngine({ cwd: allocation.worktree, ownerSession: "missing-bwrap-owner" });
+    missingSandbox.spawnSandbox = () => spawn("/nonexistent/pi-browser-bwrap", [], { stdio: ["pipe", "pipe", "pipe"] });
+    const secondOpen = { args: ["--session", allocation.browserSession, "--profile", allocation.browserProfile, "open", `http://127.0.0.1:${allocation.port}/`], sessionMode: "fresh" };
+    await assert.rejects(missingSandbox.execute(secondOpen, "missing-bwrap-owner"), /ENOENT/u);
+    assert.equal(missingSandbox.state, "FAILED");
+    assert.equal(fs.existsSync(path.join(allocation.stateDir, "browser-fixture.html")), false);
   } finally {
     if (allocation) cleanupRuntimeResources(allocation.allocationId, options);
     if (previousRuntime === undefined) delete process.env.PI_OVERDRIVE_RUNTIME_ROOT; else process.env.PI_OVERDRIVE_RUNTIME_ROOT = previousRuntime;
