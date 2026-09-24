@@ -6,7 +6,7 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 33 — General-Purpose Browser, IN PROGRESS; Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Current phase: 34 — Hashline / Edit UX Maturity, IN PROGRESS; Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
 - Last functional Expansion commit: `7eb2434` (Phase 32 local CPU profiling harness; no native code)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
@@ -44,6 +44,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The bookkeeping commit containing this Phase 31 partial checkpoint follows functional commit `6a11f79`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 31 completion note follows functional commit `cb9987a`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 32 measured/not-added decision follows functional commit `7eb2434`; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing the Phase 33 browser safety disposition follows the Phase 32 note; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -105,6 +106,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 ## Phase 32 disposition — MEASURED/NOT ADDED
 
 - Representative local CPU and real-Pi offline benchmarks did not isolate a material Overdrive-owned JS hot path. Pi startup, I/O, Git, ast-grep, and LSP work are separate from those local timings. Pinned OMP MIT native crates were inspected without copying or importing them. No Rust helper is justified by current evidence; existing Node/native-tool fallbacks remain authoritative. See `docs/implementation-notes/phase-32-native-profile.md`.
+
+## Phase 33 disposition — DEFERRED FOR SAFETY
+
+- The existing LOCAL_ISOLATED browser remains real-host-verified and networkless. PUBLIC_WEB needs controller-level egress/origin enforcement; AUTHENTICATED_SITE additionally needs explicit user authority and separate credential/profile lifecycle. Neither exists yet, and the pinned browser's domain flag was previously shown incompatible with the required profile boundary. No external browsing, downloads, auth inheritance or model-facing mode selector was enabled. See `docs/implementation-notes/phase-33-browser-boundary.md`.
 - Read-only source assessment found `/home/tasso/.config/omniroute/cache/openrouter-catalog.json` (445 OpenRouter records, `fetchedAt=2026-09-13T13:10:43.946Z`, 1,157,614 bytes, mode 0644). At the 2026-09-24 checkpoint it is eleven days old and covers OpenRouter, not all OmniRoute backends. Only shape/count/timestamp/field names were inspected; no raw descriptions, prices, credentials, or call logs were published. It is not ingested into the authoritative registry or used to infer current price, rate limits, availability, or runtime callability. No local `/v1/models` fetch or model call was made.
 
 ## Dirty files
@@ -127,4 +132,4 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 
 ## Exact next action
 
-Continue Phase 33 from the existing confined local browser. Begin with explicit LOCAL_ISOLATED/PUBLIC_WEB/AUTHENTICATED_SITE policy boundaries; do not enable external/authenticated browsing without independently enforced network isolation, download and profile rules. Preserve the working browser/Second Brain/routing/workflow boundaries and zero-extra-cost policy; do not push, create a PR, change tags, reset, clean or stash user work.
+Continue Phase 34 from the existing transactional edit and hash-anchored snapshot contract. Study pinned OMP Hashline read-only and improve model-facing edit ergonomics only if equivalent target/range/inode validation and the existing LSP-on-write/receipt boundaries remain intact. Preserve zero-extra-cost and all prior safety boundaries; do not push, create a PR, change tags, reset, clean or stash user work.
