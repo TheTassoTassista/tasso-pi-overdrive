@@ -5,7 +5,7 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { readAstEditPolicy, TransactionalAstEdit } from "../lib/ast-edit-engine.mjs";
-import { AST_EDIT_CONTRACT, EDIT_CONTRACT, EditEngine, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
+import { AST_EDIT_CONTRACT, EDIT_CONTRACT, EditEngine, editRecoveryGuidance, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
 import { LspWriteGuard } from "../lib/lsp-write-guard.mjs";
 
 const Action = Type.Union([Type.Literal("preview"), Type.Literal("apply")]);
@@ -212,7 +212,8 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       } catch (error) {
         const errorCode = safeCode(error);
         pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "edit_apply" : "edit_preview", status: "FAIL", errorCode, lspClassification: safeLspClassification(error) });
-        throw new Error(errorCode === "STALE_EDIT" ? "STALE_EDIT: file changed or the anchor cannot be recovered safely; read the exact range again." : `Transactional edit denied (${errorCode}).`);
+        const guidance = editRecoveryGuidance(errorCode);
+        throw new Error(`Transactional edit denied (${errorCode}).${guidance ? ` ${guidance}` : ""}`);
       }
     },
   });

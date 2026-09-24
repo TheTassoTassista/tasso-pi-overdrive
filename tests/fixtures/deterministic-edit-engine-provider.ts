@@ -116,6 +116,7 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				previewNonMutating,
 				applyIsError: (results[2] as any)?.isError === true,
 				applyStatus: /APPLIED(?: AST)? transaction/u.test(applyText) ? "APPLIED" : /STALE_EDIT/u.test(applyText) ? "STALE_EDIT" : "UNKNOWN",
+				applyGuidancePresent: scenario !== "stale" ? null : applyText.includes("Read the exact range again") && applyText.includes("never retry the old transaction"),
 				finalDigest: digestFile(target),
 			}));
 		} catch (error) {

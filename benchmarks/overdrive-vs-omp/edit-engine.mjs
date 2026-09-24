@@ -155,7 +155,7 @@ try {
     safeRecoveryApplied: recovery.finalPayload?.applyStatus === "APPLIED" && recovery.finalPayload?.applyIsError === false && recovery.finalContents === "external prefix\nheader\nanchor new\ntail\n",
     immutableMetadataReceipt: recovery.receipts.length === 1 && recovery.receipts[0].mode === 0o400 && recovery.receipts[0].containsRawData === false,
     staleRunCompleted: stale.status === "COMPLETE" && stale.providerTurns === 4 && stale.finalPayload?.previewNonMutating === true,
-    staleApplyFailedClosed: stale.finalPayload?.applyIsError === true && stale.finalPayload?.applyStatus === "STALE_EDIT" && stale.finalContents === "external after preview\n" && stale.receipts.length === 0,
+    staleApplyFailedClosed: stale.finalPayload?.applyIsError === true && stale.finalPayload?.applyStatus === "STALE_EDIT" && stale.finalPayload?.applyGuidancePresent === true && stale.finalContents === "external after preview\n" && stale.receipts.length === 0,
     noStagedResidue: recovery.stagedFiles === 0 && stale.stagedFiles === 0,
     metadataOnly: metadataSafe && recovery.editMetadata.length >= 3 && stale.editMetadata.length >= 3,
     commandRegisteredWithoutProviderCall: command.status === "PASS" && command.providerTurns === 0,

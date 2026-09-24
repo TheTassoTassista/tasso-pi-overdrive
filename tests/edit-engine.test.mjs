@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { EditEngine, snapshotFooter, validateEditEnginePolicy } from "../lib/edit-engine.mjs";
+import { EditEngine, editRecoveryGuidance, snapshotFooter, validateEditEnginePolicy } from "../lib/edit-engine.mjs";
 
 const policy = Object.freeze({
   version: 1,
@@ -17,6 +17,20 @@ const policy = Object.freeze({
   recoveryMaxLineShift: 8,
   recoveryContextChars: 64,
   maxReceiptsPerSession: 16,
+});
+
+test("edit recovery guidance is bounded, action-specific and never echoes source or rejected input", () => {
+  const expected = ["STALE_EDIT", "EDIT_ANCHOR_AMBIGUOUS", "EDIT_UNSEEN_RANGE", "EDIT_SNAPSHOT_MISSING", "EDIT_TRANSACTION_MISSING", "EDIT_OVERLAP_DENIED", "EDIT_SYNTAX_INVALID", "EDIT_NOOP_DENIED", "EDIT_RECEIPT_LIMIT_REACHED"];
+  for (const code of expected) {
+    const guidance = editRecoveryGuidance(code);
+    assert.equal(typeof guidance, "string");
+    assert.ok(guidance.length < 220);
+  }
+  assert.match(editRecoveryGuidance("EDIT_ANCHOR_AMBIGUOUS"), /adjacent unchanged context/u);
+  assert.match(editRecoveryGuidance("EDIT_UNSEEN_RANGE"), /Reopen that exact range/u);
+  assert.match(editRecoveryGuidance("STALE_EDIT"), /never retry the old transaction/u);
+  assert.equal(editRecoveryGuidance("SECRET=abc"), null);
+  assert.doesNotMatch(JSON.stringify(expected.map(editRecoveryGuidance)), /SECRET=abc|pathDigest|raw contents/u);
 });
 
 function fixture(t, options = {}) {
