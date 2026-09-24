@@ -6,8 +6,8 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 32 — Native Core / Fast Paths, PROFILING; Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
-- Last functional Expansion commit: `cb9987a` (Phase 31 field-level provenance, local catalog ingest and conservative Context Governor cap)
+- Current phase: 33 — General-Purpose Browser, IN PROGRESS; Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Last functional Expansion commit: `7eb2434` (Phase 32 local CPU profiling harness; no native code)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -32,6 +32,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `3945eec` — Task Policy-gated deterministic local Worker prewalk on the pinned Git runner; canonical, name-only, size/binary/secret/link filtering; bounded Worker-only hints, metadata-only tracing, four focused tests, and a real offline Pi CONTROL/PREWALK benchmark. No route, retry, role, or spawn-policy change.
 - `6a11f79` — read-only, digest-bound Provider Capability Registry combining Pi model declarations, receipt-backed callability and harness profiles; `/models --capabilities` scoped inspection, unknown-safe price/capability representation, and offline Pi command smoke. No adapter, provider request, route, or credential change.
 - `cb9987a` — Phase 31 bounded completion: separately validated stale-aware local catalog snapshot, conflict resolution, field-level provenance, conservative Context Governor cap, bounded human/JSON inspection, regression tests, and deterministic local benchmark. No provider/routing/credential change.
+- `7eb2434` — Phase 32 representative local CPU/proc profiling harness; no native binary, OMP source, build chain, route or policy change.
 
 ## Bookkeeping commits
 
@@ -42,6 +43,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The bookkeeping commit containing the Phase 30 disposition and `docs/implementation-notes/phase-30-local-prewalk.md` follows functional commit `3945eec`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing this Phase 31 partial checkpoint follows functional commit `6a11f79`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 31 completion note follows functional commit `cb9987a`; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing the Phase 32 measured/not-added decision follows functional commit `7eb2434`; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -57,6 +59,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 30 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 485/485 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS; `git diff --cached --check` PASS. As before, a bare gate without the documented LSP selector returned 483/485 because the ignored Rust/Go binaries are absent from this experimental worktree; no product code was changed to mask that environment selection.
 - Phase 31 checkpoint: two focused registry tests PASS; real Pi offline routing-command smoke 12/12 PASS with zero model/provider calls; authoritative Expansion gate with the documented LSP selector 487/487 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. Registry output is metadata-only and a zero/zero default price without explicit provenance is UNKNOWN, not free.
 - Phase 31 bounded completion: 13 focused registry/catalog tests PASS; real Pi offline routing-command smoke 13/13 PASS with zero inference calls; deterministic Context Governor Pi benchmark PASS; local metadata benchmark 1,000 runs/4 models, mean 0.2776 ms, zero external calls. Authoritative gate with the documented LSP selector 498/498 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. Bare `npm test` still has the two documented LSP runtime-selection failures in this worktree.
+- Phase 32 local profile: nine deterministic benchmark suites PASS, zero paid/external calls; owned control operations range from 0.019 to 1.282 ms mean, actual optional catalog read/parse 6.078 ms mean, Pi `--version` startup median 255.15 ms. One isolated full-gate run observed 497/498 with failure identity lost to truncated output; immediately following focused test and full gate each passed 498/498. No speculative fix or native helper was added. See `docs/implementation-notes/phase-32-native-profile.md`.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -98,6 +101,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 
 - A local Provider Capability Registry now combines the live Pi registry, current authenticated-model view, owner-only runtime-callability evidence, and already selected harness profiles. Each field carries DECLARED/VERIFIED/UNKNOWN provenance; missing tool, vision, structured-output, price, or rate-limit evidence stays UNKNOWN. A zero/zero Pi cost default is never promoted to a free-price claim, and OmniRoute prices remain UNKNOWN without catalog pricing. Exact model or provider inspection uses the existing `/models --capabilities [selector]` command; no model-facing tool, network fetch, probe, adapter, routing mutation, or provider call was added. A 50-record display bound prevents broad UI output.
 - The bounded completion adds a separately validated **local** OpenRouter snapshot, stale/unknown freshness, deterministic conflict evidence, and a non-increasing Context Governor cap. The host cache is 11 days old and only one backend slice, so it is never claimed to prove current OmniRoute availability or pricing. Missing cost units and rate-limit authority remain UNKNOWN. See `docs/implementation-notes/phase-31-provider-capability-registry.md`.
+
+## Phase 32 disposition — MEASURED/NOT ADDED
+
+- Representative local CPU and real-Pi offline benchmarks did not isolate a material Overdrive-owned JS hot path. Pi startup, I/O, Git, ast-grep, and LSP work are separate from those local timings. Pinned OMP MIT native crates were inspected without copying or importing them. No Rust helper is justified by current evidence; existing Node/native-tool fallbacks remain authoritative. See `docs/implementation-notes/phase-32-native-profile.md`.
 - Read-only source assessment found `/home/tasso/.config/omniroute/cache/openrouter-catalog.json` (445 OpenRouter records, `fetchedAt=2026-09-13T13:10:43.946Z`, 1,157,614 bytes, mode 0644). At the 2026-09-24 checkpoint it is eleven days old and covers OpenRouter, not all OmniRoute backends. Only shape/count/timestamp/field names were inspected; no raw descriptions, prices, credentials, or call logs were published. It is not ingested into the authoritative registry or used to infer current price, rate limits, availability, or runtime callability. No local `/v1/models` fetch or model call was made.
 
 ## Dirty files
@@ -120,4 +127,4 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 
 ## Exact next action
 
-Profile Phase 32 representative Expansion workloads before considering native code. Separate startup, I/O, external LSP/native tools and Overdrive-owned JS CPU. Add no native helper without a measured hot path, equivalent semantics, safe fallback and material gain. Preserve all prior boundaries and zero-extra-cost policy; do not push, create a PR, change tags, reset, clean or stash user work.
+Continue Phase 33 from the existing confined local browser. Begin with explicit LOCAL_ISOLATED/PUBLIC_WEB/AUTHENTICATED_SITE policy boundaries; do not enable external/authenticated browsing without independently enforced network isolation, download and profile rules. Preserve the working browser/Second Brain/routing/workflow boundaries and zero-extra-cost policy; do not push, create a PR, change tags, reset, clean or stash user work.
