@@ -269,7 +269,8 @@ export default function editEngineExtension(pi: ExtensionAPI): void {
       } catch (error) {
         const errorCode = safeCode(error);
         pi.events.emit("pi-overdrive:edit-metadata", { kind: parameters.action === "apply" ? "ast_edit_apply" : "ast_edit_preview", status: "FAIL", contract: AST_EDIT_CONTRACT, errorCode, lspClassification: safeLspClassification(error) });
-        throw new Error(errorCode === "STALE_EDIT" ? "STALE_EDIT: source changed; read all structural target ranges again." : `Transactional AST edit denied (${errorCode}).`);
+        const guidance = editRecoveryGuidance(errorCode);
+        throw new Error(`Transactional AST edit denied (${errorCode}).${guidance ? ` ${guidance}` : ""}`);
       }
     },
   });

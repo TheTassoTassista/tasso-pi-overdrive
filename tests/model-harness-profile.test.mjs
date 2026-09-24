@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { contextModelForProfile, constrainToolsForModelProfile, EVIDENCE_LEVELS, modelHarnessProfileMetadata, resolveEditContract, resolveModelHarnessProfile, validateModelHarnessProfileConfig } from "../lib/model-harness-profile.mjs";
+import { resolveEditBenchmarkPreference } from "../lib/edit-benchmark-evidence.mjs";
 
 const model = { provider: "openai-codex", id: "gpt-5.6-terra", reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, contextWindow: 278528, maxTokens: 131072 };
 const callability = { version: 1, entries: { "openai-codex/gpt-5.6-terra": { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "FIXTURE", evidenceRunId: "0789657a-a21f-4614-8919-ad88089050b8" } } };
@@ -113,4 +114,40 @@ test("profile context cannot increase a model limit", () => {
   value.capabilities.maxOutputTokens.value = 999999;
   assert.equal(contextModelForProfile(model, value).contextWindow, model.contextWindow);
   assert.equal(contextModelForProfile(model, value).maxTokens, model.maxTokens);
+});
+
+const benchmarkNow = Date.parse("2026-09-24T12:00:00.000Z");
+const benchmarkRecord = {
+  scope: "family", key: "OpenAI", mode: "ordinary", fixtureCount: 20, costBasis: "SUBSCRIPTION_BACKED",
+  sourceDigest: "a".repeat(64), measuredAt: "2026-09-23T12:00:00.000Z",
+  results: [
+    { contract: "HASH_ANCHORED", attempts: 20, exactSuccesses: 15, formatFailures: 2, retries: 4, unsafeOutcomes: 0, modelCalls: 24, inputTokens: 1000, outputTokens: 500 },
+    { contract: "REPLACE", attempts: 20, exactSuccesses: 18, formatFailures: 1, retries: 3, unsafeOutcomes: 0, modelCalls: 23, inputTokens: 1000, outputTokens: 500 },
+  ],
+};
+
+test("qualified comparative family evidence can reorder only configured, active edit contracts", () => {
+  const value = resolveModelHarnessProfile({ model, registeredModels: [model], authenticatedModels: [model], callability, editBenchmarkEvidence: { version: 1, records: [benchmarkRecord] }, now: benchmarkNow });
+  assert.equal(value.editBenchmark.ordinary.level, "BENCHMARKED");
+  assert.deepEqual(resolveEditContract(value, { activeTools: ["transactional_edit", "edit"] }).selected, "REPLACE");
+  assert.deepEqual(resolveEditContract(value, { activeTools: ["transactional_edit"] }).selected, "HASH_ANCHORED");
+  assert.deepEqual(resolveEditContract(value, { activeTools: ["transactional_ast_edit", "transactional_edit"], structural: true }).selected, "AST_STRUCTURAL");
+  assert.deepEqual(constrainToolsForModelProfile(["read", "transactional_edit"], value).activeTools, ["read", "transactional_edit"]);
+  assert.equal("route" in value, false);
+});
+
+test("single-sample, stale, unsafe, malformed and inconclusive evidence cannot alter a profile", () => {
+  const variants = [
+    { ...benchmarkRecord, results: benchmarkRecord.results.map((entry) => ({ ...entry, attempts: 1, modelCalls: 1 })) },
+    { ...benchmarkRecord, measuredAt: "2026-01-01T12:00:00.000Z" },
+    { ...benchmarkRecord, results: [{ ...benchmarkRecord.results[0], unsafeOutcomes: 1 }, benchmarkRecord.results[1]] },
+    { ...benchmarkRecord, sourceDigest: "not-a-digest" },
+    { ...benchmarkRecord, results: [{ ...benchmarkRecord.results[0], exactSuccesses: 17 }, benchmarkRecord.results[1]] },
+  ];
+  for (const record of variants) {
+    const evidence = { version: 1, records: [record] };
+    assert.equal(resolveEditBenchmarkPreference({ evidence, scope: "family", key: "OpenAI", mode: "ordinary", candidates: ["HASH_ANCHORED", "REPLACE"], now: benchmarkNow }).level, "UNKNOWN");
+    const value = resolveModelHarnessProfile({ model, registeredModels: [model], authenticatedModels: [model], callability, editBenchmarkEvidence: evidence, now: benchmarkNow });
+    assert.equal(resolveEditContract(value, { activeTools: ["transactional_edit", "edit"] }).selected, "HASH_ANCHORED");
+  }
 });
