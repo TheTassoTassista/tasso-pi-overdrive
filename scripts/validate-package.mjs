@@ -146,9 +146,17 @@ try {
   const policy = dapEngine.validateDapPolicy(JSON.parse(await readFile(path.join(root, 'config/dap-engine.json'), 'utf8')));
   if (!policy.enabled || policy.platform !== 'linux-x64' || policy.adapter.id !== 'gdb' || policy.adapter.binaryPath !== '/usr/bin/gdb' || policy.adapter.binaryVersion !== 'GNU gdb (GDB) 17.2' || policy.adapter.binarySha256 !== '5a159b8868d53a85bee261bc35dc59437800b1d139d0389d83e4fdee5a24945d') failures.push('DAP adapter identity is not the exact reviewed host binary');
   if (JSON.stringify(policy.adapter.arguments) !== JSON.stringify(['-q', '-nx', '-nh', '-iex', 'set auto-load off', '-iex', 'set debuginfod enabled off', '-i', 'dap']) || policy.maxVariables > 100 || policy.maxBreakpoints > 32 || policy.maxOutputBytes > 128 * 1024) failures.push('DAP security arguments or hard bounds changed');
+  const debugpy = policy.secondaryAdapters?.[0];
+  if (policy.secondaryAdapters?.length !== 1 || debugpy?.id !== 'debugpy' || debugpy?.binaryPath !== '/usr/bin/python3.14' || debugpy?.binaryVersion !== 'Python 3.14.7' || debugpy?.binarySha256 !== 'dd65a07e8f535525443d63e2bd6dd10efbf22bf22e0b6d65e634266acc7ac976' || debugpy?.moduleVersion !== '1.8.22' || debugpy?.moduleRelative !== 'runtime/dap/python/debugpy' || debugpy?.moduleSha256 !== '28fd1a1c1eaaa19efc055c51ee576ec9326726fa81ca1c95727383ae42756636' || JSON.stringify(debugpy?.arguments) !== JSON.stringify(['-m', 'debugpy.adapter'])) failures.push('DAP debugpy profile is not the exact reviewed runtime');
+  if (dapEngine.DAP_ADAPTER_CAPABILITIES?.debugpy?.attach !== false || dapEngine.DAP_ADAPTER_CAPABILITIES?.debugpy?.evaluate !== false || dapEngine.DAP_ADAPTER_CAPABILITIES?.debugpy?.customRequest !== false || dapEngine.DAP_ADAPTER_CAPABILITIES?.debugpy?.remoteTarget !== false) failures.push('DAP debugpy capability boundary changed');
 } catch (error) { failures.push(`DAP Debug Engine validation failed: ${error.message}`); }
 const dapExtension = await readFile(path.join(root, 'extensions/debug-engine.ts'), 'utf8');
 for (const marker of ['name: "debug_engine"', 'registerCommand("debug-engine"', 'session_shutdown', 'No attach']) if (!dapExtension.includes(marker)) failures.push(`DAP Debug Engine integration marker is missing: ${marker}`);
+if (dapExtension.includes('adapter: Type.Optional') || !dapExtension.includes('adapter selected by controller')) failures.push('DAP adapter selection must remain controller-owned');
+const dapRequirements = await readFile(path.join(root, 'config/dap-requirements.txt'), 'utf8');
+if (!dapRequirements.includes('debugpy==1.8.22 --hash=sha256:0c1104233340196e5cbf5514e7dfdbb98968e730cfd7fdd6f3d72a082be838a9')) failures.push('Managed debugpy wheel pin changed');
+const dapInstaller = await readFile(path.join(root, 'scripts/install-managed-dap.sh'), 'utf8');
+if (!dapInstaller.includes('--require-hashes') || !dapInstaller.includes('--no-deps') || !dapInstaller.includes('refusing to overwrite') || !dapInstaller.includes('28fd1a1c1eaaa19efc055c51ee576ec9326726fa81ca1c95727383ae42756636')) failures.push('Managed debugpy installer safety markers are missing');
 try {
   const evalEngine = await import(path.join(root, 'lib/persistent-eval.mjs'));
   const policy = evalEngine.validateEvalPolicy(JSON.parse(await readFile(path.join(root, 'config/eval-engine.json'), 'utf8')));
@@ -220,6 +228,7 @@ const extensionOrder = packageJson.pi?.extensions ?? [];
 if (!(extensionOrder.indexOf('./extensions/tool-surface.ts') < extensionOrder.indexOf('./extensions/director-mode.ts') && extensionOrder.indexOf('./extensions/director-mode.ts') < extensionOrder.indexOf('./extensions/context-governor.ts'))) failures.push('Director Mode must clamp after Tool Governor and before the final Context Governor');
 const sandboxSource = await readFile(path.join(root, 'scripts/sandbox-run.sh'), 'utf8');
 for (const marker of ['--unshare-all', '--clearenv', '--workspace-read-only', '--die-with-parent']) if (!sandboxSource.includes(marker)) failures.push(`DAP sandbox boundary marker is missing: ${marker}`);
+if (!sandboxSource.includes('--ro-bind "$dap_runtime/debugpy" /opt/pi-overdrive-dap/debugpy')) failures.push('DAP must mount only the attested debugpy module, not an ambient Python package tree');
 for (const marker of ['--minimal-runtime', 'minimal_runtime == 0']) if (!sandboxSource.includes(marker)) failures.push(`Persistent Eval minimal sandbox marker is missing: ${marker}`);
 const runtimeIsolationSource = await readFile(path.join(root, 'lib/runtime-isolation.mjs'), 'utf8');
 for (const marker of ['RUNTIME_ALLOCATION_VERSION = 2', 'RUNTIME_ISOLATION_BACKEND = "git-worktree-v2"', 'assertNoSymlinkComponents(', 'fs.constants.O_NOFOLLOW', 'runtime roots must be independent', 'runtime allocation canonical identity rejected']) if (!runtimeIsolationSource.includes(marker)) failures.push(`Isolation V2 boundary marker is missing: ${marker}`);

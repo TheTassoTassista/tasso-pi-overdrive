@@ -9,6 +9,7 @@ schema=
 relative_cwd=.
 workspace_read_only=0
 minimal_runtime=0
+managed_dap=0
 tool_root=${PI_OVERDRIVE_TOOL_ROOT:-"$HOME/.local/share/pi-overdrive/lsp-node"}
 
 while [[ $# -gt 0 ]]; do
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
     --schema) schema=${2:-}; shift 2 ;;
     --workspace-read-only) workspace_read_only=1; shift ;;
     --minimal-runtime) minimal_runtime=1; shift ;;
+    --managed-dap) managed_dap=1; shift ;;
     *) break ;;
   esac
 done
@@ -54,7 +56,23 @@ fi
 runtime_args=()
 tool_args=()
 protected_args=()
+dap_args=()
 tool_path=/usr/bin:/bin
+if (( managed_dap == 1 )); then
+  package_root=$(realpath -e -- "$(dirname -- "${BASH_SOURCE[0]}")/..")
+  dap_runtime="$package_root/runtime/dap/python"
+  if [[ -L "$dap_runtime" || ! -d "$dap_runtime/debugpy" || -L "$dap_runtime/debugpy" || $(realpath -e -- "$dap_runtime/debugpy") != "$dap_runtime/debugpy" ]]; then
+    echo "Managed DAP runtime is unavailable or unsafe." >&2
+    exit 1
+  fi
+  dap_args+=(
+    --dir /opt/pi-overdrive-dap
+    --ro-bind "$dap_runtime/debugpy" /opt/pi-overdrive-dap/debugpy
+    --setenv PYTHONPATH /opt/pi-overdrive-dap
+    --setenv PYTHONNOUSERSITE 1
+    --setenv PYTHONDONTWRITEBYTECODE 1
+  )
+fi
 if (( minimal_runtime == 0 )); then
   if [[ -d "$tool_root/node_modules/.bin" ]]; then
     tool_root=$(realpath -e -- "$tool_root")
@@ -172,6 +190,7 @@ exec bwrap \
   --setenv CI 1 \
   --setenv PI_OVERDRIVE_IN_SANDBOX 1 \
   "${tool_args[@]}" \
+  "${dap_args[@]}" \
   "${pi_args[@]}" \
   "${runtime_args[@]}" \
   "${workspace_args[@]}" \

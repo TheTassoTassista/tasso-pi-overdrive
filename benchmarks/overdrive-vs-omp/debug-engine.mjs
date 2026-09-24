@@ -13,6 +13,7 @@ const extension = path.join(packageRoot, "extensions", "debug-engine.ts");
 const artifacts = path.join(packageRoot, "extensions", "artifacts.ts");
 const pi = process.env.PI_BIN ?? "pi";
 const writeResults = process.argv.includes("--write-results");
+const pythonMode = process.argv.includes("--python");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-dap-benchmark-"));
 
 function parseJsonLines(text) { return String(text ?? "").split(/\r?\n/u).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } }); }
@@ -100,12 +101,23 @@ try {
   const agentDir = path.join(root, "agent");
   const stateHome = path.join(root, "state");
   const auditFile = path.join(root, "audit.jsonl");
-  const source = path.join(root, "fixture.c");
-  const program = path.join(root, "fixture");
+  const sourceName = pythonMode ? "fixture.py" : "fixture.c";
+  const programName = pythonMode ? "fixture.py" : "fixture";
+  const source = path.join(root, sourceName);
+  const program = path.join(root, programName);
   fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
   fs.writeFileSync(auditFile, "", { mode: 0o600 });
-  fs.writeFileSync(source, [
+  fs.writeFileSync(source, pythonMode ? [
+    "import os", "import socket", "def helper(value):", "    next_value = value + 1", "    return next_value",
+    "result = helper(41)",
+    "if os.getenv('PI_OVERDRIVE_DAP_BENCHMARK_SECRET'): raise RuntimeError('ambient secret inherited')",
+    "try:", "    open('/workspace/forbidden-write', 'w').close()", "    raise RuntimeError('workspace write permitted')",
+    "except OSError: pass",
+    "try:", "    with socket.socket() as probe:", "        if probe.connect_ex(('1.1.1.1', 9)) == 0: raise RuntimeError('external network permitted')",
+    "except OSError: pass",
+    "print('A' * 24000)", "print('DAP_BENCHMARK_COMPLETE')", "if result != 42: raise RuntimeError('wrong result')", "",
+  ].join("\n") : [
     "#include <stdio.h>",
     "#include <stdlib.h>",
     "int helper(int value) {",
@@ -123,14 +135,21 @@ try {
     "}",
     "",
   ].join("\n"), { mode: 0o600 });
-  const compiled = spawnSync("cc", ["-g", "-O0", "-fno-omit-frame-pointer", `-fdebug-prefix-map=${root}=/workspace`, "-o", program, source], { encoding: "utf8" });
-  if (compiled.status !== 0) throw new Error(`fixture_compile_failed:${compiled.stderr}`);
+  if (!pythonMode) {
+    const compiled = spawnSync("cc", ["-g", "-O0", "-fno-omit-frame-pointer", `-fdebug-prefix-map=${root}=/workspace`, "-o", program, source], { encoding: "utf8" });
+    if (compiled.status !== 0) throw new Error(`fixture_compile_failed:${compiled.stderr}`);
+  }
   const sequence = [
-    { name: "debug_engine", args: { action: "launch", program: "fixture" } },
-    { name: "debug_engine", args: { action: "set_breakpoint", file: "fixture.c", line: 4 } },
+    { name: "debug_engine", args: { action: "launch", program: programName } },
+    { name: "debug_engine", args: { action: "set_breakpoint", file: sourceName, line: 4 } },
     { name: "debug_engine", args: { action: "continue" } },
     { name: "debug_engine", args: { action: "continue" } },
     { name: "debug_engine", args: { action: "stack_trace", levels: 8 } },
+    ...(pythonMode ? [
+      { name: "debug_engine", args: { action: "scopes", frameId: "$previous.frameId" } },
+      { name: "debug_engine", args: { action: "variables", variablesReference: "$previous.variablesReference", count: 8 } },
+      { name: "debug_engine", args: { action: "step_over" } },
+    ] : []),
     { name: "debug_engine", args: { action: "continue" } },
     { name: "debug_engine", args: { action: "output" } },
     { name: "debug_engine", args: { action: "terminate" } },
@@ -158,9 +177,12 @@ try {
   const dapMetadata = audit.filter((entry) => entry.auditKind === "dap_metadata");
   const providerTurnEntries = audit.filter((entry) => entry.kind === "provider_turn");
   const providerTurns = providerTurnEntries.length;
-  const outputProviderTurn = providerTurnEntries.find((entry) => entry.completedTools === 7);
+  const outputIndex = pythonMode ? 9 : 6;
+  const exitIndex = pythonMode ? 8 : 5;
+  const terminateIndex = sequence.length - 1;
+  const outputProviderTurn = providerTurnEntries.find((entry) => entry.completedTools === outputIndex + 1);
   const artifactMetadata = audit.filter((entry) => entry.auditKind === "artifact_metadata" && entry.kind === "artifact_externalized");
-  const artifactResult = toolResults[6] ? textOf(toolResults[6]) : "";
+  const artifactResult = toolResults[outputIndex] ? textOf(toolResults[outputIndex]) : "";
   const artifactFiles = fs.existsSync(path.join(stateHome, "pi-overdrive", "artifacts")) ? fs.readdirSync(path.join(stateHome, "pi-overdrive", "artifacts"), { recursive: true }).filter((name) => String(name).endsWith(".json")) : [];
   const processListing = spawnSync("ps", ["-eo", "args="], { encoding: "utf8" }).stdout;
   const command = commandInspection();
@@ -169,27 +191,28 @@ try {
     realPiWorkflowCompleted: run.status === 0 && run.settled && !run.timedOut && finalText === "AUDIT_TOOL_FINISHED" && toolResults.length === sequence.length && providerTurns === sequence.length + 1,
     launchWasIsolated: parsed[0]?.state === "CONFIGURING" && parsed[0]?.sandboxed === true && parsed[0]?.network === false && parsed[0]?.workspaceReadOnly === true,
     breakpointAndStopsWorked: parsed[1]?.kind === "DAP_BREAKPOINTS" && parsed[2]?.state === "STOPPED" && parsed[3]?.state === "STOPPED",
-    realStackReachedHelper: parsed[4]?.kind === "DAP_STACK_TRACE" && parsed[4]?.frames?.some((frame) => frame.name.includes("helper") && frame.source === "fixture.c" && frame.line === 4),
-    debuggeeIsolationEnforced: parsed[5]?.state === "EXITED" && parsed[5]?.exitCode === 0 && !fs.existsSync(path.join(root, "forbidden-write")),
+    realStackReachedHelper: parsed[4]?.kind === "DAP_STACK_TRACE" && parsed[4]?.frames?.some((frame) => frame.name.includes("helper") && frame.source === sourceName && frame.line === 4),
+    pythonInspectionWorked: !pythonMode || (parsed[5]?.kind === "DAP_SCOPES" && parsed[5]?.scopes?.some((scope) => scope.name === "Locals" && scope.variablesReference > 0) && parsed[6]?.kind === "DAP_VARIABLES" && parsed[6]?.variables?.some((variable) => variable.name === "value" && variable.value.includes("41")) && parsed[7]?.state === "STOPPED"),
+    debuggeeIsolationEnforced: parsed[exitIndex]?.state === "EXITED" && parsed[exitIndex]?.exitCode === 0 && !fs.existsSync(path.join(root, "forbidden-write")),
     largeOutputExternalized: artifactMetadata.some((entry) => entry.status === "PASS" && entry.producerTool === "debug_engine" && entry.sourceBytes > entry.previewChars) && artifactFiles.length >= 1 && outputProviderTurn?.modelFacingLastToolArtifact === true && outputProviderTurn?.modelFacingLastToolChars < 12_000,
     metadataOnly: dapMetadata.length >= sequence.length && dapMetadata.every((entry) => !JSON.stringify(entry).includes(temporary) && !/fixture\.c|DAP_BENCHMARK_COMPLETE|must-not-reach|A{32}/u.test(JSON.stringify(entry))),
-    deterministicCleanup: parsed[7]?.cleanupReason === "EXPLICIT" && !processListing.includes(temporary),
+    deterministicCleanup: parsed[terminateIndex]?.cleanupReason === "EXPLICIT" && !processListing.includes(temporary),
     lazyCommandSurface: command.status === "PASS" && command.providerTurns === 0 && command.adapterProcessFound === false,
   };
   report = {
     version: 1, recordedAt: new Date().toISOString(), status: Object.values(assertions).every(Boolean) ? "PASS" : "FAIL",
-    measurementMode: "real-pi-process-deterministic-local-provider-real-gdb-bubblewrap", piVersion: spawnSync(pi, ["--version"], { encoding: "utf8" }).stdout.trim(),
-    overdriveUltra: {
+    measurementMode: pythonMode ? "real-pi-process-deterministic-local-provider-managed-debugpy-bubblewrap" : "real-pi-process-deterministic-local-provider-real-gdb-bubblewrap", piVersion: spawnSync(pi, ["--version"], { encoding: "utf8" }).stdout.trim(),
+    [pythonMode ? "overdriveExpansion" : "overdriveUltra"]: {
       elapsedMs, providerTurns, toolResults: toolResults.length, dapMetadataEvents: dapMetadata.length,
       adapter: parsed[0]?.adapter ?? null, adapterVersion: parsed[0]?.adapterVersion ?? null,
-      finalState: parsed[5]?.state ?? null, exitCode: parsed[5]?.exitCode ?? null,
+      finalState: parsed[exitIndex]?.state ?? null, exitCode: parsed[exitIndex]?.exitCode ?? null,
       sessionOutputDigest: artifactResult ? sha256(artifactResult) : null, sessionOutputChars: artifactResult.length,
       modelFacingOutputChars: outputProviderTurn?.modelFacingLastToolChars ?? null, artifactMetadataEvents: artifactMetadata.length, artifactManifests: artifactFiles.length,
       command, assertions,
     },
     accounting: { deterministicLocalProviderTurns: providerTurns, paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
     cleanup: { temporaryProcessResidue: processListing.includes(temporary), workspaceWriteResidue: fs.existsSync(path.join(root, "forbidden-write")) },
-    ompReference: { commit: "4267074ac91456866e95ed8de0b6353388f08502", version: "18.1.21", executableStatus: "NOT_RUN", reason: "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence." },
+    ompReference: { commit: pythonMode ? "a1b3b83a7fb8460445f2f5995a6aa56047bd44c7" : "4267074ac91456866e95ed8de0b6353388f08502", version: pythonMode ? "18.2.11" : "18.1.21", executableStatus: "NOT_RUN", reason: "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence." },
     stderrDigest: run.stderr ? sha256(String(run.stderr)) : null,
     diagnostics: run.status === 0 && toolResults.length === sequence.length ? undefined : {
       exitCode: run.status, signal: run.signal ?? null, error: run.error?.message ?? null, timedOut: run.timedOut, settled: run.settled,
@@ -205,6 +228,6 @@ try {
 }
 
 const serialized = `${JSON.stringify(report, null, 2)}\n`;
-if (writeResults) fs.writeFileSync(path.join(benchmarkRoot, "debug-engine-results.json"), serialized, { mode: 0o600 });
+if (writeResults) fs.writeFileSync(path.join(benchmarkRoot, pythonMode ? "debugpy-engine-results.json" : "debug-engine-results.json"), serialized, { mode: 0o600 });
 process.stdout.write(serialized);
 process.exit(report.status === "PASS" ? 0 : 1);

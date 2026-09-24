@@ -1,0 +1,2 @@
+# Linux x86_64, CPython 3.14 wheel. Installer requires this exact hash.
+debugpy==1.8.22 --hash=sha256:0c1104233340196e5cbf5514e7dfdbb98968e730cfd7fdd6f3d72a082be838a9

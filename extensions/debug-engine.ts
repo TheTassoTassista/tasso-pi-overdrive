@@ -10,7 +10,7 @@ const Action = Type.Union([
 
 const Parameters = Type.Object({
   action: Action,
-  program: Type.Optional(Type.String({ minLength: 1, maxLength: 2048, description: "Workspace-relative executable for launch." })),
+  program: Type.Optional(Type.String({ minLength: 1, maxLength: 2048, description: "Workspace-relative executable or .py source for launch; adapter selected by controller." })),
   args: Type.Optional(Type.Array(Type.String({ maxLength: 4096 }), { maxItems: 64, description: "Bounded debuggee arguments; never a shell command." })),
   file: Type.Optional(Type.String({ minLength: 1, maxLength: 2048, description: "Workspace-relative source file for a breakpoint." })),
   line: Type.Optional(Type.Integer({ minimum: 1, maximum: 10000000 })),
@@ -80,10 +80,10 @@ export default function debugEngineExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "debug_engine",
     label: "Sandboxed Debug Engine",
-    description: "Use one lazy GDB DAP session for a workspace executable. The adapter and debuggee run inside a networkless Bubblewrap sandbox with the workspace read-only. No attach, raw debugger command, arbitrary adapter, memory write, or function evaluation is exposed.",
+    description: "Use one lazy GDB or debugpy DAP session for a workspace executable or Python source. The controller selects the pinned adapter. Both adapter and debuggee run inside a networkless Bubblewrap sandbox with the workspace read-only. No attach, raw debugger command, arbitrary adapter, memory write, or function evaluation is exposed.",
     promptSnippet: "Use debug_engine for bounded launch, breakpoints, stepping, stack/scopes/variables, output, and deterministic cleanup",
     promptGuidelines: [
-      "Launch only an existing workspace-relative executable. Set source breakpoints while CONFIGURING, then continue to complete DAP configuration.",
+      "Launch only an existing workspace-relative executable or .py source. Set source breakpoints while CONFIGURING, then continue to complete DAP configuration.",
       "Inspect stack_trace, then scopes for a returned frameId, then variables for a returned variablesReference.",
       "Always terminate the session when debugging is complete. Any timeout or protocol failure cleans up fail closed.",
     ],

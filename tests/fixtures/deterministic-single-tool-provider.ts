@@ -47,7 +47,12 @@ function streamSingleTool(model: Model<any>, context: Context, options?: SimpleS
 				const step = hasNextSequenceTool ? sequence[completedTools] : null;
 				const name = step && typeof step === "object" && typeof step.name === "string" ? step.name : process.env.PI_OVERDRIVE_AUDIT_TOOL;
 				if (!name) throw new Error("PI_OVERDRIVE_AUDIT_TOOL is required");
-				const args = hasNextSequenceTool ? (step && typeof step === "object" && !Array.isArray(step) && "args" in step ? step.args : step) : JSON.parse(process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS ?? "{}");
+				const args = hasNextSequenceTool ? (step && typeof step === "object" && !Array.isArray(step) && "args" in step ? { ...step.args } : { ...step }) : JSON.parse(process.env.PI_OVERDRIVE_AUDIT_TOOL_ARGS ?? "{}");
+				if (args.frameId === "$previous.frameId" || args.variablesReference === "$previous.variablesReference") {
+					const previous = JSON.parse(lastToolText);
+					if (args.frameId === "$previous.frameId") args.frameId = previous?.frames?.[0]?.id;
+					if (args.variablesReference === "$previous.variablesReference") args.variablesReference = previous?.scopes?.find((scope: any) => scope.name === "Locals")?.variablesReference;
+				}
 				const toolCall = { type: "toolCall" as const, id: hasNextSequenceTool ? `audit-call-${completedTools + 1}` : "single-audit-call", name, arguments: args };
 				output.content.push(toolCall);
 				stream.push({ type: "toolcall_start", contentIndex: 0, partial: output });

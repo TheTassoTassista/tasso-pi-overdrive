@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DapEngine, DapEngineError, readDapPolicy, validateDapPolicy } from "../lib/dap-engine.mjs";
+import { DAP_ADAPTER_CAPABILITIES, DapEngine, DapEngineError, readDapPolicy, validateDapPolicy } from "../lib/dap-engine.mjs";
 
 const basePolicy = readDapPolicy();
 const testPolicy = validateDapPolicy({
@@ -80,6 +80,7 @@ class FakeAdapter extends EventEmitter {
     }
     if (message.type !== "request") return;
     if (message.command === "initialize") {
+      if (this.options.crashOnInitialize) { this.kill(); return; }
       this.#response(message, { supportsConfigurationDoneRequest: true });
       this.#send({ type: "request", command: "runInTerminal", arguments: { cwd: "/workspace", args: ["escape"] } });
       if (this.options.malformedAfterInitialize) this.stdout.write("Content-Length: 999999999\r\n\r\n{}");
@@ -230,6 +231,32 @@ test("request timeout and malformed protocol terminate the adapter without a reu
   assert.equal(malformed.engine.status().stats.cleanups, 1);
 });
 
+test("adapter crash and partial startup failure leave no reusable session", async (t) => {
+  const crashed = fixture(t, { crashOnInitialize: true });
+  await assert.rejects(crashed.engine.execute({ action: "launch", program: "fixture" }), /DAP_ADAPTER_EXITED|DAP_ADAPTER_NOT_RUNNING/u);
+  assert.equal(crashed.engine.status().state, "IDLE");
+  assert.equal(crashed.engine.status().stats.cleanups, 1);
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-dap-spawn-fail-"));
+  fs.writeFileSync(path.join(root, "fixture.py"), "print(42)\n", { mode: 0o600 });
+  const engine = new DapEngine({ cwd: root, policy: testPolicy, attestAdapter: () => ({ digest: "attested" }), spawnAdapter: () => { throw new Error("startup failed"); } });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  await assert.rejects(engine.execute({ action: "launch", program: "fixture.py" }), /DAP_ENGINE_FAILED/u);
+  assert.equal(engine.status().state, "IDLE");
+});
+
+test("debugpy module digest mismatch denies launch before any adapter process is spawned", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-dap-digest-"));
+  fs.writeFileSync(path.join(root, "fixture.py"), "print(42)\n", { mode: 0o600 });
+  let spawned = 0;
+  const policy = validateDapPolicy({ ...testPolicy, secondaryAdapters: [{ ...testPolicy.secondaryAdapters[0], moduleSha256: "0".repeat(64) }] });
+  const engine = new DapEngine({ cwd: root, policy, spawnAdapter: () => { spawned++; throw new Error("must not spawn"); } });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  await assert.rejects(engine.execute({ action: "launch", program: "fixture.py" }), /DAP_ADAPTER_DIGEST_MISMATCH/u);
+  assert.equal(spawned, 0);
+  assert.equal(engine.status().state, "IDLE");
+});
+
 test("program replacement during the configuration window is detected before execution resumes", async (t) => {
   const item = fixture(t);
   await item.engine.execute({ action: "launch", program: "fixture" });
@@ -244,8 +271,32 @@ test("program replacement during the configuration window is detected before exe
 test("DAP policy rejects extra adapters, unsafe arguments and unbounded controls", () => {
   assert.throws(() => validateDapPolicy({ ...basePolicy, adapter: { ...basePolicy.adapter, id: "lldb" } }), DapEngineError);
   assert.throws(() => validateDapPolicy({ ...basePolicy, adapter: { ...basePolicy.adapter, arguments: ["-i", "dap"] } }), /DAP_POLICY_ADAPTER_ARGUMENTS_INVALID/u);
+  assert.throws(() => validateDapPolicy({ ...basePolicy, secondaryAdapters: [{ ...basePolicy.secondaryAdapters[0], moduleVersion: "latest" }] }), /DAP_POLICY_SECONDARY_ADAPTER_INVALID/u);
+  assert.throws(() => validateDapPolicy({ ...basePolicy, secondaryAdapters: [{ ...basePolicy.secondaryAdapters[0], binaryPath: "/usr/bin/python3" }] }), /DAP_POLICY_SECONDARY_ADAPTER_INVALID/u);
+  assert.throws(() => validateDapPolicy({ ...basePolicy, secondaryAdapters: [] }), /DAP_POLICY_SECONDARY_ADAPTER_INVALID/u);
+  assert.equal(DAP_ADAPTER_CAPABILITIES.debugpy.attach, false);
+  assert.equal(DAP_ADAPTER_CAPABILITIES.debugpy.evaluate, false);
+  assert.equal(DAP_ADAPTER_CAPABILITIES.debugpy.customRequest, false);
+  assert.equal(DAP_ADAPTER_CAPABILITIES.debugpy.remoteTarget, false);
   assert.throws(() => validateDapPolicy({ ...basePolicy, maxVariables: 1000 }), /DAP_POLICY_VARIABLE_LIMIT_INVALID/u);
   assert.throws(() => validateDapPolicy({ ...basePolicy, unknown: true }), /DAP_POLICY_UNKNOWN_FIELD/u);
+});
+
+test("controller resolves Python to the reviewed profile and never accepts model-supplied adapter authority", async (t) => {
+  const item = fixture(t);
+  fs.writeFileSync(path.join(item.root, "fixture.py"), "value = 42\n", { mode: 0o600 });
+  await assert.rejects(item.engine.execute({ action: "launch", program: "fixture.py", adapter: "debugpy" }), /DAP_INPUT_INVALID/u);
+  await assert.rejects(item.engine.execute({ action: "attach", pid: 1 }), /DAP_INPUT_INVALID/u);
+  await assert.rejects(item.engine.execute({ action: "launch", program: "fixture.py", request: "attach" }), /DAP_INPUT_INVALID/u);
+  await assert.rejects(item.engine.execute({ action: "launch", program: "fixture.py", host: "0.0.0.0" }), /DAP_INPUT_INVALID/u);
+  await assert.rejects(item.engine.execute({ action: "launch", program: "fixture.py", command: "evaluate" }), /DAP_INPUT_INVALID/u);
+  const summary = await item.engine.execute({ action: "launch", program: "fixture.py" });
+  assert.equal(summary.adapter, "debugpy");
+  assert.equal(item.child.launchRequest.arguments.type, "python");
+  assert.equal(item.child.launchRequest.arguments.program, "/workspace/fixture.py");
+  assert.equal(item.child.launchRequest.arguments.console, "internalConsole");
+  assert.equal(item.child.launchRequest.arguments.subProcess, false);
+  assert.equal(item.spawned, 1);
 });
 
 test("real pinned GDB runs a C fixture inside the read-only networkless sandbox", { timeout: 45_000 }, async (t) => {
@@ -296,5 +347,70 @@ test("real pinned GDB runs a C fixture inside the read-only networkless sandbox"
   assert.equal(terminated.sandboxed, true);
   assert.equal(terminated.network, false);
   assert.equal(terminated.workspaceReadOnly, true);
+  assert.equal(engine.status().state, "IDLE");
+});
+
+test("real project-owned debugpy runs Python breakpoints and bounded inspection inside Bubblewrap", { timeout: 60_000 }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-debugpy-real-"));
+  fs.writeFileSync(path.join(root, "fixture.py"), [
+    "import os", "import socket", "def helper(value):", "    next_value = value + 1", "    return next_value",
+    "result = helper(41)",
+    "if os.getenv('PI_OVERDRIVE_DAP_SECRET_PROBE'): raise RuntimeError('ambient secret inherited')",
+    "try:", "    open('/workspace/forbidden-write', 'w').close()", "    raise RuntimeError('workspace write permitted')",
+    "except OSError: pass",
+    "try:", "    with socket.socket() as probe:", "        if probe.connect_ex(('1.1.1.1', 9)) == 0: raise RuntimeError('external network permitted')",
+    "except OSError: pass",
+    "print(f'result={result}')", "if result != 42: raise RuntimeError('wrong result')", "",
+  ].join("\n"), { mode: 0o600 });
+  const priorSecret = process.env.PI_OVERDRIVE_DAP_SECRET_PROBE;
+  process.env.PI_OVERDRIVE_DAP_SECRET_PROBE = "must-not-reach-debuggee";
+  const engine = new DapEngine({ cwd: root });
+  t.after(async () => { await engine.terminate("TEST_CLEANUP"); fs.rmSync(root, { recursive: true, force: true }); });
+  t.after(() => { if (priorSecret === undefined) delete process.env.PI_OVERDRIVE_DAP_SECRET_PROBE; else process.env.PI_OVERDRIVE_DAP_SECRET_PROBE = priorSecret; });
+
+  const launched = await engine.execute({ action: "launch", program: "fixture.py" });
+  assert.equal(launched.adapter, "debugpy");
+  assert.equal(launched.adapterVersion, "1.8.22");
+  assert.equal(launched.sandboxed, true);
+  assert.equal(launched.network, false);
+  assert.equal(launched.workspaceReadOnly, true);
+  const breakpoint = await engine.execute({ action: "set_breakpoint", file: "fixture.py", line: 4 });
+  assert.equal(breakpoint.breakpoints[0].verified, true);
+  assert.equal((await engine.execute({ action: "continue" })).state, "STOPPED");
+  assert.equal((await engine.execute({ action: "continue" })).stopReason, "breakpoint");
+  const stack = await engine.execute({ action: "stack_trace", levels: 8 });
+  assert.equal(stack.frames.some((frame) => frame.name === "helper" && frame.source === "fixture.py" && frame.line === 4), true);
+  const scopes = await engine.execute({ action: "scopes", frameId: stack.frames[0].id });
+  const locals = scopes.scopes.find((scope) => scope.name === "Locals");
+  assert.ok(locals?.variablesReference > 0);
+  const variables = await engine.execute({ action: "variables", variablesReference: locals.variablesReference, count: 4 });
+  assert.equal(variables.variables.some((variable) => variable.name === "value" && variable.value.includes("41")), true);
+  assert.equal(variables.variables.every((variable) => variable.value.length <= basePolicy.maxValueChars), true);
+  assert.equal((await engine.execute({ action: "step_over" })).stopReason, "step");
+  const exited = await engine.execute({ action: "continue" });
+  assert.equal(exited.state, "EXITED");
+  assert.equal(exited.exitCode, 0);
+  assert.equal(fs.existsSync(path.join(root, "forbidden-write")), false);
+  const output = await engine.execute({ action: "output" });
+  assert.match(output.output, /result=42/u);
+  assert.doesNotMatch(output.output, /must-not-reach-debuggee/u);
+  const terminated = await engine.execute({ action: "terminate" });
+  assert.equal(terminated.adapterExited, true);
+  assert.equal(engine.status().state, "IDLE");
+});
+
+test("real debugpy reports debuggee failure and removes its owned sandbox process", { timeout: 45_000 }, async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-debugpy-crash-"));
+  fs.writeFileSync(path.join(root, "fixture.py"), "raise SystemExit(7)\n", { mode: 0o600 });
+  const engine = new DapEngine({ cwd: root });
+  t.after(async () => { await engine.terminate("TEST_CLEANUP"); fs.rmSync(root, { recursive: true, force: true }); });
+  await engine.execute({ action: "launch", program: "fixture.py" });
+  assert.equal((await engine.execute({ action: "continue" })).state, "STOPPED");
+  const exited = await engine.execute({ action: "continue" });
+  assert.equal(exited.state, "EXITED");
+  assert.equal(exited.exitCode, 7);
+  await engine.execute({ action: "terminate" });
+  const processes = spawnSync("ps", ["-eo", "args="], { encoding: "utf8" }).stdout;
+  assert.equal(processes.includes(root), false);
   assert.equal(engine.status().state, "IDLE");
 });
