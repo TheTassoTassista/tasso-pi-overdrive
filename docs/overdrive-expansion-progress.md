@@ -6,8 +6,8 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 29 — Agent Hub Control Plane, NEXT; Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, and Phase 28 is DEFERRED FOR SAFETY
-- Last functional Expansion commit: `ea7aad044da9ad30af6280d6f1f3fbbda7b84b3b` (Phase 27 contract)
+- Current phase: 30 — Persistent / Richer Subagents, NEXT; Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, and Phase 29 is COMPLETE/BOUNDED
+- Last functional Expansion commit: `10c6b23` (Phase 29 exact-attempt cancellation)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -28,12 +28,14 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 
 - `6ec6f7595ccd629b9e850f66d9c0446d81fa9ece` — one controller-selected GDB/debugpy DAP tool, exact debugpy wheel/module/interpreter attestation, project-owned installer, module-only Bubblewrap mount, real Python and GDB regressions, and Pi benchmark path.
 - `ea7aad044da9ad30af6280d6f1f3fbbda7b84b3b` — platform-neutral, fail-closed Computer Use action/approval/target/frame contract and Linux/Windows fixture tests. No native backend or model tool was registered.
+- `10c6b23` — controller-owned `/agent-cancel` for exact active Worker/Tester attempts, one-shot session/role/state validation, installed `pi-subagents` bridge correlation, durable terminal projection, bounded metadata trace, offline Pi/worktree/process benchmark, and regression tests. Agent Hub itself remains a read-only frontend.
 
 ## Bookkeeping commits
 
 - `a76ce40` contains the Phase 26 ledger, authority matrix, implementation note, and `benchmarks/overdrive-vs-omp/debugpy-engine-results.json`.
 - The subsequent commit containing this Phase 27 disposition and `docs/implementation-notes/phase-27-computer-use-contract.md` records the contract-only, native-backend-deferred boundary. Resolve its exact hash with `git log -1` after commit.
 - `797d50e` records the Phase 27 disposition. The following bookkeeping-only commit records the Phase 28 no-relay safety assessment; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing this Phase 29 result and Phase 30 coordinates follows functional commit `10c6b23`; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -43,6 +45,8 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 26 real Pi/GDB benchmark rerun: PASS; 8/8 tool results, nine deterministic local-provider turns, exit 0, isolation/artifact/cleanup assertions green. The original GDB result fixture was not overwritten.
 - Phase 26 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 466/466 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. `bash -n scripts/install-managed-dap.sh scripts/sandbox-run.sh` and `git diff --check` PASS.
 - Phase 27 contract tests: 8/8 PASS across Linux and Windows fixture backends. Authoritative Expansion gate using the same verified LSP runtime: 474/474 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. A bare `npm test` without that LSP selector returned 472/474 because ignored Rust/Go managed binaries are absent in this Expansion worktree; rerunning with the documented selector returned 474/474, so this is dependency-selection evidence rather than a product regression.
+- Phase 29 focused tests: exact reservation/session/role/state binding, malformed/unknown/stale/terminal/replay/completion races, Council/Judge denial, uncertainty fail-closed and installed `pi-subagents@0.66.0` exact cancellation isolation all PASS. Real Pi 0.85.1 projection benchmark PASS; new real Pi 0.85.1 offline controller benchmark PASS with actual child process and independent Git worktree, durable cancelled receipt, unaffected unrelated process, port/runtime/worktree cleanup, production command registration, zero provider calls and €0. See `benchmarks/overdrive-vs-omp/agent-hub-control-results.json`. This is a deterministic controller fixture, not an authenticated full secure-workflow E2E.
+- Phase 29 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 481/481 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. `git diff --check` PASS.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -69,6 +73,12 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Pinned OMP collaboration documentation was inspected read-only at `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7`. Full-control guests can influence the host; view-only guests still receive the historical session. Neither behavior maps safely to the current metadata-only Agent Hub or per-call local ACP bridge.
 - No named guest, approved disclosure set, relay endpoint, or guest-copy retention/approval boundary exists for this installation. Phase 28 remains DEFERRED FOR SAFETY; no listener, link, client, transcript replication, provider call, or model schema was created. See `docs/implementation-notes/phase-28-collaboration-assessment.md`.
 
+## Phase 29 disposition
+
+- The only added control is `/agent-cancel <attempt-uuid>` for one currently RUNNING Worker or Tester in the same Pi session. The secure-workflow controller validates its own reservation, emits an exact upstream cancellation, waits for the normal terminal response/receipt path, and fails the workflow on dispatch uncertainty or a non-cancelled acknowledgement. The Hub merely displays eligible attempt IDs and durable lifecycle metadata. No model-facing Agent Hub mutation schema was added.
+- Council/Judge and all other roles remain status-only. Pause/resume, message/steer, manual retry, revive, and spawn are deferred/not implemented because no safe controller primitive and bounded authority/receipt contract currently exists. Concurrency 3, depth 1, two correction rounds, 39+3 spawn envelope, provider routing, Council fan-out, Judge order, and retry policy are unchanged.
+- Normal production cleanup retains the owned worktree for human review and releases runtime reservations; the existing explicit destroy mode removes it. The deterministic Pi benchmark verifies destruction. No authenticated cancellation E2E or paid provider call was made. See `docs/implementation-notes/phase-29-agent-hub-control.md`.
+
 ## Dirty files
 
 - After the Phase 26 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
@@ -81,9 +91,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 26 DAP is multi-adapter only on the verified Linux host; sessions remain single-session and memory-only. The Python runtime is deliberately host-pinned, and fresh worktrees must run the project-owned hashed installer. Same-UID runtime mutation remains a local trust assumption despite per-launch attestation.
 - Phase 27's `ComputerUseController` is an internal contract, not an OS sandbox or a usable desktop feature. Both native backends are unavailable; host-wide raw screenshot/input remains prohibited. Linux and Windows fixture tests do not establish host validation.
 - Phase 28 collaboration needs a named opt-in guest workflow and explicit disclosure/retention choices before implementation; a strong token alone would not make transcript sharing safe.
+- Phase 29 cancellation is deliberately limited to Worker/Tester and an active local session. The real Pi benchmark exercises a deterministic controller fixture sharing the production state machine/CLI adapter, while a separate installed-bridge test verifies upstream exact-attempt abort; it does not claim an authenticated full secure-workflow cancellation run. If an upstream cancellation never acknowledges, the existing delegation timeout remains the fail-closed fallback, not an immediate cleanup guarantee.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 29 from this clean checkpoint: inspect the existing Agent Hub projection and the authoritative secure-workflow controller. Add cancel/pause/resume/message/steer only where exact attempt/session binding and Council isolation can be enforced by the existing controller; otherwise defer those verbs instead of creating a parallel authority. Do not reopen Phase 27 or 28 without their missing safety evidence. Do not push, create a PR, change tags, reset, clean or stash user work.
+Begin Phase 30 from the completed Phase 29 checkpoint: inspect existing `pi-subagents` lifecycle and Second Brain/artifact/receipt boundaries before choosing a bounded persistent-worker primitive. Do not add an unbounded transcript, hidden spawn path, extra model turn, or a model-facing persistent-agent schema merely for parity. Consider deterministic local prewalk first where it genuinely reduces Worker context. Do not reopen Phase 27 or 28 without their missing safety evidence. Do not push, create a PR, change tags, reset, clean or stash user work.
