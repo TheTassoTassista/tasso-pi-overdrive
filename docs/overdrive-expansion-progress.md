@@ -7,7 +7,7 @@
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
 - Current phase: 34 — Hashline / Edit UX Maturity, IN PROGRESS; Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
-- Last functional Expansion commit: `7eb2434` (Phase 32 local CPU profiling harness; no native code)
+- Last functional Expansion commit: `99d5d07` (Phase 34 bounded model-visible edit recovery guidance)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -33,6 +33,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `6a11f79` — read-only, digest-bound Provider Capability Registry combining Pi model declarations, receipt-backed callability and harness profiles; `/models --capabilities` scoped inspection, unknown-safe price/capability representation, and offline Pi command smoke. No adapter, provider request, route, or credential change.
 - `cb9987a` — Phase 31 bounded completion: separately validated stale-aware local catalog snapshot, conflict resolution, field-level provenance, conservative Context Governor cap, bounded human/JSON inspection, regression tests, and deterministic local benchmark. No provider/routing/credential change.
 - `7eb2434` — Phase 32 representative local CPU/proc profiling harness; no native binary, OMP source, build chain, route or policy change.
+- `99d5d07` — Phase 34 checkpoint: fixed source-free recovery guidance for existing transactional edit failures, plus unit and real-Pi fixture assertions. No edit authority, matching, LSP, receipt or model routing change.
 
 ## Bookkeeping commits
 
@@ -45,6 +46,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The bookkeeping commit containing the Phase 31 completion note follows functional commit `cb9987a`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 32 measured/not-added decision follows functional commit `7eb2434`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 33 browser safety disposition follows the Phase 32 note; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing this Phase 34 partial checkpoint follows functional commit `99d5d07`; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -61,6 +63,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 31 checkpoint: two focused registry tests PASS; real Pi offline routing-command smoke 12/12 PASS with zero model/provider calls; authoritative Expansion gate with the documented LSP selector 487/487 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. Registry output is metadata-only and a zero/zero default price without explicit provenance is UNKNOWN, not free.
 - Phase 31 bounded completion: 13 focused registry/catalog tests PASS; real Pi offline routing-command smoke 13/13 PASS with zero inference calls; deterministic Context Governor Pi benchmark PASS; local metadata benchmark 1,000 runs/4 models, mean 0.2776 ms, zero external calls. Authoritative gate with the documented LSP selector 498/498 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. Bare `npm test` still has the two documented LSP runtime-selection failures in this worktree.
 - Phase 32 local profile: nine deterministic benchmark suites PASS, zero paid/external calls; owned control operations range from 0.019 to 1.282 ms mean, actual optional catalog read/parse 6.078 ms mean, Pi `--version` startup median 255.15 ms. One isolated full-gate run observed 497/498 with failure identity lost to truncated output; immediately following focused test and full gate each passed 498/498. No speculative fix or native helper was added. See `docs/implementation-notes/phase-32-native-profile.md`.
+- Phase 34 partial checkpoint: focused edit tests 13/13 PASS; real Pi offline edit benchmark PASS with model-visible stale guidance and cleanup, 0 paid/external calls; authoritative gate 499/499 PASS, syntax, installed-Pi TypeScript and package/secret validation PASS. See `docs/implementation-notes/phase-34-edit-ux-checkpoint.md`.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -110,6 +113,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 ## Phase 33 disposition — DEFERRED FOR SAFETY
 
 - The existing LOCAL_ISOLATED browser remains real-host-verified and networkless. PUBLIC_WEB needs controller-level egress/origin enforcement; AUTHENTICATED_SITE additionally needs explicit user authority and separate credential/profile lifecycle. Neither exists yet, and the pinned browser's domain flag was previously shown incompatible with the required profile boundary. No external browsing, downloads, auth inheritance or model-facing mode selector was enabled. See `docs/implementation-notes/phase-33-browser-boundary.md`.
+
+## Phase 34 checkpoint — IN PROGRESS
+
+- Pinned OMP Hashline was reviewed read-only. This checkpoint improves failed-edit recovery instructions without changing Overdrive's stronger staged transaction, seen-range, TOCTOU, LSP, atomic apply/rollback and receipt gates. Per-real-model edit-format/token comparisons and a compact grammar remain unproven and unimplemented; no paid probing was performed. See `docs/implementation-notes/phase-34-edit-ux-checkpoint.md`.
 - Read-only source assessment found `/home/tasso/.config/omniroute/cache/openrouter-catalog.json` (445 OpenRouter records, `fetchedAt=2026-09-13T13:10:43.946Z`, 1,157,614 bytes, mode 0644). At the 2026-09-24 checkpoint it is eleven days old and covers OpenRouter, not all OmniRoute backends. Only shape/count/timestamp/field names were inspected; no raw descriptions, prices, credentials, or call logs were published. It is not ingested into the authoritative registry or used to infer current price, rate limits, availability, or runtime callability. No local `/v1/models` fetch or model call was made.
 
 ## Dirty files
@@ -132,4 +139,4 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 
 ## Exact next action
 
-Continue Phase 34 from the existing transactional edit and hash-anchored snapshot contract. Study pinned OMP Hashline read-only and improve model-facing edit ergonomics only if equivalent target/range/inode validation and the existing LSP-on-write/receipt boundaries remain intact. Preserve zero-extra-cost and all prior safety boundaries; do not push, create a PR, change tags, reset, clean or stash user work.
+Continue Phase 34 from the bounded recovery-guidance checkpoint. Any compact line/edit grammar or multi-edit batching needs a representative offline success/token benchmark and semantic parity with exact seen ranges, unique target, staged preview, LSP-on-write, atomic apply/rollback and receipts. Do not probe paid models to manufacture evidence. Preserve zero-extra-cost and all prior safety boundaries; do not push, create a PR, change tags, reset, clean or stash user work.
