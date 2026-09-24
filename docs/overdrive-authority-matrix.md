@@ -1,4 +1,4 @@
-# Overdrive authority matrix — Expansion baseline
+# Overdrive authority matrix — Expansion checkpoint
 
 This matrix records effective boundaries before Phases 26–39. A model-facing schema or prompt is not itself a sandbox. `None` means the reviewed Overdrive capability does not grant it; it does not claim that an independently installed arbitrary Pi extension is sandboxed. Changes to any row require an explicit phase review and tests.
 
@@ -12,7 +12,7 @@ This matrix records effective boundaries before Phases 26–39. A model-facing s
 | Sentinel / Task Governor | Explicit bounded hard-debug task | None | One Oracle completion, zero tools | Only selected provider call | Explicit `/sentinel` plus policy gate | Metadata reservation/receipt | No transcript or credential access | Tool-less read-only completion |
 | Agent Hub / workflow controller | Journal, reservations and immutable receipts | None | None | None | Local `/agents` inspection | No second registry | Metadata allowlist excludes contents | Read-only projection |
 | Browser / browser controller | Local unauthenticated fixture DOM, bounded PNG | Private profile/capture state only | Pinned Chromium in one owned session | Network namespace blocks host network; fixture loopback only | Explicit browser intent/allocation | Allocation-scoped profile/artifact | No credential import or user profile | Persistent networkless Bubblewrap |
-| Computer Use / no owner yet | None | None | None | None | Not available | None | None | Deferred for safety |
+| Computer Use / internal contract only | No host content; Linux/Windows fixture contract only | None on host | None on host | None | Contract requires per-action approval, but no native broker is enabled | No host image/session artifact | No host capture; receipts exclude content | Native Linux/Windows backends unavailable; model tool unregistered |
 | Collaboration client / no owner yet | None | None | None | None | Not available | None | None | Deferred for safety |
 | ACP client / local bridge | One canonical text session | One-shot approved Pi mutation calls | Pi RPC through ordinary hooks | No client network grant | Exact per-call `allow_once` | Ephemeral session; metadata transport journal | No client credential bridge | Bridge is an interface, not an OS sandbox |
 | Subagents / secure-workflow controller | Role-scoped worktree/evidence | Worker only in assigned worktree | Role and depth/spawn-budget restricted | Denied for autonomous roles | Controller-owned reservation | Bounded receipts/artifacts | No ambient protected files | Role profile plus worktree/Bubblewrap |
