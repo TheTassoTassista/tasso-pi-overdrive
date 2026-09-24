@@ -31,6 +31,7 @@ if (!pkg.pi.extensions.includes('./extensions/lsp.ts') || pkg.pi.extensions.incl
 if (!pkg.pi.extensions.includes('./extensions/model-policy.ts')) failures.push('user-owned model policy commands are missing');
 if (!pkg.pi.extensions.includes('./extensions/omniroute.ts')) failures.push('OmniRoute provider registration is missing');
 if (!pkg.pi.extensions.includes('./extensions/second-brain.ts')) failures.push('Second Brain extension is missing');
+if (pkg.pi.extensions.some((entry) => /computer|desktop/iu.test(entry))) failures.push('Host Computer Use remains unregistered until native approval/target brokers are verified');
 if (!pkg.pi.extensions.includes('./extensions/resources.ts')) failures.push('ResourceFS extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/smart-read.ts')) failures.push('SmartRead extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/edit-engine.ts')) failures.push('Edit Engine V2 extension is missing');
