@@ -6,8 +6,8 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 31 — Provider Ecosystem Intelligence, NEXT; Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
-- Last functional Expansion commit: `3945eec` (Phase 30 bounded local Worker prewalk)
+- Current phase: 31 — Provider Ecosystem Intelligence, IN PROGRESS; Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Last functional Expansion commit: `6a11f79` (Phase 31 read-only capability registry checkpoint)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -30,6 +30,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `ea7aad044da9ad30af6280d6f1f3fbbda7b84b3b` — platform-neutral, fail-closed Computer Use action/approval/target/frame contract and Linux/Windows fixture tests. No native backend or model tool was registered.
 - `10c6b23` — controller-owned `/agent-cancel` for exact active Worker/Tester attempts, one-shot session/role/state validation, installed `pi-subagents` bridge correlation, durable terminal projection, bounded metadata trace, offline Pi/worktree/process benchmark, and regression tests. Agent Hub itself remains a read-only frontend.
 - `3945eec` — Task Policy-gated deterministic local Worker prewalk on the pinned Git runner; canonical, name-only, size/binary/secret/link filtering; bounded Worker-only hints, metadata-only tracing, four focused tests, and a real offline Pi CONTROL/PREWALK benchmark. No route, retry, role, or spawn-policy change.
+- `6a11f79` — read-only, digest-bound Provider Capability Registry combining Pi model declarations, receipt-backed callability and harness profiles; `/models --capabilities` scoped inspection, unknown-safe price/capability representation, and offline Pi command smoke. No adapter, provider request, route, or credential change.
 
 ## Bookkeeping commits
 
@@ -38,6 +39,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `797d50e` records the Phase 27 disposition. The following bookkeeping-only commit records the Phase 28 no-relay safety assessment; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing this Phase 29 result and Phase 30 coordinates follows functional commit `10c6b23`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 30 disposition and `docs/implementation-notes/phase-30-local-prewalk.md` follows functional commit `3945eec`; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing this Phase 31 partial checkpoint follows functional commit `6a11f79`; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -51,6 +53,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 29 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 481/481 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. `git diff --check` PASS.
 - Phase 30 focused prewalk tests: 4/4 PASS. Real Pi 0.85.1 offline deterministic Worker benchmark: PASS, correct discovery in both arms; CONTROL 3 local turns/1 search/1 read, PREWALK 2 local turns/0 search/1 read; prewalk 125 characters/12.639 ms/0 model calls, enriched prompt +127 characters. The observed −84.364 ms total delta is a single-run measurement, not a general latency claim. Cleanup PASS. See `benchmarks/overdrive-vs-omp/local-prewalk-results.json`.
 - Phase 30 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 485/485 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS; `git diff --cached --check` PASS. As before, a bare gate without the documented LSP selector returned 483/485 because the ignored Rust/Go binaries are absent from this experimental worktree; no product code was changed to mask that environment selection.
+- Phase 31 checkpoint: two focused registry tests PASS; real Pi offline routing-command smoke 12/12 PASS with zero model/provider calls; authoritative Expansion gate with the documented LSP selector 487/487 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. Registry output is metadata-only and a zero/zero default price without explicit provenance is UNKNOWN, not free.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -88,6 +91,11 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - PREWALK COMPLETE: only code-discovery tasks with a validated Task Policy and no Scout receive a small relative-path hint. Exact-file tiny edits, non-code tasks, and Scout-led workflows skip it. The prewalk uses the attested, hardened Git runner on the exact isolated worktree, does no model/provider call, emits no path/content trace, and adds no tool authority. It does not duplicate Second Brain or alter Context/Tool Governor decisions. The real Pi fixture proves one fewer search and local turn for the tested discovery task, with the same relevant file found.
 - PERSISTENT WORKERS DEFERRED: the current subagent API has no verified lease/resume/receipt contract for owned provider conversations, bounded retained context, per-lease tool recalculation, route and budget binding, expiry, and crash cleanup. The existing fresh Worker/correction lifecycle remains authoritative; Director and Agent Hub do not gain worker-session ownership. Council independence and 39+3 spawn accounting remain unchanged. See `docs/implementation-notes/phase-30-local-prewalk.md`.
 
+## Phase 31 checkpoint — PARTIAL
+
+- A local Provider Capability Registry now combines the live Pi registry, current authenticated-model view, owner-only runtime-callability evidence, and already selected harness profiles. Each field carries DECLARED/VERIFIED/UNKNOWN provenance; missing tool, vision, structured-output, price, or rate-limit evidence stays UNKNOWN. A zero/zero Pi cost default is never promoted to a free-price claim, and OmniRoute prices remain UNKNOWN without catalog pricing. Exact model or provider inspection uses the existing `/models --capabilities [selector]` command; no model-facing tool, network fetch, probe, adapter, routing mutation, or provider call was added. A 50-record display bound prevents broad UI output.
+- This is not Phase 31 completion: a separately validated, current OmniRoute catalog snapshot and authoritative rate-limit information are not wired in. Pi's registered OmniRoute models supply declarations only; they do not independently prove catalog freshness or live callability. A future checkpoint should add a read-only, provenance-stamped catalog ingest only if an existing local source can be safely validated, then test stale/malformed/conflicting evidence and cost units without spending provider quota. Do not infer capability from model names or change established role routes.
+
 ## Dirty files
 
 - After the Phase 26 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
@@ -102,9 +110,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 28 collaboration needs a named opt-in guest workflow and explicit disclosure/retention choices before implementation; a strong token alone would not make transcript sharing safe.
 - Phase 29 cancellation is deliberately limited to Worker/Tester and an active local session. The real Pi benchmark exercises a deterministic controller fixture sharing the production state machine/CLI adapter, while a separate installed-bridge test verifies upstream exact-attempt abort; it does not claim an authenticated full secure-workflow cancellation run. If an upstream cancellation never acknowledges, the existing delegation timeout remains the fail-closed fallback, not an immediate cleanup guarantee.
 - Phase 30 prewalk is lexical and tracked-path-only; it deliberately omits untracked paths and path names outside a conservative ASCII grammar. The offline deterministic Pi benchmark establishes only its fixture discovery path, not broad model savings or full secure-workflow E2E. Persistent provider conversations remain disabled pending the documented lease/context/budget/cleanup contract.
+- Phase 31 registry currently leaves rate limits UNKNOWN and does not independently fetch or attest a fresh OmniRoute catalog. Declared Pi registry pricing is not a verified billing quote. The inspection view is informational and cannot authorize a model that routing already rejects.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 31 from the completed bounded Phase 30 checkpoint: inspect the existing model inventory/callability, routing, and Model Harness Profiles, then strengthen the authoritative Provider Capability Registry without copying OMP's adapter catalog. Preserve zero extra monetary cost and all Phase 29/30 authority boundaries. Do not enable persistent workers without the documented verified contract. Do not reopen Phase 27 or 28 without their missing safety evidence. Do not push, create a PR, change tags, reset, clean or stash user work.
+Continue Phase 31 from functional checkpoint `6a11f79`: assess whether the existing local OmniRoute catalog exposes a safely readable, provenance-stamped snapshot; do not call paid models or invent capabilities. Add catalog validation/conflict/staleness tests if the source exists, keep pricing and rate limits UNKNOWN otherwise, and leave routing unchanged. Preserve all Phase 29/30 boundaries and the zero-extra-cost policy. Do not enable persistent workers without the documented contract; do not push, create a PR, change tags, reset, clean or stash user work.

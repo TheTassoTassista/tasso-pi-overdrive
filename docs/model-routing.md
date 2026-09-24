@@ -21,6 +21,8 @@ The precedence is fixed: security and hard correctness, explicit quality, preset
 /quality max
 /ai-tree
 /ai-tree --json
+/models --capabilities
+/models --capabilities openai-codex/gpt-5.6-sol
 ```
 
 `/preset` writes the owner-only policy at `${XDG_CONFIG_HOME:-~/.config}/pi-overdrive/model-policy.json`. A version-1 `efficient` policy is read as `normal` without rewriting or dropping overrides; an explicit `/preset` selection writes version 2. The compatibility command `/model-preset` and exact `/model-role ROLE PROVIDER/MODEL[:THINKING]` override remain available.
@@ -107,5 +109,7 @@ Workflow evidence and metadata traces record only routing metadata: preset, requ
 The Council is model-family heterogeneous—OpenAI direct, DeepSeek through OmniRoute, Qwen through OmniRoute—with an Astra Judge. DeepSeek and Qwen share one gateway and therefore do **not** provide infrastructure independence.
 
 ## Harness profiles are post-route
+
+`/models --capabilities` gives a read-only summary of the local Provider Capability Registry; add an exact provider or `provider/model` selector for bounded detail. It combines Pi declarations, receipt-backed callability and harness evidence without fetching a catalog or calling a model. UNKNOWN capability, rate limit, or price remains UNKNOWN; a default zero/zero price is not treated as proof of free usage. This inspection view cannot authorize a route.
 
 Routing chooses the provider/model/thinking tuple first. `lib/model-harness-profile.mjs` then composes that exact identity with Pi registry metadata, the existing callability cache, and `config/model-harness-profiles.json`. It cannot select a model, modify a fallback chain, lower Council/Judge effort, or spend a provider call. The profile can only narrow the Tool Governor surface, choose among already-exposed transactional edit contracts, and supply non-increasing context metadata to the Context Governor. Use `/model-profile [--json]` to inspect the current profile and evidence locally.
