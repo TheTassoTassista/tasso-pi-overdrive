@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-24T18:13:25.951Z",
+  "status": "PASS",
+  "measurementMode": "real-Pi-offline-deterministic-local-Worker-provider",
+  "piVersion": "0.85.1",
+  "prewalk": {
+    "status": "HINTS",
+    "chars": 125,
+    "selectedCount": 1,
+    "scannedCount": 2,
+    "elapsedMs": 12.639
+  },
+  "control": {
+    "elapsedMs": 377.257,
+    "promptChars": 54,
+    "approximatePromptTokens": 14,
+    "providerTurns": 3,
+    "searchCalls": 1,
+    "readCalls": 1,
+    "toolCalls": 2,
+    "result": {
+      "found": true,
+      "path": "src/parser.ts",
+      "searchDone": true,
+      "readDone": true
+    },
+    "stderrBytes": 0
+  },
+  "enriched": {
+    "elapsedMs": 280.254,
+    "promptChars": 181,
+    "approximatePromptTokens": 46,
+    "providerTurns": 2,
+    "searchCalls": 0,
+    "readCalls": 1,
+    "toolCalls": 1,
+    "result": {
+      "found": true,
+      "path": "src/parser.ts",
+      "searchDone": false,
+      "readDone": true
+    },
+    "stderrBytes": 0
+  },
+  "assertions": {
+    "eligibleWithoutScout": true,
+    "relevantPathSelected": true,
+    "sameCorrectResult": true,
+    "searchReduced": true,
+    "noExtraRead": true,
+    "oneFewerProviderTurn": true,
+    "noExtraAuthority": true
+  },
+  "deltas": {
+    "providerTurns": -1,
+    "searchCalls": -1,
+    "reads": 0,
+    "promptChars": 127,
+    "elapsedMsIncludingPrewalk": -84.364
+  },
+  "accounting": {
+    "localDeterministicProviderTurns": 5,
+    "prewalkModelCalls": 0,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "monetaryCost": 0
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

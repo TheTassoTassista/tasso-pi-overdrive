@@ -22,6 +22,7 @@ import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
 import { AGENT_HUB_EVENT, roleReceiptMetadata, roleReservationMetadata, roleStartedMetadata, workflowJournalMetadata } from "../lib/agent-hub.mjs";
 import { AgentAttemptController, requestExactUserCancellation } from "../lib/agent-hub-control.mjs";
+import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
@@ -516,6 +517,11 @@ export default function (pi: ExtensionAPI) {
         };
         if (!priorExecution) {
           if (!(["PASS", "FAIL"].includes(latestState?.status) && latestState?.evidence?.transitions?.some((entry: any) => entry.state === "FINAL"))) {
+            const prewalkStarted = performance.now();
+            const prewalk = allocation?.worktree
+              ? await buildLocalPrewalk(allocation.worktree, params.task, activeTaskPolicy)
+              : { status: "UNAVAILABLE_WORKTREE", text: "", candidateCount: 0, scannedCount: 0, digest: null };
+            try { pi.events.emit("pi-overdrive:agent-prewalk-metadata", { status: prewalk.status, candidateCount: prewalk.candidateCount, scannedCount: prewalk.scannedCount, selectedChars: prewalk.text.length, durationMs: Math.round(performance.now() - prewalkStarted), modelCalls: 0, digest: prewalk.digest }); } catch {}
             const state: any = await runEnforcedWorkflow({
               task: params.task,
               allocation,
@@ -531,6 +537,7 @@ export default function (pi: ExtensionAPI) {
               taskPolicy: activeTaskPolicy,
               sharedMemoryPack,
               sharedMemoryMetadata,
+              localPrewalk: prewalk.text,
               spawnBudgetGuard,
               receiptVerifier: (response: any, expected: any) => {
                 if (!roleReceiptStore || !response?.workflowReceipt) throw new Error(`${expected.agent} has no durable role receipt reference`);

@@ -480,6 +480,21 @@ export default function (pi: ExtensionAPI) {
       stateAfter: status("stateAfter"),
     });
   });
+  pi.events.on("pi-overdrive:agent-prewalk-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const allowed = new Set(["HINTS", "NO_SAFE_MATCH", "SKIPPED_SCOUT", "SKIPPED_POLICY", "SKIPPED_EXACT_FILE", "SKIPPED_NO_TASK", "UNAVAILABLE_WORKTREE", "UNAVAILABLE_GIT_INDEX"]);
+    const count = (field: string) => Number.isSafeInteger(data?.[field]) && (data[field] as number) >= 0 && (data[field] as number) <= 1_000_000 ? data[field] as number : undefined;
+    await record({
+      event: "agent_prewalk_metadata",
+      status: typeof data?.status === "string" && allowed.has(data.status) ? data.status : "REJECTED_INVALID_STATUS",
+      candidateCount: count("candidateCount"),
+      scannedCount: count("scannedCount"),
+      selectedChars: count("selectedChars"),
+      durationMs: count("durationMs"),
+      modelCalls: data?.modelCalls === 0 ? 0 : undefined,
+      digest: typeof data?.digest === "string" && /^[0-9a-f]{64}$/u.test(data.digest) ? data.digest : undefined,
+    });
+  });
   pi.events.on("pi-overdrive:director-metadata", async (value) => {
     let data: Record<string, unknown>;
     try { data = directorTraceMetadata(value) as Record<string, unknown>; }
