@@ -6,7 +6,7 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 28 — Secure Collaboration, NEXT; Phase 26 is COMPLETE/BOUNDED and Phase 27 is PARTIAL/DEFERRED FOR SAFETY after its contract checkpoint
+- Current phase: 29 — Agent Hub Control Plane, NEXT; Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, and Phase 28 is DEFERRED FOR SAFETY
 - Last functional Expansion commit: `ea7aad044da9ad30af6280d6f1f3fbbda7b84b3b` (Phase 27 contract)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
@@ -33,6 +33,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 
 - `a76ce40` contains the Phase 26 ledger, authority matrix, implementation note, and `benchmarks/overdrive-vs-omp/debugpy-engine-results.json`.
 - The subsequent commit containing this Phase 27 disposition and `docs/implementation-notes/phase-27-computer-use-contract.md` records the contract-only, native-backend-deferred boundary. Resolve its exact hash with `git log -1` after commit.
+- `797d50e` records the Phase 27 disposition. The following bookkeeping-only commit records the Phase 28 no-relay safety assessment; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -63,6 +64,11 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Pi model-facing capability: UNREGISTERED by policy validation. No host action, external provider, or paid call was added. See `docs/implementation-notes/phase-27-computer-use-contract.md`.
 - Status: PARTIAL/DEFERRED FOR SAFETY rather than a false cross-platform PASS. A trusted approval UI, native target-bound capture/inspection/input broker, pre-publication redaction, and host tests remain prerequisites.
 
+## Phase 28 disposition
+
+- Pinned OMP collaboration documentation was inspected read-only at `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7`. Full-control guests can influence the host; view-only guests still receive the historical session. Neither behavior maps safely to the current metadata-only Agent Hub or per-call local ACP bridge.
+- No named guest, approved disclosure set, relay endpoint, or guest-copy retention/approval boundary exists for this installation. Phase 28 remains DEFERRED FOR SAFETY; no listener, link, client, transcript replication, provider call, or model schema was created. See `docs/implementation-notes/phase-28-collaboration-assessment.md`.
+
 ## Dirty files
 
 - After the Phase 26 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
@@ -74,9 +80,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 23 host Computer Use and Phase 24 Collaboration remain deferred under the prior safety decisions until a new authority boundary is proved.
 - Phase 26 DAP is multi-adapter only on the verified Linux host; sessions remain single-session and memory-only. The Python runtime is deliberately host-pinned, and fresh worktrees must run the project-owned hashed installer. Same-UID runtime mutation remains a local trust assumption despite per-launch attestation.
 - Phase 27's `ComputerUseController` is an internal contract, not an OS sandbox or a usable desktop feature. Both native backends are unavailable; host-wide raw screenshot/input remains prohibited. Linux and Windows fixture tests do not establish host validation.
+- Phase 28 collaboration needs a named opt-in guest workflow and explicit disclosure/retention choices before implementation; a strong token alone would not make transcript sharing safe.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 28 from this clean checkpoint: inspect the Phase 24 collaboration safety assessment and the pinned OMP reference, then require a concrete authenticated, opt-in guest-rights/retention/approval boundary before any listener or shared transcript. Keep Phase 27's native Computer Use deferred until a reviewed OS broker and host evidence exist; do not use Phase 28 to bypass it. Do not push, create a PR, change tags, reset, clean or stash user work.
+Begin Phase 29 from this clean checkpoint: inspect the existing Agent Hub projection and the authoritative secure-workflow controller. Add cancel/pause/resume/message/steer only where exact attempt/session binding and Council isolation can be enforced by the existing controller; otherwise defer those verbs instead of creating a parallel authority. Do not reopen Phase 27 or 28 without their missing safety evidence. Do not push, create a PR, change tags, reset, clean or stash user work.
