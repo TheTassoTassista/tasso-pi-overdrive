@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-24T15:32:02.938Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-process-deterministic-local-provider-managed-debugpy-bubblewrap",
+  "piVersion": "0.85.1",
+  "overdriveExpansion": {
+    "elapsedMs": 2229.955,
+    "providerTurns": 12,
+    "toolResults": 11,
+    "dapMetadataEvents": 11,
+    "adapter": "debugpy",
+    "adapterVersion": "1.8.22",
+    "finalState": "EXITED",
+    "exitCode": 0,
+    "sessionOutputDigest": "84fe0996813a396ab18a0e7235be98377046b5c319177283422fe6a1f6ff166a",
+    "sessionOutputChars": 5073,
+    "modelFacingOutputChars": 5073,
+    "artifactMetadataEvents": 1,
+    "artifactManifests": 1,
+    "command": {
+      "status": "PASS",
+      "providerTurns": 0,
+      "adapterProcessFound": false,
+      "exitCode": 0
+    },
+    "assertions": {
+      "realPiWorkflowCompleted": true,
+      "launchWasIsolated": true,
+      "breakpointAndStopsWorked": true,
+      "realStackReachedHelper": true,
+      "pythonInspectionWorked": true,
+      "debuggeeIsolationEnforced": true,
+      "largeOutputExternalized": true,
+      "metadataOnly": true,
+      "deterministicCleanup": true,
+      "lazyCommandSurface": true
+    }
+  },
+  "accounting": {
+    "deterministicLocalProviderTurns": 12,
+    "paidModelCalls": 0,
+    "externalProviderCalls": 0,
+    "networkCalls": 0,
+    "cost": 0
+  },
+  "cleanup": {
+    "temporaryProcessResidue": false,
+    "workspaceWriteResidue": false,
+    "temporaryRemoved": true
+  },
+  "ompReference": {
+    "commit": "a1b3b83a7fb8460445f2f5995a6aa56047bd44c7",
+    "version": "18.2.11",
+    "executableStatus": "NOT_RUN",
+    "reason": "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence."
+  },
+  "stderrDigest": null
+}

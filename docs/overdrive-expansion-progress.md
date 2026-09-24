@@ -5,10 +5,10 @@
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra-expansion`
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
-- Current HEAD: resolve with `git rev-parse HEAD`; no Expansion commit yet at ledger creation
-- Current phase: 26 — Multi-Adapter DAP, IN PROGRESS
-- Last functional Expansion commit: none
-- Last bookkeeping Expansion commit: none
+- Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
+- Current phase: 27 — Cross-Platform Computer Use, NEXT; Phase 26 is COMPLETE/BOUNDED
+- Last functional Expansion commit: `6ec6f7595ccd629b9e850f66d9c0446d81fa9ece` (Phase 26)
+- Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
 - Extra monetary cost/external model-provider calls: €0 / 0
@@ -26,32 +26,45 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 
 ## Functional commits
 
-- None yet.
+- `6ec6f7595ccd629b9e850f66d9c0446d81fa9ece` — one controller-selected GDB/debugpy DAP tool, exact debugpy wheel/module/interpreter attestation, project-owned installer, module-only Bubblewrap mount, real Python and GDB regressions, and Pi benchmark path.
 
 ## Bookkeeping commits
 
-- None yet.
+- The commit containing this ledger, `docs/overdrive-authority-matrix.md`, `docs/implementation-notes/phase-26-multi-adapter-dap.md`, and `benchmarks/overdrive-vs-omp/debugpy-engine-results.json` closes Phase 26. Its exact hash is the branch HEAD after commit.
 
 ## Tests and benchmarks
 
 - Pre-change Expansion baseline: 461/461 PASS, syntax PASS, TypeScript PASS, package validation PASS.
-- Phase 26 focused tests: pending.
-- Phase 26 real adapter benchmark: pending.
+- Phase 26 focused tests: 11/11 PASS; real GDB/C and real Python/debugpy are both included. Adapter crash, debuggee nonzero exit, timeout/malformed frame, partial startup, policy/digest mismatch, path replacement, reverse request, model-supplied adapter/attach/remote/custom request denial, secret scrubbing, read-only workspace, external-network denial, bounded variables/output, and cleanup are covered.
+- Phase 26 real Pi/debugpy benchmark: PASS on Pi 0.85.1; 11/11 tool results, 12 deterministic local-provider turns, real breakpoint/stack/scopes/variables/step/exit 0, 24 KiB output externalized, metadata only, no process/workspace/temporary residue, zero paid/external provider calls and €0. See `benchmarks/overdrive-vs-omp/debugpy-engine-results.json`.
+- Phase 26 real Pi/GDB benchmark rerun: PASS; 8/8 tool results, nine deterministic local-provider turns, exit 0, isolation/artifact/cleanup assertions green. The original GDB result fixture was not overwritten.
+- Phase 26 authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check`: 466/466 PASS, syntax PASS, installed-Pi TypeScript PASS, package/secret validation PASS. `bash -n scripts/install-managed-dap.sh scripts/sandbox-run.sh` and `git diff --check` PASS.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
+
+## Phase 26 adapter matrix
+
+| Adapter | Implementation | Host evidence | Notes |
+|---|---|---|---|
+| GDB | IMPLEMENTED | REAL_HOST_VERIFIED | Existing Linux-x64 reviewed profile and C/Pi regressions remained green |
+| debugpy | IMPLEMENTED | REAL_HOST_VERIFIED | Linux-x64 CPython 3.14.7 and managed debugpy 1.8.22 only; exact wheel, binary, and module-tree hashes |
+| LLDB/CodeLLDB, Delve, js-debug | NOT_RUN | UNAVAILABLE | No runtime/policy/real host probe; not advertised as usable |
+| Windows backend | NOT_RUN | NOT_RUN | No Windows execution evidence or support claim |
+
+Both real adapters support bounded launch, source breakpoints, continue, step-over, stack, scopes, variables, output, status, and termination. Neither grants attach, arbitrary requests/commands, evaluation, remote targets, or workspace write.
 
 ## Dirty files
 
-- At initial ledger creation: this ledger and `docs/overdrive-authority-matrix.md` only; recheck `git status --short` after every checkpoint.
+- After the Phase 26 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
 
 ## Known limitations
 
 - The installed Pi configuration still points to the stable package, not this experimental Expansion worktree.
 - Windows backend evidence is `NOT_RUN`; no Linux result may be promoted to Windows host support.
 - Phase 23 host Computer Use and Phase 24 Collaboration remain deferred under the prior safety decisions until a new authority boundary is proved.
-- The existing DAP is a real, pinned Linux/GDB implementation, not yet a multi-adapter implementation.
+- Phase 26 DAP is multi-adapter only on the verified Linux host; sessions remain single-session and memory-only. The Python runtime is deliberately host-pinned, and fresh worktrees must run the project-owned hashed installer. Same-UID runtime mutation remains a local trust assumption despite per-launch attestation.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Implement Phase 26 adapter-profile selection and strict availability/attestation without widening DAP input authority. Add a project-local pinned second adapter only if its runtime can be isolated and real-smoked; otherwise record it as unavailable. Run focused/adversarial tests, real Pi/adapter benchmark, full gate, commit locally, update this ledger, then continue to Phase 27. Do not push, create a PR, change tags, reset, clean or stash user work.
+Begin Phase 27 from this clean checkpoint: inspect the prior Phase 23 host-computer-use safety decision and current Linux/Windows native API candidates; design a platform-neutral target-bound approval contract before any host input/screenshot implementation. Preserve the Phase 23 deferred boundary until real secure host evidence exists. Do not push, create a PR, change tags, reset, clean or stash user work.
