@@ -14,7 +14,8 @@ const writeResults = process.argv.includes("--write-results");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-agent-hub-benchmark-"));
 
 async function runSequence(root, env) {
-  const child = spawn(pi, [
+  const piExecutable = fs.realpathSync(path.isAbsolute(pi) ? pi : spawnSync("which", [pi], { encoding: "utf8" }).stdout.trim());
+  const args = [
     "--offline", "--approve", "--no-session", "--mode", "rpc",
     "--extension", hubExtension,
     "--extension", controllerFixture,
@@ -23,7 +24,12 @@ async function runSequence(root, env) {
     "--model", "agent-hub-local/fixture",
     "--thinking", "low",
     "--no-tools",
-  ], { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] });
+  ];
+  const command = [piExecutable, ...args].map((value) => {
+    if (!/^[A-Za-z0-9_./:@=-]+$/u.test(value)) throw new Error("benchmark command path contains unsupported shell characters");
+    return value;
+  }).join(" ");
+  const child = spawn("script", ["-q", "-e", "-c", command, "/dev/null"], { cwd: root, env, stdio: ["pipe", "pipe", "pipe"] });
   const events = [];
   const rawLines = [];
   const waiters = new Set();
@@ -124,7 +130,7 @@ try {
     accountingUsesReceipts: /Usage PARTIAL; attempts 2; active 1; terminal 2\./u.test(output),
     hardLimitsVisibleAndUnchanged: /spawn 3\/42 · limits c3\/d1\/r2/u.test(output),
     protectedContentAbsent: !/fixture failure content|"transcript"|toolArgs|toolResult|councilOutput|"reasoning"|credential|arbitraryPath/u.test(output),
-    noControlAuthority: /no transcripts, prompts, tool payloads, Council outputs, steering, cancellation, spawning, or model calls/u.test(output),
+    projectionStillReadOnly: /Read-only metadata projection: no transcripts, prompts, tool payloads, Council outputs, steering, spawning, or model calls/u.test(output),
     malformedEventFailsSoft: /Agent Hub: DEGRADED \(AGENT_HUB_EVENT_FIELDS_INVALID\)/u.test(degradedOutput) && !degradedOutput.includes("FORBIDDEN_FIXTURE_TRANSCRIPT"),
     durablePrivateReceipts: roleReceipts.length === 2 && roleReceipts.every((file) => (fs.statSync(file).mode & 0o777) === 0o400),
     zeroProviderTurns: !run.events.some((event) => event.type === "agent_start") && !fs.existsSync(unexpectedCallFile),

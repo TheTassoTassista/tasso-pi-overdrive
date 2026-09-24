@@ -21,6 +21,7 @@ import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfig
 import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
 import { AGENT_HUB_EVENT, roleReceiptMetadata, roleReservationMetadata, roleStartedMetadata, workflowJournalMetadata } from "../lib/agent-hub.mjs";
+import { AgentAttemptController, requestExactUserCancellation } from "../lib/agent-hub-control.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
@@ -163,6 +164,23 @@ function journalUpdate(state: any, lifecycleStatus = "RUNNING", terminal = false
 
 export default function (pi: ExtensionAPI) {
   let running = false;
+  let agentControl: AgentAttemptController | undefined;
+  let agentControlUncertain = false;
+  pi.registerCommand("agent-cancel", {
+    description: "Request cancellation of one active Worker or Tester attempt shown by /agents",
+    handler: async (args, ctx) => {
+      const executionId = args.trim();
+      if (!agentControl || !running) {
+        ctx.ui.notify("Agent control denied: NO_ACTIVE_CONTROLLER", "warning");
+        return;
+      }
+      const requestId = randomUUID();
+      const decision = requestExactUserCancellation(agentControl, { requestId, sessionId: ctx.sessionManager.getSessionId(), executionId });
+      if (decision.code === "DISPATCH_UNCERTAIN") agentControlUncertain = true;
+      try { pi.events.emit("pi-overdrive:agent-control-metadata", { operation: "CANCEL", result: decision.code, role: decision.role, sequence: decision.sequence, attemptDigest: decision.attemptDigest, requestDigest: taskDigest(requestId), stateBefore: decision.stateBefore, stateAfter: decision.stateAfter }); } catch {}
+      ctx.ui.notify(`Agent control ${decision.code}${decision.role ? `: ${decision.role}#${decision.sequence}` : ""}. ${decision.code === "CANCEL_REQUESTED" ? "Await the terminal receipt in /agents." : decision.code === "DISPATCH_UNCERTAIN" ? "Workflow will fail closed; cancellation outcome is unconfirmed." : "No cancellation was accepted."}`, decision.code === "CANCEL_REQUESTED" ? "info" : "warning");
+    },
+  });
   pi.registerTool({
     name: "secure_coding_workflow",
     label: "Enforced coding workflow",
@@ -183,6 +201,7 @@ export default function (pi: ExtensionAPI) {
       });
       let spawnBudgetGuard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit, plan: spawnBudgetPlan });
       running = true;
+      agentControlUncertain = false;
       let allocation: Record<string, any> | undefined;
       let ownerRunId = `secure-${toolCallId}-${randomUUID()}`.slice(0, 240);
       const digest = taskDigest(params.task);
@@ -273,6 +292,8 @@ export default function (pi: ExtensionAPI) {
         const executionId = requestId;
         const assignedReceiptSequence = receiptSequence++;
         const nodeId = `${String(sequence += 1).padStart(2, "0")}-${agent}`;
+        if (!agentControl) throw new Error("Agent controller is unavailable for the delegated attempt.");
+        agentControl.reserve({ executionId, role: agent, sequence: assignedReceiptSequence, attempt, cancel: () => pi.events.emit(CANCEL_EVENT, { requestId, ownerRunId, nodeId }) });
         let hubReservation: Record<string, unknown> | undefined;
         try {
           const reservationMetadata = roleReservationMetadata({
@@ -295,9 +316,11 @@ export default function (pi: ExtensionAPI) {
           publishHub(reservationMetadata);
         } catch {}
         let settled = false;
-        const finish = (callback: (value: any) => void, value: any) => {
+        let attemptStarted = false;
+        const finish = (callback: (value: any) => void, value: any, terminalStatus: string) => {
           if (settled) return;
           settled = true;
+          agentControl?.terminal(executionId, terminalStatus);
           clearTimeout(timer);
           unsubscribeStarted();
           unsubscribe();
@@ -306,34 +329,42 @@ export default function (pi: ExtensionAPI) {
         };
         const unsubscribeStarted = pi.events.on(STARTED_EVENT, (data) => {
           const started = data as Record<string, unknown>;
-          if (started?.requestId === requestId && started?.ownerRunId === ownerRunId && started?.nodeId === nodeId && hubReservation) {
-            try { publishHub(roleStartedMetadata(hubReservation)); } catch {}
+          if (started?.requestId === requestId && started?.ownerRunId === ownerRunId && started?.nodeId === nodeId) {
+            attemptStarted = true;
+            agentControl?.started(executionId);
+            if (hubReservation) try { publishHub(roleStartedMetadata(hubReservation)); } catch {}
           }
         });
         const unsubscribe = pi.events.on(RESPONSE_EVENT, (data) => {
           const response = data as Record<string, unknown>;
           if (response?.requestId === requestId && response?.ownerRunId === ownerRunId && response?.nodeId === nodeId) {
             try {
+              if (agentControl?.state(executionId) === "CANCEL_REQUESTED" && response.status !== "cancelled") agentControlUncertain = true;
               if (!evidenceRun || !roleReceiptStore) throw new Error("role receipt store is unavailable");
               const canonicalResponse = canonicalizeDelegationResponse(route, response, { attempt, schema: result.kind === "structured" ? result.schema : undefined });
+              if (attemptStarted && canonicalResponse.status === "cancelled" && canonicalResponse.launchStatus === "not_launched") {
+                canonicalResponse.launchStatus = "launched";
+                canonicalResponse.modelCalls = null;
+              }
               const receiptResponse = { ...canonicalResponse, provider: canonicalResponse.routeAttested === true ? route.provider : null };
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: receiptResponse });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              agentControl?.terminal(executionId, receipt.status);
               try { publishHub(roleReceiptMetadata(receipt, reference)); } catch {}
               const normalized = { ...canonicalResponse, status: receipt.status, provider: route.provider, usage: receipt.usage, fallbackIndex: route.fallbackIndex, callNumber, retryCount: attempt - 1, workflowReceipt: { ...reference, executionId, sequence: assignedReceiptSequence } };
               delegationAudit.push({ agent, role: policyRole, attempt, retryCount: attempt - 1, callNumber, status: receipt.status, failureCategory: receipt.failure_category, failureReason: canonicalResponse.failureReason, failureMetadata: receipt.failure_metadata, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, fallbackIndex: route.fallbackIndex, preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, launchContractDigest: receipt.launch_contract_digest, policyDigest: activeModelPolicy.digest, runId: response.runId, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest, exitCode: receipt.exit_code });
               if (receipt.status === "completed") {
-                finish(resolve, normalized);
+                finish(resolve, normalized, receipt.status);
               } else {
                 const failure = new Error(`${agent} delegation ended with ${receipt.status}: ${String(canonicalResponse.error ?? "")}`);
                 Object.assign(failure, { delegationReceiptRecorded: true, failureCategory: receipt.failure_category, delegationStatus: receipt.status });
-                finish(reject, failure);
+                finish(reject, failure, receipt.status);
               }
             } catch (error) {
               if (error && typeof error === "object") {
                 try { Object.assign(error, { delegationLaunched: true }); } catch {}
               }
-              finish(reject, error);
+              finish(reject, error, "failed");
             }
           }
         });
@@ -344,6 +375,7 @@ export default function (pi: ExtensionAPI) {
               const failureCategory = classifyDelegationFailure({ status, error: message });
               const receipt = makeRoleReceipt({ runId: evidenceRun.runId, taskId: digest, protocolNonce, executionId, sequence: assignedReceiptSequence, role: agent, round, iteration, attempt, nodeId, ownerRunId, response: { status, agent, nodeId, ownerRunId, error: message, failureCategory, launchStatus: "launched" } });
               const reference = writeRoleReceipt(roleReceiptStore, receipt);
+              agentControl?.terminal(executionId, receipt.status);
               try { publishHub(roleReceiptMetadata(receipt, reference)); } catch {}
               delegationAudit.push({ agent, attempt, status, failureCategory, launchStatus: receipt.launch_status, modelCalls: receipt.model_calls, provider: receipt.provider, model: receipt.model, thinking: receipt.thinking, usage: receipt.usage, nodeId, ownerRunId, executionId, receiptSequence: assignedReceiptSequence, receiptSha256: reference.sha256, errorDigest: receipt.error_digest });
               receiptRecorded = true;
@@ -351,7 +383,7 @@ export default function (pi: ExtensionAPI) {
           } catch {}
           const failure = new Error(message);
           Object.assign(failure, { delegationReceiptRecorded: receiptRecorded, failureCategory: classifyDelegationFailure({ status, error: message }), delegationStatus: status });
-          finish(reject, failure);
+          finish(reject, failure, status);
         };
         const abort = () => {
           pi.events.emit(CANCEL_EVENT, { requestId, ownerRunId, nodeId });
@@ -474,6 +506,7 @@ export default function (pi: ExtensionAPI) {
           if (!Number.isSafeInteger(priorBudget?.used) || !Number.isSafeInteger(priorBudget?.retriesUsed)) throw new Error("interrupted workflow has no valid spawn budget state");
           spawnBudgetGuard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit, plan: spawnBudgetPlan, initialUsed: priorBudget.used, initialRetriesUsed: priorBudget.retriesUsed });
         }
+        agentControl = new AgentAttemptController({ sessionId: ctx.sessionManager.getSessionId(), runId: evidenceRun.runId, taskDigest: digest });
         const verify = async ({ cwd }: { cwd: string }) => {
           const result = await pi.exec(process.execPath, [verifyScript, "--json", "--full", "--cwd", cwd], { cwd, ...(signal ? { signal } : {}), timeout: 16 * 60 * 1000 });
           let parsed;
@@ -539,6 +572,7 @@ export default function (pi: ExtensionAPI) {
           try { repositoryEvidence = snapshotWorktree(allocation.worktree); } catch {}
         }
       } finally {
+        if (agentControlUncertain) workflowError ??= new Error("Exact attempt cancellation was not acknowledged by the delegated controller.");
         let execution: any = priorExecution;
         let executionSha256: string | undefined = priorExecutionSha256;
         let evidenceStatus = priorExecution ? "PASS" : "FAIL";
@@ -631,6 +665,8 @@ export default function (pi: ExtensionAPI) {
             }
           }
         }
+        agentControl?.close();
+        agentControl = undefined;
         running = false;
       }
 

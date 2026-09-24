@@ -464,6 +464,22 @@ export default function (pi: ExtensionAPI) {
       receiptDigest: scalar("receiptDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:agent-control-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const digest = (field: string) => typeof data?.[field] === "string" && /^[0-9a-f]{64}$/u.test(data[field] as string) ? data[field] as string : undefined;
+    const status = (field: string) => typeof data?.[field] === "string" && /^[A-Z_]{1,48}$/u.test(data[field] as string) ? data[field] as string : undefined;
+    await record({
+      event: "agent_control_metadata",
+      operation: data?.operation === "CANCEL" ? "CANCEL" : "REJECTED_INVALID_OPERATION",
+      result: status("result"),
+      role: data?.role === "worker" || data?.role === "tester" ? data.role : undefined,
+      sequence: Number.isSafeInteger(data?.sequence) && (data.sequence as number) >= 0 && (data.sequence as number) < 42 ? data.sequence as number : undefined,
+      attemptDigest: digest("attemptDigest"),
+      requestDigest: digest("requestDigest"),
+      stateBefore: status("stateBefore"),
+      stateAfter: status("stateAfter"),
+    });
+  });
   pi.events.on("pi-overdrive:director-metadata", async (value) => {
     let data: Record<string, unknown>;
     try { data = directorTraceMetadata(value) as Record<string, unknown>; }

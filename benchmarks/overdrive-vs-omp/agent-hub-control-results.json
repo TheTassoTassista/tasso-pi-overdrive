@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "recordedAt": "2026-09-24T16:14:57.469Z",
+  "status": "PASS",
+  "measurementMode": "real-pi-offline-controller-owned-process-worktree-durable-receipt",
+  "elapsedMs": 1033.45,
+  "piVersion": "0.85.1",
+  "attemptId": "adb21d68-2842-4e54-b796-14e905c818f1",
+  "receiptCount": 1,
+  "assertions": {
+    "piCommandsRegistered": true,
+    "activeWorkerProjected": true,
+    "exactCancelAccepted": true,
+    "durableCancelledReceipt": true,
+    "terminalProjected": true,
+    "usageNotInvented": true,
+    "worktreeDestroyed": true,
+    "runtimeReleased": true,
+    "portReleased": true,
+    "zeroProviderCalls": true,
+    "productionCommandRegistered": true,
+    "unrelatedProcessSurvived": true,
+    "piExitZero": true
+  },
+  "accounting": {
+    "providerCalls": 0,
+    "externalNetworkCalls": 0,
+    "monetaryCost": 0
+  },
+  "stderr": "",
+  "cleanup": {
+    "temporaryRemoved": true,
+    "unrelatedProcessStopped": true,
+    "workerAbsent": true,
+    "residualAllocations": 0
+  }
+}

@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "recordedAt": "2026-09-21T15:59:48.692Z",
+  "recordedAt": "2026-09-24T16:09:31.614Z",
   "status": "PASS",
   "measurementMode": "real-pi-process-controller-events-and-durable-receipts",
   "piVersion": "0.85.1",
   "overdriveUltra": {
-    "elapsedMs": 286.097,
+    "elapsedMs": 291.391,
     "rosterEntries": 3,
     "activeEntries": 1,
     "terminalEntries": 2,
@@ -19,7 +19,7 @@
       "accountingUsesReceipts": true,
       "hardLimitsVisibleAndUnchanged": true,
       "protectedContentAbsent": true,
-      "noControlAuthority": true,
+      "projectionStillReadOnly": true,
       "malformedEventFailsSoft": true,
       "durablePrivateReceipts": true,
       "zeroProviderTurns": true

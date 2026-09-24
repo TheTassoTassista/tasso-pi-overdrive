@@ -123,6 +123,7 @@ test("authoritative reservation and correlated started event form a conservative
   projection.ingest(roleStartedMetadata(reserved));
   snapshot = projection.snapshot();
   assert.equal(snapshot.roster.roles[0].status, "RUNNING");
+  assert.equal(snapshot.roster.roles[0].attemptId, reserved.executionId);
   assert.equal(snapshot.roster.roles[0].modelCalls, null);
   assert.match(renderAgentHubSnapshot(snapshot), /UNAVAILABLE \| UNAVAILABLE \| UNAVAILABLE/u);
 });
@@ -210,6 +211,8 @@ test("Council slots expose identity metadata but cannot carry member content acr
   const hostile = { ...second, councilOutput: "MEMBER_B_PROTECTED_CONCLUSION" };
   assert.throws(() => projection.ingest(hostile), /AGENT_HUB_EVENT_FIELDS_INVALID/u);
   const serialized = JSON.stringify(projection.snapshot());
+  assert.equal(projection.snapshot().roster.roles[0].attemptId, null);
+  assert.equal(projection.snapshot().roster.roles[1].attemptId, null);
   assert.match(serialized, /council-1/u);
   assert.match(serialized, /council-2/u);
   assert.doesNotMatch(serialized, /MEMBER_B_PROTECTED_CONCLUSION|"councilOutput"|"conclusion"|"recommendation"|"transcript"|"toolArgs"|"toolResult"/u);
@@ -260,6 +263,7 @@ test("the user command is schema-free/read-only and Judge still follows three Co
   const workflow = fs.readFileSync(path.join(root, "lib", "workflow-state.mjs"), "utf8");
   assert.match(extension, /registerCommand\("agents"/u);
   assert.doesNotMatch(extension, /pi\.registerTool|ctx\.modelRegistry|pi\.sendMessage|pi\.sendUserMessage|pi\.exec|node:child_process|prompt-template:subagent:cancel/u);
+  assert.match(fs.readFileSync(path.join(root, "extensions", "secure-workflow.ts"), "utf8"), /registerCommand\("agent-cancel"/u);
   assert.ok(workflow.indexOf('members.length !== COUNCIL_MEMBERS.length') < workflow.indexOf('runRole("council-judge"'));
   assert.match(workflow, /COUNCIL_MEMBERS\.length !== MAX_WORKFLOW_CONCURRENCY/u);
 });
