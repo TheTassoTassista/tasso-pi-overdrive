@@ -12,6 +12,7 @@ import { calculateRequiredSpawnBudget, EXTERNAL_SUBAGENT_QUOTA, readConfiguredSp
 import { memoryPolicyTopology, resolveMemoryPolicy } from "../lib/memory-policy.mjs";
 import { availableContextFromPiUsage, renderTaskPolicy, resolveTaskPolicy } from "../lib/task-governor.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
+import { buildProviderCapabilityRegistry } from "../lib/provider-capability-registry.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -191,8 +192,20 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
     },
   });
   pi.registerCommand("models", {
-    description: "List registered/authenticated models and public callability metadata",
-    handler: async (_args, ctx) => { try { ctx.ui.notify(JSON.stringify(publicInventory(ctx), null, 2), "info"); } catch (error) { notifyError(ctx, error); } },
+    description: "List local model availability; /models --capabilities [PROVIDER or PROVIDER/MODEL] inspects evidence without provider calls",
+    handler: async (args, ctx) => {
+      try {
+        const request = args.trim();
+        if (!request) { ctx.ui.notify(JSON.stringify(publicInventory(ctx), null, 2), "info"); return; }
+        if (!request.startsWith("--capabilities") || (request !== "--capabilities" && !/^--capabilities [A-Za-z0-9._/-]+$/u.test(request))) throw new Error("usage: /models [--capabilities [PROVIDER or PROVIDER/MODEL]]");
+        const selector = request.slice("--capabilities".length).trim();
+        const registry = buildProviderCapabilityRegistry({ registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
+        const selected = selector ? registry.models.filter((record: any) => selector.includes("/") ? record.identity === selector : record.provider === selector) : [];
+        if (selector && selected.length === 0) throw new Error("provider_registry_selector_not_found");
+        if (selected.length > 50) throw new Error("provider_registry_selector_too_broad");
+        ctx.ui.notify(JSON.stringify({ version: registry.version, kind: registry.kind, digest: registry.digest, totalModels: registry.models.length, providers: [...new Set(registry.models.map((record: any) => record.provider))], selectedModels: selected, decisionModelCalls: registry.decisionModelCalls, catalogFetches: registry.catalogFetches, routingMutations: registry.routingMutations }, null, 2), "info");
+      } catch (error) { notifyError(ctx, error); }
+    },
   });
   pi.registerCommand("model-profile", {
     description: "Inspect the local harness profile for the already-selected model without making a model call",

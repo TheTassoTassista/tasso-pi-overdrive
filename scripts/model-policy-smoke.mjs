@@ -86,7 +86,12 @@ try {
   try { parsedProfile = JSON.parse(notifications(modelProfile)); } catch {}
   check("model-profile-command-generic-safe-and-zero-model-calls", modelProfile.code === 0 && noModelCall(modelProfile) && parsedProfile?.id === "generic-safe-v1" && parsedProfile?.decisionModelCalls === 0 && parsedProfile?.match?.identity === "pi-overdrive-routing-audit/driver", parsedProfile ?? (notifications(modelProfile) || modelProfile.stderr));
 
-  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile)].join("\n");
+  const providerRegistry = await run({ id: "provider-registry", type: "prompt", message: "/models --capabilities pi-overdrive-routing-audit/driver" });
+  let parsedRegistry;
+  try { parsedRegistry = JSON.parse(notifications(providerRegistry)); } catch {}
+  check("provider-capability-registry-local-and-zero-model-calls", providerRegistry.code === 0 && noModelCall(providerRegistry) && parsedRegistry?.selectedModels?.length === 1 && parsedRegistry.selectedModels[0].identity === "pi-overdrive-routing-audit/driver" && parsedRegistry.selectedModels[0].availability.runtime.state === "UNKNOWN" && parsedRegistry.selectedModels[0].pricing.state === "UNKNOWN" && parsedRegistry.decisionModelCalls === 0 && parsedRegistry.catalogFetches === 0 && parsedRegistry.routingMutations === 0, parsedRegistry ?? (notifications(providerRegistry) || providerRegistry.stderr));
+
+  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile), notifications(providerRegistry)].join("\n");
   check("routing-command-output-secret-free", !/bearer\s+|api[_ -]?key\s*[:=]|cookie\s*[:=]|credential\s*[:=]/iu.test(secretScan), "metadata-only command output");
 } catch (error) {
   check("routing-smoke-harness", false, error instanceof Error ? error.message : String(error));
@@ -94,6 +99,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 11 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 12 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, modelInferenceCalls: 0, providerExecution: "NONE_COMMAND_HANDLERS_ONLY", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);
