@@ -13,6 +13,7 @@ import { memoryPolicyTopology, resolveMemoryPolicy } from "../lib/memory-policy.
 import { availableContextFromPiUsage, renderTaskPolicy, resolveTaskPolicy } from "../lib/task-governor.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import { buildProviderCapabilityRegistry } from "../lib/provider-capability-registry.mjs";
+import { readLocalOpenRouterCatalog } from "../lib/provider-catalog-snapshot.mjs";
 
 function notifyError(ctx: ExtensionContext, error: unknown): void {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
@@ -192,18 +193,37 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
     },
   });
   pi.registerCommand("models", {
-    description: "List local model availability; /models --capabilities [PROVIDER or PROVIDER/MODEL] inspects evidence without provider calls",
+    description: "List local model availability; /models --capabilities [--json] [--provider NAME] [--callable] [MODEL] inspects local evidence",
     handler: async (args, ctx) => {
       try {
         const request = args.trim();
         if (!request) { ctx.ui.notify(JSON.stringify(publicInventory(ctx), null, 2), "info"); return; }
-        if (!request.startsWith("--capabilities") || (request !== "--capabilities" && !/^--capabilities [A-Za-z0-9._/-]+$/u.test(request))) throw new Error("usage: /models [--capabilities [PROVIDER or PROVIDER/MODEL]]");
-        const selector = request.slice("--capabilities".length).trim();
-        const registry = buildProviderCapabilityRegistry({ registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
-        const selected = selector ? registry.models.filter((record: any) => selector.includes("/") ? record.identity === selector : record.provider === selector) : [];
-        if (selector && selected.length === 0) throw new Error("provider_registry_selector_not_found");
+        const tokens = request.split(/\s+/u);
+        if (tokens.shift() !== "--capabilities") throw new Error("usage: /models --capabilities [--json] [--provider NAME] [--callable] [MODEL]");
+        let json = false; let callable = false; let provider = ""; let selector = "";
+        while (tokens.length) {
+          const token = tokens.shift()!;
+          if (token === "--json" && !json) json = true;
+          else if (token === "--callable" && !callable) callable = true;
+          else if (token === "--provider" && !provider && tokens.length) provider = tokens.shift()!;
+          else if (!selector && !token.startsWith("--")) selector = token;
+          else throw new Error("usage: /models --capabilities [--json] [--provider NAME] [--callable] [MODEL]");
+        }
+        if ((provider && !/^[A-Za-z0-9._-]+$/u.test(provider)) || (selector && !/^[~A-Za-z0-9._:/-]+$/u.test(selector))) throw new Error("provider_registry_selector_invalid");
+        const localCatalog = readLocalOpenRouterCatalog();
+        const registry = buildProviderCapabilityRegistry({ registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable(), catalogSnapshot: localCatalog.snapshot, catalogStatus: localCatalog.status });
+        const selected = provider || callable || selector ? registry.models.filter((record: any) => (!provider || record.provider === provider) && (!callable || record.availability.selectable) && (!selector || (selector.includes("/") ? record.identity === selector : record.provider === selector || record.identity.toLowerCase().includes(selector.toLowerCase())))) : [];
+        if ((provider || selector) && selected.length === 0) throw new Error("provider_registry_selector_not_found");
         if (selected.length > 50) throw new Error("provider_registry_selector_too_broad");
-        ctx.ui.notify(JSON.stringify({ version: registry.version, kind: registry.kind, digest: registry.digest, totalModels: registry.models.length, providers: [...new Set(registry.models.map((record: any) => record.provider))], selectedModels: selected, decisionModelCalls: registry.decisionModelCalls, catalogFetches: registry.catalogFetches, routingMutations: registry.routingMutations }, null, 2), "info");
+        if (json) {
+          ctx.ui.notify(JSON.stringify({ version: registry.version, kind: registry.kind, digest: registry.digest, totalModels: registry.models.length, catalog: registry.catalog, selectedModels: selected, decisionModelCalls: registry.decisionModelCalls, catalogFetches: registry.catalogFetches, routingMutations: registry.routingMutations }, null, 2), "info");
+          return;
+        }
+        ctx.ui.notify([
+          `Provider capabilities: ${selected.length}/${registry.models.length}; local catalog ${registry.catalog.status}; conflicts ${registry.conflicts.length}`,
+          ...selected.map((record: any) => `${record.identity} | ${record.availability.freshlyVerified ? "runtime-verified" : record.availability.selectable ? "route-eligible; evidence not fresh" : "not route-eligible"} (${record.availability.runtime.state}) | context ${record.contextWindow.value ?? "?"} [${record.contextWindow.state}] | tools ${record.toolSupport.value ?? "?"} | vision ${record.vision.value ?? "?"} | structured ${record.structuredOutput.value ?? "?"} | price ${record.pricing.state === "UNKNOWN" ? "UNKNOWN" : `${record.pricing.value.input}/${record.pricing.value.output} ${record.pricing.value.currency ?? "unit unknown"}`} | rate UNKNOWN`),
+          "Read-only local evidence; catalog presence does not prove runtime callability or current price.",
+        ].join("\n"), "info");
       } catch (error) { notifyError(ctx, error); }
     },
   });

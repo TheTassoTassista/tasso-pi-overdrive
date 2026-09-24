@@ -2,6 +2,8 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { type ExtensionAPI, type ExtensionContext, sessionEntryToContextMessages } from "@earendil-works/pi-coding-agent";
 import { CONTEXT_FIT_STATUS, contextFitMetadata, governContext, readContextGovernorPolicy, renderContextFit } from "../lib/context-governor.mjs";
 import { contextModelForProfile, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
+import { buildProviderCapabilityRegistry, contextModelWithRegistryCap } from "../lib/provider-capability-registry.mjs";
+import { readLocalOpenRouterCatalog } from "../lib/provider-catalog-snapshot.mjs";
 import { ProjectRuleRegistry, renderRuleStatus, rulePackMetadata } from "../lib/rule-interoperability.mjs";
 
 interface FitProof {
@@ -19,11 +21,17 @@ function runGate(pi: ExtensionAPI, messages: AgentMessage[], ctx: ExtensionConte
   if (!ctx.model) throw new Error("context_model_unavailable");
   const usage = ctx.getContextUsage();
   const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
+  const localCatalog = readLocalOpenRouterCatalog();
+  const registry = buildProviderCapabilityRegistry({
+    registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable(),
+    catalogSnapshot: localCatalog.snapshot, catalogStatus: localCatalog.status,
+    onlyIdentity: `${ctx.model.provider}/${ctx.model.id}`,
+  });
   return governContext({
     messages,
     systemPrompt: ctx.getSystemPrompt(),
     ...toolsFor(pi),
-    model: contextModelForProfile(ctx.model, profile),
+    model: contextModelWithRegistryCap(contextModelForProfile(ctx.model, profile), registry.models[0]),
     reserveOutputTokens,
     reportedUsageTokens: usage?.tokens ?? undefined,
     reportedContextWindow: usage?.contextWindow,

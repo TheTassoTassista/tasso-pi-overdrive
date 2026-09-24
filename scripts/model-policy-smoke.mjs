@@ -13,6 +13,7 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-routing-sm
 const agentDir = path.join(temporary, "agent");
 const policyFile = path.join(temporary, "config", "pi-overdrive", "model-policy.json");
 const callabilityFile = path.join(temporary, "config", "pi-overdrive", "model-callability.json");
+const catalogFile = path.join(temporary, "openrouter-catalog.json");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 const directIds = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"].map((id) => `openai-codex/${id}`);
@@ -25,7 +26,7 @@ function run(message) {
   const messages = Array.isArray(message) ? message : [message];
   const child = spawnSync(pi, ["--extension", provider, "--extension", extension, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-routing-audit", "--model", "driver", "--api-key", "audit-only", "--no-tools"], {
     cwd: root,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only" },
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile, PI_OVERDRIVE_OMNIROUTE_CATALOG_CACHE: catalogFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only" },
     input: `${messages.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
     encoding: "utf8",
     timeout: 30_000,
@@ -43,6 +44,7 @@ try {
   fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
   fs.mkdirSync(path.dirname(callabilityFile), { recursive: true, mode: 0o700 });
   fs.writeFileSync(callabilityFile, `${JSON.stringify({ version: 1, entries: Object.fromEntries([...directIds, ...omniIds].map((identity) => [identity, { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "DETERMINISTIC_LOCAL_PROVIDER" }])) }, null, 2)}\n`, { mode: 0o600 });
+  fs.writeFileSync(catalogFile, `${JSON.stringify({ fetchedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(), data: [{ id: "fixture/stale", context_length: 64000 }] })}\n`, { mode: 0o600 });
 
   const catalog = await run({ id: "commands", type: "get_commands" });
   const commands = catalog.events.find((event) => event.type === "response" && event.id === "commands")?.data?.commands ?? [];
@@ -86,12 +88,16 @@ try {
   try { parsedProfile = JSON.parse(notifications(modelProfile)); } catch {}
   check("model-profile-command-generic-safe-and-zero-model-calls", modelProfile.code === 0 && noModelCall(modelProfile) && parsedProfile?.id === "generic-safe-v1" && parsedProfile?.decisionModelCalls === 0 && parsedProfile?.match?.identity === "pi-overdrive-routing-audit/driver", parsedProfile ?? (notifications(modelProfile) || modelProfile.stderr));
 
-  const providerRegistry = await run({ id: "provider-registry", type: "prompt", message: "/models --capabilities pi-overdrive-routing-audit/driver" });
+  const providerRegistry = await run({ id: "provider-registry", type: "prompt", message: "/models --capabilities --json pi-overdrive-routing-audit/driver" });
   let parsedRegistry;
   try { parsedRegistry = JSON.parse(notifications(providerRegistry)); } catch {}
   check("provider-capability-registry-local-and-zero-model-calls", providerRegistry.code === 0 && noModelCall(providerRegistry) && parsedRegistry?.selectedModels?.length === 1 && parsedRegistry.selectedModels[0].identity === "pi-overdrive-routing-audit/driver" && parsedRegistry.selectedModels[0].availability.runtime.state === "UNKNOWN" && parsedRegistry.selectedModels[0].pricing.state === "UNKNOWN" && parsedRegistry.decisionModelCalls === 0 && parsedRegistry.catalogFetches === 0 && parsedRegistry.routingMutations === 0, parsedRegistry ?? (notifications(providerRegistry) || providerRegistry.stderr));
 
-  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile), notifications(providerRegistry)].join("\n");
+  const providerSummary = await run({ id: "provider-summary", type: "prompt", message: "/models --capabilities" });
+  const summaryText = notifications(providerSummary);
+  check("provider-capability-registry-default-output-bounded", providerSummary.code === 0 && noModelCall(providerSummary) && summaryText.includes("Provider capabilities: 0/") && summaryText.includes("local catalog STALE") && summaryText.length < 500, { characters: summaryText.length, modelCalls: 0 });
+
+  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile), notifications(providerRegistry), summaryText].join("\n");
   check("routing-command-output-secret-free", !/bearer\s+|api[_ -]?key\s*[:=]|cookie\s*[:=]|credential\s*[:=]/iu.test(secretScan), "metadata-only command output");
 } catch (error) {
   check("routing-smoke-harness", false, error instanceof Error ? error.message : String(error));
@@ -99,6 +105,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 12 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 13 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, modelInferenceCalls: 0, providerExecution: "NONE_COMMAND_HANDLERS_ONLY", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);
