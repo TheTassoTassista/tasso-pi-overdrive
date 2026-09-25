@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "status": "PASS",
+  "measurementMode": "real-pi-process-controller-observation-fixture",
+  "piVersion": "0.85.1",
+  "durationMs": 616.636,
+  "metadataEvents": 11,
+  "statuses": [
+    "SKIPPED_DISABLED",
+    "SKIPPED_DISABLED",
+    "SKIPPED_DISABLED",
+    "SKIPPED_INELIGIBLE",
+    "SKIPPED_NO_TRIGGER",
+    "REVIEWED",
+    "SKIPPED_DUPLICATE",
+    "SKIPPED_NO_TRIGGER",
+    "SKIPPED_NO_TRIGGER",
+    "REVIEWED",
+    "FAILED_SOFT"
+  ],
+  "adviceCount": 2,
+  "assertions": {
+    "registered": true,
+    "defaultOff": true,
+    "tinyDenied": true,
+    "repeatedFailureAdvised": true,
+    "duplicateSuppressed": true,
+    "regressionAdvised": true,
+    "malformedFailSoft": true,
+    "customAdviceNoTurn": true,
+    "noModelOrToolCalls": true,
+    "boundedMetadataOnly": true
+  },
+  "accounting": {
+    "deterministicLocalModelCalls": 0,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "costEur": 0
+  },
+  "limitations": {
+    "fullSecureWorkflowE2E": "NOT_RUN",
+    "controllerObservationPath": "fixture-emitted through production event contract"
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}

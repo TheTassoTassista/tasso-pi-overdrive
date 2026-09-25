@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "enabledByDefault": false,
+  "maxReviewsPerTask": 2,
+  "tokenSaverMaxReviews": 1,
+  "cooldownMs": 30000,
+  "failureThreshold": 2,
+  "tokenSaverFailureThreshold": 3,
+  "maxDeltaChars": 768,
+  "maxAdviceChars": 600
+}

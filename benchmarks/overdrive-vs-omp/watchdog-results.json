@@ -1,0 +1,423 @@
+{
+  "version": 1,
+  "status": "PASS",
+  "measurementMode": "deterministic-local-watchdog-controller",
+  "fixtureDigest": "0824d5accd93343b0daac5b278af9d583c97bf6053c8da5c841567a267f53f27",
+  "control": {
+    "name": "CONTROL",
+    "reports": [
+      {
+        "scenario": "successful",
+        "index": 0,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.266,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 1,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.019,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 2,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.034,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 3,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.021,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 0,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.019,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 1,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.015,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 2,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.014,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 3,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.017,
+        "stateDigest": null
+      },
+      {
+        "scenario": "regression",
+        "index": 0,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.019,
+        "stateDigest": null
+      },
+      {
+        "scenario": "regression",
+        "index": 1,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.022,
+        "stateDigest": null
+      },
+      {
+        "scenario": "regression",
+        "index": 2,
+        "status": "SKIPPED_DISABLED",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.018,
+        "stateDigest": null
+      }
+    ],
+    "actualWorkflows": {
+      "successful": {
+        "status": "PASS",
+        "verificationCount": 1,
+        "mainTaskCalls": 7,
+        "workerCalls": 1,
+        "correctionAdviceDeliveries": 0,
+        "watchdogInvocations": 0,
+        "duplicateSuppressions": 0,
+        "maxContextChars": 0,
+        "reasons": [],
+        "localFixtureDelegations": 7,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      },
+      "repeatedError": {
+        "status": "PASS",
+        "verificationCount": 3,
+        "mainTaskCalls": 22,
+        "workerCalls": 3,
+        "correctionAdviceDeliveries": 0,
+        "watchdogInvocations": 0,
+        "duplicateSuppressions": 0,
+        "maxContextChars": 0,
+        "reasons": [],
+        "localFixtureDelegations": 22,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      },
+      "regression": {
+        "status": "PASS",
+        "verificationCount": 3,
+        "mainTaskCalls": 26,
+        "workerCalls": 3,
+        "correctionAdviceDeliveries": 0,
+        "watchdogInvocations": 0,
+        "duplicateSuppressions": 0,
+        "maxContextChars": 0,
+        "reasons": [],
+        "localFixtureDelegations": 26,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      }
+    },
+    "invocations": 0,
+    "duplicateSuppressions": 0,
+    "modelCalls": 0,
+    "toolCalls": 0,
+    "finalStatus": {
+      "version": 1,
+      "enabled": false,
+      "runActive": true,
+      "reviewCount": 0,
+      "findingCount": 0,
+      "maxReviewsPerTask": 2,
+      "authority": {
+        "tools": 0,
+        "modelCalls": 0,
+        "mutations": false,
+        "routingChanges": false,
+        "spawns": false,
+        "councilAccess": false
+      }
+    }
+  },
+  "watchdog": {
+    "name": "WATCHDOG",
+    "reports": [
+      {
+        "scenario": "successful",
+        "index": 0,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.068,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 1,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.016,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 2,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.01,
+        "stateDigest": null
+      },
+      {
+        "scenario": "successful",
+        "index": 3,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.018,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 0,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.017,
+        "stateDigest": null
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 1,
+        "status": "REVIEWED",
+        "reason": "REPEATED_FAILURE",
+        "severity": "CONCERN",
+        "contextChars": 467,
+        "modelCalls": 0,
+        "durationMs": 1.021,
+        "stateDigest": "736cd6b440b805cf1a8c6c2e6c6c7566b3ee27c9772cf3c0660c6598fd2a77c9"
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 2,
+        "status": "SKIPPED_DUPLICATE",
+        "reason": "REPEATED_FAILURE",
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.023,
+        "stateDigest": "736cd6b440b805cf1a8c6c2e6c6c7566b3ee27c9772cf3c0660c6598fd2a77c9"
+      },
+      {
+        "scenario": "repeatedError",
+        "index": 3,
+        "status": "REVIEWED",
+        "reason": "REPEATED_FAILURE",
+        "severity": "CONCERN",
+        "contextChars": 461,
+        "modelCalls": 0,
+        "durationMs": 0.162,
+        "stateDigest": "4965fcd99276933115518155ef735b16ff41152e5a2543ed6cbaa29a7b5c3a70"
+      },
+      {
+        "scenario": "regression",
+        "index": 0,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.011,
+        "stateDigest": null
+      },
+      {
+        "scenario": "regression",
+        "index": 1,
+        "status": "SKIPPED_NO_TRIGGER",
+        "reason": null,
+        "severity": null,
+        "contextChars": 0,
+        "modelCalls": 0,
+        "durationMs": 0.013,
+        "stateDigest": null
+      },
+      {
+        "scenario": "regression",
+        "index": 2,
+        "status": "REVIEWED",
+        "reason": "VERIFICATION_REGRESSION",
+        "severity": "CONCERN",
+        "contextChars": 467,
+        "modelCalls": 0,
+        "durationMs": 0.04,
+        "stateDigest": "ceb7da2d00fc6a1e7e47dc4a7d9d363df29f112a7a90845f1bf129c353bcbc18"
+      }
+    ],
+    "actualWorkflows": {
+      "successful": {
+        "status": "PASS",
+        "verificationCount": 1,
+        "mainTaskCalls": 7,
+        "workerCalls": 1,
+        "correctionAdviceDeliveries": 0,
+        "watchdogInvocations": 0,
+        "duplicateSuppressions": 0,
+        "maxContextChars": 0,
+        "reasons": [],
+        "localFixtureDelegations": 7,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      },
+      "repeatedError": {
+        "status": "PASS",
+        "verificationCount": 3,
+        "mainTaskCalls": 22,
+        "workerCalls": 3,
+        "correctionAdviceDeliveries": 1,
+        "watchdogInvocations": 2,
+        "duplicateSuppressions": 8,
+        "maxContextChars": 474,
+        "reasons": [
+          "REPEATED_FAILURE",
+          "REPEATED_FAILURE"
+        ],
+        "localFixtureDelegations": 22,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      },
+      "regression": {
+        "status": "PASS",
+        "verificationCount": 3,
+        "mainTaskCalls": 26,
+        "workerCalls": 3,
+        "correctionAdviceDeliveries": 1,
+        "watchdogInvocations": 1,
+        "duplicateSuppressions": 0,
+        "maxContextChars": 467,
+        "reasons": [
+          "VERIFICATION_REGRESSION"
+        ],
+        "localFixtureDelegations": 26,
+        "externalProviderCalls": 0,
+        "modelCalls": 0,
+        "toolCalls": 0
+      }
+    },
+    "invocations": 3,
+    "duplicateSuppressions": 1,
+    "modelCalls": 0,
+    "toolCalls": 0,
+    "finalStatus": {
+      "version": 1,
+      "enabled": true,
+      "runActive": true,
+      "reviewCount": 1,
+      "findingCount": 1,
+      "maxReviewsPerTask": 2,
+      "authority": {
+        "tools": 0,
+        "modelCalls": 0,
+        "mutations": false,
+        "routingChanges": false,
+        "spawns": false,
+        "councilAccess": false
+      }
+    }
+  },
+  "assertions": {
+    "controlNoReview": true,
+    "successfulSilent": true,
+    "repeatedFailureCaught": true,
+    "unchangedSuppressed": true,
+    "regressionCaught": true,
+    "boundedInput": true,
+    "noExtraAuthority": true,
+    "workflowParity": true,
+    "actualRepeatedFailure": true,
+    "actualRegression": true,
+    "actualSuccessSilent": true,
+    "actualControlSilent": true,
+    "actualBoundedNoCost": true
+  },
+  "accounting": {
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "costEur": 0
+  },
+  "limitations": {
+    "fullSecureWorkflowE2E": "NOT_RUN"
+  },
+  "ompReference": {
+    "executableStatus": "NOT_RUN"
+  }
+}

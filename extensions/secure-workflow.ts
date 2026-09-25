@@ -24,6 +24,7 @@ import { AGENT_HUB_EVENT, roleReceiptMetadata, roleReservationMetadata, roleStar
 import { AgentAttemptController, requestExactUserCancellation } from "../lib/agent-hub-control.mjs";
 import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
+import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -165,6 +166,15 @@ function journalUpdate(state: any, lifecycleStatus = "RUNNING", terminal = false
 
 export default function (pi: ExtensionAPI) {
   let running = false;
+  let activeWatchdogRunDigest: string | null = null;
+  let pendingWatchdogAdvice: ReturnType<typeof validateWatchdogAdvice> | null = null;
+  pi.events.on(WATCHDOG_ADVICE_EVENT, (value) => {
+    if (!running || !activeWatchdogRunDigest || !value || typeof value !== "object") return;
+    try {
+      const message = value as { runDigest?: unknown; advice?: unknown };
+      if (message.runDigest === activeWatchdogRunDigest) pendingWatchdogAdvice = validateWatchdogAdvice(message.advice);
+    } catch {}
+  });
   let agentControl: AgentAttemptController | undefined;
   let agentControlUncertain = false;
   pi.registerCommand("agent-cancel", {
@@ -202,6 +212,8 @@ export default function (pi: ExtensionAPI) {
       });
       let spawnBudgetGuard = createWorkflowSpawnBudgetGuard({ configuredSpawnLimit, plan: spawnBudgetPlan });
       running = true;
+      activeWatchdogRunDigest = null;
+      pendingWatchdogAdvice = null;
       agentControlUncertain = false;
       let allocation: Record<string, any> | undefined;
       let ownerRunId = `secure-${toolCallId}-${randomUUID()}`.slice(0, 240);
@@ -565,6 +577,16 @@ export default function (pi: ExtensionAPI) {
               onCheckpoint: (checkpoint: any) => {
                 latestState = checkpoint;
                 checkpointJournal(journalUpdate(checkpoint));
+                try {
+                  const observation = watchdogObservationFromWorkflow(checkpoint, activeTaskPolicy, evidenceRun!.runId);
+                  activeWatchdogRunDigest = observation.runDigest;
+                  pi.events.emit(WATCHDOG_EVENT, observation);
+                } catch {}
+              },
+              watchdogAdvisory: () => {
+                const advice = pendingWatchdogAdvice;
+                pendingWatchdogAdvice = null;
+                return advice;
               },
             });
             latestState = state;
@@ -675,6 +697,8 @@ export default function (pi: ExtensionAPI) {
         agentControl?.close();
         agentControl = undefined;
         running = false;
+        activeWatchdogRunDigest = null;
+        pendingWatchdogAdvice = null;
       }
 
       if (!finalReceipt) throw new WorkflowFailure(JSON.stringify({ status: "FAIL", runId: evidenceRun?.runId, error: "workflow evidence finalization failed" }), false);

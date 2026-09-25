@@ -436,6 +436,25 @@ export default function (pi: ExtensionAPI) {
       parentReceiptDigest: scalar("parentReceiptDigest") as string | undefined,
     });
   });
+  pi.events.on("pi-overdrive:watchdog-metadata", async (value) => {
+    const data = value as Record<string, unknown>;
+    const status = ["SKIPPED_DISABLED", "SKIPPED_INELIGIBLE", "SKIPPED_COUNCIL", "SKIPPED_NO_TRIGGER", "SKIPPED_DUPLICATE", "SKIPPED_BUDGET", "SKIPPED_COOLDOWN", "REVIEWED", "FAILED_SOFT"].includes(data?.status as string) ? data.status as string : undefined;
+    const reason = ["REPEATED_FAILURE", "REPEATED_CORRECTION", "VERIFICATION_REGRESSION"].includes(data?.reason as string) ? data.reason as string : undefined;
+    const count = (key: string, maximum: number) => typeof data?.[key] === "number" && Number.isFinite(data[key] as number) && (data[key] as number) >= 0 && (data[key] as number) <= maximum ? data[key] as number : undefined;
+    await record({
+      event: "watchdog_metadata",
+      kind: data?.kind === "watchdog" ? "watchdog" : undefined,
+      status,
+      reason,
+      stateDigest: typeof data?.stateDigest === "string" && /^[0-9a-f]{64}$/u.test(data.stateDigest) ? data.stateDigest : undefined,
+      contextChars: count("contextChars", 768),
+      durationMs: count("durationMs", 3_600_000),
+      modelCalls: data?.modelCalls === 0 ? 0 : undefined,
+      provider: data?.provider === "LOCAL_DETERMINISTIC" ? "LOCAL_DETERMINISTIC" : undefined,
+      severity: ["NIT", "CONCERN", "BLOCKER"].includes(data?.severity as string) ? data.severity as string : undefined,
+      reviewCount: count("reviewCount", 2),
+    });
+  });
   pi.events.on("pi-overdrive:agent-hub-metadata", async (value) => {
     let data: Record<string, unknown>;
     try { data = agentHubTraceMetadata(value) as Record<string, unknown>; }
