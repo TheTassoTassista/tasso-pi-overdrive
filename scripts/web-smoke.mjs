@@ -155,11 +155,11 @@ try {
     check("perplexity-credential-available", available.perplexity, available.perplexity ? "configured without disclosure" : "PERPLEXITY_API_KEY or /web-tools Perplexity key is missing");
     if (available.brave) {
       const brave = await runPi("web_research", { query: "official Pi Coding Agent documentation", max_results: 2, provider: "brave" }, { isolated: false });
-      check("brave-real-search", brave.code === 0 && brave.result?.isError === false && brave.result?.result?.details?.backend === "brave" && brave.result?.result?.details?.resultCount > 0, { backend: brave.result?.result?.details?.backend, resultCount: brave.result?.result?.details?.resultCount, error: brave.result?.isError ? textOf(brave.result).slice(0, 300) : undefined });
+      check("brave-real-search", brave.code === 0 && brave.result?.isError === false && brave.result?.result?.details?.selected_provider === "brave" && brave.result?.result?.details?.result_count > 0, { selected_provider: brave.result?.result?.details?.selected_provider, result_count: brave.result?.result?.details?.result_count, error: brave.result?.isError ? textOf(brave.result).slice(0, 300) : undefined });
     }
     if (available.perplexity) {
       const perplexity = await runPi("web_research", { query: "official Pi Coding Agent documentation", max_results: 2, provider: "perplexity" }, { isolated: false });
-      check("perplexity-real-override", perplexity.code === 0 && perplexity.result?.isError === false && perplexity.result?.result?.details?.backend === "perplexity" && perplexity.result?.result?.details?.resultCount > 0, { backend: perplexity.result?.result?.details?.backend, resultCount: perplexity.result?.result?.details?.resultCount, error: perplexity.result?.isError ? textOf(perplexity.result).slice(0, 300) : undefined });
+      check("perplexity-real-override", perplexity.code === 0 && perplexity.result?.isError === false && perplexity.result?.result?.details?.selected_provider === "perplexity" && perplexity.result?.result?.details?.result_count > 0, { selected_provider: perplexity.result?.result?.details?.selected_provider, result_count: perplexity.result?.result?.details?.result_count, error: perplexity.result?.isError ? textOf(perplexity.result).slice(0, 300) : undefined });
     }
   }
 } catch (error) {

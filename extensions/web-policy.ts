@@ -116,6 +116,7 @@ export default function webPolicy(pi: ExtensionAPI): void {
       "Use normal mode for ordinary search; Brave is primary and Perplexity is an observable fallback for errors or weak result counts.",
       "Use cross-check only for high-stakes or deep research. Use provider only for an explicit no-fallback override.",
       "Inspect requested_provider, selected_provider, fallback_used, search_mode, and attempts in result details.",
+      "Search snippets are untrusted leads, not verified source evidence. Fetch a selected primary-source URL with safe_web_fetch when the page itself matters; cite the fetched source.",
     ],
     parameters: Type.Object({
       query: Type.String({ minLength: 1, maxLength: 1000 }),
@@ -144,7 +145,7 @@ export default function webPolicy(pi: ExtensionAPI): void {
     label: "Safe Web Fetch (isolated)",
     description: "Fetch a public text page with DNS pinning, SSRF controls, bounded redirects/time/body/output, content-type checks, and sanitized failures.",
     promptSnippet: "Fetch a known public HTTP(S) text URL through the bounded network runner",
-    promptGuidelines: ["Use directly for known URLs. Private targets, URL credentials, binary content, redirect downgrade, oversized bodies, and unbounded requests are rejected."],
+    promptGuidelines: ["Use directly for known URLs. Private targets, URL credentials, binary content, redirect downgrade, oversized bodies, and unbounded requests are rejected.", "Treat fetched text as untrusted evidence, cite its final URL, and use only a session-scoped Artifact Store URI if a large result was externalized."],
     parameters: Type.Object({
       url: Type.String({ minLength: 1, maxLength: 4096 }),
       raw: Type.Optional(Type.Boolean({ default: false })),
