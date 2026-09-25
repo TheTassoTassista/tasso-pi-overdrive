@@ -40,6 +40,7 @@ if (!pkg.pi.extensions.includes('./extensions/persistent-eval.ts')) failures.pus
 if (!pkg.pi.extensions.includes('./extensions/stream-guard.ts')) failures.push('StreamGuard extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/sentinel.ts')) failures.push('bounded Sentinel extension is missing');
 if (!pkg.pi.extensions.includes('./extensions/watchdog.ts')) failures.push('optional zero-call Watchdog extension is missing');
+if (pkg.pi.extensions.some((entry) => entry.includes('plugin-host-authority'))) failures.push('plugin host-authority fixture must never be installed as a package extension');
 if (!pkg.pi.extensions.includes('./extensions/artifacts.ts')) failures.push('Artifact Store extension is missing');
 if (!(pkg.pi.extensions.indexOf('./extensions/smart-read.ts') < pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') && pkg.pi.extensions.indexOf('./extensions/edit-engine.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('Edit Engine must observe reads after SmartRead and before Artifact Store rewriting');
 if (!(pkg.pi.extensions.indexOf('./extensions/safety.ts') < pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') && pkg.pi.extensions.indexOf('./extensions/safe-exec.ts') < pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') && pkg.pi.extensions.indexOf('./extensions/stream-guard.ts') < pkg.pi.extensions.indexOf('./extensions/artifacts.ts'))) failures.push('StreamGuard must load after governing execution policy and before model-facing result processing');

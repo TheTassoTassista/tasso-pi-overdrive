@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "status": "PASS",
+  "measurementMode": "real-pi-offline-import-time-host-authority-fixture",
+  "piVersion": "0.85.1",
+  "assertions": {
+    "extensionLoaded": true,
+    "hostFileVisibleAtImport": true,
+    "hostProcessSpawnedAtImport": true,
+    "noModelOrToolCalls": true
+  },
+  "implication": "ExtensionAPI tool restrictions cannot confine module import-time host filesystem/process access; manifests alone are advisory.",
+  "accounting": {
+    "modelCalls": 0,
+    "externalProviderCalls": 0,
+    "paidModelCalls": 0,
+    "networkCalls": 0,
+    "costEur": 0
+  },
+  "cleanup": {
+    "temporaryRemoved": true
+  }
+}
