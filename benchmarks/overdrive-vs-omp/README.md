@@ -15,6 +15,7 @@ Run:
 npm run benchmark:ultra:baseline
 npm run benchmark:ultra:task-governor
 npm run benchmark:ultra:edit-engine
+npm run benchmark:ultra:edit-corpus
 npm run benchmark:ultra:ast-edit
 npm run benchmark:ultra:lsp-write
 npm run benchmark:ultra:stream-guard
@@ -30,6 +31,8 @@ npm run benchmark:ultra:commit-planner
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
 
 `edit-engine.mjs` drives the real Pi read → snapshot → preview → apply lifecycle with a deterministic local provider. It records a safe-relocation success and a preview/apply race denial, receipt privacy/mode, metadata-only events, staged-file cleanup, and slash-command discovery. It performs no network, external-provider, paid-model, or billable call.
+
+`edit-contract-corpus.mjs` executes 20 deterministic classes against the real local transactional engine, including a policy-pinned ast-grep structural case, exact-byte and sidecar oracles, expected safety denials, syntax checks where available, receipts and cleanup. It is not a model/provider comparison or an OMP execution. Unsupported `APPLY_PATCH`, non-transactional `REPLACE`, missing TypeScript/Go syntax checks in this corpus, and absent billing-token evidence are reported explicitly rather than given numeric scores.
 
 `ast-edit.mjs` drives real Pi through read → snapshot → transactional AST preview → atomic apply and a separate stale race. The actual pinned ast-grep CLI rewrites two duplicate call expressions from private snapshot bytes; the benchmark verifies match counts, non-mutating preview, receipt contract/privacy/mode, external-content preservation, staged-file cleanup, and `/ast-edit` discovery. It performs no network, external-provider, paid-model, or billable call.
 
