@@ -6,8 +6,8 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 39 — Cross-Platform Portability, IN PROGRESS; Phase 38 is DEFERRED FOR SAFETY, Phase 37 is PARTIAL/COMPOSED, Phase 36 is MEASURED/NOT ADDED, Phase 35 is COMPLETE/BOUNDED, Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
-- Last functional Expansion commit: `f8cc164` (Phase 38 Pi extension-host authority fixture and safety guard)
+- Current phase: 39 — Cross-Platform Portability, PARTIAL/WINDOWS DEFERRED; the Expansion 26–39 roadmap has reached its bounded checkpoint. Phase 38 is DEFERRED FOR SAFETY, Phase 37 is PARTIAL/COMPOSED, Phase 36 is MEASURED/NOT ADDED, Phase 35 is COMPLETE/BOUNDED, Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Last functional Expansion commit: `849ff3a` (Phase 39 unsupported-host bootstrap preflight)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -38,6 +38,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `618906c` — Phase 35 optional event-driven Watchdog: fixed zero-call Task Policy-gated advisor, strict bounded aggregate delta/output, duplicate/cooldown/task budgets, Council isolation, metadata-only trace, fail-soft delivery to existing correction Worker, deterministic workflow comparison and real-Pi offline fixture. No new model, tool, route, agent, authority or provider call.
 - `24d05a1` — Phase 37 fixes stale `backend`/`resultCount` research guidance and credentialed smoke assertions to the actual `selected_provider`/`result_count` receipt, clarifies source-fetch/Artifact Store use, and adds a routing-preserving regression. No search, credential, provider or browser policy change.
 - `f8cc164` — Phase 38 negative security evidence: offline real-Pi fixture proves import-time host file metadata/process authority before ExtensionAPI registration; package validator prohibits installing that fixture. No capability manifest or new plugin was misrepresented as confinement.
+- `849ff3a` — Phase 39 Linux x86_64 bootstrap preflight runs before install flags, rejects native Windows/other hosts without changes, and adds fixture/order regression plus syntax/package validation. No Windows backend or weakening of Linux Bubblewrap.
 
 ## Bookkeeping commits
 
@@ -56,6 +57,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The Phase 36 measured/not-added assessment and ledger follow the Phase 35 bookkeeping commit. No functional code commit was needed because no candidate met the value/security/schema gate.
 - The Phase 37 boundary note and ledger follow functional commit `24d05a1`; the unified cross-source transaction remains explicitly partial rather than receiving a false PASS.
 - The Phase 38 boundary note, benchmark README and ledger follow safety-evidence commit `f8cc164`; an enforceable Plugin Framework V2 remains deferred until a pre-import isolation primitive exists.
+- The Phase 39 boundary note and final ledger follow functional commit `849ff3a`; Windows remains `NOT_RUN` for real-host verification.
 
 ## Tests and benchmarks
 
@@ -78,6 +80,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 36: pinned OMP source-only tool inventory and current Overdrive overlap/security/schema assessment completed. Existing offline real-Pi Tool Governor benchmark rerun PASS on Pi 0.85.1: nine deterministic local turns, zero network/external/paid calls; simple edit four tools/2,128 schema characters, debugging 13/6,436, research four/2,104. No OMP executable comparison or new tool was justified. See `docs/implementation-notes/phase-36-tool-ecosystem.md`.
 - Phase 37: research-guidance regression 1/1, web-routing 6/6, and local loopback safe-fetch 1/1 PASS; authoritative gate 514/514, syntax, installed-Pi TypeScript and package/secret validation PASS. The initial loopback fixture under the restricted shell sandbox returned `listen EPERM`; the permitted local test namespace passed without a public network call. Credentialed Brave/Perplexity smoke, Context7 runtime, public fetch and SearXNG are NOT_RUN. See `docs/implementation-notes/phase-37-research-boundary.md`.
 - Phase 38: real Pi 0.85.1 offline import-time fixture PASS: harmless host file metadata read and no-op child process both succeeded before registration, zero model/tool/network/provider calls, temporary cleanup PASS. Added fixture-not-installed validation and syntax check; authoritative gate 514/514, TypeScript, package/secret validation PASS. This is proof that in-process manifests alone cannot constrain plugins, not a plugin V2 implementation. See `docs/implementation-notes/phase-38-plugin-framework-boundary.md`.
+- Phase 39: platform preflight fixture 1/1 PASS over Linux, Windows-like and unsupported-host cases; read-only real Linux prerequisites PASS with Pi 0.85.1 and Node 22.23.2. Final authoritative gate with the managed LSP selector 515/515, syntax, installed-Pi TypeScript and package/secret validation PASS. No native Windows host test or backend was performed. See `docs/implementation-notes/phase-39-portability-boundary.md`.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -150,9 +153,13 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 
 - Pi 0.85.1 imports extension modules in its host process before `ExtensionAPI` registration. An uninstalled offline fixture demonstrated file metadata and process-spawn host access at import time. Thus a declarative capability manifest inside this package could not enforce filesystem/network/process restrictions or prevent a hook from bypassing core policy. Selected third-party packages remain pinned/audited but trusted host code, not OS-confined plugins. V2 needs a pre-import isolated host/process boundary and controller-granted protocol; no manifest-only framework was added.
 
+## Phase 39 disposition — PARTIAL/WINDOWS DEFERRED
+
+- The bootstrap now fails before installation on native Windows-like and other unsupported hosts; Linux x86_64 behavior is unchanged and locally verified. The shared Computer Use contract has Windows fixtures but no native backend. Linux Bubblewrap, process identity, runtime ownership, DAP/LSP/browser, and package bootstrap cannot be labeled Windows-capable from this evidence. Windows x86_64 remains `REAL_HOST_VERIFIED: NOT_RUN` pending an independently enforced platform backend and real Windows host tests.
+
 ## Dirty files
 
-- After the Phase 37 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
+- After the Phase 39 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
 
 ## Known limitations
 
@@ -170,9 +177,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 36 has no new binary-format reader or specialized security scan; revisit only with a concrete coding task, bounded handler design, and measured improvement over existing tools.
 - Phase 37 does not claim SearXNG availability or a unified research API. The credentialed smoke assertions were statically corrected but real provider calls were intentionally not made; only local routing/fetch fixtures are verified.
 - Phase 38 installed Pi extensions are not sandboxed as plugins merely because their model-facing tools are governed. Do not install an untrusted extension on the assumption that a future manifest or Tool Governor will confine import-time code.
+- Phase 39 does not provide native Windows coding, sandboxing or bootstrap support. The preflight prevents a misleading partial install but is not a Windows backend or a security boundary against a malicious local host.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 39 by comparing current Linux x86_64 runtime bindings against the Windows x86_64 target, preserving Bubblewrap and other Linux security. Do not claim Windows host verification from fixtures; add only fail-closed or truly portable contracts, with no push, PR, tag, reset, clean or stash.
+The bounded 26–39 Expansion checkpoint is complete. Do not promote this experimental worktree to the installed stable Pi package without a separate review and explicit authorization. Reopen only a concrete, reproducible gap: a reviewed parser task for Phase 36, a provenance-safe cross-source research transaction for Phase 37, upstream/pre-import plugin confinement for Phase 38, or an independently secured real Windows backend for Phase 39. Preserve zero-extra-cost, no push/PR/tag/history rewrite, and protected audit state.
