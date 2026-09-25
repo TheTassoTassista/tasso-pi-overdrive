@@ -6,8 +6,8 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 35 — Continuous Advisor / Watchdog, IN PROGRESS; Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
-- Last functional Expansion commit: `0b85907` (Phase 34 deterministic edit corpus and qualified evidence gate)
+- Current phase: 36 — Expanded Tool Ecosystem, IN PROGRESS; Phase 35 is COMPLETE/BOUNDED, Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Last functional Expansion commit: `618906c` (Phase 35 bounded zero-model-call Watchdog)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
 - OMP license: repository root and coding-agent package declare MIT; no source copied into Expansion
@@ -35,6 +35,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - `7eb2434` — Phase 32 representative local CPU/proc profiling harness; no native binary, OMP source, build chain, route or policy change.
 - `99d5d07` — Phase 34 checkpoint: fixed source-free recovery guidance for existing transactional edit failures, plus unit and real-Pi fixture assertions. No edit authority, matching, LSP, receipt or model routing change.
 - `0b85907` — Phase 34 bounded completion: 20-class exact-oracle edit corpus with verified ast-grep, four expected fail-closed denials, LSP/AST recovery hints, empty real-model evidence file and conservative comparative-evidence qualification. No real-model preference, route, authority or retry change.
+- `618906c` — Phase 35 optional event-driven Watchdog: fixed zero-call Task Policy-gated advisor, strict bounded aggregate delta/output, duplicate/cooldown/task budgets, Council isolation, metadata-only trace, fail-soft delivery to existing correction Worker, deterministic workflow comparison and real-Pi offline fixture. No new model, tool, route, agent, authority or provider call.
 
 ## Bookkeeping commits
 
@@ -49,6 +50,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The bookkeeping commit containing the Phase 33 browser safety disposition follows the Phase 32 note; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing this Phase 34 partial checkpoint follows functional commit `99d5d07`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 34 completion note, benchmark README and this ledger follows functional commit `0b85907`; resolve its exact hash with `git log -1` after commit.
+- The bookkeeping commit containing the Phase 35 note, benchmark README and this ledger follows functional commit `618906c`; resolve its exact hash with `git log -1` after commit.
 
 ## Tests and benchmarks
 
@@ -67,6 +69,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 32 local profile: nine deterministic benchmark suites PASS, zero paid/external calls; owned control operations range from 0.019 to 1.282 ms mean, actual optional catalog read/parse 6.078 ms mean, Pi `--version` startup median 255.15 ms. One isolated full-gate run observed 497/498 with failure identity lost to truncated output; immediately following focused test and full gate each passed 498/498. No speculative fix or native helper was added. See `docs/implementation-notes/phase-32-native-profile.md`.
 - Phase 34 partial checkpoint: focused edit tests 13/13 PASS; real Pi offline edit benchmark PASS with model-visible stale guidance and cleanup, 0 paid/external calls; authoritative gate 499/499 PASS, syntax, installed-Pi TypeScript and package/secret validation PASS. See `docs/implementation-notes/phase-34-edit-ux-checkpoint.md`.
 - Phase 34 completion: 20/20 deterministic corpus classes PASS (16 exact edits, four expected denials), including a real policy-pinned ast-grep case; qualified comparative evidence tests PASS. The authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check` passed 502/502, syntax, installed-Pi TypeScript, package/secret validation. A bare 500/502 repeat without that selector failed only the two documented Rust/Go LSP runtime-selection tests; the exact selector restored 502/502. An earlier full-gate attempt under a sandbox without loopback permission produced `listen EPERM` in unrelated integration suites; the gate passed once local loopback was permitted. No paid/external provider calls or comparative real-model inference occurred. See `docs/implementation-notes/phase-34-edit-ux-completion.md`.
+- Phase 35: focused Watchdog tests 11/11 PASS. Deterministic CONTROL/WATCHDOG benchmark PASS against the actual local workflow state machine: 7/22/26 fixture delegate calls and PASS in each corresponding arm; successful work produced no review, repeated failures produced two bounded reviews/eight duplicate suppressions, and post-PASS regression produced one review. One already-required correction Worker in each failing scenario received advisory data; maximum aggregate delta was 474 characters. Real Pi 0.85.1 offline fixture benchmark PASS with two advice messages, zero provider/model/tool calls and temporary cleanup. The final authoritative gate with the documented LSP selector passed 513/513, syntax, installed-Pi TypeScript, and package/secret validation. One immediately preceding local gate yielded 512/513 with the failing identity lost to console truncation; the filtered suite and full gate both subsequently passed 513/513, so this remains a non-reproduced observation, not a diagnosed regression. No authenticated workflow E2E or paid call was made. See `docs/implementation-notes/phase-35-watchdog.md`.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -122,9 +125,14 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Pinned OMP Hashline was reviewed read-only. The 20-class local corpus proves exact edit outcomes and fail-closed refusal paths; existing real-Pi edit/AST/LSP benchmarks cover the registered extension path separately. The stronger staged transaction, seen-range, TOCTOU, LSP, atomic apply/rollback and receipt gates were not weakened. `APPLY_PATCH` is not a registered production edit tool here, and Pi's built-in `REPLACE` lacks transactional parity; neither is scored as an equivalent local implementation. See `docs/implementation-notes/phase-34-edit-ux-completion.md`.
 - `config/edit-benchmark-evidence.json` has zero records. Qualified, comparative, recent records can reorder only already-configured contracts, and one-sample/stale/malformed/unsafe or inconclusive input cannot change a profile. No real family preference is asserted: model-format/token comparisons are `NOT_RUN` because zero-extra-cost eligibility was not established for that experiment. The trusted tracked evidence file remains a review boundary, not cryptographic proof of provider behavior. External provider/model calls and extra monetary cost remain 0/€0.
 
+## Phase 35 disposition — COMPLETE/BOUNDED
+
+- The optional `/watchdog` remains off by default and activates only for Task Policy-eligible hard/high-risk tasks. Controller checkpoints provide fixed-size aggregate deltas, with no transcript, diff bytes, paths or Council internals. Static local advice has zero model/tool/process authority, two reviews per task at most (one in Token Saver), 30-second cooldown, duplicate suppression, strict output schema, and fail-soft behavior. A validated run-bound advisory may reach an existing correction Worker as untrusted data; it never causes correction or changes the workflow gate. Metadata trace is allowlisted. The stable installed Pi configuration remains unchanged.
+- The bounded variant does not analyze actual source/diff semantics, handle Director-initiated reviews, or provide a full authenticated secure-workflow E2E. The real Pi benchmark uses a deterministic observation fixture; production controller correction delivery is exercised by focused and local workflow-state-machine tests. No extra provider route is justified under the zero-cost policy.
+
 ## Dirty files
 
-- After the Phase 34 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
+- After the Phase 35 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
 
 ## Known limitations
 
@@ -138,9 +146,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 30 prewalk is lexical and tracked-path-only; it deliberately omits untracked paths and path names outside a conservative ASCII grammar. The offline deterministic Pi benchmark establishes only its fixture discovery path, not broad model savings or full secure-workflow E2E. Persistent provider conversations remain disabled pending the documented lease/context/budget/cleanup contract.
 - Phase 31 registry leaves rate limits and unqualified OpenRouter prices UNKNOWN. It does not fetch or attest a fresh/complete OmniRoute catalog. Declared Pi registry pricing is not a verified billing quote. The inspection view cannot authorize a model that routing already rejects.
 - Phase 34's deterministic corpus is not a real-model format/token comparison; TypeScript/Go syntax in that corpus is `NOT_RUN` (separate LSP gate is authoritative for managed languages). No model-family contract winner has been measured or promoted.
+- Phase 35's Watchdog is deterministic aggregate-metadata advice, not semantic code review. Its real Pi observation benchmark is a fixture, not authenticated full secure-workflow E2E; any anomalous Watchdog or existing-suite failure must be reproduced before changing architecture.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 35 from the existing one-shot Sentinel: optional, Task Policy-eligible, event-driven, bounded delta-only, duplicate-suppressed, read-only and fail-soft Watchdog. Do not add timer-driven or paid background calls. Preserve zero-extra-cost and all prior safety boundaries; do not push, create a PR, change tags, reset, clean or stash user work.
+Begin Phase 36 by inspecting the pinned OMP tool ecosystem against the current Overdrive tool surface. Evaluate missing capability value, security, schema/token overhead and overlap before adding anything; no raw tool-count race, paid call, route change, push, PR, tag, reset, clean or stash.

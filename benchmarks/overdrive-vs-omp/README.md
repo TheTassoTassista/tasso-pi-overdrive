@@ -26,6 +26,8 @@ npm run benchmark:ultra:isolation
 npm run benchmark:ultra:model-harness
 npm run benchmark:ultra:git-resources
 npm run benchmark:ultra:commit-planner
+npm run benchmark:ultra:watchdog
+npm run benchmark:ultra:watchdog-pi
 ```
 
 `task-governor.mjs` validates four fixed task classes and measures 10,000 deterministic Task Policy decisions. It performs no model or provider call. Its capability list is policy intent; later phases are responsible for implementing and gating optional tools.
@@ -53,5 +55,7 @@ npm run benchmark:ultra:commit-planner
 `git-resources.mjs` drives real Pi against a temporary local repository through the production pinned Git runner. It verifies status, worktree/staged diffs, conflict catalog and conflict-side reads, mutation-surface denial, immutable trust metadata, command discovery, and cleanup. Six operations use twelve deterministic in-memory provider turns and zero network, external-provider, paid-model, or billable calls. GitHub is honestly `NOT_RUN` because no authenticated read-only client is available; the benchmark does not probe credentials or the network.
 
 `commit-planner.mjs` drives real Pi through an explicit one-file inspection and a two-group hunk proposal while unrelated and protected changes coexist. It proves exact changed/excluded counts, digest binding, metadata privacy, zero staging/commit/publish authority, `/commit-plan` discovery, byte-identical HEAD/index/worktree state, deterministic cleanup, and exactly three in-memory provider turns with zero decision-model, network, external-provider, paid-model, or billable calls.
+
+`watchdog.mjs` compares disabled/enabled Watchdog on deterministic successful, repeated-failure, unchanged-state and regression scenarios. It also drives the actual local secure-workflow state machine with fixture delegates: outcomes and delegate counts are identical, and bounded advice reaches only an already-required correction Worker. It records invocation/deduplication counts, context size, workflow result, fixture delegate calls, latency samples and zero model/tool/provider cost. `watchdog-pi.mjs` starts real Pi 0.85.1 with isolated settings and the production Watchdog extension, injects deterministic controller-observation fixtures, checks command discovery, advisory messages, fail-soft behavior, privacy and cleanup. It does not claim an authenticated full secure-workflow E2E or general token savings.
 
 The committed result intentionally marks OMP execution `NOT_RUN`: this host did not have the reference project's required Bun >=1.4 runtime. Source inspection is never converted into fabricated numeric results. Later phase benchmarks must use identical fixtures and record failures as well as successes.
