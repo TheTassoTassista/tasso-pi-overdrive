@@ -37,17 +37,17 @@ const full = await workflow(async ({ agent, result }) => {
 check("full-zero-paid-workflow-with-correction", full.status === "PASS" && full.correctionPerformed === true && full.evidence.roles.filter((item) => item.agent === "worker").length === 2 && full.evidence.verifications.length === 2, { status: full.status, workerRounds: full.evidence.roles.filter((item) => item.agent === "worker").length, verificationRounds: full.evidence.verifications.length });
 
 const routingModels = [
-  ...["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"].map((id) => ({ provider: "openai-codex", id, reasoning: true, thinkingLevelMap: { max: "max" } })),
+  ...["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"].map((id) => ({ provider: "openai-codex", id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" } })),
   ...["deepseek/deepseek-v4-pro-high", "deepseek/deepseek-v4-flash", "openrouter/qwen/qwen3.8-27b", "openrouter/qwen/qwen3-coder-next", "groq/qwen/qwen3-32b", "auto/best-fast", "auto/best-reasoning", "auto/best-coding"].map((id) => ({ provider: "omniroute", id, reasoning: false })),
 ];
-const intentionallyRejected = new Set(["openai-codex/gpt-5.6-luna", "omniroute/groq/qwen/qwen3-32b", "omniroute/auto/best-fast"]);
+const intentionallyRejected = new Set(["openai-codex/gpt-6-luna", "omniroute/groq/qwen/qwen3-32b", "omniroute/auto/best-fast"]);
 const routingOptions = { registeredModels: routingModels, callability: { version: 1, entries: Object.fromEntries(routingModels.map((model) => {
   const identity = `${model.provider}/${model.id}`;
   const rejected = intentionallyRejected.has(identity);
   return [identity, { runtimeStatus: rejected ? "RUNTIME_REJECTED" : "RUNTIME_CALLABLE", reasonCode: rejected ? "UNSUPPORTED_MODEL" : "LOCAL_FIXTURE" }];
 })) } };
 const fallback = resolveModelPolicy(routingModels, { version: 2, preset: "normal", basePreset: "normal", overrides: {} }, routingOptions);
-check("unsupported-model-fallback", fallback.roles.scout.model === "openai-codex/gpt-5.6-terra" && fallback.roles.scout.fallbackIndex === 3 && fallback.routingDecisions.some((entry) => entry.role === "scout" && entry.skipped.length > 0));
+check("unsupported-model-fallback", fallback.roles.scout.model === "openai-codex/gpt-5.6-luna" && fallback.roles.scout.fallbackIndex === 1 && fallback.routingDecisions.some((entry) => entry.role === "scout" && entry.skipped.length > 0));
 let blocked = false;
 const fullyRejected = { registeredModels: routingModels, callability: { version: 1, entries: Object.fromEntries(routingModels.map((model) => [`${model.provider}/${model.id}`, { runtimeStatus: "RUNTIME_REJECTED", reasonCode: "UNSUPPORTED_MODEL" }])) } };
 try { resolveModelPolicy(routingModels, { version: 2, preset: "normal", basePreset: "normal", overrides: {} }, fullyRejected); } catch (error) { blocked = /BLOCKED_BY_MODEL/u.test(error.message); }

@@ -17,7 +17,7 @@ const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
 const identities = [
   "openai-codex/gpt-5.5", "openai-codex/gpt-5.6-luna", "openai-codex/gpt-5.6-sol",
-  "openai-codex/gpt-5.6-terra", "openai-codex/gpt-6-astra",
+  "openai-codex/gpt-5.6-terra", "openai-codex/gpt-6-luna", "openai-codex/gpt-6-sol", "openai-codex/gpt-6-astra",
   "omniroute/deepseek/deepseek-v4-pro-high", "omniroute/deepseek/deepseek-v4-flash",
   "omniroute/openrouter/qwen/qwen3.8-27b", "omniroute/openrouter/qwen/qwen3-coder-next",
   "omniroute/groq/qwen/qwen3-32b", "omniroute/auto/best-fast",
@@ -70,11 +70,11 @@ try {
 
   const statusRun = runPi({ id: "council-status", type: "prompt", message: "/council-status" });
   const statusText = notifications(statusRun);
-  check("pi-council-status-is-live-heterogeneous-and-secret-free", statusRun.code === 0 && [
-    "council-1: openai-codex/gpt-5.6-sol:high", "council-2: omniroute/deepseek/deepseek-v4-pro-high:off",
-    "council-3: omniroute/openrouter/qwen/qwen3.8-27b:off", "council-judge: openai-codex/gpt-6-astra:high",
-    "concurrency=3", "depth=1", "nested council=disabled", "same OmniRoute gateway",
-  ].every((value) => statusText.includes(value)) && !/api[_ -]?key|credential\s*[:=]|token\s*[:=]/iu.test(statusText) && noModelCall(statusRun), statusRun.code === 0 ? { heterogeneous: true, modelCalls: 0, characters: statusText.length } : statusText || statusRun.stderr || statusRun.error);
+  check("pi-council-status-reports-cost-gated-diversity-and-is-secret-free", statusRun.code === 0 && [
+    "council-1: openai-codex/gpt-6-sol:high", "council-2: openai-codex/gpt-5.5:high",
+    "council-3: openai-codex/gpt-6-luna:high", "council-judge: openai-codex/gpt-6-astra:high",
+    "concurrency=3", "depth=1", "nested council=disabled", "attested", "cost/callability",
+  ].every((value) => statusText.includes(value)) && !/api[_ -]?key|credential\s*[:=]|token\s*[:=]/iu.test(statusText) && noModelCall(statusRun), statusRun.code === 0 ? { diverseCandidateCostGated: true, modelCalls: 0, characters: statusText.length } : statusText || statusRun.stderr || statusRun.error);
 
   const agents = spawnSync(process.execPath, [path.join(root, "scripts", "agent-policy-smoke.mjs")], { cwd: root, env: process.env, encoding: "utf8", timeout: 180_000, maxBuffer: 16 * 1024 * 1024 });
   let agentEvidence;

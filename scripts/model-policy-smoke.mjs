@@ -16,7 +16,7 @@ const callabilityFile = path.join(temporary, "config", "pi-overdrive", "model-ca
 const catalogFile = path.join(temporary, "openrouter-catalog.json");
 const results = [];
 const check = (name, condition, detail) => results.push({ name, status: condition ? "PASS" : "FAIL", detail });
-const directIds = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"].map((id) => `openai-codex/${id}`);
+const directIds = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"].map((id) => `openai-codex/${id}`);
 const omniIds = [
   "deepseek/deepseek-v4-pro-high", "deepseek/deepseek-v4-flash", "openrouter/qwen/qwen3.8-27b",
   "openrouter/qwen/qwen3-coder-next", "groq/qwen/qwen3-32b", "auto/best-fast", "auto/best-reasoning", "auto/best-coding",
@@ -65,14 +65,14 @@ try {
     { id: "quality-tree", type: "prompt", message: "/ai-tree" },
   ]);
   const qualityText = notifications(quality);
-  check("quality-command-and-immediate-session-effect", quality.code === 0 && qualityText.includes("Quality: max (session)") && qualityText.includes("openai-codex/gpt-5.6-terra:max") && qualityText.includes("reset quality to auto") && noModelCall(quality), quality.code === 0 ? { quality: "max", workerEffort: "max", modelCalls: 0 } : qualityText || quality.stderr);
+  check("quality-command-and-immediate-session-effect", quality.code === 0 && qualityText.includes("Quality: max (session)") && qualityText.includes("openai-codex/gpt-6-sol:xhigh") && qualityText.includes("reset quality to auto") && noModelCall(quality), quality.code === 0 ? { quality: "max", workerEffort: "xhigh", modelCalls: 0 } : qualityText || quality.stderr);
 
   const freshQuality = await run({ id: "quality-fresh", type: "prompt", message: "/quality" }, /Quality: auto \(session\)/u);
   check("quality-new-session-resets-auto", freshQuality.code === 0 && noModelCall(freshQuality), notifications(freshQuality));
 
   const tree = await run({ id: "tree", type: "prompt", message: "/ai-tree" }, /PI OVERDRIVE AI ROUTING/u);
   const treeText = notifications(tree);
-  check("ai-tree-complete-and-zero-model-calls", tree.code === 0 && noModelCall(tree) && ["openai-codex/gpt-5.6-luna:low", "omniroute/deepseek/deepseek-v4-pro-high:off", "omniroute/openrouter/qwen/qwen3.8-27b:off", "openai-codex/gpt-6-astra:high", "deterministic/local tools first", "share the OmniRoute gateway"].every((text) => treeText.includes(text)), tree.code === 0 ? { characters: treeText.length, roles: 12, modelCalls: 0 } : treeText.slice(0, 5000) || tree.stderr);
+  check("ai-tree-complete-and-zero-model-calls", tree.code === 0 && noModelCall(tree) && ["openai-codex/gpt-6-luna:low", "openai-codex/gpt-6-sol:medium", "omniroute/deepseek/deepseek-v4-pro-high:off", "COST_NOT_ATTESTED", "openai-codex/gpt-6-astra:high", "deterministic/local tools first"].every((text) => treeText.includes(text)), tree.code === 0 ? { characters: treeText.length, roles: 12, modelCalls: 0 } : treeText.slice(0, 5000) || tree.stderr);
 
   const treeJson = await run({ id: "tree-json", type: "prompt", message: "/ai-tree --json" }, /"title": "PI OVERDRIVE AI ROUTING"/u);
   let parsedTree;

@@ -116,6 +116,17 @@ test("profile context cannot increase a model limit", () => {
   assert.equal(contextModelForProfile(model, value).maxTokens, model.maxTokens);
 });
 
+test("GPT-6 models use the safe OpenAI family/provider profile without invented exact-model edit preference", () => {
+  for (const id of ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"]) {
+    const next = { ...model, id };
+    const value = resolveModelHarnessProfile({ model: next, registeredModels: [next], authenticatedModels: [next], callability: { version: 1, entries: {} } });
+    assert.equal(value.match.known, true);
+    assert.equal(value.provenance.some((entry) => entry.scope === "model"), false);
+    assert.equal(value.dynamicEvidence.runtimeStatus, "RUNTIME_UNKNOWN");
+    assert.equal(resolveEditContract(value, { activeTools: ["transactional_edit", "edit"] }).selected, "HASH_ANCHORED");
+  }
+});
+
 const benchmarkNow = Date.parse("2026-09-24T12:00:00.000Z");
 const benchmarkRecord = {
   scope: "family", key: "OpenAI", mode: "ordinary", fixtureCount: 20, costBasis: "SUBSCRIPTION_BACKED",

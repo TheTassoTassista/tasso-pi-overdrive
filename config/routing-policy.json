@@ -2,19 +2,32 @@
   "version": 1,
   "models": {
     "luna": {
-      "identity": "openai-codex/gpt-5.6-luna",
+      "identity": "openai-codex/gpt-6-luna",
       "source": "direct",
       "family": "OpenAI"
     },
     "sol": {
-      "identity": "openai-codex/gpt-5.6-sol",
+      "identity": "openai-codex/gpt-6-sol",
       "source": "direct",
       "family": "OpenAI"
     },
     "terra": {
       "identity": "openai-codex/gpt-5.6-terra",
       "source": "direct",
-      "family": "OpenAI"
+      "family": "OpenAI",
+      "migrationStatus": "LEGACY_FALLBACK"
+    },
+    "legacy-luna": {
+      "identity": "openai-codex/gpt-5.6-luna",
+      "source": "direct",
+      "family": "OpenAI",
+      "migrationStatus": "LEGACY_FALLBACK"
+    },
+    "legacy-sol": {
+      "identity": "openai-codex/gpt-5.6-sol",
+      "source": "direct",
+      "family": "OpenAI",
+      "migrationStatus": "LEGACY_FALLBACK"
     },
     "astra": {
       "identity": "openai-codex/gpt-6-astra",
@@ -114,36 +127,36 @@
       "displayName": "Normal Work",
       "description": "Successful-result-per-token: direct proven models first, deterministic tools before optional escalation.",
       "roles": {
-        "scout": { "mode": "conditional", "chain": [["luna", "low"], ["qwen-fast", "off"], ["auto-fast", "off"], ["terra", "low"]] },
-        "planner": { "mode": "conditional", "chain": [["sol", "high"], ["deepseek-reasoning", "off"], ["qwen-reasoning", "off"], ["auto-reasoning", "off"], ["astra", "high"]] },
-        "oracle": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["deepseek-reasoning", "off"]] },
-        "worker": { "mode": "enabled", "chain": [["terra", "high"], ["qwen-coding", "off"], ["deepseek-coding", "off"], ["auto-coding", "off"], ["sol", "high"]] },
-        "tester": { "mode": "conditional", "chain": [["luna", "medium"], ["qwen-fast", "off"], ["terra", "medium"]] },
-        "correctness": { "mode": "conditional", "chain": [["sol", "high"], ["deepseek-reasoning", "off"], ["astra", "high"]] },
-        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["astra", "high"]] },
-        "simplicity": { "mode": "conditional", "chain": [["luna", "medium"], ["qwen-fast", "off"], ["terra", "medium"]] },
-        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["astra", "high"]] },
-        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["sol", "high"]] },
-        "council-3": { "mode": "conditional", "chain": [["qwen-reasoning", "off"], ["qwen-coding", "off"], ["luna", "high"]] },
-        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"]] }
+        "scout": { "mode": "conditional", "chain": [["luna", "low"], ["legacy-luna", "low"], ["terra", "low"]] },
+        "planner": { "mode": "conditional", "chain": [["sol", "medium"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "oracle": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["legacy-sol", "high"]] },
+        "worker": { "mode": "enabled", "chain": [["sol", "medium"], ["terra", "high"], ["legacy-sol", "high"]] },
+        "tester": { "mode": "conditional", "chain": [["luna", "medium"], ["legacy-luna", "medium"], ["terra", "medium"]] },
+        "correctness": { "mode": "conditional", "chain": [["sol", "medium"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "simplicity": { "mode": "conditional", "chain": [["luna", "medium"], ["legacy-luna", "medium"], ["terra", "medium"]] },
+        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["legacy-sol", "high"]] },
+        "council-3": { "mode": "conditional", "chain": [["luna", "high"], ["legacy-luna", "high"]] },
+        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["legacy-sol", "high"]] }
       }
     },
     "token-saver": {
       "displayName": "Token Saver",
       "description": "Tools-first, smallest useful context and minimum fan-out; escalate once evidence shows the cheap path is insufficient.",
       "roles": {
-        "scout": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "low"], ["auto-fast", "off"]] },
-        "planner": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["sol", "high"], ["qwen-reasoning", "off"], ["auto-reasoning", "off"]] },
-        "oracle": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["astra", "high"], ["sol", "high"]] },
-        "worker": { "mode": "enabled", "chain": [["qwen-coding", "off"], ["deepseek-coding", "off"], ["terra", "high"], ["auto-coding", "off"]] },
-        "tester": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "medium"], ["terra", "medium"]] },
-        "correctness": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["sol", "high"], ["astra", "high"]] },
-        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["astra", "high"]] },
-        "simplicity": { "mode": "conditional", "chain": [["qwen-fast", "off"], ["luna", "medium"]] },
-        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["astra", "high"]] },
-        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["sol", "high"]] },
-        "council-3": { "mode": "conditional", "chain": [["qwen-reasoning", "off"], ["qwen-coding", "off"], ["luna", "high"]] },
-        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"]] }
+        "scout": { "mode": "conditional", "chain": [["luna", "low"], ["legacy-luna", "low"]] },
+        "planner": { "mode": "conditional", "chain": [["luna", "medium"], ["sol", "low"], ["legacy-sol", "high"]] },
+        "oracle": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["legacy-sol", "high"]] },
+        "worker": { "mode": "enabled", "chain": [["luna", "medium"], ["sol", "medium"], ["terra", "high"]] },
+        "tester": { "mode": "conditional", "chain": [["luna", "medium"], ["legacy-luna", "medium"]] },
+        "correctness": { "mode": "conditional", "chain": [["luna", "medium"], ["sol", "medium"], ["legacy-sol", "high"]] },
+        "security": { "mode": "conditional-mandatory-on-risk", "chain": [["sol", "high"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "simplicity": { "mode": "conditional", "chain": [["luna", "low"], ["legacy-luna", "medium"]] },
+        "council-1": { "mode": "conditional", "chain": [["sol", "high"], ["legacy-sol", "high"], ["astra", "high"]] },
+        "council-2": { "mode": "conditional", "chain": [["deepseek-reasoning", "off"], ["gpt55", "high"], ["legacy-sol", "high"]] },
+        "council-3": { "mode": "conditional", "chain": [["luna", "high"], ["legacy-luna", "high"]] },
+        "council-judge": { "mode": "conditional", "chain": [["astra", "high"], ["sol", "high"], ["legacy-sol", "high"]] }
       }
     }
   },
@@ -152,8 +165,8 @@
     "directEffort": {
       "low": { "default": "low", "worker": "medium", "security": "high", "oracle": "high", "council-1": "high", "council-2": "high", "council-3": "high", "council-judge": "high" },
       "medium": {},
-      "high": {},
-      "max": { "default": "max", "scout": "medium", "tester": "high", "simplicity": "high" }
+      "high": { "default": "high", "scout": "low", "simplicity": "medium" },
+      "max": { "default": "xhigh", "scout": "medium", "tester": "high", "simplicity": "medium" }
     }
   },
   "council": {

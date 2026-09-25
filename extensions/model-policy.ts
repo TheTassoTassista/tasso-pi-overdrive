@@ -55,7 +55,7 @@ function renderCouncilStatus(resolved: any): string {
     ...councilRoles.map((role) => `${role}: ${resolved.roles[role].model}:${resolved.roles[role].thinking} [${resolved.roles[role].family}; ${resolved.roles[role].source}]`),
     "Escalation: explicit /council; critical risk; material reviewer disagreement when quality authorizes it; second bounded correction",
     "Independence: three fresh read-only contexts, synchronized fanout, Judge only after three valid structured results",
-    "Infrastructure note: DeepSeek and Qwen are different model families behind the same OmniRoute gateway, not independent infrastructure",
+    "Diversity note: Council-2 retains a DeepSeek candidate, but cost/callability must be attested; its current GPT-5.5 fallback shares OpenAI infrastructure",
     "Hard limits: concurrency=3, depth=1, correction rounds=2, nested council=disabled",
     `Spawn budget: base=${spawnBudget.requiredBaseSpawns}, retry reserve=${spawnBudget.retryReserve}, required total=${spawnBudget.requiredTotalSpawns}, configured=${configuredSpawnLimit}`,
     `External pi-subagents quota: ${EXTERNAL_SUBAGENT_QUOTA.status} (${EXTERNAL_SUBAGENT_QUOTA.reason}); upstream still fails closed before provider launch`,
@@ -81,10 +81,11 @@ function aiTreeObject(resolved: any, quality: string): object {
         family: candidate.family,
         effort: candidate.desiredThinking ?? candidate.configuredThinking,
         callability: candidate.callability,
+        blockedReason: candidate.usable ? null : candidate.reason,
       })),
     })),
     deterministicVerification: { position: "before AI tester/review escalation", mandatory: true, failurePropagation: "fail-closed" },
-    council: { members: ROUTING_POLICY.council.members, judge: ROUTING_POLICY.council.judge, triggers: ROUTING_POLICY.council.triggers, concurrency: 3, depth: 1, sharedGatewayWarning: "DeepSeek and Qwen share OmniRoute infrastructure" },
+    council: { members: ROUTING_POLICY.council.members, judge: ROUTING_POLICY.council.judge, triggers: ROUTING_POLICY.council.triggers, concurrency: 3, depth: 1, diversityWarning: "Council-2 DeepSeek candidate requires verified zero-extra-cost evidence; fallback is OpenAI GPT-5.5" },
     tokenContextPolicy: { toolsFirst: true, stopWhenSolved: true, presetCaps: (ROUTING_POLICY as any).context[resolved.basePreset], correctionRounds: 2, retryPolicy: "one retry only for eligible transient/attested structured-output failures; workflow reserve 3" },
     secondBrain: memoryPolicyTopology(memoryPolicy),
     policyDigest: resolved.digest,
@@ -99,7 +100,7 @@ export function renderAiTree(resolved: any, quality = getSessionQuality(), json 
     const arm = last ? "└──" : "├──";
     const pad = last ? "    " : "│   ";
     const selected = entry.selected;
-    const chain = entry.fallbackChain.map((candidate: any) => `${candidate.source} ${candidate.identity}:${candidate.effort} [${candidate.callability.runtimeStatus}/${candidate.callability.authenticationStatus}]`).join(" → ");
+    const chain = entry.fallbackChain.map((candidate: any) => `${candidate.source} ${candidate.identity}:${candidate.effort} [${candidate.callability.runtimeStatus}/${candidate.callability.authenticationStatus}${candidate.blockedReason ? `/${candidate.blockedReason}` : ""}]`).join(" → ");
     return [`${arm} ${entry.role} [${entry.mode}]`, `${pad}selected: ${selected.source} ${selected.model}:${selected.thinking} (fallback ${selected.fallbackIndex})`, `${pad}chain: ${chain}`];
   });
   return [
@@ -111,8 +112,8 @@ export function renderAiTree(resolved: any, quality = getSessionQuality(), json 
     ...roleLines,
     "Verification: deterministic/local tools first; non-zero exit cannot become PASS",
     `Council: conditional; ${tree.council.triggers.join("; ")}`,
-    "Council topology: OpenAI direct + DeepSeek via OmniRoute + Qwen via OmniRoute → GPT-6 Astra Judge (exact route shown above)",
-    "Diversity note: DeepSeek and Qwen are model-family diverse but share the OmniRoute gateway",
+    "Council topology: GPT-6 Sol + cost-attested diverse Council-2 (currently GPT-5.5 fallback) + GPT-6 Luna → GPT-6 Astra Judge",
+    `Diversity note: ${tree.council.diversityWarning}`,
     `Context: tools-first, compact handoffs <=${tree.tokenContextPolicy.presetCaps.handoffChars} chars, stop when solved, corrections<=2`,
     "Second Brain",
     `├── Current-context check → Memory Router (${tree.secondBrain.router})`,

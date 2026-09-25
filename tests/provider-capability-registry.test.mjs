@@ -143,3 +143,17 @@ test("explicit unit-qualified positive catalog price cannot be represented as ze
   assert.equal(record.pricing.value.input, 0.1);
   assert.equal(record.zeroExtraCost, false);
 });
+
+test("GPT-6 registry declarations retain provenance without inventing runtime callability or free billing", () => {
+  const models = ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"].map((id) => ({ provider: "openai-codex", id, reasoning: true, thinkingLevelMap: { low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" }, contextWindow: 272000, maxTokens: 128000, input: ["text", "image"] }));
+  const registry = buildProviderCapabilityRegistry({ registeredModels: models, authenticatedModels: models, callability: { version: 1, entries: {} }, now });
+  assert.deepEqual(registry.models.map((record) => record.identity), models.map((model) => `openai-codex/${model.id}`).sort());
+  for (const record of registry.models) {
+    assert.equal(record.contextWindow.source, "pi-model-registry");
+    assert.equal(record.vision.source, "pi-model-registry");
+    assert.equal(record.availability.runtime.state, "UNKNOWN");
+    assert.equal(record.availability.selectable, false);
+    assert.equal(record.zeroExtraCost, null);
+    assert.equal(record.rateLimit.state, "UNKNOWN");
+  }
+});

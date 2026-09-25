@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-const direct = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"].map((id) => ({
+const direct = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"].map((id) => ({
   id, name: `Deterministic ${id}`, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, input: ["text"] as ["text"], cost, contextWindow: 278528, maxTokens: 32768,
 }));
 const omni = [

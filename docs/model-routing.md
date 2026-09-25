@@ -22,7 +22,7 @@ The precedence is fixed: security and hard correctness, explicit quality, preset
 /ai-tree
 /ai-tree --json
 /models --capabilities
-/models --capabilities openai-codex/gpt-5.6-sol
+/models --capabilities openai-codex/gpt-6-sol
 ```
 
 `/preset` writes the owner-only policy at `${XDG_CONFIG_HOME:-~/.config}/pi-overdrive/model-policy.json`. A version-1 `efficient` policy is read as `normal` without rewriting or dropping overrides; an explicit `/preset` selection writes version 2. The compatibility command `/model-preset` and exact `/model-role ROLE PROVIDER/MODEL[:THINKING]` override remain available.
@@ -31,24 +31,30 @@ The precedence is fixed: security and hard correctness, explicit quality, preset
 
 `/ai-tree` is metadata-only. It shows the configured chains, current selected route, exact provider/model/effort, direct versus OmniRoute source, registry/auth/callability state, conditional roles, Council triggers, deterministic verification and context limits. It never invokes a model.
 
+## GPT-6 migration boundary
+
+This worktree stages the GPT-6 policy; the installed Pi 0.85.1 package still points to the stable worktree. Pi's local `models-store.json` lists `gpt-6-luna`, `gpt-6-sol`, and `gpt-6-astra` under `openai-codex`, but the owner-only runtime-callability evidence attests only Astra. Registry presence is not a successful subscription-backed inference. Luna/Sol remain `RUNTIME_UNKNOWN` and are skipped by the resolver until a separate permitted smoke establishes callability. No Pi update, credential change, API key, or paid route is part of this migration.
+
+Luna handles focused high-volume roles and the first Token Saver Worker attempt. Sol is the normal coding/review model. Astra is reserved for Oracle/Judge or exceptional escalation. Legacy GPT-5.6 direct models remain bounded fallbacks so this staged change does not strand the installed runtime. No context or exposed-tool budget increases follow from the larger GPT-6 catalog limits.
+
 ## Normal Work
 
 At `quality=auto`, direct OpenAI targets and efforts are:
 
 | Role | Primary | Effort | Ordered fallback |
 |---|---|---:|---|
-| Scout | `openai-codex/gpt-5.6-luna` | low | Qwen/Groq fast → `auto/best-fast` → Terra low |
-| Planner | `openai-codex/gpt-5.6-sol` | high | DeepSeek reasoning → Qwen reasoning → `auto/best-reasoning` → Astra high |
-| Oracle | `openai-codex/gpt-6-astra` | high | Sol high → DeepSeek reasoning |
-| Worker | `openai-codex/gpt-5.6-terra` | high | Qwen coding → DeepSeek coding → `auto/best-coding` → Sol high |
-| Tester AI | `openai-codex/gpt-5.6-luna` | medium | Qwen/Groq fast → Terra medium |
-| Correctness | `openai-codex/gpt-5.6-sol` | high | DeepSeek reasoning → Astra high |
-| Security | `openai-codex/gpt-5.6-sol` | high | Astra high; no cheap/unknown downgrade |
-| Simplicity | `openai-codex/gpt-5.6-luna` | medium | Qwen/Groq fast → Terra medium |
-| Council 1 | `openai-codex/gpt-5.6-sol` | high | Astra high |
-| Council 2 | DeepSeek reasoning via OmniRoute | provider-side high ID / Pi effort off | 5.5 high → Sol high |
-| Council 3 | Qwen reasoning via OmniRoute | Pi effort off | Qwen coding → Luna high |
-| Judge | `openai-codex/gpt-6-astra` | high | Sol high |
+| Scout | `openai-codex/gpt-6-luna` | low | 5.6 Luna → Terra |
+| Planner | `openai-codex/gpt-6-sol` | medium | 5.6 Sol high → Astra high |
+| Oracle | `openai-codex/gpt-6-astra` | high | Sol high → 5.6 Sol high |
+| Worker | `openai-codex/gpt-6-sol` | medium | 5.6 Terra high → 5.6 Sol high |
+| Tester AI | `openai-codex/gpt-6-luna` | medium | 5.6 Luna → Terra |
+| Correctness | `openai-codex/gpt-6-sol` | medium | 5.6 Sol high → Astra high |
+| Security | `openai-codex/gpt-6-sol` | high | 5.6 Sol high → Astra high |
+| Simplicity | `openai-codex/gpt-6-luna` | medium | 5.6 Luna → Terra |
+| Council 1 | `openai-codex/gpt-6-sol` | high | 5.6 Sol → Astra |
+| Council 2 | DeepSeek reasoning only with verified zero-extra-cost evidence | provider-side high ID / Pi effort off | 5.5 high → 5.6 Sol high |
+| Council 3 | `openai-codex/gpt-6-luna` | high | 5.6 Luna high |
+| Judge | `openai-codex/gpt-6-astra` | high | Sol high → 5.6 Sol high |
 
 Simple work runs Worker → deterministic verification → stop. Hard work adds compact Scout/Planner evidence and the appropriate review. Tester and reviewers are not launched solely because they exist. Critical risk, material reviewer disagreement, an explicit `/council`, or the second bounded correction can authorize Council.
 
@@ -58,16 +64,16 @@ Token Saver changes route preference and role authorization without weakening ve
 
 | Role | Primary | Ordered fallback |
 |---|---|---|
-| Scout | `omniroute/groq/qwen/qwen3-32b` | Luna low → `auto/best-fast` |
-| Planner | `omniroute/deepseek/deepseek-v4-pro-high` | Sol high → Qwen reasoning → `auto/best-reasoning` |
-| Oracle | DeepSeek reasoning | Astra high → Sol high |
-| Worker | `omniroute/openrouter/qwen/qwen3-coder-next` | DeepSeek V4 Flash → Terra high → `auto/best-coding` |
-| Tester AI | Qwen/Groq fast | Luna medium → Terra medium |
-| Correctness | DeepSeek reasoning | Sol high → Astra high |
-| Security | Sol high | Astra high |
-| Simplicity | Qwen/Groq fast | Luna medium |
+| Scout | GPT-6 Luna low | 5.6 Luna low |
+| Planner, normally skipped | GPT-6 Luna medium | GPT-6 Sol low → 5.6 Sol high |
+| Oracle, exceptional only | GPT-6 Astra high | GPT-6 Sol high → 5.6 Sol high |
+| Worker | GPT-6 Luna medium | GPT-6 Sol medium only when Luna is unavailable or explicitly escalated → 5.6 Terra high |
+| Tester AI, conditional | GPT-6 Luna medium | 5.6 Luna medium |
+| Correctness, conditional | GPT-6 Luna medium | GPT-6 Sol medium → 5.6 Sol high |
+| Security, risk-gated | GPT-6 Sol high | 5.6 Sol high → Astra high |
+| Simplicity, conditional | GPT-6 Luna low | 5.6 Luna medium |
 
-Tester AI, correctness and Council are normally disabled on a successful cheap/default path. A deterministic failure activates Tester interpretation and correctness review before a correction. Security-sensitive work elevates low/medium policy to effective high and retains the strong direct Security route. Repeated failure does not loop cheap models indefinitely: the second and final correction may use Oracle plus heterogeneous Council.
+Tester AI, correctness and Council are normally disabled on a successful cheap/default path. A deterministic failure activates Tester interpretation and correctness review before a correction; by itself it does not prove Luna lacks model capability or authorize Sol. A separately justified model-capability escalation can use the bounded Sol fallback. Security-sensitive work elevates low/medium policy to effective high and retains the strong direct Security route. The second and final correction can authorize Oracle/Council, but never unbounded fan-out.
 
 ## Exact OmniRoute catalog IDs
 
@@ -88,13 +94,13 @@ OmniRoute is registered from the existing `OMNIROUTER_BASE_URL` and `OMNIROUTER_
 
 Registry presence, authentication and runtime callability are separate. `/v1/models` proves only catalog presence. A candidate is selectable only when the Pi registry sees it, authentication is available, and the owner-only callability cache says `RUNTIME_CALLABLE`. `RUNTIME_UNKNOWN` and `RUNTIME_REJECTED` candidates are skipped in declared order with a reason. When no candidate remains, resolution returns `BLOCKED_BY_MODEL` before allocation or fan-out.
 
-Because this change made no inference probes, the newly discovered OmniRoute IDs are not falsely seeded as callable. Until genuine runtime evidence is recorded by the existing callability workflow, live routing falls back to previously attested direct OpenAI models. Deterministic tests inject local callability evidence to prove the intended heterogeneous selection without spending quota.
+Because this change made no inference probes, the new GPT-6 Luna/Sol IDs and existing OmniRoute IDs are not falsely seeded as callable. Direct legacy models remain available while GPT-6 runtime status is unknown. Even a fixture-callable OmniRoute route remains unavailable to automatic selection without Provider Capability Registry proof of zero additional cost. The Council-2 diverse candidate stays in the chain but is currently blocked; the safe 5.5 fallback reduces live Council family diversity. This limitation must be resolved by authoritative cost/callability evidence, not a guessed price.
 
 An unsupported/auth/policy response after launch remains fail-closed and is not retried or silently switched. Fallback is a deterministic preflight decision based on current evidence; it is not an unbounded provider-error retry mechanism.
 
 ## Quality and governor
 
-`auto` classifies tasks as `simple`, `normal`, `hard`, or `critical` using bounded metadata: task length/lines, file-reference count, explicit high-risk request, and a closed list of complexity/security signals. The task text is never retained in governor metadata. Automatic quality maps those classes to low/medium/high/max. Security-sensitive evidence elevates effective quality to at least high.
+`auto` classifies tasks as `simple`, `normal`, `hard`, or `critical` using bounded metadata: task length/lines, file-reference count, explicit high-risk request, and a closed list of complexity/security signals. The task text is never retained in governor metadata. Automatic quality maps those classes to low/medium/high/max. Security-sensitive evidence elevates effective quality to at least high. Explicit `high` raises direct Planner/Worker/Correctness to high and Tester to high while leaving Scout low. `max` uses xhigh for eligible direct roles, not unconditional Astra or extra roles.
 
 The controller owns the resulting role booleans, Council permissions, context caps and model-call ceiling. None is present in the model-callable tool schema. Ceilings range from 12 calls for cheap Token Saver work to 42 for the complete 39-spawn critical path plus the existing global three-retry reserve. Concurrency remains 3, depth 1, corrections 2 and transient/attested-structured retry at most one per delegation and three per workflow.
 
@@ -106,7 +112,7 @@ Normal handoffs are capped at 12,000 characters (10,000 evidence; 8,000 Council)
 
 Workflow evidence and metadata traces record only routing metadata: preset, requested/effective quality, difficulty, security flag, role, provider, exact model, effort, fallback index, call number, retry count, policy digest and model-call limit. Existing role receipts retain provider-reported input/output/cache usage and result/error digests. Prompts, raw model output, file contents, keys, cookies and bearer credentials are never added by the routing layer. Unknown OmniRoute pricing is reported as unavailable rather than zero; only catalog-reported pricing is exposed.
 
-The Council is model-family heterogeneous—OpenAI direct, DeepSeek through OmniRoute, Qwen through OmniRoute—with an Astra Judge. DeepSeek and Qwen share one gateway and therefore do **not** provide infrastructure independence.
+The intended Council remains Sol + an independently reasoned DeepSeek route when its cost and callability are verified + Luna, followed by an Astra Judge. At present Council-2 resolves to GPT-5.5 under the fail-closed cost rule, so the active route is three different OpenAI model identities but one model family/provider. The DeepSeek candidate and its independent read-only/structured contract remain intact; no false heterogeneous-runtime claim is made.
 
 ## Harness profiles are post-route
 

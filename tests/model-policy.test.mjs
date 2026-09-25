@@ -10,7 +10,7 @@ import {
 } from "../lib/model-policy.mjs";
 import { assessModelCapability, validateCallabilityCache } from "../lib/model-callability.mjs";
 
-const directIds = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"];
+const directIds = ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-luna", "gpt-6-sol", "gpt-6-astra"];
 const directCatalog = directIds.map((id) => ({ provider: "openai-codex", id, reasoning: true, thinkingLevelMap: { xhigh: "xhigh", max: "max" }, contextWindow: 278528, maxTokens: 131072, input: ["text"], cost: { input: 1, output: 1, cacheRead: 1, cacheWrite: 1 } }));
 const omniIds = [
   "deepseek/deepseek-v4-pro-high", "deepseek/deepseek-v4-flash", "openrouter/qwen/qwen3.8-27b",
@@ -53,40 +53,53 @@ test("legacy efficient policy migrates in memory without discarding explicit ove
 test("Normal Work exact direct role targets and efforts are explicit", () => {
   const resolved = resolveModelPolicy(directCatalog, policy(), options(directCatalog));
   const expected = {
-    scout: ["openai-codex/gpt-5.6-luna", "low"], planner: ["openai-codex/gpt-5.6-sol", "high"], oracle: ["openai-codex/gpt-6-astra", "high"],
-    worker: ["openai-codex/gpt-5.6-terra", "high"], tester: ["openai-codex/gpt-5.6-luna", "medium"], correctness: ["openai-codex/gpt-5.6-sol", "high"],
-    security: ["openai-codex/gpt-5.6-sol", "high"], simplicity: ["openai-codex/gpt-5.6-luna", "medium"], "council-1": ["openai-codex/gpt-5.6-sol", "high"],
-    "council-2": ["openai-codex/gpt-5.5", "high"], "council-3": ["openai-codex/gpt-5.6-luna", "high"], "council-judge": ["openai-codex/gpt-6-astra", "high"],
+    scout: ["openai-codex/gpt-6-luna", "low"], planner: ["openai-codex/gpt-6-sol", "medium"], oracle: ["openai-codex/gpt-6-astra", "high"],
+    worker: ["openai-codex/gpt-6-sol", "medium"], tester: ["openai-codex/gpt-6-luna", "medium"], correctness: ["openai-codex/gpt-6-sol", "medium"],
+    security: ["openai-codex/gpt-6-sol", "high"], simplicity: ["openai-codex/gpt-6-luna", "medium"], "council-1": ["openai-codex/gpt-6-sol", "high"],
+    "council-2": ["openai-codex/gpt-5.5", "high"], "council-3": ["openai-codex/gpt-6-luna", "high"], "council-judge": ["openai-codex/gpt-6-astra", "high"],
   };
   for (const role of MODEL_ROLES) assert.deepEqual([resolved.roles[role].model, resolved.roles[role].thinking], expected[role], role);
   assert.ok(Object.values(resolved.roles).filter((route) => route.provider === "openai-codex").every((route) => ["low", "medium", "high"].includes(route.thinking)));
 });
 
-test("Token Saver selects explicit cloud Qwen/DeepSeek routes when runtime-callable", () => {
+test("Token Saver is Luna-first and skips unpriced gateway routes even when fixture-callable", () => {
   const resolved = resolveModelPolicy(fullCatalog, policy("token-saver"), options(fullCatalog));
-  assert.equal(resolved.roles.scout.model, "omniroute/groq/qwen/qwen3-32b");
-  assert.equal(resolved.roles.worker.model, "omniroute/openrouter/qwen/qwen3-coder-next");
-  assert.equal(resolved.roles.planner.model, "omniroute/deepseek/deepseek-v4-pro-high");
-  assert.equal(resolved.roles.correctness.model, "omniroute/deepseek/deepseek-v4-pro-high");
-  assert.equal(resolved.roles.security.model, "openai-codex/gpt-5.6-sol");
+  assert.equal(resolved.roles.scout.model, "openai-codex/gpt-6-luna");
+  assert.equal(resolved.roles.worker.model, "openai-codex/gpt-6-luna");
+  assert.equal(resolved.roles.planner.model, "openai-codex/gpt-6-luna");
+  assert.equal(resolved.roles.correctness.model, "openai-codex/gpt-6-luna");
+  assert.equal(resolved.roles.security.model, "openai-codex/gpt-6-sol");
+  assert.equal(resolved.roles["council-2"].model, "openai-codex/gpt-5.5");
+  assert.equal(resolved.routeChains["council-2"][0].reason, "COST_NOT_ATTESTED");
 });
 
-test("Council is heterogeneous by model family and Judge is exact direct Astra high", () => {
+test("Council keeps the diverse candidate dormant without cost proof and Judge stays Astra high", () => {
   const resolved = resolveModelPolicy(fullCatalog, policy(), options(fullCatalog));
-  assert.deepEqual([resolved.roles["council-1"].family, resolved.roles["council-2"].family, resolved.roles["council-3"].family], ["OpenAI", "DeepSeek", "Qwen"]);
+  assert.deepEqual(resolved.routeChains["council-2"].map((route) => route.family), ["DeepSeek", "OpenAI", "OpenAI"]);
+  assert.deepEqual([resolved.roles["council-1"].model, resolved.roles["council-2"].model, resolved.roles["council-3"].model], ["openai-codex/gpt-6-sol", "openai-codex/gpt-5.5", "openai-codex/gpt-6-luna"]);
   assert.deepEqual([resolved.roles["council-judge"].model, resolved.roles["council-judge"].thinking, resolved.roles["council-judge"].source], ["openai-codex/gpt-6-astra", "high", "direct"]);
-  assert.equal(resolved.diversity.heterogeneousProviders, true);
-  assert.equal(resolved.diversity.sharedGatewayFamilies >= 2, true);
+  assert.equal(resolved.diversity.heterogeneousProviders, false);
+});
+
+test("Council-2 becomes diverse only with verified runtime and zero-extra-cost registry evidence", () => {
+  const identity = "omniroute/deepseek/deepseek-v4-pro-high";
+  const record = { identity, zeroExtraCost: true, availability: { selectable: true, runtime: { state: "VERIFIED" } }, pricing: { state: "VERIFIED", value: { input: 0, output: 0 } } };
+  const eligible = resolveModelPolicy(fullCatalog, policy(), { ...options(fullCatalog), providerRegistry: { kind: "PROVIDER_CAPABILITY_REGISTRY", models: [record] } });
+  assert.equal(eligible.roles["council-2"].model, identity);
+  assert.equal(eligible.diversity.heterogeneousProviders, true);
+  const unverified = resolveModelPolicy(fullCatalog, policy(), { ...options(fullCatalog), providerRegistry: { kind: "PROVIDER_CAPABILITY_REGISTRY", models: [{ ...record, pricing: { ...record.pricing, state: "CACHED" } }] } });
+  assert.equal(unverified.roles["council-2"].model, "openai-codex/gpt-5.5");
+  assert.throws(() => validateResolvedModelPolicy(fullCatalog, eligible, options(fullCatalog)), /cost_unattested/u);
 });
 
 test("fallback order is deterministic and rejects catalog presence without callability evidence", () => {
-  const rejectedQwen = { "omniroute/openrouter/qwen/qwen3-coder-next": "RUNTIME_REJECTED" };
-  const fallback = resolveModelPolicy(fullCatalog, policy("token-saver"), options(fullCatalog, rejectedQwen));
-  assert.equal(fallback.roles.worker.model, "omniroute/deepseek/deepseek-v4-flash");
+  const rejectedLuna = { "openai-codex/gpt-6-luna": "RUNTIME_REJECTED" };
+  const fallback = resolveModelPolicy(fullCatalog, policy("token-saver"), options(fullCatalog, rejectedLuna));
+  assert.equal(fallback.roles.worker.model, "openai-codex/gpt-6-sol");
   assert.equal(fallback.roles.worker.fallbackIndex, 1);
-  assert.deepEqual(fallback.routingDecisions.find((entry) => entry.role === "worker").skipped, [{ model: "omniroute/openrouter/qwen/qwen3-coder-next", reason: "RUNTIME_REJECTED:UNSUPPORTED_MODEL" }]);
-  const unknownOmni = { version: 1, entries: Object.fromEntries(directCatalog.map((model) => [`${model.provider}/${model.id}`, { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "LOCAL_FIXTURE" }])) };
-  const liveSafe = resolveModelPolicy(fullCatalog, policy("token-saver"), { registeredModels: fullCatalog, callability: unknownOmni });
+  assert.deepEqual(fallback.routingDecisions.find((entry) => entry.role === "worker").skipped, [{ model: "openai-codex/gpt-6-luna", reason: "RUNTIME_REJECTED:UNSUPPORTED_MODEL" }]);
+  const oldOnly = { version: 1, entries: Object.fromEntries(directCatalog.filter((model) => !["gpt-6-luna", "gpt-6-sol"].includes(model.id)).map((model) => [`${model.provider}/${model.id}`, { runtimeStatus: "RUNTIME_CALLABLE", reasonCode: "LOCAL_FIXTURE" }])) };
+  const liveSafe = resolveModelPolicy(fullCatalog, policy("token-saver"), { registeredModels: fullCatalog, callability: oldOnly });
   assert.equal(liveSafe.roles.worker.model, "openai-codex/gpt-5.6-terra");
   assert.equal(liveSafe.roles.worker.fallbackIndex, 2);
 });
@@ -109,8 +122,20 @@ test("manual unsupported effort is rejected and quality max uses strongest suppo
   const nonReasoning = [{ provider: "fixture", id: "plain/model", reasoning: false }];
   assert.throws(() => parseModelSelection("fixture/plain/model:high", nonReasoning, options(nonReasoning)), /thinking_not_supported/u);
   const max = resolveModelPolicy(directCatalog, policy(), { ...options(directCatalog), qualityRequested: "max", effectiveQuality: "max" });
-  assert.equal(max.roles.worker.thinking, "max");
+  assert.equal(max.roles.worker.thinking, "xhigh");
   assert.equal(max.roles.scout.thinking, "medium");
+});
+
+test("high raises Sol coding effort without raising fan-out or context limits", () => {
+  const base = resolveModelPolicy(directCatalog, policy(), options(directCatalog));
+  const high = resolveModelPolicy(directCatalog, policy(), { ...options(directCatalog), qualityRequested: "high", effectiveQuality: "high" });
+  assert.equal(base.roles.worker.thinking, "medium");
+  assert.equal(high.roles.worker.thinking, "high");
+  assert.equal(high.roles.planner.thinking, "high");
+  assert.equal(high.roles.tester.thinking, "high");
+  assert.equal(high.roles.scout.thinking, "low");
+  assert.equal(high.roles["council-judge"].thinking, "high");
+  assert.deepEqual(Object.keys(high.roles), Object.keys(base.roles));
 });
 
 test("low quality cannot weaken mandatory Security, Oracle, Council, or Judge direct reasoning", () => {
