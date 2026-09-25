@@ -6,7 +6,7 @@
 - Branch: `feature/overdrive-ultra-expansion`
 - Base HEAD: `abbaa7d2e7c2841c4bc290b5ac29f5843456ade7` (validated Ultra Phase 25)
 - Current HEAD: resolve with `git rev-parse HEAD` after this bookkeeping commit
-- Current phase: 36 — Expanded Tool Ecosystem, IN PROGRESS; Phase 35 is COMPLETE/BOUNDED, Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
+- Current phase: 37 — Unified Web / Research Resource Layer, IN PROGRESS; Phase 36 is MEASURED/NOT ADDED, Phase 35 is COMPLETE/BOUNDED, Phase 34 is COMPLETE/BOUNDED, Phase 33 is DEFERRED FOR SAFETY, Phase 32 is MEASURED/NOT ADDED, Phase 31 is COMPLETE/BOUNDED, Phase 26 is COMPLETE/BOUNDED, Phase 27 is PARTIAL/DEFERRED FOR SAFETY, Phase 28 is DEFERRED FOR SAFETY, Phase 29 is COMPLETE/BOUNDED, and Phase 30 is PREWALK COMPLETE / PERSISTENCE DEFERRED
 - Last functional Expansion commit: `618906c` (Phase 35 bounded zero-model-call Watchdog)
 - Last bookkeeping Expansion commit: the commit containing this ledger update (resolve with `git log -1`)
 - OMP reference: `a1b3b83a7fb8460445f2f5995a6aa56047bd44c7` (main on 2026-09-23, coding-agent 18.2.11)
@@ -51,6 +51,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - The bookkeeping commit containing this Phase 34 partial checkpoint follows functional commit `99d5d07`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 34 completion note, benchmark README and this ledger follows functional commit `0b85907`; resolve its exact hash with `git log -1` after commit.
 - The bookkeeping commit containing the Phase 35 note, benchmark README and this ledger follows functional commit `618906c`; resolve its exact hash with `git log -1` after commit.
+- The Phase 36 measured/not-added assessment and ledger follow the Phase 35 bookkeeping commit. No functional code commit was needed because no candidate met the value/security/schema gate.
 
 ## Tests and benchmarks
 
@@ -70,6 +71,7 @@ Retain one controller-owned DAP session, exact adapter identity, networkless Bub
 - Phase 34 partial checkpoint: focused edit tests 13/13 PASS; real Pi offline edit benchmark PASS with model-visible stale guidance and cleanup, 0 paid/external calls; authoritative gate 499/499 PASS, syntax, installed-Pi TypeScript and package/secret validation PASS. See `docs/implementation-notes/phase-34-edit-ux-checkpoint.md`.
 - Phase 34 completion: 20/20 deterministic corpus classes PASS (16 exact edits, four expected denials), including a real policy-pinned ast-grep case; qualified comparative evidence tests PASS. The authoritative `PI_OVERDRIVE_LSP_RUNTIME=/home/tasso/Documents/Codex/tasso-pi-overdrive/runtime/lsp npm run check` passed 502/502, syntax, installed-Pi TypeScript, package/secret validation. A bare 500/502 repeat without that selector failed only the two documented Rust/Go LSP runtime-selection tests; the exact selector restored 502/502. An earlier full-gate attempt under a sandbox without loopback permission produced `listen EPERM` in unrelated integration suites; the gate passed once local loopback was permitted. No paid/external provider calls or comparative real-model inference occurred. See `docs/implementation-notes/phase-34-edit-ux-completion.md`.
 - Phase 35: focused Watchdog tests 11/11 PASS. Deterministic CONTROL/WATCHDOG benchmark PASS against the actual local workflow state machine: 7/22/26 fixture delegate calls and PASS in each corresponding arm; successful work produced no review, repeated failures produced two bounded reviews/eight duplicate suppressions, and post-PASS regression produced one review. One already-required correction Worker in each failing scenario received advisory data; maximum aggregate delta was 474 characters. Real Pi 0.85.1 offline fixture benchmark PASS with two advice messages, zero provider/model/tool calls and temporary cleanup. The final authoritative gate with the documented LSP selector passed 513/513, syntax, installed-Pi TypeScript, and package/secret validation. One immediately preceding local gate yielded 512/513 with the failing identity lost to console truncation; the filtered suite and full gate both subsequently passed 513/513, so this remains a non-reproduced observation, not a diagnosed regression. No authenticated workflow E2E or paid call was made. See `docs/implementation-notes/phase-35-watchdog.md`.
+- Phase 36: pinned OMP source-only tool inventory and current Overdrive overlap/security/schema assessment completed. Existing offline real-Pi Tool Governor benchmark rerun PASS on Pi 0.85.1: nine deterministic local turns, zero network/external/paid calls; simple edit four tools/2,128 schema characters, debugging 13/6,436, research four/2,104. No OMP executable comparison or new tool was justified. See `docs/implementation-notes/phase-36-tool-ecosystem.md`.
 - OMP execution: `NOT_RUN` (Bun >=1.4 not materialized in an isolated comparable runtime).
 
 ## Phase 26 adapter matrix
@@ -130,6 +132,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - The optional `/watchdog` remains off by default and activates only for Task Policy-eligible hard/high-risk tasks. Controller checkpoints provide fixed-size aggregate deltas, with no transcript, diff bytes, paths or Council internals. Static local advice has zero model/tool/process authority, two reviews per task at most (one in Token Saver), 30-second cooldown, duplicate suppression, strict output schema, and fail-soft behavior. A validated run-bound advisory may reach an existing correction Worker as untrusted data; it never causes correction or changes the workflow gate. Metadata trace is allowlisted. The stable installed Pi configuration remains unchanged.
 - The bounded variant does not analyze actual source/diff semantics, handle Director-initiated reviews, or provide a full authenticated secure-workflow E2E. The real Pi benchmark uses a deterministic observation fixture; production controller correction delivery is exercised by focused and local workflow-state-machine tests. No extra provider route is justified under the zero-cost policy.
 
+## Phase 36 disposition — MEASURED/NOT ADDED
+
+- The current pinned OMP tool inventory was compared against Overdrive's governed source/edit/debug/eval/Git/web/agent surfaces. Archive/SQLite/PDF reads have potential value but need independent parser/root/size/secret boundaries and a representative task; security-scan cloud/mutation, remote GitHub, broad browser/computer, image generation and interactive shell would cross established authority or cost boundaries. Additional coordination tools overlap existing Pi/notebook/skills/Hub/Second Brain. The measured conditional schema is already smaller for ordinary tasks. No new model-facing schema, tool, package or route was added.
+
 ## Dirty files
 
 - After the Phase 35 bookkeeping commit: expected clean; verify with `git status --short`. The managed `runtime/dap/python` and managed LSP dependencies are ignored project-local materializations, not tracked secrets.
@@ -147,9 +153,10 @@ Both real adapters support bounded launch, source breakpoints, continue, step-ov
 - Phase 31 registry leaves rate limits and unqualified OpenRouter prices UNKNOWN. It does not fetch or attest a fresh/complete OmniRoute catalog. Declared Pi registry pricing is not a verified billing quote. The inspection view cannot authorize a model that routing already rejects.
 - Phase 34's deterministic corpus is not a real-model format/token comparison; TypeScript/Go syntax in that corpus is `NOT_RUN` (separate LSP gate is authoritative for managed languages). No model-family contract winner has been measured or promoted.
 - Phase 35's Watchdog is deterministic aggregate-metadata advice, not semantic code review. Its real Pi observation benchmark is a fixture, not authenticated full secure-workflow E2E; any anomalous Watchdog or existing-suite failure must be reproduced before changing architecture.
+- Phase 36 has no new binary-format reader or specialized security scan; revisit only with a concrete coding task, bounded handler design, and measured improvement over existing tools.
 - Ignored managed Rust/Go LSP binaries remain in the verified stable runtime selected for the full gate; the new worktree owns only its lockfile-pinned Node LSP modules.
 - `docs/final-adversarial-audit.md` and all other protected audit state must remain untouched.
 
 ## Exact next action
 
-Begin Phase 36 by inspecting the pinned OMP tool ecosystem against the current Overdrive tool surface. Evaluate missing capability value, security, schema/token overhead and overlap before adding anything; no raw tool-count race, paid call, route change, push, PR, tag, reset, clean or stash.
+Begin Phase 37 from the existing safe SearXNG/search, safe fetch, Context7/MCP, Git resources, SmartRead, Artifact Store and Context Governor paths. Seek a unified bounded research flow without creating a browser/public-web bypass, raw web dump, paid search requirement, route change, push, PR, tag, reset, clean or stash.
