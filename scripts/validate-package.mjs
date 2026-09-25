@@ -6,6 +6,8 @@ import { calculateRequiredSpawnBudget } from '../lib/workflow-spawn-budget.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
+const prerequisitesSource = await readFile(path.join(root, 'scripts/prerequisites.sh'), 'utf8');
+if (!prerequisitesSource.includes('platform-preflight.sh') || prerequisitesSource.indexOf('platform-preflight.sh') > prerequisitesSource.indexOf('install_system=false')) failures.push('platform preflight must run before any prerequisite installation');
 const requiredJson = ['package.json', 'config/settings-patch.json', 'config/model-policy.json', 'config/model-callability.json', 'config/model-harness-profiles.json', 'config/edit-benchmark-evidence.json', 'config/routing-policy.json', 'config/second-brain.json', 'config/memory-model-policy.json', 'config/local-embedding-model.json', 'config/managed-lsp.json', 'config/packages.json', 'config/pi-fff.json', 'config/subagents.json', 'config/browser.json', 'config/mcp.json', 'config/web-tools.json', 'config/artifacts.json', 'config/context-governor.json', 'config/edit-engine.json', 'config/ast-edit.json', 'config/lsp-write-guard.json', 'config/dap-engine.json', 'config/eval-engine.json', 'config/stream-guard.json', 'config/sentinel.json', 'config/watchdog.json', 'config/agent-hub.json', 'config/director-mode.json', 'config/git-resources.json', 'config/commit-planner.json', 'config/rule-interoperability.json', 'config/editor-bridge.json', 'runtime/mcp/package.json', 'runtime/mcp/package-lock.json', 'runtime/lsp/package.json', 'runtime/lsp/package-lock.json'];
 for (const relative of requiredJson) {
   try { JSON.parse(await readFile(path.join(root, relative), 'utf8')); }

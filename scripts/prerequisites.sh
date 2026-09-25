@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+prerequisite_script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+bash "$prerequisite_script_dir/platform-preflight.sh" "$(uname -s)" "$(uname -m)"
+
 install_system=false
 install_pi=false
 for argument in "$@"; do
