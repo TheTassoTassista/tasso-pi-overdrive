@@ -103,14 +103,24 @@ test('native Windows Node caller death also terminates the supervisor and tree',
   } finally { caller?.kill('SIGKILL'); fs.rmSync(root, { recursive: true, force: true }); }
 });
 test('native Windows cancellation is not converted to success', native, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-win-process-'));
   const controller = new AbortController();
-  const running = runOwnedEngine(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore', signal: controller.signal });
-  const timer = setTimeout(() => controller.abort(), 100);
-  try { await assert.rejects(running, /CANCELLED/u); }
-  finally { clearTimeout(timer); }
+  const file = path.join(root, 'pids.json');
+  const running = runOwnedEngine(process.execPath, ['-e', tree(file, false)], { stdio: 'ignore', signal: controller.signal, timeoutMs: 8000 });
+  // Install rejection observation before aborting; prove active descendants,
+  // not an abort before CreateProcess that never exercised native cleanup.
+  const rejected = assert.rejects(running, /CANCELLED/u);
+  try { const pids = await receipt(file); controller.abort(); await rejected; await gone(pids); }
+  finally { controller.abort(); await rejected.catch(() => {}); fs.rmSync(root, { recursive: true, force: true }); }
 });
 test('native Windows output flood fails closed with bounded buffering', native, async () => {
-  await assert.rejects(runOwnedEngine(process.execPath, ['-e', 'process.stdout.write("x".repeat(3*1024*1024));setInterval(()=>{},1000)'], { stdio: 'ignore' }), /OUTPUT_LIMIT/u);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-win-process-'));
+  try {
+    const file = path.join(root, 'pids.json');
+    const program = `require('node:fs').writeFileSync(${JSON.stringify(file)},JSON.stringify([process.pid]));process.stdout.write('x'.repeat(3*1024*1024));setInterval(()=>{},1000);`;
+    await assert.rejects(runOwnedEngine(process.execPath, ['-e', program], { stdio: 'ignore' }), /OUTPUT_LIMIT/u);
+    await gone(await receipt(file));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 test('native Windows direct spawn failure and malformed requests preserve failure', native, () => {
   const request = windowsProcessRequest(path.join(os.tmpdir(), 'phi-nonexistent-fixture.exe'), [], { timeoutMs: 1000 });
