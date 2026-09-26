@@ -1,5 +1,9 @@
 import { spawn } from 'node:child_process';
 
+export function processBackendStatus() {
+  return { id: 'exec-and-posix-groups', available: typeof process.execve === 'function', scope: 'trusted ownership; sandbox separate', evidence: 'runtime API presence only; not a live cleanup probe' };
+}
+
 export function execEngine(command, args, env = process.env) {
   if (typeof process.execve !== 'function') throw new Error('PHI_EXEC_BACKEND_UNAVAILABLE');
   // Preserve the legacy launcher's exec semantics: same PID and no additional

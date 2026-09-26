@@ -1,8 +1,13 @@
 import { platformAdapter } from '../index.mjs';
 
+async function ownedBackend() {
+  return platformAdapter().id === 'linux' ? import('../linux/process.mjs') : import('../windows/process.mjs');
+}
+
+export async function processBackendStatus() { return (await ownedBackend()).processBackendStatus(); }
+
 export async function runOwnedEngine(command, args, options = {}) {
-  const platform = platformAdapter();
-  const backend = platform.id === 'linux' ? await import('../linux/process.mjs') : await import('../windows/process.mjs');
+  const backend = await ownedBackend();
   return backend.runOwnedEngine(command, args, options);
 }
 

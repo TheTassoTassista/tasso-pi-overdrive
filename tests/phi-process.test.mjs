@@ -4,7 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runOwnedEngine } from '../platform/shared/process.mjs';
+import { runOwnedEngine, processBackendStatus } from '../platform/shared/process.mjs';
+
+test('process presence metadata does not claim sandbox or live cleanup attestation', async () => {
+  const status = await processBackendStatus();
+  assert.equal(typeof status.available, 'boolean');
+  assert.match(status.scope, /trusted/iu);
+  assert.match(status.evidence, /not|only|build required/iu);
+  assert.doesNotMatch(status.id, /appcontainer|sandbox/iu);
+});
 
 test('Linux owned local verification terminates a descendant after parent exit', { skip: process.platform !== 'linux' }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-process-'));

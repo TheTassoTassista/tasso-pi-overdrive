@@ -16,3 +16,10 @@ test('native PowerShell policy failure is reduced to a fixed code, never its pat
   assert.deepEqual(evidence.diagnosticCodes, ['PHI_BUILD_SCRIPT_POLICY_BLOCKED']);
   assert.doesNotMatch(JSON.stringify(evidence), /private/u);
 });
+test('Desktop PowerShell pipe encodings preserve fixed diagnostics without publishing decoded text', () => {
+  const error = 'PHI_WINDOWS_BUILD_COMPILER_MISSING private-path';
+  const evidence = validationFailureEvidence('windows-process-build', { status: 1, stderr: [...error].join('\0') });
+  assert.deepEqual(evidence.diagnosticCodes, ['PHI_WINDOWS_BUILD_COMPILER_MISSING']);
+  assert.doesNotMatch(JSON.stringify(evidence), /private/u);
+  assert.deepEqual(validationFailureEvidence('windows-process-build', { status: 1, stderr: 'PHI_x005F_WINDOWS_BUILD_x005F_COMPILER_MISSING' }).diagnosticCodes, ['PHI_WINDOWS_BUILD_COMPILER_MISSING']);
+});

@@ -25,6 +25,14 @@ export function ownedWindowsHelper() {
   if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'OwnedProcess.cs')) || record.binarySha256 !== digest(binary)) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   return binary;
 }
+export function processBackendStatus() {
+  try {
+    ownedWindowsHelper();
+    return { id: 'windows-job-object', available: true, scope: 'trusted non-interactive ownership; NOT a sandbox', evidence: 'local build hashes only; not ACL or live cleanup attestation' };
+  } catch {
+    return { id: 'windows-job-object', available: false, scope: 'trusted non-interactive ownership; NOT a sandbox', evidence: 'native tracked-source build required' };
+  }
+}
 export function windowsProcessRequest(command, args, { cwd = process.cwd(), env = process.env, timeoutMs = WINDOWS_PROCESS_LIMITS.lifetimeMs } = {}) {
   if (process.platform !== 'win32') throw new Error('PHI_NATIVE_PROCESS_PLATFORM_UNSUPPORTED');
   const string = (value) => typeof value === 'string' && !value.includes('\0');
