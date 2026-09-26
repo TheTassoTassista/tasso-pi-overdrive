@@ -122,7 +122,12 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
-        request["env"] = new Dictionary<string, string> { { "SystemRoot", Environment.GetEnvironmentVariable("SystemRoot") }, { "TEMP", scratch }, { "TMP", scratch } };
+        string system = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        request["env"] = new Dictionary<string, string> {
+          { "SystemRoot", system }, { "windir", system }, { "SystemDrive", Path.GetPathRoot(system).TrimEnd('\\') },
+          { "PATH", runtime }, { "USERPROFILE", scratch }, { "LOCALAPPDATA", scratch }, { "APPDATA", scratch },
+          { "TEMP", scratch }, { "TMP", scratch }
+        };
         request["timeoutMs"] = 8000; request["guardianPid"] = System.Diagnostics.Process.GetCurrentProcess().Id;
         // Execute requires an older guardian than the supervisor. The outer
         // Node guardian is provided by our process's inherited environment only

@@ -113,6 +113,7 @@ namespace Phi.Native {
       IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, output = IntPtr.Zero, error = IntPtr.Zero;
       IntPtr guardian = IntPtr.Zero;
       ProcessInfo child = new ProcessInfo(); bool listReady = false;
+      string phase = "REQUEST";
       try {
         JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = MaxRequest;
         Dictionary<string, object> request = serializer.Deserialize<Dictionary<string, object>>(ReadRequest(input));
@@ -145,18 +146,21 @@ namespace Phi.Native {
         string block = String.Join("\0", sorted.Select(pair => pair.Key + "=" + pair.Value)) + "\0\0";
         if (block.Length > 32760) throw new InvalidDataException();
         environment = Marshal.StringToHGlobalUni(block);
+        phase = "JOB";
         job = CreateJobObjectW(IntPtr.Zero, null); Check(job != IntPtr.Zero);
         ExtendedLimits limits = new ExtendedLimits();
         // No BREAKAWAY_OK or SILENT_BREAKAWAY_OK. Native limits are not input-controlled.
         limits.Basic.Flags = KillOnClose | ActiveProcessLimit | DieOnException;
         limits.Basic.ActiveProcessLimit = 32;
         Check(SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf(typeof(ExtendedLimits))));
+        phase = "STDIO";
         SecurityAttributes security = new SecurityAttributes(); security.Size = Marshal.SizeOf(typeof(SecurityAttributes)); security.Inherit = 1;
         Check(CreatePipe(out inputRead, out inputWrite, ref security, 0));
         Check(SetHandleInformation(inputWrite, 1, 0));
         IntPtr self = GetCurrentProcess();
         Check(DuplicateHandle(self, GetStdHandle(-11), self, out output, 0, true, 2));
         Check(DuplicateHandle(self, GetStdHandle(-12), self, out error, 0, true, 2));
+        phase = "ATTRIBUTES";
         IntPtr size = IntPtr.Zero;
         int attributeCount = scope == null ? 2 : 4;
         InitializeProcThreadAttributeList(IntPtr.Zero, attributeCount, 0, ref size);
@@ -171,7 +175,9 @@ namespace Phi.Native {
         StartupEx startup = new StartupEx(); startup.Startup.Size = Marshal.SizeOf(typeof(StartupEx)); startup.Startup.Flags = 0x100;
         startup.Startup.Input = inputRead; startup.Startup.Output = output; startup.Startup.Error = error; startup.Attributes = list;
         // Atomic job assignment at CreateProcess closes the suspended-unassigned orphan window.
+        phase = "CREATE";
         Check(CreateProcessW(command, encoded, IntPtr.Zero, IntPtr.Zero, true, ExtendedStartup | UnicodeEnvironment | Suspended | NoWindow, environment, cwd, ref startup, out child));
+        phase = "ATTEST";
         bool inside; Check(IsProcessInJob(child.Process, job, out inside)); if (!inside) throw new InvalidDataException();
         if (scope != null) scope.VerifyToken(child.Process);
         Close(ref inputRead); Close(ref output); Close(ref error);
@@ -181,18 +187,20 @@ namespace Phi.Native {
           catch (IOException) { } catch (ObjectDisposedException) { } catch (ArgumentException) { }
           finally { writeHandle.Dispose(); }
         }); copy.IsBackground = true; copy.Start();
+        phase = "RESUME";
         if (ResumeThread(child.Thread) == UInt32.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
         uint waited = WaitForMultipleObjects(2, new IntPtr[] { child.Process, guardian }, false, (uint)timeout);
         if (waited != 0 && waited != 1 && waited != 258) throw new Win32Exception(Marshal.GetLastWin32Error());
         uint code = waited == 1 ? 125U : 124U;
         if (waited == 0) Check(GetExitCodeProcess(child.Process, out code));
         // A successful parent exit is not evidence that descendants finished.
+        phase = "CLEANUP";
         Check(TerminateJobObject(job, 137));
         DateTime deadline = DateTime.UtcNow.AddSeconds(5);
         while (!EmptyJob(job)) { if (DateTime.UtcNow >= deadline) throw new InvalidDataException(); Thread.Sleep(10); }
         writeHandle.Dispose();
         return code <= 255 ? (int)code : 1;
-      } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode); return 70; }
+      } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
         catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED"); return 70; }
       finally {
         // Closing the non-inherited last Job handle kills owned children even on exception.
