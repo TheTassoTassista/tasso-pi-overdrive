@@ -8,7 +8,7 @@ import { requireAutonomousBackend } from '../platform/index.mjs';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 
 function probeMetadata(stdout, stderr, status) {
-  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
+  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'journalRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
   const receipts = stdout.trim().split(/\r?\n/u).slice(0, 4).flatMap((line) => {
     try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
     catch { return []; }
@@ -96,6 +96,21 @@ test('scope recovery uses bounded durable receipts, generation checks and opened
 });
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function terminateProbe(child) {
+  // Signal exit leaves exitCode null. Do not wait for an already-fired close.
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Owned probe termination timed out')), 5000);
+    child.once('close', () => { clearTimeout(timer); resolve(); });
+    child.kill('SIGKILL');
+  });
+}
+test('probe termination is bounded and idempotent after signal exit', async () => {
+  const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore', shell: false });
+  await terminateProbe(child);
+  assert.equal(child.signalCode, 'SIGKILL');
+  await terminateProbe(child);
+});
 function recover(id) {
   const result = spawnSync(ownedWindowsHelper(), id ? ['--recover-scope', id] : ['--recover-scopes'], { encoding: 'utf8', shell: false, windowsHide: true, timeout: 16000, maxBuffer: 8192 });
   assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
@@ -143,7 +158,7 @@ for (const role of ['worker', 'tester', 'reviewer']) {
       assert.equal(recovered.active, 0);
       assert.equal(recover(scopeId).recovered, 0, 'recovery must be idempotent');
     } finally {
-      if (child?.exitCode === null) { const closed = new Promise((resolve) => child.once('close', resolve)); child.kill('SIGKILL'); await closed; }
+      await terminateProbe(child);
       if (scopeId) recover(scopeId);
       await new Promise((resolve) => server.close(resolve));
     }
@@ -164,5 +179,13 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
       assert.equal(receipt.recovered, failure === 'cleanup-exception' ? 1 : 0);
       assert.equal(recover(cleanup.scopeId).recovered, 0);
     } finally { await new Promise((resolve) => server.close(resolve)); }
+  });
+}
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction']) {
+  test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
+    assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
+    assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, processKills: 0 });
+    assert.equal(recover().quarantined, 0);
   });
 }

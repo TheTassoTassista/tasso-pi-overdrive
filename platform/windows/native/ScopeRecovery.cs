@@ -26,6 +26,7 @@ namespace Phi.Native {
     [DllImport("advapi32.dll")] static extern int RegFlushKey(IntPtr key);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegQueryValueExW(IntPtr key, string name, IntPtr reserved, out uint type, byte[] data, ref uint size);
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int DeleteAppContainerProfile(string name);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
     static readonly Regex IdPattern = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex IdentityPattern = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     readonly Mutex lease;
@@ -99,7 +100,8 @@ namespace Phi.Native {
         bool alive; int pid = Process.GetCurrentProcess().Id;
         record = new Dictionary<string, object> { { "v", 1 }, { "id", id }, { "pid", pid }, { "created", ProcessCreation(pid, out alive) }, { "profile", false }, { "registry", false }, { "rootIdentity", "" }, { "ready", false } };
         using (RegistryKey root = OpenBase()) {
-          if (root.GetSubKeyNames().Length >= MaxScopes || root.OpenSubKey(id) != null) throw new InvalidDataException();
+          using (RegistryKey existing = root.OpenSubKey(id))
+            if (root.GetSubKeyNames().Length >= MaxScopes || existing != null) throw new InvalidDataException();
           using (RegistryKey key = root.CreateSubKey(id, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, PrivateRegistryAcl())) Write(key, record);
         }
       } catch { Dispose(); throw; }
@@ -188,5 +190,85 @@ namespace Phi.Native {
       return quarantined == 0 ? 0 : 70;
     }
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
+    // Fixed owned fixtures only: never a generic metadata import/edit API.
+    internal static int SelfTest(string name) {
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction" };
+      if (!cases.Contains(name)) return 70;
+      ScopeRecovery scope = null;
+      Dictionary<string, object> saved = null;
+      string extra = null, extraIdentity = null, replacementIdentity = null;
+      bool passed = false, fixtureClean = true;
+      try {
+        scope = Begin();
+        if (name == "clean") {
+          string id = scope.Id; scope.Complete(true);
+          passed = Recover(false, id) == 0;
+        } else {
+          Directory.CreateDirectory(scope.Root);
+          File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
+          scope.RootCreated(); scope.Ready();
+          // A live unrelated generation with the recorded PID must not be
+          // killed. The record deliberately refers to a different generation.
+          scope.record["created"] = "0000000000000001"; scope.Save();
+          saved = new Dictionary<string, object>(scope.record);
+          if (name == "corrupt" || name == "unknown-field" || name == "oversized") {
+            using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id, true)) {
+              string text = name == "corrupt" ? "invalid-receipt" : name == "oversized" ? new string('x', 5000) : new JavaScriptSerializer().Serialize(new Dictionary<string, object>(saved) { { "unrecognized", "synthetic-not-echoed" } });
+              key.SetValue("Receipt", text, RegistryValueKind.String); if (RegFlushKey(key.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException();
+            }
+          }
+          if (name == "missing") scope.CleanupFiles();
+          if (name == "root-swap" || name == "hardlink" || name == "junction") {
+            extra = RootFor(Guid.NewGuid().ToString("N"));
+            if (name == "root-swap") {
+              Directory.Move(scope.Root, extra); extraIdentity = RecoveryFilesystem.DirectoryIdentity(extra);
+              Directory.CreateDirectory(scope.Root);
+              File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-replacement-not-owned-by-receipt");
+              replacementIdentity = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+            } else {
+              Directory.CreateDirectory(extra); extraIdentity = RecoveryFilesystem.DirectoryIdentity(extra);
+              File.WriteAllText(Path.Combine(extra, "sentinel.txt"), "synthetic-unrelated-original");
+              if (name == "hardlink" && !CreateHardLinkW(Path.Combine(scope.Root, "link"), Path.Combine(extra, "sentinel.txt"), IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+              if (name == "junction") AppContainerScope.CreateOwnedJunction(Path.Combine(scope.Root, "link"), extra);
+            }
+          }
+          scope.Dispose();
+          int result = Recover(false, scope.Id);
+          if (name == "corrupt" || name == "unknown-field" || name == "oversized" || name == "root-swap") {
+            if (result != 70 || !Directory.Exists(scope.Root)) throw new InvalidDataException();
+            string expected = name == "root-swap" ? "synthetic-replacement-not-owned-by-receipt" : "synthetic-scope-owned";
+            if (File.ReadAllText(Path.Combine(scope.Root, "sentinel.txt")) != expected) throw new InvalidDataException();
+            if (name == "root-swap") {
+              using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(scope.Root, replacementIdentity);
+              replacementIdentity = null;
+              Directory.Move(extra, scope.Root); extra = null;
+            }
+            using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id, true)) Write(key, saved);
+            result = Recover(false, scope.Id);
+          }
+          if (result != 0 || Directory.Exists(scope.Root) || Recover(false, scope.Id) != 0) throw new InvalidDataException();
+          if (extra != null && File.ReadAllText(Path.Combine(extra, "sentinel.txt")) != "synthetic-unrelated-original") throw new InvalidDataException();
+          bool alive; if (ProcessCreation(Process.GetCurrentProcess().Id, out alive) == null || !alive) throw new InvalidDataException();
+          passed = true;
+        }
+      } catch { Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED"); }
+      finally {
+        // Only exact fresh self-test objects with their captured identities.
+        // Never clean an arbitrary path from corrupt metadata.
+        try {
+          if (scope != null) {
+            scope.Dispose();
+            if (saved != null && Directory.Exists(scope.Root)) {
+              string expected = replacementIdentity ?? (string)saved["rootIdentity"];
+              using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(scope.Root, expected);
+            }
+            using (RegistryKey root = OpenBase()) root.DeleteSubKeyTree(scope.Id, false);
+          }
+          if (extra != null) using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(extra, extraIdentity);
+        } catch { fixtureClean = false; Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_CLEANUP_FAILED"); }
+      }
+      Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, fixtureCleanup = fixtureClean, processKills = 0 }));
+      return passed && fixtureClean ? 0 : 70;
+    }
   }
 }

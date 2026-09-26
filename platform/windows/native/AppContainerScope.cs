@@ -173,7 +173,7 @@ namespace Phi.Native {
         for (int index = 0; index < bytes.Length; index++) if (bytes[index] != actual[index]) throw new InvalidDataException();
       } finally { CloseHandle(handle); }
     }
-    static void CreateOwnedJunction(string directory, string target) {
+    internal static void CreateOwnedJunction(string directory, string target) {
       // Controller-only, fixed synthetic paths under the same fresh root.
       // Real NTFS mount-point reparse data, not a shell command or a mock.
       Directory.CreateDirectory(directory);
@@ -284,6 +284,7 @@ namespace Phi.Native {
         File.SetAccessControl(allPackages, allAcl);
         registryKey = scope.recovery.FixtureRegistry;
         RegistrySecurity privateAcl = new RegistrySecurity(); privateAcl.SetAccessRuleProtection(true, false);
+        privateAcl.SetOwner(WindowsIdentity.GetCurrent().User);
         privateAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, privateAcl)) { key.SetValue("Fixture", "synthetic-private-value"); if ((string)key.GetValue("Fixture") != "synthetic-private-value") throw new InvalidDataException(); }
         scope.recovery.RegistryCreated();
