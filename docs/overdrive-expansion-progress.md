@@ -1,5 +1,9 @@
 # Overdrive Ultra Expansion 26–39 progress ledger
 
+## Final active integration (2026-09-26)
+
+Expansion commit `9664b82` was fast-forwarded into the stable repository at `/home/tasso/Documents/Codex/tasso-pi-overdrive`, then the active Pi 0.87.1 integration fix was committed there as `dabd5c5` on `feature/routing-presets-quality`. The Expansion worktree remains an unmodified historical branch; no push, PR, tag, reset or stash occurred. The user-modified `docs/final-adversarial-audit.md` remains unstaged and byte-for-byte intact (SHA-256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`). The authoritative active gate passed 524/524 plus syntax, installed-Pi TypeScript and package/secret validation; active offline subsystem smokes and two tiny subscription-route fixture tasks passed. An accidentally invoked complex authenticated E2E failed before subagent launch on an unsupported pi-subagents request field; the field was removed and parser-regression tested locally, but no full authenticated rerun was authorized. See `docs/final-integration-audit.md` for exact evidence, calls, limits and daily-use status.
+
 ## Resume coordinates
 
 - Worktree: `/home/tasso/Documents/Codex/tasso-pi-overdrive-ultra-expansion`
