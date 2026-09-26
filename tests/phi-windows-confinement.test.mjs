@@ -254,7 +254,7 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     finally { await new Promise((resolve) => server.close(resolve)); }
   }
 });
-for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception', 'open-sharing-control', 'delete-pending-control']) {
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception', 'open-sharing-control', 'delete-pending-control', 'sharing-release', 'pending-release', 'sharing-cascade']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     if (name === 'open-sharing-control' || name === 'delete-pending-control') for (const failure of validationFailureEvidence('foundation-tests', result).filesystemFailures ?? []) console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
@@ -271,6 +271,14 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
     assert.equal(recover().quarantined, 0);
   });
 }
+test('cleanup acquisition retries only proven native sharing/delete-pending statuses within its original budget', () => {
+  const source = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
+  assert.match(source, /result == unchecked\(\(int\)0xc0000043\).*0xc0000056/u);
+  assert.doesNotMatch(source, /result == unchecked\(\(int\)0xc0000022\)/u);
+  assert.match(source, /out info, false, deadline/u);
+  assert.match(source, /out info, true, deadline/u);
+  assert.match(source, /if \(cleanupDeadline == null \|\| !transient \|\| cleanupDeadline.ElapsedMilliseconds >= 5000\) throw/u);
+});
 test('native recovery status is read-only and reports actual clean journal metadata', { skip: process.platform !== 'win32', timeout: 20000 }, () => {
   const result = spawnSync(ownedWindowsHelper(), ['--scope-recovery-status'], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
   assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));

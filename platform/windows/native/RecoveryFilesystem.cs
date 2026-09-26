@@ -33,6 +33,7 @@ namespace Phi.Native {
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly string directoryPath;
     internal static int TransientDeleteRetries;
+    internal static volatile int TransientOpenRetries;
     static void Failure(string operation, IntPtr parent, string name, uint access, uint share, uint options, int status, int error) {
       // Fixed operation names plus numeric/object metadata only. Never emit a
       // DOS path, leaf name, ACL text, environment, exception or file contents.
@@ -81,7 +82,7 @@ namespace Phi.Native {
     static void Leaf(string name) {
       if (String.IsNullOrEmpty(name) || name.Length > 1024 || name == "." || name == ".." || name.IndexOfAny(new char[] { '\\', '/', ':', '\0' }) >= 0) throw new InvalidDataException();
     }
-    static IntPtr OpenRelative(IntPtr parent, string name, uint access, uint share, uint disposition, uint options, IntPtr descriptor, out Info info, bool unlinkReparse = false) {
+    static IntPtr OpenRelative(IntPtr parent, string name, uint access, uint share, uint disposition, uint options, IntPtr descriptor, out Info info, bool unlinkReparse = false, Stopwatch cleanupDeadline = null) {
       Leaf(name); Info parentInfo;
       if (!GetFileInformationByHandle(parent, out parentInfo)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if ((parentInfo.Attributes & 0x400) != 0 || (parentInfo.Attributes & 0x10) == 0) throw new InvalidDataException();
@@ -91,8 +92,24 @@ namespace Phi.Native {
         unicode = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UnicodeString))); Marshal.StructureToPtr(value, unicode, false);
         ObjectAttributes attributes = new ObjectAttributes(); attributes.Length = (uint)Marshal.SizeOf(typeof(ObjectAttributes)); attributes.Root = parent; attributes.Name = unicode; attributes.Attributes = unlinkReparse ? 0x40U : 0x1040U; attributes.Descriptor = descriptor;
         IoStatus status;
-        int result = NtCreateFile(out handle, access | 0x100000, ref attributes, out status, IntPtr.Zero, 0, share, disposition, options | 0x200020, IntPtr.Zero, 0);
-        if (result != 0) { int error = (int)RtlNtStatusToDosError(result); Failure("NT_OPEN", parent, name, access | 0x100000, share, options | 0x200020, result, error); throw new Win32Exception(error); }
+        bool diagnosed = false;
+        while (true) {
+          int result = NtCreateFile(out handle, access | 0x100000, ref attributes, out status, IntPtr.Zero, 0, share, disposition, options | 0x200020, IntPtr.Zero, 0);
+          if (result == 0) break;
+          int error = (int)RtlNtStatusToDosError(result);
+          // Cleanup lookup only, before any successful child open. The parent
+          // stays pinned, names are single components and reparses never follow.
+          // STATUS_DELETE_PENDING maps to Win32 5, unlike an ACL denial:
+          // never retry STATUS_ACCESS_DENIED or broaden rights/sharing.
+          bool transient = result == unchecked((int)0xc0000043) || result == unchecked((int)0xc0000056);
+          if (!diagnosed || cleanupDeadline == null || !transient || cleanupDeadline.ElapsedMilliseconds >= 5000) Failure("NT_OPEN", parent, name, access | 0x100000, share, options | 0x200020, result, error);
+          diagnosed = true;
+          if (cleanupDeadline == null || !transient || cleanupDeadline.ElapsedMilliseconds >= 5000) throw new Win32Exception(error);
+          if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle);
+          handle = IntPtr.Zero;
+          TransientOpenRetries++;
+          System.Threading.Thread.Sleep(10);
+        }
         if (!GetFileInformationByHandle(handle, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
         // Only owned-tree unlinking may open a final reparse point itself.
         // FILE_OPEN_REPARSE_POINT always applies; never follow its target.
@@ -159,11 +176,12 @@ namespace Phi.Native {
       string full = Path.GetFullPath(root);
       if (!String.Equals(Path.GetDirectoryName(full), directoryPath, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException();
       Info info; IntPtr handle;
-      try { handle = OpenRelative(parents[parents.Count - 1], Path.GetFileName(full), 0x10081, 1, 1, 1, IntPtr.Zero, out info); }
+      Stopwatch deadline = Stopwatch.StartNew();
+      try { handle = OpenRelative(parents[parents.Count - 1], Path.GetFileName(full), 0x10081, 1, 1, 1, IntPtr.Zero, out info, false, deadline); }
       catch (Win32Exception ex) { if (ex.NativeErrorCode == 2 || ex.NativeErrorCode == 3) return; throw; }
       try {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || HandleIdentity(handle) != expected) throw new InvalidDataException();
-        int remaining = 2048; Stopwatch deadline = Stopwatch.StartNew();
+        int remaining = 2048;
         DeleteContents(handle, 0, ref remaining, deadline);
         DeleteHandle(handle, info, deadline);
       } finally { CloseHandle(handle); }
@@ -203,11 +221,21 @@ namespace Phi.Native {
               uint attributes = unchecked((uint)Marshal.ReadInt32(entry, 56));
               bool isDirectory = (attributes & 0x10) != 0;
               // Ordinary-file unlinking needs no READ_DATA authority.
-              IntPtr handle = OpenRelative(directory, name, isDirectory ? 0x10081U : 0x10080U, 1, 1, isDirectory ? 1U : 0x40U, IntPtr.Zero, out info, true);
+              IntPtr handle;
+              try { handle = OpenRelative(directory, name, isDirectory ? 0x10081U : 0x10080U, 1, 1, isDirectory ? 1U : 0x40U, IntPtr.Zero, out info, true, deadline); }
+              catch (Win32Exception error) {
+                // An enumerated, delete-pending leaf may finish disappearing
+                // while we wait. Only actual absence in this pinned directory
+                // is idempotent success; no unknown object is mutated.
+                if (error.NativeErrorCode != 2 && error.NativeErrorCode != 3) throw;
+                handle = IntPtr.Zero; info = new Info();
+              }
               try {
-                if ((info.Attributes & 0x10) != 0 && (info.Attributes & 0x400) == 0) DeleteContents(handle, depth + 1, ref remaining, deadline);
-                DeleteHandle(handle, info, deadline);
-              } finally { CloseHandle(handle); }
+                if (handle != IntPtr.Zero) {
+                  if ((info.Attributes & 0x10) != 0 && (info.Attributes & 0x400) == 0) DeleteContents(handle, depth + 1, ref remaining, deadline);
+                  DeleteHandle(handle, info, deadline);
+                }
+              } finally { if (handle != IntPtr.Zero) CloseHandle(handle); }
             }
             if (next == 0) break;
             offset += (int)next;

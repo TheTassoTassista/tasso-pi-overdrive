@@ -277,7 +277,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception", "open-sharing-control", "delete-pending-control" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception", "open-sharing-control", "delete-pending-control", "sharing-release", "pending-release", "sharing-cascade" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -290,6 +290,26 @@ namespace Phi.Native {
         if (name == "clean") {
           string id = scope.Id; scope.Complete(true);
           passed = Recover(false, id) == 0;
+        } else if (name == "sharing-cascade") {
+          scope.CreateRoot(); scope.Ready();
+          string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+          File.WriteAllText(sentinel, "synthetic-scope-owned");
+          scope.record["created"] = "0000000000000001"; scope.Save(); scope.Dispose();
+          using (FileStream hold = new FileStream(sentinel, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+            if (Recover(false, scope.Id) != 70) throw new InvalidDataException();
+            using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id)) {
+              if (key == null || (string)Read(key, scope.Id)["rootIdentity"] != (string)scope.record["rootIdentity"]) throw new InvalidDataException();
+            }
+            bool blocked = false;
+            try { using (ScopeRecovery unexpected = Begin()) unexpected.Complete(true); }
+            catch (InvalidOperationException error) { if (error.Message != "PHI_RECOVERY_UNSAFE_STATE") throw; blocked = true; }
+            if (!blocked || File.ReadAllText(sentinel) != "synthetic-scope-owned") throw new InvalidDataException();
+          }
+          // The unrelated live generation is never killed. Once OUR known
+          // blocking handle closes, the same journal recovers idempotently.
+          if (Recover(false, scope.Id) != 0 || Recover(false, scope.Id) != 0 || Directory.Exists(scope.Root)) throw new InvalidDataException();
+          bool alive; if (ProcessCreation(Process.GetCurrentProcess().Id, out alive) == null || !alive) throw new InvalidDataException();
+          passed = true;
         } else {
           scope.CreateRoot();
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
@@ -298,6 +318,25 @@ namespace Phi.Native {
             throw new InvalidOperationException("PHI_FIXED_CREATION_EXCEPTION");
           }
           scope.Ready();
+          if (name == "sharing-release") {
+            string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            RecoveryFilesystem.TransientOpenRetries = 0;
+            using (FileStream hold = new FileStream(sentinel, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (Timer release = new Timer(delegate(object state) { if (RecoveryFilesystem.TransientOpenRetries > 0) hold.Dispose(); }, null, 0, 10)) scope.CleanupFiles();
+            if (RecoveryFilesystem.TransientOpenRetries < 1) throw new InvalidDataException();
+          }
+          if (name == "pending-release") {
+            IntPtr hold = CreateFileW(scope.Root, 0x80, 7, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+            if (hold == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            try {
+              if (RecoveryFilesystem.HandleIdentity(hold) != (string)scope.record["rootIdentity"]) throw new InvalidDataException();
+              scope.CleanupFiles(); RecoveryFilesystem.TransientOpenRetries = 0;
+              using (Timer release = new Timer(delegate(object state) {
+                if (RecoveryFilesystem.TransientOpenRetries > 0) { IntPtr handle = Interlocked.Exchange(ref hold, IntPtr.Zero); if (handle != IntPtr.Zero) CloseHandle(handle); }
+              }, null, 0, 10)) scope.CleanupFiles();
+              if (RecoveryFilesystem.TransientOpenRetries < 1) throw new InvalidDataException();
+            } finally { IntPtr handle = Interlocked.Exchange(ref hold, IntPtr.Zero); if (handle != IntPtr.Zero) CloseHandle(handle); }
+          }
           if (name == "open-sharing-control" || name == "delete-pending-control") {
             // Deterministic native API controls: the only blocking handle is
             // ours, on a fresh private fixture, released before final recovery.
@@ -319,13 +358,13 @@ namespace Phi.Native {
                 // handle-relative root open, not a guessed leaf-open error.
                 scope.CleanupFiles();
               }
-              bool denied = false;
+              bool denied = false; Stopwatch elapsed = Stopwatch.StartNew(); RecoveryFilesystem.TransientOpenRetries = 0;
               try { scope.CleanupFiles(); }
               catch (Win32Exception error) {
                 if (error.NativeErrorCode != (name == "open-sharing-control" ? 32 : 5)) throw;
                 denied = true;
               }
-              if (!denied) throw new InvalidDataException();
+              if (!denied || elapsed.ElapsedMilliseconds < 4500 || elapsed.ElapsedMilliseconds > 7000 || RecoveryFilesystem.TransientOpenRetries < 1) throw new InvalidDataException();
               if (name == "open-sharing-control" && File.ReadAllText(sentinel) != "synthetic-scope-owned") throw new InvalidDataException();
             }
             } finally { if (heldRoot != IntPtr.Zero && heldRoot != new IntPtr(-1)) CloseHandle(heldRoot); }

@@ -12,7 +12,10 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
 const clone = path.join(temp, 'source with spaces');
 let stage = 'git-source';
 function run(command, args, cwd = source, env = process.env) {
-  const result = spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+  // The required native suite includes two held-open 5s denial controls and
+  // two recovery/cascade passes. Budget the gate, not the product cleanup:
+  // native 5s cleanup / 10s recovery bounds remain unchanged.
+  const result = spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: stage === 'foundation-tests' ? 180000 : 120000, maxBuffer: 16 * 1024 * 1024 });
   if (result.status !== 0) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
     error.evidence = { ...validationFailureEvidence(stage, result), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };

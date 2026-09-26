@@ -17,6 +17,11 @@ test('native operation evidence is limited to four validated records', () => {
   const result = validationFailureEvidence('foundation-tests', { stderr: Array.from({ length: 8 }, () => `PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`).join('\n') });
   assert.deepEqual(result.filesystemFailures, Array(4).fill(failure));
 });
+test('nested native test receipts preserve the failing API through clone redaction', () => {
+  const result = validationFailureEvidence('foundation-tests', { stdout: `error: |-\n  ${JSON.stringify({ filesystemFailures: [failure], privateContent: 'DO_NOT_ECHO' })}` });
+  assert.deepEqual(result.filesystemFailures, [failure]);
+  assert.doesNotMatch(JSON.stringify(result), /DO_NOT_ECHO|privateContent/u);
+});
 test('native failure preserves bounded Win32 error numbers without raw context', () => {
   const result = validationFailureEvidence('foundation-tests', { stderr: 'PHI_APPCONTAINER_FAILED:32 private-file PHI_NATIVE_PROCESS_FAILED:5:CREATE PHI_APPCONTAINER_FAILED:99999 secret' });
   assert.deepEqual(result.nativeErrorNumbers, [32, 5]);
