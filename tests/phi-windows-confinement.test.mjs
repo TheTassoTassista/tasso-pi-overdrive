@@ -85,6 +85,7 @@ test('scope recovery uses bounded durable receipts, generation checks and opened
   assert.match(recovery, /generation == \(string\)value\["created"\]/u);
   assert.match(recovery, /processKills = 0/u);
   assert.match(recovery, /size > 4096/u);
+  assert.match(recovery, /rule\.FileSystemRights & ~FileSystemRights\.Synchronize\) == FileSystemRights\.ReadPermissions/u);
   assert.doesNotMatch(recovery, /TerminateProcess|\.Kill\(|Directory\.Delete/u);
   assert.match(filesystem, /GetFileInformationByHandleEx\(handle, 18/u);
   assert.match(filesystem, /HandleIdentity\(handle\) != expected/u);

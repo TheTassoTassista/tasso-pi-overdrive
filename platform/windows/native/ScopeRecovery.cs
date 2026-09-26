@@ -69,7 +69,9 @@ namespace Phi.Native {
         if (!actual.AreAccessRulesProtected || !User.Equals(actual.GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
         foreach (FileSystemAccessRule rule in actual.GetAccessRules(true, true, typeof(SecurityIdentifier))) {
           string sid = rule.IdentityReference.Value;
-          if (rule.AccessControlType != AccessControlType.Allow || (sid != User.Value && sid != "S-1-5-18" && !(sid == "S-1-3-4" && rule.FileSystemRights == FileSystemRights.ReadPermissions))) throw new InvalidDataException();
+          // FileSystemAccessRule automatically adds SYNCHRONIZE to Allow
+          // masks. Accept only that normalization, never WRITE_DAC/WRITE_OWNER.
+          if (rule.AccessControlType != AccessControlType.Allow || (sid != User.Value && sid != "S-1-5-18" && !(sid == "S-1-3-4" && (rule.FileSystemRights & ~FileSystemRights.Synchronize) == FileSystemRights.ReadPermissions))) throw new InvalidDataException();
         }
       }
     }
@@ -103,9 +105,12 @@ namespace Phi.Native {
       } catch { Dispose(); throw; }
     }
     internal static ScopeRecovery Begin() {
-      EnsureRootBase();
-      int code = Recover(false, null); if (code != 0) throw new InvalidOperationException("PHI_RECOVERY_UNSAFE_STATE");
-      return new ScopeRecovery();
+      string phase = "ROOT_BASE";
+      try {
+        EnsureRootBase(); phase = "PASS";
+        int code = Recover(false, null); if (code != 0) throw new InvalidOperationException("PHI_RECOVERY_UNSAFE_STATE");
+        phase = "RECEIPT"; return new ScopeRecovery();
+      } catch { Console.Error.WriteLine("PHI_RECOVERY_BEGIN_" + phase + "_FAILED"); throw; }
     }
     static void Write(RegistryKey key, Dictionary<string, object> value) {
       ValidateRegistry(key);
@@ -137,8 +142,10 @@ namespace Phi.Native {
     internal static int Recover(bool emit, string only) {
       int scanned = 0, active = 0, recovered = 0, quarantined = 0;
       DateTime deadline = DateTime.UtcNow.AddSeconds(10);
+      string phase = "ROOT_BASE";
       try {
         EnsureRootBase();
+        phase = "REGISTRY_BASE";
         using (RegistryKey root = OpenBase()) {
           string[] ids = only == null ? root.GetSubKeyNames() : new string[] { only };
           if (ids.Length > MaxScopes) throw new InvalidDataException();
@@ -149,29 +156,34 @@ namespace Phi.Native {
             using (Mutex mutex = ScopeMutex(id)) {
               if (!Acquire(mutex)) { active++; continue; }
               try {
+                phase = "RECEIPT";
                 Dictionary<string, object> value;
                 using (RegistryKey key = root.OpenSubKey(id)) { if (key == null) continue; value = Read(key, id); }
                 bool live; string generation = ProcessCreation((int)value["pid"], out live);
                 // A reused PID is NOT authority to kill that unrelated process.
                 if (live && generation == (string)value["created"]) { active++; continue; }
                 string directory = RootFor(id), identity = (string)value["rootIdentity"];
+                phase = "FILES";
                 using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) {
                   if (identity == "") { if (Directory.Exists(directory) || (!(bool)value["profile"] && !(bool)value["registry"] && !(bool)value["ready"])) throw new InvalidDataException(); }
                   else pins.DeleteOwnedTree(directory, identity);
                 }
                 if ((bool)value["registry"]) {
+                  phase = "REGISTRY";
                   string fixture = "Software\\PhiProbe-" + id;
                   using (RegistryKey key = Registry.CurrentUser.OpenSubKey(fixture)) if (key != null) { if (!User.Equals(key.GetAccessControl().GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException(); }
                   Registry.CurrentUser.DeleteSubKeyTree(fixture, false);
                 }
+                phase = "PROFILE";
                 if ((bool)value["profile"]) { int result = DeleteAppContainerProfile("Phi.Probe." + id); if (result != 0 && result != unchecked((int)0x80070002) && result != unchecked((int)0x80070003)) throw new InvalidDataException(); }
+                phase = "COMMIT";
                 root.DeleteSubKeyTree(id); if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException(); recovered++;
-              } catch { quarantined++; }
+              } catch { quarantined++; Console.Error.WriteLine("PHI_RECOVERY_" + phase + "_FAILED"); }
               finally { mutex.ReleaseMutex(); }
             }
           }
         }
-      } catch { quarantined++; }
+      } catch { quarantined++; Console.Error.WriteLine("PHI_RECOVERY_" + phase + "_FAILED"); }
       if (emit) Console.WriteLine(new JavaScriptSerializer().Serialize(new { scope = "FIXED_NATIVE_SCOPES_ONLY", scanned, active, recovered, quarantined, processKills = 0, status = quarantined == 0 ? "PASS" : "FAIL" }));
       return quarantined == 0 ? 0 : 70;
     }
