@@ -8,7 +8,7 @@ import { requireAutonomousBackend } from '../platform/index.mjs';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 
 function probeMetadata(stdout, stderr, status) {
-  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
+  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
   const receipts = stdout.trim().split(/\r?\n/u).slice(0, 4).flatMap((line) => {
     try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
     catch { return []; }
@@ -39,6 +39,9 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.match(source, /WriteAlternateStream\(Path\.Combine\(secret, "\.env"\)\)/u);
   assert.match(source, /ReadFile\(handle, actual/u);
   assert.doesNotMatch(source, /File\.WriteAllText\([^\n]*\.env:fixture/u);
+  assert.match(source, /CreateOwnedJunction\(junction, secret\)/u);
+  assert.match(source, /CreateHardLinkW\(privateLink/u);
+  assert.match(source, /File\.ReadAllText\(Path\.Combine\(junction, "\.env"\)\)/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
 });
 const completedScopes = new Set();
@@ -60,7 +63,7 @@ for (const role of ['worker', 'tester', 'reviewer']) {
       assert.deepEqual(control, { allPackagesReadControl: true });
       assert.deepEqual(nativeRights, { registryReadAvailable: true, privateRegistryDenied: true, hostHandleDuplicationDenied: true, protectedDaclChangeDenied: true, runtimeDaclChangeDenied: true });
       assert.equal(receipt.role, role);
-      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
+      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
       assert.equal(receipt.workspaceWrite, role === 'worker');
       const { scopeId, ...result } = cleanup;
       assert.deepEqual(result, { tokenVerified: true, cleanup: 'PASS', scope: 'FIXED_SYNTHETIC_PROBE_ONLY' });

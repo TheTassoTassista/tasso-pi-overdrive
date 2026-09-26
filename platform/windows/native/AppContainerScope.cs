@@ -36,6 +36,8 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool WriteFile(IntPtr file, byte[] buffer, uint count, out uint written, IntPtr overlapped);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadFile(IntPtr file, byte[] buffer, uint count, out uint read, IntPtr overlapped);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool DeviceIoControl(IntPtr file, uint code, byte[] input, uint inputSize, IntPtr output, uint outputSize, out uint returned, IntPtr overlapped);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -161,6 +163,29 @@ namespace Phi.Native {
         for (int index = 0; index < bytes.Length; index++) if (bytes[index] != actual[index]) throw new InvalidDataException();
       } finally { CloseHandle(handle); }
     }
+    static void CreateOwnedJunction(string directory, string target) {
+      // Controller-only, fixed synthetic paths under the same fresh root.
+      // Real NTFS mount-point reparse data, not a shell command or a mock.
+      Directory.CreateDirectory(directory);
+      byte[] substitute = Encoding.Unicode.GetBytes("\\??\\" + target);
+      byte[] display = Encoding.Unicode.GetBytes(target);
+      int payload = 8 + substitute.Length + 2 + display.Length + 2;
+      if (payload > 16376) throw new InvalidDataException();
+      byte[] buffer = new byte[8 + payload];
+      using (BinaryWriter writer = new BinaryWriter(new MemoryStream(buffer))) {
+        writer.Write(0xa0000003U); writer.Write((ushort)payload); writer.Write((ushort)0);
+        writer.Write((ushort)0); writer.Write((ushort)substitute.Length);
+        writer.Write((ushort)(substitute.Length + 2)); writer.Write((ushort)display.Length);
+        writer.Write(substitute); writer.Write((ushort)0); writer.Write(display); writer.Write((ushort)0);
+      }
+      IntPtr handle = CreateFileW(directory, 0x40000000, 7, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      try {
+        uint returned;
+        if (!DeviceIoControl(handle, 0x900a4, buffer, (uint)buffer.Length, IntPtr.Zero, 0, out returned, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      } finally { CloseHandle(handle); }
+      if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) == 0) throw new InvalidDataException();
+    }
     int RunAllPackagesControl(Dictionary<string, object> request, string runtime, string file) {
       // Fixed, read-only positive control only. Never expose this mode in a
       // request schema or route arbitrary code through ordinary AppContainer.
@@ -230,6 +255,12 @@ namespace Phi.Native {
         WriteAlternateStream(Path.Combine(secret, ".env"));
         scope.protectedDirectory = secret;
         scope.readOnlyAsset = Path.Combine(runtime, "read-only.txt"); File.WriteAllText(scope.readOnlyAsset, "synthetic-read-only");
+        string junction = Path.Combine(scratch, "host-junction"), privateLink = Path.Combine(scratch, "host-private-link"), assetLink = Path.Combine(scratch, "host-read-only-link");
+        CreateOwnedJunction(junction, secret);
+        if (!CreateHardLinkW(privateLink, Path.Combine(secret, ".env"), IntPtr.Zero) || !CreateHardLinkW(assetLink, scope.readOnlyAsset, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        // Host positive controls prove actual pre-existing alias traversal.
+        // Child-side creation denial alone is not enough for this assertion.
+        if (File.ReadAllText(Path.Combine(junction, ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(privateLink) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(assetLink) != "synthetic-read-only") throw new InvalidDataException();
         string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
         FileSecurity allAcl = new FileSecurity(); allAcl.SetAccessRuleProtection(true, false);
         allAcl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, AccessControlType.Allow));
@@ -253,6 +284,10 @@ denied('extendedPathReadDenied',()=>fs.readFileSync(path.toNamespacedPath(path.j
 denied('alternateStreamReadDenied',()=>fs.readFileSync(path.join(secret,'.env:fixture')));
 denied('readOnlyAssetWriteDenied',()=>fs.appendFileSync(path.join(runtime,'read-only.txt'),'mutation'));
 denied('runtimeRenameDenied',()=>fs.renameSync(path.join(runtime,'read-only.txt'),path.join(scratch,'stolen.txt')));
+denied('existingJunctionReadDenied',()=>fs.readFileSync(path.join(scratch,'host-junction','.env')));
+denied('existingPrivateHardlinkReadDenied',()=>fs.readFileSync(path.join(scratch,'host-private-link')));
+result.existingReadOnlyHardlinkReadable=fs.readFileSync(path.join(scratch,'host-read-only-link'),'utf8')==='synthetic-read-only';
+denied('existingReadOnlyHardlinkWriteDenied',()=>fs.appendFileSync(path.join(scratch,'host-read-only-link'),'mutation'));
 function escapedLink(key,create,target,mutate){try{create();denied(key,()=>mutate?fs.appendFileSync(target,'mutation'):fs.readFileSync(target));}catch(e){result[key]=['EACCES','EPERM'].includes(e.code);}}
 escapedLink('junctionEscapeDenied',()=>fs.symlinkSync(secret,path.join(scratch,'junction'),'junction'),path.join(scratch,'junction','.env'),false);
 escapedLink('privateHardlinkEscapeDenied',()=>fs.linkSync(path.join(secret,'.env'),path.join(scratch,'private-link')),path.join(scratch,'private-link'),false);
@@ -266,7 +301,7 @@ console.error('PHI_CONFINEMENT_NETWORK_WAIT');
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
-let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.existingJunctionReadDenied&&result.existingPrivateHardlinkReadDenied&&result.existingReadOnlyHardlinkReadable&&result.existingReadOnlyHardlinkWriteDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
@@ -287,6 +322,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         byte[] input = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(request) + "\n");
         using (MemoryStream stream = new MemoryStream(input)) code = OwnedProcess.Execute(stream, scope);
         if (!scope.TokenVerified) code = 70;
+        if (File.ReadAllText(Path.Combine(secret, ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(scope.readOnlyAsset) != "synthetic-read-only") code = 70;
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_APPCONTAINER_FAILED:" + ex.NativeErrorCode); code = 70; }
         catch { Console.Error.WriteLine("PHI_APPCONTAINER_PROBE_FAILED"); code = 70; }
       finally {
