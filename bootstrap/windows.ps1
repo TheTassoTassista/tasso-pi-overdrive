@@ -5,7 +5,7 @@ if ($env:OS -ne 'Windows_NT') { throw 'Phi Windows bootstrap requires native Win
 if ($PSVersionTable.PSVersion -lt [Version]'5.1') { throw 'PowerShell 5.1 or newer is required.' }
 if ([Environment]::OSVersion.Version.Major -lt 10) { throw 'Windows 10 / Server 2016 or newer is required.' }
 $PhiRoot = Split-Path -Parent $PSScriptRoot
-$PhiNode = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
+$PhiNode = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $PhiNode) { throw 'Install supported Node >=22.19 from nodejs.org and Git for Windows. No admin or system installer is run by Phi.' }
 & $PhiNode.Source -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a<22||(a===22&&b<19)?1:0)'
 if ($LASTEXITCODE -ne 0) { throw 'Node >=22.19 is required.' }

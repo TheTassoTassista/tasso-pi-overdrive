@@ -10,4 +10,7 @@ if ! command -v node >/dev/null 2>&1; then
   echo 'Install Node >=22.19 and Git using your distribution package manager.' >&2
   exit 1
 fi
-exec node "$phi_root/bootstrap/core.mjs" "${@---foundation}"
+if [ "$#" -eq 0 ]; then
+  set -- --foundation
+fi
+exec node "$phi_root/bootstrap/core.mjs" "$@"

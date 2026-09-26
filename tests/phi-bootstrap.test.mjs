@@ -51,3 +51,22 @@ test('thin wrapper quoting supports spaces and rejects unsafe Windows expansion'
   assert.match(wrapperContent('win32', 'C:\\Program Files\\node.exe', 'D:\\Phi Folder\\bin\\phi.mjs'), /"C:\\Program Files/u);
   for (const unsafe of ['x%PATH%', 'x!foo!', 'x&run', 'x\nrun']) assert.throws(() => wrapperContent('win32', unsafe, 'C:\\phi.mjs'));
 });
+test('Linux thin bootstrap supplies an explicit default argv without shell-specific expansion', { skip: process.platform !== 'linux' }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-sh-'));
+  try {
+    const node = path.join(root, 'node');
+    fs.writeFileSync(node, '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o700 });
+    const bootstrap = path.resolve(import.meta.dirname, '..', 'bootstrap', 'linux.sh');
+    const shell = fs.existsSync('/usr/bin/dash') ? '/usr/bin/dash' : '/bin/sh';
+    const env = { ...process.env, PATH: `${root}${path.delimiter}${process.env.PATH}` };
+    const defaultRun = spawnSync(shell, [bootstrap], { encoding: 'utf8', env, shell: false });
+    assert.equal(defaultRun.status, 0, defaultRun.stderr);
+    assert.equal(defaultRun.stdout.trim().split('\n')[1], '--foundation');
+    const plan = spawnSync(shell, [bootstrap, '--plan'], { encoding: 'utf8', env, shell: false });
+    assert.equal(plan.status, 0, plan.stderr); assert.equal(plan.stdout.trim().split('\n')[1], '--plan');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+test('Windows bootstrap selects one native Node application instead of a PATH result array', () => {
+  const source = fs.readFileSync(new URL('../bootstrap/windows.ps1', import.meta.url), 'utf8');
+  assert.match(source, /Get-Command node[^\n]*\| Select-Object -First 1/u);
+});
