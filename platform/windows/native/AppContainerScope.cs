@@ -261,7 +261,7 @@ namespace Phi.Native {
       recovery.ProfileRemoved();
     }
     internal static int Probe(string node, string role, string portText, string failure = "normal") {
-      if (failure != "normal" && failure != "hold-child" && failure != "hold-tree" && failure != "before-cleanup" && failure != "cleanup-exception") return 70;
+      if (failure != "normal" && failure != "hold-child" && failure != "hold-tree" && failure != "timeout-tree" && failure != "before-cleanup" && failure != "cleanup-exception") return 70;
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
       int port;
       if (!Int32.TryParse(portText, out port) || port < 1 || port > 65535 || !Path.IsPathRooted(node) || node.StartsWith("\\\\") || !node.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 70;
@@ -336,7 +336,7 @@ s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
 let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.existingJunctionReadDenied&&result.existingPrivateHardlinkReadDenied&&result.existingReadOnlyHardlinkReadable&&result.existingReadOnlyHardlinkWriteDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         if (failure == "hold-child") script = script.Replace("console.log(JSON.stringify(result));process.exit(", "console.log(JSON.stringify({...result,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));setInterval(()=>{},1000);return;process.exit(");
-        if (failure == "hold-tree") {
+        if (failure == "hold-tree" || failure == "timeout-tree") {
           // Pinned Node 22's libuv creates non-LOCAL named pipes; LPAC must
           // not be broadened to permit them. Inherit the three already-scoped
           // stdio handles for this tree. Generic piped tools need a broker.
@@ -354,7 +354,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
           { "PATH", runtime }, { "USERPROFILE", scratch }, { "LOCALAPPDATA", scratch }, { "APPDATA", scratch },
           { "TEMP", scratch }, { "TMP", scratch }
         };
-        request["timeoutMs"] = 8000; request["guardianPid"] = System.Diagnostics.Process.GetCurrentProcess().Id;
+        request["timeoutMs"] = failure == "timeout-tree" ? 4000 : 8000; request["guardianPid"] = System.Diagnostics.Process.GetCurrentProcess().Id;
         // Execute requires an older guardian than the supervisor. The outer
         // Node guardian is provided by our process's inherited environment only
         // to this fixed probe, never exposed as sandbox authority.

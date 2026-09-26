@@ -185,18 +185,24 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
     } finally { await new Promise((resolve) => server.close(resolve)); }
   });
 }
-for (const role of ['worker', 'tester', 'reviewer']) test(`native LPAC ${role} nested subprocess tree: inherited denial, crash containment and durable cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'role'], ['tester', 'role'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
   const server = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   let child, scopeId;
   try {
-    child = spawn(ownedWindowsHelper(), ['--confinement-failure-probe', process.execPath, role, String(server.address().port), 'hold-tree'], { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const helper = ownedWindowsHelper();
+    const args = ['--confinement-failure-probe', process.execPath, role, String(server.address().port), failure === 'timeout' ? 'timeout-tree' : 'hold-tree'];
+    if (failure === 'parent') {
+      const wrapper = `const{spawn}=require('node:child_process');const h=spawn(${JSON.stringify(helper)},${JSON.stringify(args)},{shell:false,stdio:'inherit',env:{...process.env,PHI_PROBE_GUARDIAN:String(process.pid)}});console.log(JSON.stringify({supervisorPid:h.pid}));setInterval(()=>{},1000);`;
+      child = spawn(process.execPath, ['-e', wrapper], { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } else child = spawn(helper, args, { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const closed = new Promise((resolve, reject) => { child.once('close', resolve); child.once('error', reject); });
     let stdout = '', stderr = '';
     child.stdout.on('data', (value) => { stdout += value; if (stdout.length > 65536) child.kill('SIGKILL'); });
     child.stderr.on('data', (value) => { stderr += value; if (stderr.length > 65536) child.kill('SIGKILL'); });
     const deadline = Date.now() + 8000; const row = {};
     while (!row.leafPid && Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
-      for (const line of stdout.split(/\r?\n/u)) { try { const value = JSON.parse(line); if (typeof value.scopeId === 'string') Object.assign(row, value); } catch {} }
+      for (const line of stdout.split(/\r?\n/u)) { try { const value = JSON.parse(line); if (typeof value.scopeId === 'string' || Number.isInteger(value.supervisorPid)) Object.assign(row, value); } catch {} }
       if (!row.leafPid) await delay(20);
     }
     assert.ok(row.leafPid, probeMetadata(stdout, stderr, child.exitCode));
@@ -212,9 +218,18 @@ for (const role of ['worker', 'tester', 'reviewer']) test(`native LPAC ${role} n
     const pids = [row.ownedPid, row.middlePid, row.leafPid];
     assert.equal(new Set(pids).size, 3);
     for (const pid of pids) { assert.ok(Number.isInteger(pid) && pid > 0); assert.equal(alive(pid), true); }
-    await terminateProbe(child);
+    if (failure === 'role') process.kill(row.ownedPid, 'SIGKILL');
+    else if (failure !== 'timeout') await terminateProbe(child);
+    const code = await closed;
     for (const pid of pids) await gone(pid);
-    assert.equal(recover(scopeId).recovered, 1);
+    if (failure === 'parent') { assert.ok(Number.isInteger(row.supervisorPid)); await gone(row.supervisorPid); }
+    if (failure === 'timeout' || failure === 'role') {
+      assert.notEqual(code, 0, 'forced failure must not be reported successful');
+      if (failure === 'timeout') assert.equal(code, 124);
+      const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
+      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS');
+    }
+    assert.equal(recover(scopeId).recovered, failure === 'supervisor' ? 1 : 0);
     assert.equal(recover(scopeId).recovered, 0);
   } finally { await terminateProbe(child); if (scopeId) recover(scopeId); await new Promise((resolve) => server.close(resolve)); }
 });
