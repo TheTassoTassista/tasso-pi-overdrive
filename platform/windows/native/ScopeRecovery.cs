@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -30,6 +29,28 @@ namespace Phi.Native {
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int CreateAppContainerProfile(string name, string display, string description, IntPtr capabilities, uint count, out IntPtr sid);
     [DllImport("advapi32.dll")] static extern IntPtr FreeSid(IntPtr sid);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileMappingW(IntPtr file, IntPtr attributes, uint protection, uint high, uint low, string name);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr MapViewOfFile(IntPtr mapping, uint access, uint high, uint low, UIntPtr bytes);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool UnmapViewOfFile(IntPtr address);
+    // Fixed self-test image only. Never executes the mapped PE or accepts a
+    // workspace path; data mappings are not a valid image-lock control.
+    sealed class FixtureImage : IDisposable {
+      FileStream stream; IntPtr mapping, view;
+      internal FixtureImage(string file) {
+        try {
+          stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+          mapping = CreateFileMappingW(stream.SafeFileHandle.DangerousGetHandle(), IntPtr.Zero, 0x1000002, 0, 0, null); // SEC_IMAGE | PAGE_READONLY
+          if (mapping == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+          view = MapViewOfFile(mapping, 4, 0, 0, UIntPtr.Zero);
+          if (view == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        } catch { Dispose(); throw; }
+      }
+      public void Dispose() {
+        IntPtr address = Interlocked.Exchange(ref view, IntPtr.Zero); if (address != IntPtr.Zero && !UnmapViewOfFile(address)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        IntPtr section = Interlocked.Exchange(ref mapping, IntPtr.Zero); if (section != IntPtr.Zero) CloseHandle(section);
+        FileStream file = Interlocked.Exchange(ref stream, null); if (file != null) file.Dispose();
+      }
+    }
     static readonly Regex IdPattern = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex IdentityPattern = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     readonly Mutex lease;
@@ -272,11 +293,10 @@ namespace Phi.Native {
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
           scope.RootCreated(); scope.Ready();
           if (name == "mapped-file") {
-            string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            string sentinel = Path.Combine(scope.Root, "owned-image.exe");
             mappingPhase = "SETUP";
-            using (FileStream stream = new FileStream(sentinel, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-            using (MemoryMappedFile mapping = MemoryMappedFile.CreateFromFile(stream, null, 0, MemoryMappedFileAccess.Read, HandleInheritability.None, true))
-            using (MemoryMappedViewAccessor view = mapping.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read)) {
+            File.Copy(Process.GetCurrentProcess().MainModule.FileName, sentinel);
+            using (FixtureImage mapping = new FixtureImage(sentinel)) {
               bool denied = false;
               mappingPhase = "DENIAL_CONTROL";
               try { File.Delete(sentinel); }
@@ -285,7 +305,7 @@ namespace Phi.Native {
               if (!denied || !File.Exists(sentinel)) throw new InvalidDataException();
               RecoveryFilesystem.TransientDeleteRetries = 0;
               mappingPhase = "RETRY_CONTROL";
-              using (Timer release = new Timer(delegate(object state) { view.Dispose(); mapping.Dispose(); stream.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
+              using (Timer release = new Timer(delegate(object state) { mapping.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
               if (RecoveryFilesystem.TransientDeleteRetries < 1) throw new InvalidDataException();
             }
           }
