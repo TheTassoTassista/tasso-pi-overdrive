@@ -244,7 +244,7 @@ namespace Phi.Native {
       recovery.ProfileRemoved();
     }
     internal static int Probe(string node, string role, string portText, string failure = "normal") {
-      if (failure != "normal" && failure != "hold-child" && failure != "before-cleanup" && failure != "cleanup-exception") return 70;
+      if (failure != "normal" && failure != "hold-child" && failure != "hold-tree" && failure != "before-cleanup" && failure != "cleanup-exception") return 70;
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
       int port;
       if (!Int32.TryParse(portText, out port) || port < 1 || port > 65535 || !Path.IsPathRooted(node) || node.StartsWith("\\\\") || !node.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 70;
@@ -320,6 +320,12 @@ s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
 let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.existingJunctionReadDenied&&result.existingPrivateHardlinkReadDenied&&result.existingReadOnlyHardlinkReadable&&result.existingReadOnlyHardlinkWriteDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         if (failure == "hold-child") script = script.Replace("console.log(JSON.stringify(result));process.exit(", "console.log(JSON.stringify({...result,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));setInterval(()=>{},1000);return;process.exit(");
+        if (failure == "hold-tree") {
+          string leaf = @"const fs=require('node:fs');const [secret]=process.argv.slice(1);let hostReadDenied=false;try{fs.readFileSync(secret);}catch(e){hostReadDenied=['EACCES','EPERM'].includes(e.code);}console.log(JSON.stringify({leafPid:process.pid,hostReadDenied}));setInterval(()=>{},1000);";
+          string middle = "const{spawn}=require('node:child_process');const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(leaf) + ",process.argv[1]],{shell:false,stdio:['ignore','pipe','ignore']});let text='';c.stdout.on('data',v=>{text+=v;const end=text.indexOf('\\n');if(end>=0){const row=JSON.parse(text.slice(0,end));console.log(JSON.stringify({...row,middlePid:process.pid}));}});setInterval(()=>{},1000);";
+          string tree = "const{spawn}=require('node:child_process');const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(middle) + ",path.join(secret,'.env')],{shell:false,stdio:['ignore','pipe','ignore']});let text='';c.stdout.on('data',v=>{text+=v;const end=text.indexOf('\\n');if(end>=0){const row=JSON.parse(text.slice(0,end));console.log(JSON.stringify({...result,...row,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));}});setInterval(()=>{},1000);return;process.exit(";
+          script = script.Replace("console.log(JSON.stringify(result));process.exit(", tree);
+        }
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };

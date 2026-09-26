@@ -181,6 +181,35 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
     } finally { await new Promise((resolve) => server.close(resolve)); }
   });
 }
+test('native LPAC nested subprocess tree: inherited denial, crash containment and durable cleanup', { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+  const server = net.createServer((socket) => socket.destroy());
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  let child, scopeId;
+  try {
+    child = spawn(ownedWindowsHelper(), ['--confinement-failure-probe', process.execPath, 'worker', String(server.address().port), 'hold-tree'], { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', (value) => { stdout += value; if (stdout.length > 65536) child.kill('SIGKILL'); });
+    child.stderr.on('data', (value) => { stderr += value; if (stderr.length > 65536) child.kill('SIGKILL'); });
+    const deadline = Date.now() + 8000; let row;
+    while (!row && Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      for (const line of stdout.split(/\r?\n/u)) { try { const value = JSON.parse(line); if (Number.isInteger(value.leafPid)) row = value; } catch {} }
+      if (!row) await delay(20);
+    }
+    assert.ok(row, probeMetadata(stdout, stderr, child.exitCode));
+    scopeId = row.scopeId;
+    assert.match(scopeId, /^[0-9a-f]{32}$/u);
+    assert.equal(row.hostReadDenied, true, 'actual nested token cannot read private fixture');
+    assert.equal(row.workspaceWrite, true);
+    assert.equal(row.networkDenied, true);
+    const pids = [row.ownedPid, row.middlePid, row.leafPid];
+    assert.equal(new Set(pids).size, 3);
+    for (const pid of pids) { assert.ok(Number.isInteger(pid) && pid > 0); assert.equal(alive(pid), true); }
+    await terminateProbe(child);
+    for (const pid of pids) await gone(pid);
+    assert.equal(recover(scopeId).recovered, 1);
+    assert.equal(recover(scopeId).recovered, 0);
+  } finally { await terminateProbe(child); if (scopeId) recover(scopeId); await new Promise((resolve) => server.close(resolve)); }
+});
 for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
