@@ -9,7 +9,7 @@ import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
-const clone = path.join(temp, 'source');
+const clone = path.join(temp, 'source with spaces');
 let stage = 'git-source';
 function run(command, args, cwd = source, env = process.env) {
   const result = spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: 120000, maxBuffer: 16 * 1024 * 1024 });

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "scope": "TRUSTED_NATIVE_PROCESS_OWNERSHIP_NOT_AUTONOMOUS_SANDBOX",
+  "functionalHead": "7600a6dbe37e3bcbd136e22e2f59d454b9f54d8d",
+  "runId": 36243163109,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36243163109",
+  "conclusion": "success",
+  "newPiModelCalls": 0,
+  "privateAuthCopied": false,
+  "wsl": false,
+  "runners": [
+    { "os": "windows-latest", "tests": 53, "passed": 46, "failed": 0, "skipped": 7, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" },
+    { "os": "ubuntu-latest", "tests": 53, "passed": 44, "failed": 0, "skipped": 9, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" }
+  ],
+  "localAuthoritativeLinux": { "tests": 586, "passed": 577, "failed": 0, "windowsOnlySkipped": 9, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS" },
+  "nativeWindowsLifecycle": ["argv and Unicode", "stdio", "cwd and environment", "detached descendants and grandchildren", "timeout", "forced supervisor death", "Node caller death", "observed active-tree cancellation", "output flood cleanup", "spawn failure", "malformed input", "build idempotence"],
+  "processBackend": "WINDOWS_JOB_OBJECT_ATOMIC_CREATEPROCESS_ASSIGNMENT",
+  "autonomousSandbox": "BLOCKED_UNIMPLEMENTED_APPCONTAINER_AND_TOOL_BOUNDARIES",
+  "windowsCodingE2E": "NOT_RUN_UNSAFE_ENGINE_BLOCKED",
+  "fullDisasterRecovery": "NOT_CERTIFIED",
+  "powerShellChildStartupCause": "UNPROVEN_REPLACED_WITH_DIRECT_COMPILER_NO_POLICY_CHANGE"
+}
