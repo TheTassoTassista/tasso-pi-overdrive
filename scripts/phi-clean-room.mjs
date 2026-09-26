@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
+import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
@@ -14,7 +15,7 @@ function run(command, args, cwd = source, env = process.env) {
   const result = spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
   if (result.status !== 0) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
-    error.evidence = validationFailureEvidence(stage, result);
+    error.evidence = { ...validationFailureEvidence(stage, result), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
     throw error;
   }
   return result.stdout;

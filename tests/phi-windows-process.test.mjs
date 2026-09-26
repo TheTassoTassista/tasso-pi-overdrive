@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsProcessRequest, WINDOWS_PROCESS_LIMITS, runOwnedEngine } from '../platform/windows/process.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
+import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 20000 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,6 +47,7 @@ test('Windows process ownership is never advertised as autonomous sandbox author
 test('non-native process execution fails closed instead of using a mock backend', { skip: process.platform === 'win32' }, () => {
   assert.throws(() => ownedWindowsHelper(), /PLATFORM_UNSUPPORTED/u);
   assert.throws(() => windowsProcessRequest(process.execPath, []), /PLATFORM_UNSUPPORTED/u);
+  assert.deepEqual(windowsBuildEnvironment(), { status: 'NOT_NATIVE_WINDOWS' });
 });
 test('native Windows stdio, cwd, Unicode environment and CRT argv roundtrip', native, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-win-process-'));
