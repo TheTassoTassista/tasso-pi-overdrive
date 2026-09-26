@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "scope": "PORTABLE_FOUNDATION_ONLY_NOT_FULL_WINDOWS_ENGINE",
+  "functionalHead": "0c8da9f870f19f7140246b77b1423989cd73ab25",
+  "runId": 36229995302,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36229995302",
+  "conclusion": "success",
+  "runtimeNode": "22.23.2",
+  "newModelCalls": 0,
+  "privateAuthInCI": false,
+  "wsl": false,
+  "runners": [
+    { "os": "ubuntu-latest", "platform": "linux", "tests": 37, "passed": 37, "failed": 0, "skipped": 0, "bootstrap": "PASS_FOUNDATION_ONLY", "gitSourceClone": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "fullEngine": "BLOCKED_NOT_INSTALLED" },
+    { "os": "windows-latest", "platform": "win32", "tests": 37, "passed": 31, "failed": 0, "skipped": 6, "bootstrap": "PASS_FOUNDATION_ONLY", "gitSourceClone": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "fullEngine": "BLOCKED_NOT_INSTALLED" }
+  ],
+  "windowsSkippedLinuxOnly": { "processAdapter": 3, "privateBackup": 2, "posixBootstrap": 1 },
+  "localAuthoritativeLinux": { "command": "npm run check", "tests": 570, "passed": 570, "failed": 0, "skipped": 0, "syntax": "PASS", "typescriptAgainstInstalledPi": "PASS", "packageValidation": "PASS" },
+  "authCopiedInCleanRoom": false,
+  "ignoredRuntimesCopiedInCleanRoom": false,
+  "windowsAutonomousEngine": "BLOCKED_UNIMPLEMENTED_SANDBOX",
+  "fullFreshMachineRecovery": "NOT_YET_CERTIFIED",
+  "limitations": ["Not a Windows coding E2E or complete native core certificate", "No live authenticated model inference in this phase", "Windows ACL/process/sandbox parity still required", "Full runtime and toolchain reconstruction is unfinished"]
+}

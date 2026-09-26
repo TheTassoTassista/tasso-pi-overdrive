@@ -16,7 +16,7 @@ The shared code installs a user-local `phi.cmd` wrapper. No persistent PATH chan
 
 Keep the current machine/config backups until full clean-clone reconstruction passes. The intended complete flow is clone → platform bootstrap → normal user authentication → Doctor → native acceptance → `phi`. The current foundation checkout is reproducible without secrets, but the full Linux legacy installer still requires reviewed host dependencies/digests; it is not a verified fresh-machine Phi bootstrap. Windows full reconstruction is also pending.
 
-The existing private GitHub remote is retained. This phase has not yet pushed or renamed it. Source-only local checkpoints are not a substitute for remote recovery until audited and pushed.
+The existing private GitHub remote and history are retained. Audited foundation commits are pushed to `feature/routing-presets-quality` in `TheTassoTassista/tasso-pi-overdrive`; clone that branch explicitly. The default branch has not been replaced and the repository has not been renamed. Remote foundation availability does not certify full machine recovery: the complete runtime/toolchain reconstruction remains unfinished. Do not wipe the existing machine based on a foundation-only CI result.
 
 ## Local backup / restore
 

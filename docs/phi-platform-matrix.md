@@ -4,9 +4,9 @@ This is a migration matrix, not a parity certificate. The current complete engin
 
 | Capability | Shared interface/core | Linux implementation | Native Windows implementation | Evidence/status |
 |---|---|---|---|---|
-| Identity / themes | branding + portable CLI | ANSI / UTF-8 / ASCII | same renderer, conservative legacy console fallback | Linux unit PASS; native Windows pending |
+| Identity / themes | branding + portable CLI | ANSI / UTF-8 / ASCII | same renderer, conservative legacy console fallback | real Linux/Windows foundation rendering/CLI tests PASS; full Windows engine pending |
 | Config discovery | platform directory adapter | XDG + existing private Pi state | LocalAppData + existing Pi state | path units PASS; NTFS ACL attestation pending |
-| Protected config I/O | canonical/no-link/identity checks | owner UID, mode, inode, no-follow | junction checks; ACL enforcement still needed | Linux negative tests PASS; not autonomous confinement |
+| Protected config I/O | canonical/no-link/identity checks | owner UID, mode, inode, no-follow | junction/hard-link tests PASS; ACL enforcement still needed | native Linux/Windows foundation negative tests PASS; not autonomous confinement |
 | Launcher process ownership | launchEngine / runOwnedEngine | interactive exec/same PID; local-check owned groups + exit/timeout cleanup | Job Object backend required | Linux PID/arguments/exit and descendant termination tests PASS; Windows BLOCKED |
 | Command sandbox | SandboxBackend readiness contract | existing argument-vector + Bubblewrap | AppContainer/restricted-token backend required | Linux existing baseline PASS; Windows BLOCKED |
 | Worktree / runtime | existing Git + allocation policy | existing secure native worktrees, ports/state/profile | Git for Windows + ACL/reparse validation required | Windows pending |
@@ -20,6 +20,8 @@ This is a migration matrix, not a parity certificate. The current complete engin
 | OmniRoute | existing provider boundary | current optional loopback service | investigate native service launcher | optional, no unknown-cost inference |
 | SearXNG | read-only search boundary | existing Linux container | Docker Desktop optional, NOT native service parity | unavailable without backend |
 | Bootstrap / recovery | tracked sources + manifests | legacy full installer pending clean-room repair | new portable foundation only initially | not yet recoverable full product |
+
+Native foundation evidence: hosted Actions run [36229995302](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36229995302), functional HEAD `0c8da9f870f19f7140246b77b1423989cd73ab25`: Ubuntu 37 PASS / 0 FAIL / 0 skipped, native Windows 31 PASS / 0 FAIL / 6 Linux-only skipped. Shared foundation bootstrap and Git-source clone cleanup pass on both actual OS runners. No WSL; no Windows engine, process/sandbox parity, deterministic coding E2E or complete disaster-recovery claim. Local authoritative Linux gate remains separate and complete: 570/570 PASS.
 
 ## Windows security design constraints
 
