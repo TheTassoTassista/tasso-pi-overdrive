@@ -262,11 +262,11 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
     if (name === 'open-sharing-control' || name === 'delete-pending-control') {
       const [failure] = validationFailureEvidence('foundation-tests', result).filesystemFailures ?? [];
       assert.equal(failure?.operation, 'NT_OPEN');
-      assert.equal(failure?.access, '00110080');
+      assert.equal(failure?.access, name === 'open-sharing-control' ? '00110080' : '00110081');
       assert.equal(failure?.share, 1);
       assert.equal(failure?.nativeStatus, name === 'open-sharing-control' ? 'c0000043' : 'c0000056');
       assert.equal(failure?.nativeError, name === 'open-sharing-control' ? 32 : 5);
-      console.log(JSON.stringify({ nativeControl: name, ...validationFailureEvidence('foundation-tests', result) }));
+      console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
     }
     assert.equal(recover().quarantined, 0);
   });

@@ -302,7 +302,13 @@ namespace Phi.Native {
             // ours, on a fresh private fixture, released before final recovery.
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");
             using (FileStream hold = new FileStream(sentinel, FileMode.Open, FileAccess.Read, name == "open-sharing-control" ? FileShare.Read : FileShare.ReadWrite | FileShare.Delete)) {
-              if (name == "delete-pending-control") File.Delete(sentinel);
+              if (name == "delete-pending-control") {
+                File.Delete(sentinel);
+                // Enumeration omits a delete-pending leaf, but a still-open
+                // descendant keeps its now-delete-pending root alive. Prove
+                // the second handle-relative cleanup, not a guessed leaf error.
+                scope.CleanupFiles();
+              }
               bool denied = false;
               try { scope.CleanupFiles(); }
               catch (Win32Exception error) {
