@@ -62,8 +62,12 @@ namespace Phi.Native {
         // and prove ALL_APPLICATION_PACKAGES opt-out using an access canary below.
         IntPtr buffer = Marshal.AllocHGlobal(256);
         try {
-          if (!TokenBuffer(token, 30, buffer, 256, out returned) || returned < 4 || Marshal.ReadInt32(buffer) != 0) throw new InvalidDataException();
-          if (!TokenBuffer(token, 31, buffer, 256, out returned) || returned != IntPtr.Size || !EqualSid(Marshal.ReadIntPtr(buffer), sid)) throw new InvalidDataException();
+          if (!TokenBuffer(token, 30, buffer, 256, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
+          if (returned < 4 || returned > 256 || Marshal.ReadInt32(buffer) != 0) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:CAPABILITIES:" + returned + ":" + Marshal.ReadInt32(buffer)); throw new InvalidDataException(); }
+          if (!TokenBuffer(token, 31, buffer, 256, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
+          // The variable-size buffer includes the pointed-to SID, not just the
+          // TOKEN_APPCONTAINER_INFORMATION pointer-sized header.
+          if (returned < IntPtr.Size || returned > 256 || !EqualSid(Marshal.ReadIntPtr(buffer), sid)) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:SID:" + returned); throw new InvalidDataException(); }
         } finally { Marshal.FreeHGlobal(buffer); }
         TokenVerified = true;
       } finally { CloseHandle(token); }

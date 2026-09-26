@@ -13,6 +13,8 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.match(source, /new IntPtr\(0x2000f\)/u);
   assert.match(source, /TokenBuffer\(token, 30/u);
   assert.match(source, /EqualSid\(Marshal\.ReadIntPtr\(buffer\), sid\)/u);
+  assert.match(source, /returned < IntPtr\.Size \|\| returned > 256/u);
+  assert.doesNotMatch(source, /returned != IntPtr\.Size/u);
   assert.match(source, /allPackagesReadDenied/u);
   assert.match(source, /"S-1-3-4"/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
