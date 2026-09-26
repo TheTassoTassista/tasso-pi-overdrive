@@ -9,12 +9,16 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Web.Script.Serialization;
+using Microsoft.Win32;
 
 namespace Phi.Native {
   internal sealed class AppContainerScope : IDisposable {
     [StructLayout(LayoutKind.Sequential)] struct Capabilities {
       public IntPtr Sid, Entries; public uint Count, Reserved;
     }
+    [StructLayout(LayoutKind.Sequential)] struct CapabilityEntry { public IntPtr Sid; public uint Attributes; }
+    [DllImport("kernelbase.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool DeriveCapabilitySidsFromName(string name, out IntPtr groups, out uint groupCount, out IntPtr entries, out uint entryCount);
+    [DllImport("advapi32.dll")] static extern uint GetLengthSid(IntPtr sid);
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int CreateAppContainerProfile(string name, string display, string description, IntPtr capabilities, uint count, out IntPtr sid);
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int DeleteAppContainerProfile(string name);
     [DllImport("advapi32.dll")] static extern IntPtr FreeSid(IntPtr sid);
@@ -30,21 +34,42 @@ namespace Phi.Native {
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr pointer);
     readonly string profile;
     readonly IntPtr sid;
-    IntPtr capabilities, policy;
+    IntPtr capabilities, policy, registrySid, registryEntry;
+    bool registered;
     bool disposed;
     bool optOut = true;
     internal int AttributeCount { get { return optOut ? 4 : 3; } }
     internal bool TokenVerified { get; private set; }
     internal AppContainerScope() {
       profile = "Phi.Probe." + Guid.NewGuid().ToString("N");
-      int result = CreateAppContainerProfile(profile, "Phi isolated probe", "Synthetic confinement validation only", IntPtr.Zero, 0, out sid);
-      if (result != 0 || sid == IntPtr.Zero) throw new InvalidOperationException("PHI_APPCONTAINER_PROFILE_FAILED");
       try {
-        Capabilities value = new Capabilities(); value.Sid = sid; // zero capabilities, including network
+        // Minimal OS registry-read capability is needed by Node's Winsock
+        // initialization. No network/file/identity/service capabilities added.
+        registrySid = RegistryReadSid();
+        CapabilityEntry entry = new CapabilityEntry(); entry.Sid = registrySid; entry.Attributes = 4;
+        registryEntry = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(CapabilityEntry))); Marshal.StructureToPtr(entry, registryEntry, false);
+        int result = CreateAppContainerProfile(profile, "Phi isolated probe", "Synthetic confinement validation only", registryEntry, 1, out sid);
+        if (result != 0 || sid == IntPtr.Zero) throw new InvalidOperationException("PHI_APPCONTAINER_PROFILE_FAILED");
+        registered = true;
+        Capabilities value = new Capabilities(); value.Sid = sid; value.Entries = registryEntry; value.Count = 1;
         capabilities = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Capabilities)));
         Marshal.StructureToPtr(value, capabilities, false);
         policy = Marshal.AllocHGlobal(4); Marshal.WriteInt32(policy, 1); // ALL_APPLICATION_PACKAGES opt-out / LPAC
       } catch { Dispose(); throw; }
+    }
+    static IntPtr RegistryReadSid() {
+      IntPtr groups = IntPtr.Zero, entries = IntPtr.Zero, result = IntPtr.Zero; uint groupCount = 0, entryCount = 0;
+      try {
+        if (!DeriveCapabilitySidsFromName("registryRead", out groups, out groupCount, out entries, out entryCount) || groupCount > 16 || entryCount != 1) throw new InvalidDataException();
+        IntPtr entry = Marshal.ReadIntPtr(entries); uint size = GetLengthSid(entry);
+        if (size < 8 || size > 128) throw new InvalidDataException();
+        byte[] bytes = new byte[size]; Marshal.Copy(entry, bytes, 0, (int)size);
+        result = Marshal.AllocHGlobal((int)size); Marshal.Copy(bytes, 0, result, (int)size); return result;
+      } finally {
+        foreach (Tuple<IntPtr, uint> array in new Tuple<IntPtr, uint>[] { Tuple.Create(groups, groupCount), Tuple.Create(entries, entryCount) }) {
+          if (array.Item1 != IntPtr.Zero) { for (uint index = 0; index < Math.Min(array.Item2, 16); index++) LocalFree(Marshal.ReadIntPtr(array.Item1, (int)index * IntPtr.Size)); LocalFree(array.Item1); }
+        }
+      }
     }
     internal void ApplyAttributes(IntPtr list) {
       TokenVerified = false;
@@ -63,7 +88,7 @@ namespace Phi.Native {
         IntPtr buffer = Marshal.AllocHGlobal(256);
         try {
           if (!TokenBuffer(token, 30, buffer, 256, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
-          if (returned < 4 || returned > 256 || Marshal.ReadInt32(buffer) != 0) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:CAPABILITIES:" + returned + ":" + Marshal.ReadInt32(buffer)); throw new InvalidDataException(); }
+          if (returned < 24 || returned > 256 || Marshal.ReadInt32(buffer) != 1 || !EqualSid(Marshal.ReadIntPtr(buffer, 8), registrySid) || Marshal.ReadInt32(buffer, 16) != 4) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:CAPABILITIES:" + returned + ":" + Marshal.ReadInt32(buffer)); throw new InvalidDataException(); }
           if (!TokenBuffer(token, 31, buffer, 256, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
           // The variable-size buffer includes the pointed-to SID, not just the
           // TOKEN_APPCONTAINER_INFORMATION pointer-sized header.
@@ -110,9 +135,11 @@ namespace Phi.Native {
     }
     public void Dispose() {
       if (disposed) return; disposed = true;
-      int result = DeleteAppContainerProfile(profile);
+      int result = registered ? DeleteAppContainerProfile(profile) : 0;
       if (capabilities != IntPtr.Zero) Marshal.FreeHGlobal(capabilities);
       if (policy != IntPtr.Zero) Marshal.FreeHGlobal(policy);
+      if (registryEntry != IntPtr.Zero) Marshal.FreeHGlobal(registryEntry);
+      if (registrySid != IntPtr.Zero) Marshal.FreeHGlobal(registrySid);
       if (sid != IntPtr.Zero) FreeSid(sid);
       if (result != 0) throw new InvalidOperationException("PHI_APPCONTAINER_CLEANUP_FAILED");
     }
@@ -120,7 +147,7 @@ namespace Phi.Native {
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
       int port;
       if (!Int32.TryParse(portText, out port) || port < 1 || port > 65535 || !Path.IsPathRooted(node) || node.StartsWith("\\\\") || !node.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 70;
-      string root = null; AppContainerScope scope = null; int code = 70; bool cleaned = false;
+      string root = null, registryKey = null; AppContainerScope scope = null; int code = 70; bool cleaned = false;
       try {
         if ((File.GetAttributes(node) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
         scope = new AppContainerScope();
@@ -139,24 +166,36 @@ namespace Phi.Native {
         allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-15-2-1"), FileSystemRights.ReadAndExecute, AccessControlType.Allow));
         allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, AccessControlType.Allow));
         File.SetAccessControl(allPackages, allAcl);
+        registryKey = "Software\\PhiProbe-" + Guid.NewGuid().ToString("N");
+        RegistrySecurity privateAcl = new RegistrySecurity(); privateAcl.SetAccessRuleProtection(true, false);
+        privateAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
+        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, privateAcl)) { key.SetValue("Fixture", "synthetic-private-value"); if ((string)key.GetValue("Fixture") != "synthetic-private-value") throw new InvalidDataException(); }
+        string privateRegistry = "HKU\\" + WindowsIdentity.GetCurrent().User.Value + "\\" + registryKey;
         string script = @"const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
-const [work,scratch,runtime,secret,port,role]=process.argv.slice(1);
+const [work,scratch,runtime,secret,port,role,privateRegistry]=process.argv.slice(1);
 const result={role,workspaceRead:fs.readFileSync(path.join(work,'fixture.txt'),'utf8')==='synthetic-input'};
 function denied(key,fn){try{fn();result[key]=false;}catch(e){result[key]=['EACCES','EPERM'].includes(e.code);}}
 denied('hostReadDenied',()=>fs.readFileSync(path.join(secret,'.env')));
 denied('hostWriteDenied',()=>fs.writeFileSync(path.join(secret,'escape.txt'),'synthetic'));
 denied('runtimeWriteDenied',()=>fs.writeFileSync(path.join(runtime,'escape.txt'),'synthetic'));
 denied('allPackagesReadDenied',()=>fs.readFileSync(path.join(runtime,'all-packages.txt')));
+const {spawnSync}=require('node:child_process'),reg=path.join(process.env.SystemRoot,'System32','reg.exe');
+function query(key){return spawnSync(reg,['query',key],{shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],timeout:1500,maxBuffer:65536});}
+const publicQuery=query('HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion');
+result.registryReadAvailable=publicQuery.status===0;
+const privateQuery=query(privateRegistry);
+result.privateRegistryDenied=privateQuery.status===1&&!privateQuery.stdout?.includes('synthetic-private-value');
+result.cleanEnvironment=!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|PHI_PROBE/i.test(k));
 try{fs.writeFileSync(path.join(scratch,'scratch.txt'),'synthetic');result.scratchWrite=true;}catch{result.scratchWrite=false;}
 try{fs.writeFileSync(path.join(work,'edit.txt'),'synthetic');result.workspaceWrite=true;}catch(e){result.workspaceWrite=false;result.workspaceWriteDenied=['EACCES','EPERM'].includes(e.code);}
 const s=net.connect({host:'127.0.0.1',port:Number(port)});s.setTimeout(1500);
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
-let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.registryReadAvailable&&result.privateRegistryDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
-        request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
+        request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role, privateRegistry };
         string system = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         request["env"] = new Dictionary<string, string> {
           { "SystemRoot", system }, { "windir", system }, { "SystemDrive", Path.GetPathRoot(system).TrimEnd('\\') },
@@ -176,7 +215,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_APPCONTAINER_FAILED:" + ex.NativeErrorCode); code = 70; }
         catch { Console.Error.WriteLine("PHI_APPCONTAINER_PROBE_FAILED"); code = 70; }
       finally {
-        try { if (scope != null) scope.Dispose(); if (root != null) Directory.Delete(root, true); cleaned = true; }
+        try { if (scope != null) scope.Dispose(); if (root != null) Directory.Delete(root, true); if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); cleaned = true; }
         catch { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }
       }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { tokenVerified = scope != null && scope.TokenVerified, cleanup = cleaned ? "PASS" : "FAIL", scope = "FIXED_SYNTHETIC_PROBE_ONLY" }));
