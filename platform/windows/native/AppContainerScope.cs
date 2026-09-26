@@ -38,6 +38,7 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadFile(IntPtr file, byte[] buffer, uint count, out uint read, IntPtr overlapped);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool DeviceIoControl(IntPtr file, uint code, byte[] input, uint inputSize, IntPtr output, uint outputSize, out uint returned, IntPtr overlapped);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool RemoveDirectoryW(string directory);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -236,7 +237,7 @@ namespace Phi.Native {
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
       int port;
       if (!Int32.TryParse(portText, out port) || port < 1 || port > 65535 || !Path.IsPathRooted(node) || node.StartsWith("\\\\") || !node.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 70;
-      string root = null, registryKey = null; AppContainerScope scope = null; int code = 70; bool cleaned = false;
+      string root = null, registryKey = null, ownedJunction = null; AppContainerScope scope = null; int code = 70; bool cleaned = false, aliasesReady = false;
       try {
         if ((File.GetAttributes(node) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
         scope = new AppContainerScope();
@@ -256,11 +257,13 @@ namespace Phi.Native {
         scope.protectedDirectory = secret;
         scope.readOnlyAsset = Path.Combine(runtime, "read-only.txt"); File.WriteAllText(scope.readOnlyAsset, "synthetic-read-only");
         string junction = Path.Combine(scratch, "host-junction"), privateLink = Path.Combine(scratch, "host-private-link"), assetLink = Path.Combine(scratch, "host-read-only-link");
+        ownedJunction = junction;
         CreateOwnedJunction(junction, secret);
         if (!CreateHardLinkW(privateLink, Path.Combine(secret, ".env"), IntPtr.Zero) || !CreateHardLinkW(assetLink, scope.readOnlyAsset, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
         // Host positive controls prove actual pre-existing alias traversal.
         // Child-side creation denial alone is not enough for this assertion.
         if (File.ReadAllText(Path.Combine(junction, ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(privateLink) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(assetLink) != "synthetic-read-only") throw new InvalidDataException();
+        aliasesReady = true;
         string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
         FileSecurity allAcl = new FileSecurity(); allAcl.SetAccessRuleProtection(true, false);
         allAcl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, AccessControlType.Allow));
@@ -328,6 +331,15 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
       finally {
         bool profileClean = true, filesClean = true, registryClean = true;
         try { if (scope != null) scope.Dispose(); } catch { profileClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_PROFILE_CLEANUP_FAILED"); }
+        // Unlink the exact fresh controller-created junction non-recursively
+        // BEFORE deleting its tree. Never enumerate or delete through a link.
+        // This avoids .NET Framework's recursive mount-point cleanup path.
+        try {
+          if (ownedJunction != null && !RemoveDirectoryW(ownedJunction)) {
+            int error = Marshal.GetLastWin32Error(); if (error != 2 && error != 3) throw new Win32Exception(error);
+          }
+          if (aliasesReady && File.ReadAllText(Path.Combine(root, "host-private", ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY") throw new InvalidDataException();
+        } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_JUNCTION_CLEANUP_FAILED"); }
         try { if (root != null) Directory.Delete(root, true); } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
         try { if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); } catch { registryClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_REGISTRY_CLEANUP_FAILED"); }
         cleaned = profileClean && filesClean && registryClean;

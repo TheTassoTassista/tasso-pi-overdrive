@@ -42,6 +42,8 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.match(source, /CreateOwnedJunction\(junction, secret\)/u);
   assert.match(source, /CreateHardLinkW\(privateLink/u);
   assert.match(source, /File\.ReadAllText\(Path\.Combine\(junction, "\.env"\)\)/u);
+  assert.match(source, /RemoveDirectoryW\(ownedJunction\)/u);
+  assert.ok(source.indexOf('RemoveDirectoryW(ownedJunction)') < source.indexOf('Directory.Delete(root, true)'));
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
 });
 const completedScopes = new Set();
