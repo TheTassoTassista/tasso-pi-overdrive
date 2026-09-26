@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 // Trusted launcher/verification ownership, NOT an agent execution capability.
 // No use from safe_exec or autonomous roles until separate confinement is proven.
@@ -34,6 +34,25 @@ export function processBackendStatus() {
   } catch {
     return { id: 'windows-job-object', available: false, scope: 'trusted non-interactive ownership; NOT a sandbox', evidence: 'native tracked-source build required' };
   }
+}
+// Metadata-only Doctor adapter, never a cleanup or autonomous execution API.
+export function parseWindowsRecoveryStatus(result) {
+  const invalid = () => ({ status: 'FAIL', detail: 'native recovery status unavailable or invalid; no raw output published' });
+  if (result?.error || ![0, 70].includes(result?.status) || typeof result.stdout !== 'string' || Buffer.byteLength(result.stdout) > 8192) return invalid();
+  let value;
+  try { value = JSON.parse(result.stdout); } catch { return invalid(); }
+  const fields = ['scope', 'scanned', 'active', 'stale', 'quarantined', 'processKills', 'cleanupPerformed', 'status'];
+  if (!value || Array.isArray(value) || Object.keys(value).length !== fields.length || fields.some((key) => !Object.hasOwn(value, key))) return invalid();
+  if (value.scope !== 'FIXED_NATIVE_SCOPES_ONLY' || value.processKills !== 0 || value.cleanupPerformed !== false || !['scanned', 'active', 'stale', 'quarantined'].every((key) => Number.isSafeInteger(value[key]) && value[key] >= 0 && value[key] <= 65)) return invalid();
+  const clean = value.stale === 0 && value.quarantined === 0;
+  if (value.status !== (clean ? 'PASS' : 'FAIL') || result.status !== (clean ? 0 : 70) || clean && value.active !== value.scanned) return invalid();
+  return { status: clean ? 'PASS' : 'FAIL', detail: `fixed native scopes only; active=${value.active}, stale=${value.stale}, quarantined=${value.quarantined}; read-only, zero process kills` };
+}
+export function windowsRecoveryStatus() {
+  let helper;
+  try { helper = ownedWindowsHelper(); }
+  catch { return { status: 'NOT AVAILABLE', detail: 'verified native helper build required; no recovery performed' }; }
+  return parseWindowsRecoveryStatus(spawnSync(helper, ['--scope-recovery-status'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 15000, maxBuffer: 8192 }));
 }
 export function windowsProcessRequest(command, args, { cwd = process.cwd(), env = process.env, timeoutMs = WINDOWS_PROCESS_LIMITS.lifetimeMs } = {}) {
   if (process.platform !== 'win32') throw new Error('PHI_NATIVE_PROCESS_PLATFORM_UNSUPPORTED');

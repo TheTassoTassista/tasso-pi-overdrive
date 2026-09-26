@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { ownedWindowsHelper, windowsProcessRequest, WINDOWS_PROCESS_LIMITS, runOwnedEngine } from '../platform/windows/process.mjs';
+import { ownedWindowsHelper, windowsProcessRequest, WINDOWS_PROCESS_LIMITS, runOwnedEngine, parseWindowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { buildWindowsProcess } from '../platform/windows/build-process.mjs';
@@ -44,6 +44,19 @@ test('Windows process ownership is never advertised as autonomous sandbox author
   assert.match(source, /HandleListAttribute = 0x20002/u);
   assert.doesNotMatch(source, /AssignProcessToJobObject\(/u);
   assert.match(source, /limits\.Basic\.ActiveProcessLimit = 32/u);
+});
+test('Doctor native recovery metadata requires actual matching exit status and never emits extra private fields', () => {
+  const row = { scope: 'FIXED_NATIVE_SCOPES_ONLY', scanned: 0, active: 0, stale: 0, quarantined: 0, processKills: 0, cleanupPerformed: false, status: 'PASS' };
+  const parse = (value, status = 0) => parseWindowsRecoveryStatus({ stdout: JSON.stringify(value), status });
+  assert.equal(parse(row).status, 'PASS');
+  assert.equal(parse({ ...row, scanned: 1, active: 1 }).status, 'PASS');
+  assert.equal(parse({ ...row, scanned: 1, stale: 1, status: 'FAIL' }, 70).status, 'FAIL');
+  for (const value of [{ ...row, extra: 'NEVER_EMIT_PRIVATE_SENTINEL' }, { ...row, processKills: 1 }, { ...row, cleanupPerformed: true }, { ...row, stale: 1 }, { ...row, scanned: 1 }, { ...row, scanned: 66 }, { ...row, status: 'NEVER_EMIT_PRIVATE_SENTINEL' }, null]) {
+    const result = parse(value);
+    assert.equal(result.status, 'FAIL'); assert.doesNotMatch(JSON.stringify(result), /NEVER_EMIT_PRIVATE_SENTINEL/u);
+  }
+  assert.equal(parse(row, 70).status, 'FAIL');
+  assert.equal(parseWindowsRecoveryStatus({ status: 0, stdout: JSON.stringify(row), error: { code: 'ETIMEDOUT' } }).status, 'FAIL');
 });
 test('non-native process execution fails closed instead of using a mock backend', { skip: process.platform === 'win32' }, () => {
   assert.throws(() => ownedWindowsHelper(), /PLATFORM_UNSUPPORTED/u);
