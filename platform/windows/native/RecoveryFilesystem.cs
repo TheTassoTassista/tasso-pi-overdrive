@@ -15,8 +15,11 @@ namespace Phi.Native {
     }
     [StructLayout(LayoutKind.Sequential)] struct Identity { public ulong Volume, Low, High; }
     [StructLayout(LayoutKind.Sequential)] struct Disposition { public byte Delete; }
-    [StructLayout(LayoutKind.Sequential)] struct SecurityAttributes { public int Size; public IntPtr Descriptor; public int Inherit; }
-    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateDirectoryW(string path, ref SecurityAttributes attributes);
+    [StructLayout(LayoutKind.Sequential)] struct UnicodeString { public ushort Length, MaximumLength; public IntPtr Buffer; }
+    [StructLayout(LayoutKind.Sequential)] struct ObjectAttributes { public uint Length; public IntPtr Root, Name; public uint Attributes; public IntPtr Descriptor, Quality; }
+    [StructLayout(LayoutKind.Sequential)] struct IoStatus { public IntPtr Status; public UIntPtr Information; }
+    [DllImport("ntdll.dll")] static extern int NtCreateFile(out IntPtr file, uint access, ref ObjectAttributes attributes, out IoStatus status, IntPtr allocation, uint fileAttributes, uint share, uint disposition, uint options, IntPtr ea, uint eaLength);
+    [DllImport("ntdll.dll")] static extern uint RtlNtStatusToDosError(int status);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr file, out Info info);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandleEx(IntPtr file, int type, out Identity info, uint size);
@@ -36,7 +39,7 @@ namespace Phi.Native {
         PinParent(current);
         foreach (string part in full.Substring(drive.Length).Split(new char[] { '\\' }, StringSplitOptions.RemoveEmptyEntries)) {
           if (part == "." || part == ".." || part.IndexOf(':') >= 0) throw new InvalidDataException();
-          current = Path.Combine(current, part); PinParent(current);
+          current = Path.Combine(current, part); PinRelativeParent(part);
         }
       } catch { Dispose(); throw; }
     }
@@ -53,6 +56,35 @@ namespace Phi.Native {
       if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0) { CloseHandle(handle); throw new InvalidDataException(); }
       parents.Add(handle);
     }
+    static void Leaf(string name) {
+      if (String.IsNullOrEmpty(name) || name.Length > 1024 || name == "." || name == ".." || name.IndexOfAny(new char[] { '\\', '/', ':', '\0' }) >= 0) throw new InvalidDataException();
+    }
+    static IntPtr OpenRelative(IntPtr parent, string name, uint access, uint share, uint disposition, uint options, IntPtr descriptor, out Info info) {
+      Leaf(name); Info parentInfo;
+      if (!GetFileInformationByHandle(parent, out parentInfo)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if ((parentInfo.Attributes & 0x400) != 0 || (parentInfo.Attributes & 0x10) == 0) throw new InvalidDataException();
+      IntPtr text = Marshal.StringToHGlobalUni(name), unicode = IntPtr.Zero, handle = IntPtr.Zero;
+      try {
+        UnicodeString value = new UnicodeString(); value.Length = checked((ushort)(name.Length * 2)); value.MaximumLength = checked((ushort)(value.Length + 2)); value.Buffer = text;
+        unicode = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UnicodeString))); Marshal.StructureToPtr(value, unicode, false);
+        ObjectAttributes attributes = new ObjectAttributes(); attributes.Length = (uint)Marshal.SizeOf(typeof(ObjectAttributes)); attributes.Root = parent; attributes.Name = unicode; attributes.Attributes = 0x1040; attributes.Descriptor = descriptor;
+        IoStatus status;
+        int result = NtCreateFile(out handle, access | 0x100000, ref attributes, out status, IntPtr.Zero, 0, share, disposition, options | 0x200020, IntPtr.Zero, 0);
+        if (result != 0) throw new Win32Exception((int)RtlNtStatusToDosError(result));
+        if (!GetFileInformationByHandle(handle, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if ((info.Attributes & 0x400) != 0) throw new InvalidDataException();
+        return handle;
+      } catch { if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); throw; }
+      finally { if (unicode != IntPtr.Zero) Marshal.FreeHGlobal(unicode); Marshal.FreeHGlobal(text); }
+    }
+    void PinRelativeParent(string name) {
+      Info info; IntPtr handle = OpenRelative(parents[parents.Count - 1], name, 0xa0, 1, 1, 1, IntPtr.Zero, out info);
+      if ((info.Attributes & 0x10) == 0) { CloseHandle(handle); throw new InvalidDataException(); }
+      parents.Add(handle);
+    }
+    internal IntPtr OpenFile(string leaf, out Info info) {
+      return OpenRelative(parents[parents.Count - 1], leaf, 0x12019f, 0, 1, 0x40, IntPtr.Zero, out info);
+    }
     internal static string HandleIdentity(IntPtr handle) {
       Identity identity;
       if (!GetFileInformationByHandleEx(handle, 18, out identity, (uint)Marshal.SizeOf(typeof(Identity)))) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -64,12 +96,6 @@ namespace Phi.Native {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0) throw new InvalidDataException();
         return HandleIdentity(handle);
       } finally { CloseHandle(handle); }
-    }
-    internal static IntPtr OpenExclusiveFile(string file, out Info info) {
-      IntPtr handle = CreateFileW(file, 0xc0000000U, 0, IntPtr.Zero, 3, 0x200000, IntPtr.Zero);
-      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
-      if (!GetFileInformationByHandle(handle, out info)) { int error = Marshal.GetLastWin32Error(); CloseHandle(handle); throw new Win32Exception(error); }
-      return handle;
     }
     internal static void WithDirectoryAuthority(string directory, string expectedIdentity, Action<IntPtr> operation) {
       using (RecoveryFilesystem pins = new RecoveryFilesystem(directory)) {
@@ -91,14 +117,19 @@ namespace Phi.Native {
         byte[] bytes = acl.GetSecurityDescriptorBinaryForm(); IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
         try {
           Marshal.Copy(bytes, 0, descriptor, bytes.Length);
-          SecurityAttributes attributes = new SecurityAttributes(); attributes.Size = Marshal.SizeOf(typeof(SecurityAttributes)); attributes.Descriptor = descriptor;
-          if (!CreateDirectoryW(directory, ref attributes)) {
-            int error = Marshal.GetLastWin32Error();
-            if (!allowExisting || error != 183) throw new Win32Exception(error);
-          }
-          using (RecoveryFilesystem child = new RecoveryFilesystem(directory)) { DirectoryIdentity(directory); }
+          pins.CreateChildDirectory(Path.GetFileName(directory), descriptor, allowExisting);
         } finally { Marshal.FreeHGlobal(descriptor); }
       }
+    }
+    void CreateChildDirectory(string name, IntPtr descriptor, bool allowExisting) {
+      Info info; IntPtr child = OpenRelative(parents[parents.Count - 1], name, 0xa0, 1, allowExisting ? 3U : 2U, 1, descriptor, out info);
+      try { if ((info.Attributes & 0x10) == 0) throw new InvalidDataException(); }
+      finally { CloseHandle(child); }
+    }
+    internal void CreateChildDirectory(string name, DirectorySecurity acl) {
+      byte[] bytes = acl.GetSecurityDescriptorBinaryForm(); IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
+      try { Marshal.Copy(bytes, 0, descriptor, bytes.Length); CreateChildDirectory(name, descriptor, false); }
+      finally { Marshal.FreeHGlobal(descriptor); }
     }
     internal void DeleteOwnedTree(string root, string expected) {
       Info info; IntPtr handle;

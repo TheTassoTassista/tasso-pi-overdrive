@@ -231,7 +231,10 @@ test('anchored mutation writes through the verified exclusive handle, not a reop
   assert.match(source, /parentPins = new RecoveryFilesystem/u);
   assert.doesNotMatch(source, /File\.WriteAll|File\.Open|File\.Move|File\.Delete/u);
   const filesystem = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
-  assert.match(filesystem, /CreateFileW\(file, 0xc0000000U, 0, IntPtr.Zero, 3, 0x200000/u);
+  assert.match(filesystem, /OpenRelative\(parents\[parents.Count - 1\], leaf, 0x12019f, 0/u);
+  assert.match(filesystem, /attributes.Root = parent/u);
+  assert.match(filesystem, /attributes.Attributes = 0x1040/u);
+  assert.match(filesystem, /PinRelativeParent\(part\)/u);
   assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
 });
 for (const name of ['write', 'replace-before-open', 'rename-while-open', 'delete-while-open', 'directory-swap', 'hardlink', 'junction', 'case-alias', 'ads', 'protected', 'changed-content', 'parent-reparse-while-pinned', 'create-through-junction']) {
