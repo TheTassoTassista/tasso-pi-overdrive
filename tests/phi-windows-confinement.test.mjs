@@ -46,6 +46,9 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.ok(source.indexOf('RemoveDirectoryW(ownedJunction)') < source.indexOf('scope.recovery.CleanupFiles()'));
   assert.doesNotMatch(source, /Directory\.Delete\(root, true\)/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
+  assert.match(source, /RecoveryFilesystem\.WithDirectoryAuthority/u);
+  assert.match(source, /SetSecurityInfo\(handle, 1, 0x80000004/u);
+  assert.doesNotMatch(source, /SetNamedSecurityInfo|Directory\.SetAccessControl/u);
 });
 const completedScopes = new Set();
 for (const role of ['worker', 'tester', 'reviewer']) {
@@ -190,15 +193,15 @@ test('native LPAC nested subprocess tree: inherited denial, crash containment an
     let stdout = '', stderr = '';
     child.stdout.on('data', (value) => { stdout += value; if (stdout.length > 65536) child.kill('SIGKILL'); });
     child.stderr.on('data', (value) => { stderr += value; if (stderr.length > 65536) child.kill('SIGKILL'); });
-    const deadline = Date.now() + 8000; let row;
-    while (!row && Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
-      for (const line of stdout.split(/\r?\n/u)) { try { const value = JSON.parse(line); if (Number.isInteger(value.leafPid)) row = value; } catch {} }
-      if (!row) await delay(20);
+    const deadline = Date.now() + 8000; const row = {};
+    while (!row.leafPid && Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      for (const line of stdout.split(/\r?\n/u)) { try { const value = JSON.parse(line); if (typeof value.scopeId === 'string') Object.assign(row, value); } catch {} }
+      if (!row.leafPid) await delay(20);
     }
-    assert.ok(row, probeMetadata(stdout, stderr, child.exitCode));
+    assert.ok(row.leafPid, probeMetadata(stdout, stderr, child.exitCode));
     scopeId = row.scopeId;
     assert.match(scopeId, /^[0-9a-f]{32}$/u);
-    assert.equal(row.hostReadDenied, true, 'actual nested token cannot read private fixture');
+    assert.equal(row.nestedHostReadDenied, true, 'actual nested token cannot read private fixture');
     assert.equal(row.workspaceWrite, true);
     assert.equal(row.networkDenied, true);
     const pids = [row.ownedPid, row.middlePid, row.leafPid];

@@ -42,7 +42,8 @@ namespace Phi.Native {
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
-    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern uint SetNamedSecurityInfoW(string name, uint type, uint info, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+    [DllImport("advapi32.dll")] static extern uint SetSecurityInfo(IntPtr handle, uint type, uint info, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+    [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorDacl(IntPtr descriptor, out bool present, out IntPtr dacl, out bool defaulted);
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr pointer);
     readonly string profile;
     readonly ScopeRecovery recovery;
@@ -207,20 +208,23 @@ namespace Phi.Native {
         using (MemoryStream input = new MemoryStream(Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(control) + "\n"))) return OwnedProcess.Execute(input, this);
       } finally { optOut = true; TokenVerified = false; }
     }
-    static void LowLabel(string directory) {
+    static void LowLabel(IntPtr directory) {
       IntPtr descriptor = IntPtr.Zero;
       try {
         uint size; bool present, defaulted; IntPtr sacl;
         if (!ConvertStringSecurityDescriptorToSecurityDescriptorW("S:(ML;OICI;NW;;;LW)", 1, out descriptor, out size) ||
             !GetSecurityDescriptorSacl(descriptor, out present, out sacl, out defaulted) || !present) throw new Win32Exception(Marshal.GetLastWin32Error());
-        uint result = SetNamedSecurityInfoW(directory, 1, 0x10, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, sacl);
+        if (sacl == IntPtr.Zero) throw new InvalidDataException();
+        uint result = SetSecurityInfo(directory, 1, 0x10, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, sacl);
         if (result != 0) throw new Win32Exception((int)result);
       } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
     }
     internal void SetDirectoryAuthority(string directory, bool readable, bool writable) {
       // ONLY fresh controller-owned synthetic directories. No recursive host ACL
       // mutation. No generic caller-supplied path or role overrides are exposed.
-      if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
+      string full = Path.GetFullPath(directory), allowed = Path.GetFullPath(recovery.Root);
+      if (!full.Equals(allowed, StringComparison.OrdinalIgnoreCase) && !full.StartsWith(allowed + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException();
+      string identityBefore = RecoveryFilesystem.DirectoryIdentity(full);
       DirectorySecurity acl = new DirectorySecurity(); acl.SetAccessRuleProtection(true, false);
       InheritanceFlags inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
       SecurityIdentifier user = WindowsIdentity.GetCurrent().User;
@@ -229,8 +233,18 @@ namespace Phi.Native {
       // Suppress implicit owner WRITE_DAC in the restricted token.
       acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, inherit, PropagationFlags.None, AccessControlType.Allow));
       if (readable) acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(sid), writable ? FileSystemRights.Modify : FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
-      Directory.SetAccessControl(directory, acl);
-      if (writable) LowLabel(directory);
+      byte[] bytes = acl.GetSecurityDescriptorBinaryForm();
+      RecoveryFilesystem.WithDirectoryAuthority(full, identityBefore, delegate(IntPtr handle) {
+        IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
+        try {
+          Marshal.Copy(bytes, 0, descriptor, bytes.Length);
+          bool present, defaulted; IntPtr dacl;
+          if (!GetSecurityDescriptorDacl(descriptor, out present, out dacl, out defaulted) || !present || dacl == IntPtr.Zero) throw new InvalidDataException();
+          uint result = SetSecurityInfo(handle, 1, 0x80000004, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero);
+          if (result != 0) throw new Win32Exception((int)result);
+          if (writable) LowLabel(handle);
+        } finally { Marshal.FreeHGlobal(descriptor); }
+      });
     }
     public void Dispose() {
       if (disposed) return; disposed = true;
@@ -321,9 +335,12 @@ s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
 let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.existingJunctionReadDenied&&result.existingPrivateHardlinkReadDenied&&result.existingReadOnlyHardlinkReadable&&result.existingReadOnlyHardlinkWriteDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         if (failure == "hold-child") script = script.Replace("console.log(JSON.stringify(result));process.exit(", "console.log(JSON.stringify({...result,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));setInterval(()=>{},1000);return;process.exit(");
         if (failure == "hold-tree") {
-          string leaf = @"const fs=require('node:fs');const [secret]=process.argv.slice(1);let hostReadDenied=false;try{fs.readFileSync(secret);}catch(e){hostReadDenied=['EACCES','EPERM'].includes(e.code);}console.log(JSON.stringify({leafPid:process.pid,hostReadDenied}));setInterval(()=>{},1000);";
-          string middle = "const{spawn}=require('node:child_process');const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(leaf) + ",process.argv[1]],{shell:false,stdio:['ignore','pipe','ignore']});let text='';c.stdout.on('data',v=>{text+=v;const end=text.indexOf('\\n');if(end>=0){const row=JSON.parse(text.slice(0,end));console.log(JSON.stringify({...row,middlePid:process.pid}));}});setInterval(()=>{},1000);";
-          string tree = "const{spawn}=require('node:child_process');const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(middle) + ",path.join(secret,'.env')],{shell:false,stdio:['ignore','pipe','ignore']});let text='';c.stdout.on('data',v=>{text+=v;const end=text.indexOf('\\n');if(end>=0){const row=JSON.parse(text.slice(0,end));console.log(JSON.stringify({...result,...row,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));}});setInterval(()=>{},1000);return;process.exit(";
+          // Pinned Node 22's libuv creates non-LOCAL named pipes; LPAC must
+          // not be broadened to permit them. Inherit the three already-scoped
+          // stdio handles for this tree. Generic piped tools need a broker.
+          string leaf = @"const fs=require('node:fs');const [secret,scopeId]=process.argv.slice(1);let nestedHostReadDenied=false;try{fs.readFileSync(secret);}catch(e){nestedHostReadDenied=['EACCES','EPERM'].includes(e.code);}console.log(JSON.stringify({leafPid:process.pid,scopeId,nestedHostReadDenied}));setInterval(()=>{},1000);";
+          string middle = "const{spawn}=require('node:child_process');const [secret,scopeId]=process.argv.slice(1);console.log(JSON.stringify({middlePid:process.pid,scopeId}));const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(leaf) + ",secret,scopeId],{shell:false,stdio:'inherit'});c.on('error',()=>{console.error('PHI_CONFINEMENT_CHILD_SPAWN_FAILED');process.exit(1);});setInterval(()=>{},1000);";
+          string tree = "const{spawn}=require('node:child_process');console.log(JSON.stringify({...result,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));const c=spawn(process.execPath,['--no-addons','-e'," + new JavaScriptSerializer().Serialize(middle) + ",path.join(secret,'.env'),'" + scope.recovery.Id + "'],{shell:false,stdio:'inherit'});c.on('error',()=>{console.error('PHI_CONFINEMENT_CHILD_SPAWN_FAILED');process.exit(1);});setInterval(()=>{},1000);return;process.exit(";
           script = script.Replace("console.log(JSON.stringify(result));process.exit(", tree);
         }
         Dictionary<string, object> request = new Dictionary<string, object>();

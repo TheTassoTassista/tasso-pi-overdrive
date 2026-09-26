@@ -40,7 +40,7 @@ namespace Phi.Native {
     static IntPtr Open(string file, bool delete, out Info info) {
       // No FILE_SHARE_DELETE: once opened, this actual object cannot be renamed
       // out from under path-based enumeration. Final reparse is opened, not followed.
-      IntPtr handle = CreateFileW(file, 0x80U | (delete ? 0x10000U : 0U), 3, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+      IntPtr handle = CreateFileW(file, 0x80U | (delete ? 0x10000U : 0U), 1, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
       if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if (!GetFileInformationByHandle(handle, out info)) { int error = Marshal.GetLastWin32Error(); CloseHandle(handle); throw new Win32Exception(error); }
       return handle;
@@ -67,6 +67,19 @@ namespace Phi.Native {
       if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if (!GetFileInformationByHandle(handle, out info)) { int error = Marshal.GetLastWin32Error(); CloseHandle(handle); throw new Win32Exception(error); }
       return handle;
+    }
+    internal static void WithDirectoryAuthority(string directory, string expectedIdentity, Action<IntPtr> operation) {
+      using (RecoveryFilesystem pins = new RecoveryFilesystem(directory)) {
+        IntPtr handle = CreateFileW(directory, 0xc0080, 3, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+        if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        try {
+          Info info;
+          if (!GetFileInformationByHandle(handle, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+          if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || HandleIdentity(handle) != expectedIdentity) throw new InvalidDataException();
+          operation(handle);
+          if (HandleIdentity(handle) != expectedIdentity) throw new InvalidDataException();
+        } finally { CloseHandle(handle); }
+      }
     }
     internal void DeleteOwnedTree(string root, string expected) {
       Info info; IntPtr handle;
