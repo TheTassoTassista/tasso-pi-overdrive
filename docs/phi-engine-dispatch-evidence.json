@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "scope": "PRODUCTION_ADMISSION_PARTIAL_NOT_NATIVE_CODING_CERTIFICATION",
+  "functionalHead": "bdfb1b21440df23506fad9f7083a39c849640fe8",
+  "branch": "feature/routing-presets-quality",
+  "runId": 36267318046,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36267318046",
+  "conclusion": "failure",
+  "linuxFull": { "total": 654, "passed": 591, "failed": 0, "windowsOnlySkipped": 63, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS", "packageSecretScan": "PASS" },
+  "ubuntuFocused": { "total": 121, "passed": 58, "failed": 0, "skipped": 63, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" },
+  "windowsFocused": { "total": 121, "passed": 108, "failed": 6, "linuxOnlySkipped": 7, "newDispatchTestsPassed": 9, "gitSourceClone": "NOT_RUN_AFTER_FAILURE" },
+  "firstFailure": { "test": "native LPAC worker timeout failure with nested tree", "stage": "FINAL_RECOVERY", "exitCode": 70, "nativeErrorNumbers": [5], "diagnosticCodes": ["PHI_FILESYSTEM_ACCESS_DENIED", "PHI_FILESYSTEM_NATIVE_ERROR", "PHI_RECOVERY_FILES_FAILED"], "rootCause": "UNDETERMINED", "subsequentRecoveryFailures": 5 },
+  "nativeHelperSourcesChanged": false,
+  "windowsAutonomousReady": false,
+  "codingE2E": "NOT_RUN_BLOCKED",
+  "securityDenialE2E": "NOT_RUN_BLOCKED",
+  "productionFailureE2E": "NOT_RUN_BLOCKED",
+  "newPiModelCalls": 0,
+  "authChanged": false,
+  "protectedFileChanged": false,
+  "limitations": ["real native tools/LSP broker absent", "native transactions not crash-atomic", "native timeout cleanup failed and requires isolation", "no full Doctor/backup/restore/reconstruction certificate"]
+}

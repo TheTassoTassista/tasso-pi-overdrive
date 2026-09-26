@@ -4,6 +4,8 @@ Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
 Latest verified native recovery/filesystem checkpoint: `c5995c68e6d9bb4ef3e55a82eef8345915ccf2aa`, native CI 36265238676 SUCCESS; full Linux 585 PASS / 0 FAIL / 60 native-Windows skips; native Windows 105 PASS / 0 FAIL / 7 Linux-only skips. See checkpoint 9 at the end for the authoritative continuation point. Older pending/next entries below are historical, not instructions to redo completed work.
 
+Current continuation: functional `bdfb1b2`, checkpoint 10 below; Linux 591 PASS / 0 FAIL, **native CI 36267318046 FAIL (108 PASS / 6 FAIL / 7 skips)**. New dispatch tests pass, existing timeout recovery fails. Current next step is native cleanup isolation, not an autonomy switch. Earlier green snapshots do not override this newer failure.
+
 ## Verified starting checkpoint
 
 - Branch: `feature/routing-presets-quality`.
@@ -255,3 +257,11 @@ Local source gate: **654 total / 591 PASS / 0 FAIL / 63 native-Windows skips**, 
 Validation history retained: restricted execution initially reported file-level test summaries and unrelated process/audit failures, so it was not accepted as authoritative. Actual unsandboxed host gate first encountered Second Brain ACCEPTED/REJECTED assertion once; isolated memory suite 3/3 and subsequent full gate PASS without any memory change. Do not infer a root cause or introduce a preventive memory fix. Actual typecheck found the disposable source copy lacked `platform`; include it and retain source-wiring regression, no permissive declarations/dependencies.
 
 Next after this native-tested checkpoint: implement the real confined native transport/profile broker behind the shared dispatch, then transaction-safe filesystem integration. Generic LPAC tool/LSP transport and native coding/security/failure engine E2Es still NOT IMPLEMENTED/NOT RUN. Windows stays BLOCKED. Complete full Doctor/backup/reconstruction afterward. At low quota finish tests, commit/push and stop here; do not start a half-built native broker.
+
+### Checkpoint 10 actual native outcome — FAIL, no certification
+
+Source `bdfb1b21440df23506fad9f7083a39c849640fe8`, run [36267318046](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36267318046): Ubuntu SUCCESS **121 / 58 PASS / 0 FAIL / 63 skips**, Windows FAIL **121 / 108 PASS / 6 FAIL / 7 skips**. All nine new dispatch tests PASS on actual Windows. Full Linux **654 / 591 PASS / 0 FAIL / 63 skips**, all syntax/TypeScript/package-secret checks PASS. Production admission is wired, NOT a working native coding backend.
+
+First native failure: existing LPAC Worker timeout-tree test, final recovery returns 70, ACCESS_DENIED 5 / PHI_RECOVERY_FILES_FAILED; journal quarantine causes five subsequent recovery failures. Native helper C# sources unchanged from starting HEAD. Keep failure and ownership evidence; root cause remains undetermined. Windows clone/normal whole-suite cleanup not certified for this source. No required test skipped, no automatic provider/E2E retry, no permission expansion. Source index 580/0 FAIL/13 WARN; ancestry 1,568/0 FAIL/126 WARN.
+
+Low-quota stop: code/tests/source trace and truthful failure evidence committed/pushed, protected file unstaged and unchanged. **Next precise action:** isolate the existing timeout cleanup with a fresh native journal/owned fixture, inspect fixed native stage/error metadata and compare source to last green receipt; determine the actual denied operation before implementing any correction. Do not broadly delete quarantine resources or increase cleanup bounds to hide the issue. Then resume native transport/profile integration behind this dispatch, followed by crash-atomic writes and production E2Es. Windows autonomy remains BLOCKED. All remaining whole-product goals still open; no model calls made.

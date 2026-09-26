@@ -2,6 +2,21 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current continuation — production dispatch partial, native gate FAIL
+
+This section supersedes the older green snapshot below for current delivery. Functional HEAD **`bdfb1b21440df23506fad9f7083a39c849640fe8`**, same branch/private remote. Later commits are evidence-only. Real CI [36267318046](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36267318046): **FAIL**, Ubuntu SUCCESS / Windows FAIL.
+
+- Authoritative Linux: **654 total / 591 PASS / 0 FAIL / 63 native-Windows skips**; syntax, installed-Pi TypeScript, package/pinned-policy/secret validation PASS. Ubuntu focused: **121 / 58 PASS / 0 FAIL / 63 skips** and foundation-only clone cleanup PASS.
+- Current Windows: **121 / 108 PASS / 6 FAIL / 7 Linux-only skips**. All nine new dispatch tests PASS, including actual Windows constructor/removal, real LSP entry and direct verification CLI denial. Native safe coding is **NOT** demonstrated. Windows clone did not run after the failed required suite; no current Windows reconstruction/cleanup certificate.
+- Production workflow/verification/safe_exec/LSP/debug/eval/edit/removal now use actual-platform admission/dispatch. No caller/environment switch, fixed LPAC probe or bare Job can supply production readiness. Linux vectors and shared policy remain intact. [Actual engine path and missing adapters](phi-engine-platform-integration.md).
+- Failure evidence: first failing pre-existing native timeout-tree case reports **70 / ACCESS_DENIED (5) / PHI_RECOVERY_FILES_FAILED** in its final recovery; quarantined state then fails five subsequent ownership/recovery cases. Native C# sources are byte-for-byte unchanged by this continuation. The actual Windows cleanup cause is **NOT YET DETERMINED**; do not assume it is harmless or unrelated to execution timing. Do not count earlier cleanup PASS as proof this failure cannot occur. Required tests retained; no permissions, retry limits or quarantine weakened.
+- Source index audit: **580 blobs / 0 FAIL / 13 WARN**. HEAD-ancestry: **1,568 blobs / 0 FAIL / 126 WARN**. Heuristic warnings/limits below still apply. New Pi/provider calls **0**, protected/auth fingerprints unchanged, only protected pre-existing user edit dirty.
+- Low-quota continuation point: reproduce/isolate timeout cleanup on a fresh native runner, compare unchanged helper source and captured errors, and fix only the actual demonstrated cause. Then continue native transport/profile integration behind the new dispatch. Do not flip Windows readiness or declare this whole checkpoint green.
+
+All six closure goals remain open in whole-product scope. Generic LPAC/LSP transport, crash-atomic native transactions, production coding/denial/failure E2Es, full Doctor, Windows backup/restore/cross-OS migration and complete reconstruction are not implemented/certified. Host Linux Doctor remains the prior WARN foundation check; no full-acceptance result is claimed. [Current receipt](phi-engine-dispatch-evidence.json).
+
+## Historical verified native subsystem snapshot
+
 Verified 2026-09-26. This closes a bounded native recovery/filesystem subsystem, not complete Windows coding or permission to wipe the current machine. Existing Linux Pi/Overdrive remains intact. At the requested low-quota boundary, stop after committing/pushing this verified checkpoint; resume from the next engineering step below, not from the old foundation.
 
 ## Source and exact test evidence
