@@ -47,15 +47,15 @@ fi
 node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if(major<22||(major===22&&minor<19)){console.error(`Node >=22.19 required, found ${process.versions.node}`);process.exit(1)}'
 
 if ! command -v pi >/dev/null 2>&1 && [[ "$install_pi" == true ]]; then
-  npm install --global @earendil-works/pi-coding-agent@0.85.1
+  npm install --global @earendil-works/pi-coding-agent@0.87.1
 fi
 if ! command -v pi >/dev/null 2>&1; then
-  echo "Official Pi 0.85.1 is required. Re-run with --install-pi or install @earendil-works/pi-coding-agent@0.85.1 yourself." >&2
+  echo "Official Pi 0.87.1 is required. Re-run with --install-pi or install @earendil-works/pi-coding-agent@0.87.1 yourself." >&2
   exit 1
 fi
 pi_version=$(pi --version | tr -d '[:space:]')
-if [[ "$pi_version" != 0.85.1 ]]; then
-  echo "Pi version mismatch: expected reviewed 0.85.1, found $pi_version" >&2
+if [[ "$pi_version" != 0.87.1 ]]; then
+  echo "Pi version mismatch: expected reviewed 0.87.1, found $pi_version" >&2
   exit 1
 fi
 printf 'Prerequisites: PASS (Pi %s, Node %s)\n' "$pi_version" "$(node --version)"

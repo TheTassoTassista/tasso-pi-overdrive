@@ -1,8 +1,8 @@
 {
   "version": 1,
   "provider": "openai-codex",
-  "updatedAt": "2026-09-09T18:42:32.799Z",
-  "source": "authenticated-workflow-receipts",
+  "updatedAt": "2026-09-26T00:00:37.000Z",
+  "source": "authenticated-workflow-receipts-and-pi-0.87.1-smoke",
   "entries": {
     "openai-codex/gpt-5.5": {
       "runtimeStatus": "RUNTIME_CALLABLE",
@@ -28,6 +28,14 @@
       "runtimeStatus": "RUNTIME_CALLABLE",
       "reasonCode": "COMPLETED",
       "evidenceRunId": "179bb6f7-414c-4529-baa2-709630b9bac9"
+    },
+    "openai-codex/gpt-6-luna": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "AUTHENTICATED_PI_0_87_1_SMOKE"
+    },
+    "openai-codex/gpt-6-sol": {
+      "runtimeStatus": "RUNTIME_CALLABLE",
+      "reasonCode": "AUTHENTICATED_PI_0_87_1_SMOKE"
     },
     "openai-codex/gpt-5.4": {
       "runtimeStatus": "RUNTIME_REJECTED",

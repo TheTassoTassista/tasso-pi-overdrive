@@ -17,7 +17,7 @@
 - Session-scoped Artifact Store: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/artifacts/` (owner-only, content-addressed, sanitized, default retention seven days).
 - Session-scoped Edit Engine receipts: `${XDG_STATE_HOME:-~/.local/state}/pi-overdrive/edit-receipts/` (owner-only scope directories; immutable mode-0400 metadata receipts; no source path or body).
 - Debug adapter policy: `config/dap-engine.json` (Linux-x64 GNU GDB 17.2, exact path/version/arguments/SHA-256; adapter and debuggee run in one read-only networkless Bubblewrap sandbox).
-- Persistent eval policy: `config/eval-engine.json` (exact Linux-x64 Python 3.14.7 and Node 26.8.1 paths/versions/arguments/SHA-256; private project-free networkless Bubblewrap kernels).
+- Persistent eval policy: `config/eval-engine.json` (exact Linux-x64 Python 3.14.7, Node 26.8.2, and prlimit 2.42.4 paths/versions/arguments/SHA-256; private project-free networkless Bubblewrap kernels). Host package updates change the pinned digests and cause eval to fail closed until re-attested.
 - Subagent mission artifacts: `~/.pi/agent/missions/` (owner-only, secret-pattern redaction, terminal retention 25; audit with `npm run missions:audit`, apply with `node scripts/mission-privacy.mjs --apply`).
 - Second Brain ledger/ACE/vault: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/second-brain/`.
 - Second Brain service runtimes/state: `${XDG_DATA_HOME:-~/.local/share}/pi-overdrive/services/`; user units live under `${XDG_CONFIG_HOME:-~/.config}/systemd/user/`. Their complete Python dependency graphs are tracked in deterministic lock files, and the embedding snapshot is revision- and checksum-pinned. Embeddings/OpenViking/Hindsight bind only `127.0.0.1:1934`, `:1933`, and `:8889`.

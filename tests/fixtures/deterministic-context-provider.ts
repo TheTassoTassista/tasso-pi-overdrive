@@ -7,6 +7,7 @@ import {
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerSystemPrompt, providerTools } from "./provider-context-compat.ts";
 
 const providerId = "pi-overdrive-context-audit";
 const modelId = "context-driver";
@@ -25,18 +26,18 @@ function estimateContentTokens(content: unknown): number {
 }
 
 function estimateContext(context: Context): number {
-	const prefix = estimateTextTokens(context.systemPrompt ?? "") + estimateTextTokens(JSON.stringify(context.tools ?? []));
-	return prefix + context.messages.reduce((total, message: any) => total + estimateContentTokens(message.content), 0);
+	const prefix = estimateTextTokens(providerSystemPrompt(context)) + estimateTextTokens(JSON.stringify(providerTools(context)));
+	return prefix + context.messages.filter((message) => message.role !== "system").reduce((total, message: any) => total + estimateContentTokens(message.content), 0);
 }
 
 function streamContextAudit(model: Model<any>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
 	const stream = createAssistantMessageEventStream();
 	void (async () => {
-		const tools = context.tools ?? [];
+		const tools = providerTools(context);
 		const serializedTools = JSON.stringify(tools);
 		const value = JSON.stringify({
 			estimatedContextTokens: estimateContext(context),
-			systemPromptCharacters: context.systemPrompt?.length ?? 0,
+			systemPromptCharacters: providerSystemPrompt(context).length,
 			messageCount: context.messages.length,
 			toolCount: tools.length,
 			toolNames: tools.map((tool) => tool.name),

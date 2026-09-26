@@ -8,6 +8,7 @@ import {
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerSystemPrompt, providerTools } from "./provider-context-compat.ts";
 
 const providerId = "pi-overdrive-rule-audit";
 
@@ -19,12 +20,12 @@ function appendReceipt(value: object): void {
 function streamRuleAudit(model: Model<any>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
 	const stream = createAssistantMessageEventStream();
 	void (async () => {
-		const prompt = context.systemPrompt ?? "";
+		const prompt = providerSystemPrompt(context);
 		const result = {
 			kind: "model_facing_rule_audit",
 			systemPromptChars: prompt.length,
 			estimatedSystemPromptTokens: Math.ceil(prompt.length / 4),
-			toolNames: (context.tools ?? []).map((tool) => tool.name),
+			toolNames: providerTools(context).map((tool) => tool.name),
 			rootRule: prompt.includes("ROOT_RULE_MARKER"),
 			applicableRule: prompt.includes("APPLICABLE_RULE_MARKER"),
 			unrelatedRule: prompt.includes("UNRELATED_RULE_MARKER"),

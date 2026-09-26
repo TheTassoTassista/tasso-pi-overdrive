@@ -6,7 +6,7 @@ Phase 11 adds clean-room, session-local Python and JavaScript/TypeScript eval ke
 
 The model receives two conditional schemas: `persistent_python` and `persistent_javascript`. Both support `execute`, `reset`, `status`, and `terminate`; JavaScript additionally selects `javascript` or transpile-only `typescript`. There is one sequential kernel per language per Pi session. Code, frame, output, stderr, value, startup, execution, idle, and shutdown limits are fixed by `config/eval-engine.json` and cannot be widened by tool input beyond the configured execution-time ceiling.
 
-The Linux-x64 policy pins `/usr/bin/python3.14` at Python 3.14.7 and `/usr/bin/node` at v26.8.1, including exact arguments and SHA-256 digests. It also pins TypeScript 6.0.3's single compiler file and the exact `/usr/bin/prlimit` helper. First use verifies canonical paths, regular single-link files, safe ownership-relevant modes, complete binary/file digests, and stable runtime identity. The package-owned runner and, for JavaScript, the compiler file are copied into a new owner-only root.
+The Linux-x64 policy pins `/usr/bin/python3.14` at Python 3.14.7 and `/usr/bin/node` at v26.8.2, including exact arguments and SHA-256 digests. It also pins TypeScript 6.0.3's single compiler file and `/usr/bin/prlimit` at util-linux 2.42.4. First use verifies canonical paths, regular single-link files, safe ownership-relevant modes, complete binary/file digests, and stable runtime identity. The package-owned runner and, for JavaScript, the compiler file are copied into a new owner-only root.
 
 ## Isolation and lifecycle
 

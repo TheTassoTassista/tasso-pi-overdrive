@@ -1,5 +1,5 @@
 {
-  "piVersion": "0.85.1",
+  "piVersion": "0.87.1",
   "selected": [
     "npm:@ff-labs/pi-fff@0.10.6",
     "npm:@juvio15/pi-ast-grep@0.4.2",

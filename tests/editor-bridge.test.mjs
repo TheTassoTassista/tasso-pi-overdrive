@@ -105,7 +105,7 @@ function harness(t, behavior = "auto") {
   const bridge = new EditorAcpBridge({
     policy,
     root,
-    identity: { version: "0.85.1", digest: HEX },
+    identity: { version: "0.87.1", digest: HEX },
     journal,
     send: async (value) => { outputs.push(value); },
     piFactory: (options) => { fake = new FakePi(options, behavior); return fake; },
@@ -154,7 +154,7 @@ test("project and Pi binary identities are canonical, owner-safe, executable, an
   assert.equal(root, fs.realpathSync(process.cwd()));
   const pi = findExecutable("pi");
   const identity = attestPiBinary(pi, readEditorBridgePolicy());
-  assert.equal(identity.version, "0.85.1");
+  assert.equal(identity.version, "0.87.1");
   assert.match(identity.digest, /^[0-9a-f]{64}$/u);
   assert.throws(() => attestPiBinary("/bin/false", readEditorBridgePolicy()), /editor_pi_(?:version_mismatch|binary_unsafe)/u);
 });

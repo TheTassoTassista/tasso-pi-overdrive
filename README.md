@@ -1,12 +1,12 @@
 # Tasso Pi Overdrive
 
-A reversible, pinned Pi 0.85.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, one compact lazy MCP proxy, compact search and output, lazy multi-language semantic navigation, AST tools, browser automation, web fetch, verification, observability, a fail-soft Second Brain, and reusable project templates.
+A reversible, pinned Pi 0.87.1 package for high-signal coding work on this Linux machine. It keeps Pi's existing OpenAI Codex authentication intact and adds a mechanically enforced coding workflow, specialized agents, one compact lazy MCP proxy, compact search and output, lazy multi-language semantic navigation, AST tools, browser automation, web fetch, verification, observability, a fail-soft Second Brain, and reusable project templates.
 
 ## What changes
 
 - Default interactive model: `openai-codex/gpt-5.6-terra`, medium thinking.
 - Persistent routing presets: `normal` (default) and `token-saver`; session quality: `auto` (default), `low`, `medium`, `high`, or `max`. `/ai-tree` shows every exact route and fallback without a model call.
-- Normal direct targets remain Luna low for Scout, Sol high for Planner/review, Terra high for Worker, and Astra high for Oracle/Judge. Explicit DeepSeek and Qwen cloud routes through the existing OmniRoute gateway provide conditional model-family diversity once runtime-callable.
+- Normal direct targets use GPT-6 Luna low for Scout, GPT-6 Sol medium for Planner/Worker/correctness, Sol high for security, and GPT-6 Astra high for Oracle/Judge. OmniRoute diversity remains conditional on independently verified callability and zero-extra-cost evidence.
 - Native compaction remains enabled. A session notebook stores only durable task state; `/handoff <next phase>` distills a clean-session prompt at 85% context.
 - Twelve role profiles run with fresh context and enforced tool allowlists: the original eight workflow roles plus three independent council members and a judge. Workflow version 5 uses the minimum justified roles, deterministic verification before AI interpretation, and bounded escalation/correction in one canonical `git-worktree-v2` allocation. Concurrency is capped at three, nesting at one level, and scheduled runs are disabled. Journals survive process death/reboot and resume only from a validated durable checkpoint. Every terminal role attempt has a private immutable receipt that must be durably written and independently revalidated before its state transition is admitted.
 - Successful oversized shell output is compacted deterministically; failures remain intact.
@@ -22,7 +22,7 @@ The setup has already been applied on the audited machine. To reproduce it again
 ./scripts/bootstrap.sh
 ```
 
-The bootstrap refuses Pi versions other than 0.85.1, backs up Pi configuration first, installs exact package versions and lockfile-backed LSP and Second Brain Python runtimes, writes owner-only config files, installs pinned user-local language tools, verifies browser and embedding-model checksums, and downloads an isolated Chromium. It never reads or logs authentication values.
+The bootstrap refuses Pi versions other than 0.87.1, backs up Pi configuration first, installs exact package versions and lockfile-backed LSP and Second Brain Python runtimes, writes owner-only config files, installs pinned user-local language tools, verifies browser and embedding-model checksums, and downloads an isolated Chromium. It never reads or logs authentication values.
 
 Restart Pi after installation. Then check:
 

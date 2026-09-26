@@ -6,6 +6,7 @@ import {
   type Model, type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerTools } from "./provider-context-compat.ts";
 
 const provider = "pi-overdrive-prewalk-local";
 const receiptFile = process.env.PI_OVERDRIVE_PREWALK_RECEIPT;
@@ -29,7 +30,7 @@ function respond(model: Model<any>, context: Context, options?: SimpleStreamOpti
       const readDone = toolResults.some((message: any) => message.toolName === "prewalk_read");
       const searchPath = textOf(toolResults.find((message: any) => message.toolName === "prewalk_search")).trim();
       const target = prompt.includes("- src/parser.ts") ? "src/parser.ts" : searchPath === "src/parser.ts" ? searchPath : null;
-      receipt({ kind: "provider_turn", model: model.id, toolResults: toolResults.length, promptChars: prompt.length, toolCount: context.tools?.length ?? 0 });
+      receipt({ kind: "provider_turn", model: model.id, toolResults: toolResults.length, promptChars: prompt.length, toolCount: providerTools(context).length });
       if (options?.onPayload) await options.onPayload({ model: model.id, messageCount: context.messages.length }, model);
       if (options?.signal?.aborted) throw new Error("prewalk_fixture_aborted");
       stream.push({ type: "start", partial: output });

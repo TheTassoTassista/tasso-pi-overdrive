@@ -12,8 +12,8 @@
     },
     "javascript": {
       "binaryPath": "/usr/bin/node",
-      "binaryVersion": "v26.8.1",
-      "binarySha256": "f595d3d6e782e7524d5cd73214048a7f3dd9b28a6b4c0f486fdd87d94891f239",
+      "binaryVersion": "v26.8.2",
+      "binarySha256": "5a353e52b64c67e8ac76e95e42531855f81177515d3bb608a96e341c90dbcf28",
       "runner": "runtime/eval/javascript-runner.mjs",
       "arguments": ["--no-addons", "--disable-proto=throw", "--max-old-space-size=192"],
       "typescriptCompiler": {
@@ -25,8 +25,8 @@
   },
   "processLimiter": {
     "binaryPath": "/usr/bin/prlimit",
-    "binaryVersion": "prlimit from util-linux 2.42.3",
-    "binarySha256": "2a563aca66c05649e310c9582a79d31195cddc2fa5e441ac758c8357106fc491",
+    "binaryVersion": "prlimit from util-linux 2.42.4",
+    "binarySha256": "84643075132b361f03d41228856d26e354e700eda4afe411428d366e256fa8a6",
     "arguments": ["--nproc=8", "--"]
   },
   "startupTimeoutMs": 5000,

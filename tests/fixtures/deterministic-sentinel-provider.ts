@@ -8,6 +8,7 @@ import {
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerTools } from "./provider-context-compat.ts";
 
 function appendAudit(value: object): void {
   const file = process.env.PI_OVERDRIVE_SENTINEL_AUDIT_FILE;
@@ -34,7 +35,7 @@ function streamSentinel(model: Model<any>, context: Context, options?: SimpleStr
       appendAudit({
         kind: "sentinel_provider_call", provider: model.provider, model: model.id, reasoning: options?.reasoning ?? null,
         maxRetries: options?.maxRetries ?? null, maxTokens: options?.maxTokens ?? null, timeoutMs: options?.timeoutMs ?? null,
-        cacheRetention: options?.cacheRetention ?? null, toolCount: context.tools?.length ?? 0, messageCount: context.messages.length,
+        cacheRetention: options?.cacheRetention ?? null, toolCount: providerTools(context).length, messageCount: context.messages.length,
       });
       stream.push({ type: "start", partial: output });
       const value = JSON.stringify({

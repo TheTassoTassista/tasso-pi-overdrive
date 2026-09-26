@@ -7,6 +7,7 @@ import {
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerTools } from "./provider-context-compat.ts";
 
 function createOutput(model: Model<any>): AssistantMessage {
 	return {
@@ -37,7 +38,7 @@ function streamHandoff(model: Model<any>, context: Context, options?: SimpleStre
 			stream.push({ type: "start", partial: output });
 			const marker = process.env.PI_OVERDRIVE_HANDOFF_MARKER;
 			if (!marker) throw new Error("PI_OVERDRIVE_HANDOFF_MARKER is required");
-			const hasNotebookTool = context.tools?.some((tool) => tool.name === "task_notebook") ?? false;
+			const hasNotebookTool = providerTools(context).some((tool) => tool.name === "task_notebook");
 			const hasToolResult = context.messages.some((message) => message.role === "toolResult");
 			if (hasNotebookTool && !hasToolResult) {
 				const contentIndex = output.content.length;

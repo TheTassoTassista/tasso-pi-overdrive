@@ -8,6 +8,7 @@ import {
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerSystemPrompt, providerTools } from "./provider-context-compat.ts";
 
 function appendAudit(value: object): void {
   const file = process.env.PI_OVERDRIVE_DIRECTOR_AUDIT_FILE;
@@ -47,14 +48,14 @@ function streamDirector(model: Model<any>, context: Context, options?: SimpleStr
       if (options?.signal?.aborted) throw options.signal.reason ?? new Error("director_fixture_aborted");
       stream.push({ type: "start", partial: output });
       const toolResults = context.messages.filter((message) => message.role === "toolResult");
-      const tools = (context.tools ?? []).map((tool) => tool.name).sort();
+      const tools = providerTools(context).map((tool) => tool.name).sort();
       appendAudit({
         kind: "provider_turn",
         provider: model.provider,
         model: model.id,
         toolResultCount: toolResults.length,
         tools,
-        directorPrompt: context.systemPrompt.includes("<pi-overdrive-director>"),
+        directorPrompt: providerSystemPrompt(context).includes("<pi-overdrive-director>"),
       });
       if (toolResults.length === 0) {
         emitToolCall(stream, output, "write", { path: process.env.PI_OVERDRIVE_DIRECTOR_SENTINEL ?? "director-must-not-write.txt", content: "DIRECT_MUTATION_OCCURRED\n" });

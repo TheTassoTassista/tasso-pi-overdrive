@@ -8,6 +8,7 @@ import {
 	type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { providerSystemPrompt, providerTools } from "./provider-context-compat.ts";
 
 const providerId = "pi-overdrive-context-fit-audit";
 
@@ -41,7 +42,7 @@ function streamContextFit(model: Model<any>, context: Context, options?: SimpleS
 			stopReason: "pending", timestamp: Date.now(),
 		};
 		try {
-			const payload = { provider: model.provider, model: model.id, messageCount: context.messages.length, toolCount: context.tools?.length ?? 0 };
+			const payload = { provider: model.provider, model: model.id, messageCount: context.messages.length, toolCount: providerTools(context).length };
 			if (options?.onPayload) await options.onPayload(payload, model);
 			if (options?.signal?.aborted) throw options.signal.reason ?? new Error("context_fit_aborted");
 			stream.push({ type: "start", partial: output });
@@ -62,7 +63,7 @@ function streamContextFit(model: Model<any>, context: Context, options?: SimpleS
 			finishText(stream, output, JSON.stringify({
 				messageCount: context.messages.length,
 				toolResults: texts.length,
-				contextCharacters: context.systemPrompt.length + context.messages.reduce((total, message) => total + textOf(message).length, 0),
+				contextCharacters: providerSystemPrompt(context).length + context.messages.filter((message) => message.role !== "system").reduce((total, message) => total + textOf(message).length, 0),
 				artifactReferences: serialized.match(/artifact:\/\/[0-9a-f]{64}/gu)?.length ?? 0,
 				redundantMarkers: serialized.match(/REDUNDANT ARTIFACT PREVIEW OMITTED/gu)?.length ?? 0,
 				criticalDiagnostics: serialized.match(/ERROR artifact benchmark critical diagnostic/gu)?.length ?? 0,
