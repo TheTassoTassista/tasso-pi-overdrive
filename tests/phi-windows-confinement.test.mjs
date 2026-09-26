@@ -189,3 +189,24 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
     assert.equal(recover().quarantined, 0);
   });
 }
+test('anchored mutation writes through the verified exclusive handle, not a reopened pathname', () => {
+  const source = fs.readFileSync(new URL('../platform/windows/native/AnchoredFile.cs', import.meta.url), 'utf8').split('internal static int SelfTest')[0];
+  assert.match(source, /info\.Links != 1/u);
+  assert.match(source, /Identity != expectedIdentity \|\| Digest != expectedDigest/u);
+  assert.match(source, /WriteFile\(handle, value/u);
+  assert.match(source, /FlushFileBuffers\(handle\)/u);
+  assert.match(source, /rootPins = new RecoveryFilesystem\(root\)/u);
+  assert.match(source, /parentPins = new RecoveryFilesystem/u);
+  assert.doesNotMatch(source, /File\.WriteAll|File\.Open|File\.Move|File\.Delete/u);
+  const filesystem = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
+  assert.match(filesystem, /CreateFileW\(file, 0xc0000000U, 0, IntPtr.Zero, 3, 0x200000/u);
+  assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
+});
+for (const name of ['write', 'replace-before-open', 'rename-while-open', 'delete-while-open', 'directory-swap', 'hardlink', 'junction', 'case-alias', 'ads', 'protected', 'changed-content']) {
+  test(`native anchored mutation ${name}: actual handle identity and swap protection`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const result = spawnSync(ownedWindowsHelper(), ['--anchored-file-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
+    assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
+    assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, scope: 'HANDLE_MUTATION_PRIMITIVE_NOT_TRANSACTIONAL_ENGINE' });
+    assert.equal(recover().quarantined, 0);
+  });
+}

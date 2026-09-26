@@ -104,6 +104,7 @@ namespace Phi.Native {
       if (args.Length == 1 && args[0] == "--recover-scopes") return ScopeRecovery.Recover(true, null);
       if (args.Length == 2 && args[0] == "--recover-scope") return ScopeRecovery.Recover(true, args[1]);
       if (args.Length == 2 && args[0] == "--recovery-selftest") return ScopeRecovery.SelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
       // API capability checks below fail closed on pre-Windows-10 systems.
       // Unmanifested .NET Framework OSVersion can report a legacy version.

@@ -7,8 +7,8 @@ using System.Runtime.InteropServices;
 
 namespace Phi.Native {
   internal sealed class RecoveryFilesystem : IDisposable {
-    [StructLayout(LayoutKind.Sequential)] struct Time { public uint Low, High; }
-    [StructLayout(LayoutKind.Sequential)] struct Info {
+    [StructLayout(LayoutKind.Sequential)] internal struct Time { public uint Low, High; }
+    [StructLayout(LayoutKind.Sequential)] internal struct Info {
       public uint Attributes; public Time Created, Accessed, Written;
       public uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
     }
@@ -20,6 +20,11 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetFileInformationByHandle(IntPtr file, int type, ref Disposition info, uint size);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
+    internal static void LogFailure(Exception error) {
+      Win32Exception native = error as Win32Exception;
+      string code = native == null ? "OBJECT_REJECTED" : native.NativeErrorCode == 32 || native.NativeErrorCode == 33 ? "SHARING_VIOLATION" : native.NativeErrorCode == 5 ? "ACCESS_DENIED" : native.NativeErrorCode == 145 ? "DIRECTORY_NOT_EMPTY" : "NATIVE_OTHER";
+      Console.Error.WriteLine("PHI_FILESYSTEM_" + code);
+    }
     internal RecoveryFilesystem(string directory) {
       string full = Path.GetFullPath(directory), drive = Path.GetPathRoot(full);
       if (drive.Length != 3 || drive[1] != ':' || full.StartsWith("\\\\")) throw new InvalidDataException();
@@ -45,7 +50,7 @@ namespace Phi.Native {
       if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0) { CloseHandle(handle); throw new InvalidDataException(); }
       parents.Add(handle);
     }
-    static string HandleIdentity(IntPtr handle) {
+    internal static string HandleIdentity(IntPtr handle) {
       Identity identity;
       if (!GetFileInformationByHandleEx(handle, 18, out identity, (uint)Marshal.SizeOf(typeof(Identity)))) throw new Win32Exception(Marshal.GetLastWin32Error());
       return identity.Volume.ToString("x16") + ":" + identity.Low.ToString("x16") + identity.High.ToString("x16");
@@ -56,6 +61,12 @@ namespace Phi.Native {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0) throw new InvalidDataException();
         return HandleIdentity(handle);
       } finally { CloseHandle(handle); }
+    }
+    internal static IntPtr OpenExclusiveFile(string file, out Info info) {
+      IntPtr handle = CreateFileW(file, 0xc0000000U, 0, IntPtr.Zero, 3, 0x200000, IntPtr.Zero);
+      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if (!GetFileInformationByHandle(handle, out info)) { int error = Marshal.GetLastWin32Error(); CloseHandle(handle); throw new Win32Exception(error); }
+      return handle;
     }
     internal void DeleteOwnedTree(string root, string expected) {
       Info info; IntPtr handle;

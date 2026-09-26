@@ -177,7 +177,7 @@ namespace Phi.Native {
                     if (identity == "") { if (Directory.Exists(directory) || (!(bool)value["profile"] && !(bool)value["registry"] && !(bool)value["ready"])) throw new InvalidDataException(); }
                     else pins.DeleteOwnedTree(directory, identity);
                   }
-                } catch { failed = true; Console.Error.WriteLine("PHI_RECOVERY_FILES_FAILED"); }
+                } catch (Exception error) { failed = true; RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_RECOVERY_FILES_FAILED"); }
                 phase = "REGISTRY";
                 try {
                   if ((bool)value["registry"]) {

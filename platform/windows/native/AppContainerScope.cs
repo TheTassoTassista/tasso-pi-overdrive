@@ -360,7 +360,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         try {
           if (failure == "cleanup-exception") throw new InvalidOperationException("PHI_RECOVERY_INJECTED_CLEANUP_EXCEPTION");
           if (root != null) scope.recovery.CleanupFiles();
-        } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
+        } catch (Exception error) { filesClean = false; RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
         try { if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); } catch { registryClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_REGISTRY_CLEANUP_FAILED"); }
         cleaned = profileClean && filesClean && registryClean;
         if (!cleaned) { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }

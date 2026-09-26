@@ -18,7 +18,8 @@ export function buildWindowsProcess() {
   const confinementSource = path.join(root, 'platform', 'windows', 'native', 'AppContainerScope.cs');
   const recoverySource = path.join(root, 'platform', 'windows', 'native', 'ScopeRecovery.cs');
   const recoveryFilesystemSource = path.join(root, 'platform', 'windows', 'native', 'RecoveryFilesystem.cs');
-  for (const file of [recoverySource, recoveryFilesystemSource]) {
+  const anchoredFileSource = path.join(root, 'platform', 'windows', 'native', 'AnchoredFile.cs');
+  for (const file of [recoverySource, recoveryFilesystemSource, anchoredFileSource]) {
     const stat = fs.lstatSync(file, { throwIfNoEntry: false });
     if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) fail('UNSAFE_PATH');
   }
@@ -41,13 +42,13 @@ export function buildWindowsProcess() {
     if (!fs.existsSync(manifest)) fail('STATE_INVALID');
     let record;
     try { record = JSON.parse(fs.readFileSync(manifest, 'utf8').replace(/^\uFEFF/u, '')); } catch { fail('STATE_INVALID'); }
-    if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== hash(source) || record.confinementSourceSha256 !== hash(confinementSource) || record.recoverySourceSha256 !== hash(recoverySource) || record.recoveryFilesystemSourceSha256 !== hash(recoveryFilesystemSource) || record.binarySha256 !== hash(binary)) fail('IDENTITY_MISMATCH');
+    if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== hash(source) || record.confinementSourceSha256 !== hash(confinementSource) || record.recoverySourceSha256 !== hash(recoverySource) || record.recoveryFilesystemSourceSha256 !== hash(recoveryFilesystemSource) || record.anchoredFileSourceSha256 !== hash(anchoredFileSource) || record.binarySha256 !== hash(binary)) fail('IDENTITY_MISMATCH');
     return { status: 'ALREADY_BUILT', abi: 1, scope: 'TRUSTED_PROCESS_OWNERSHIP_NOT_SANDBOX' };
   }
   if (fs.existsSync(manifest)) fail('STATE_INVALID');
   // Fixed system compiler and explicit references: no PowerShell runtime,
   // command string, ambient response file, downloaded SDK or host policy change.
-  const args = ['/nologo', '/noconfig', '/nostdlib+', '/target:exe', '/platform:x64', '/optimize+', ...references.map((file) => `/reference:${file}`), `/out:${binary}`, source, confinementSource, recoverySource, recoveryFilesystemSource];
+  const args = ['/nologo', '/noconfig', '/nostdlib+', '/target:exe', '/platform:x64', '/optimize+', ...references.map((file) => `/reference:${file}`), `/out:${binary}`, source, confinementSource, recoverySource, recoveryFilesystemSource, anchoredFileSource];
   const compile = spawnSync(compiler, args, { cwd: root, shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000, maxBuffer: 65536 });
   if (compile.status !== 0) {
     const codes = [...new Set(`${compile.stdout}\n${compile.stderr}`.match(/\bCS\d{4}\b/gu) ?? [])].slice(0, 8);
@@ -56,7 +57,7 @@ export function buildWindowsProcess() {
   }
   const version = spawnSync(binary, ['--version'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 5000, maxBuffer: 4096 });
   if (version.status !== 0 || !version.stdout.startsWith('Phi owned-process ABI 1;')) fail('ABI_FAILED');
-  const record = { schemaVersion: 1, abi: 1, sourceSha256: hash(source), confinementSourceSha256: hash(confinementSource), recoverySourceSha256: hash(recoverySource), recoveryFilesystemSourceSha256: hash(recoveryFilesystemSource), binarySha256: hash(binary) };
+  const record = { schemaVersion: 1, abi: 1, sourceSha256: hash(source), confinementSourceSha256: hash(confinementSource), recoverySourceSha256: hash(recoverySource), recoveryFilesystemSourceSha256: hash(recoveryFilesystemSource), anchoredFileSourceSha256: hash(anchoredFileSource), binarySha256: hash(binary) };
   fs.writeFileSync(manifest, `${JSON.stringify(record)}\n`, { flag: 'wx' });
   return { status: 'BUILT', abi: 1, scope: 'TRUSTED_PROCESS_OWNERSHIP_NOT_SANDBOX' };
 }
