@@ -218,10 +218,42 @@ namespace Phi.Native {
       if (emit) Console.WriteLine(new JavaScriptSerializer().Serialize(new { scope = "FIXED_NATIVE_SCOPES_ONLY", scanned, active, recovered, quarantined, processKills = 0, status = quarantined == 0 ? "PASS" : "FAIL" }));
       return quarantined == 0 ? 0 : 70;
     }
+    internal static int Status(bool emit) {
+      int scanned = 0, active = 0, stale = 0, quarantined = 0;
+      DateTime deadline = DateTime.UtcNow.AddSeconds(10);
+      // Read-only acceptance probe: do not create directories/registry bases,
+      // delete receipts/resources, flush writes or kill any process.
+      try {
+        using (RegistryKey root = Registry.CurrentUser.OpenSubKey(RegistryBase)) {
+          if (root != null) {
+            ValidateRegistry(root); string[] ids = root.GetSubKeyNames();
+            if (ids.Length > MaxScopes) throw new InvalidDataException();
+            foreach (string id in ids) {
+              if (DateTime.UtcNow >= deadline) throw new InvalidDataException();
+              scanned++;
+              if (!IdPattern.IsMatch(id)) { quarantined++; continue; }
+              using (Mutex mutex = ScopeMutex(id)) {
+                if (!Acquire(mutex)) { active++; continue; }
+                try {
+                  using (RegistryKey key = root.OpenSubKey(id)) {
+                    Dictionary<string, object> value = Read(key, id);
+                    bool live; string created = ProcessCreation((int)value["pid"], out live);
+                    if (live && created == (string)value["created"]) active++; else stale++;
+                  }
+                } catch { quarantined++; }
+                finally { mutex.ReleaseMutex(); }
+              }
+            }
+          }
+        }
+      } catch { quarantined++; }
+      if (emit) Console.WriteLine(new JavaScriptSerializer().Serialize(new { scope = "FIXED_NATIVE_SCOPES_ONLY", scanned, active, stale, quarantined, processKills = 0, cleanupPerformed = false, status = stale == 0 && quarantined == 0 ? "PASS" : "FAIL" }));
+      return stale == 0 && quarantined == 0 ? 0 : 70;
+    }
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -253,9 +285,9 @@ namespace Phi.Native {
           // killed. The record deliberately refers to a different generation.
           scope.record["created"] = "0000000000000001"; scope.Save();
           saved = new Dictionary<string, object>(scope.record);
-          if (name == "corrupt" || name == "unknown-field" || name == "oversized") {
+          if (name == "corrupt" || name == "status-corrupt" || name == "unknown-field" || name == "oversized") {
             using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id, true)) {
-              string text = name == "corrupt" ? "invalid-receipt" : name == "oversized" ? new string('x', 5000) : new JavaScriptSerializer().Serialize(new Dictionary<string, object>(saved) { { "unrecognized", "synthetic-not-echoed" } });
+              string text = name == "corrupt" || name == "status-corrupt" ? "invalid-receipt" : name == "oversized" ? new string('x', 5000) : new JavaScriptSerializer().Serialize(new Dictionary<string, object>(saved) { { "unrecognized", "synthetic-not-echoed" } });
               key.SetValue("Receipt", text, RegistryValueKind.String); if (RegFlushKey(key.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException();
             }
           }
@@ -275,6 +307,10 @@ namespace Phi.Native {
             }
           }
           scope.Dispose();
+          if (name == "status-stale" || name == "status-corrupt") {
+            if (Status(false) != 70 || File.ReadAllText(Path.Combine(scope.Root, "sentinel.txt")) != "synthetic-scope-owned") throw new InvalidDataException();
+            using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id, true)) { if (key == null) throw new InvalidDataException(); Write(key, saved); }
+          }
           int result = Recover(false, scope.Id);
           if (name == "corrupt" || name == "unknown-field" || name == "oversized" || name == "root-swap" || name == "root-swap-security") {
             if (result != 70 || !Directory.Exists(scope.Root)) throw new InvalidDataException();

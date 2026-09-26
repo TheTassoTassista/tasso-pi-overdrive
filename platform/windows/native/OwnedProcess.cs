@@ -102,6 +102,7 @@ namespace Phi.Native {
       if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("Phi owned-process ABI 1; Windows Job Object; NOT a sandbox"); return 0; }
       if (args.Length == 4 && args[0] == "--confinement-probe") return AppContainerScope.Probe(args[1], args[2], args[3]);
       if (args.Length == 1 && args[0] == "--recover-scopes") return ScopeRecovery.Recover(true, null);
+      if (args.Length == 1 && args[0] == "--scope-recovery-status") return ScopeRecovery.Status(true);
       if (args.Length == 2 && args[0] == "--recover-scope") return ScopeRecovery.Recover(true, args[1]);
       if (args.Length == 2 && args[0] == "--recovery-selftest") return ScopeRecovery.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);

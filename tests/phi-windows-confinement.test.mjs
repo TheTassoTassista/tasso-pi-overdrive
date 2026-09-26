@@ -185,15 +185,18 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
     } finally { await new Promise((resolve) => server.close(resolve)); }
   });
 }
-for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'role'], ['tester', 'role'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'guardian'], ['worker', 'role'], ['tester', 'role'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
   const server = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   let child, scopeId;
   try {
     const helper = ownedWindowsHelper();
     const args = ['--confinement-failure-probe', process.execPath, role, String(server.address().port), failure === 'timeout' ? 'timeout-tree' : 'hold-tree'];
-    if (failure === 'parent') {
-      const wrapper = `const{spawn}=require('node:child_process');const h=spawn(${JSON.stringify(helper)},${JSON.stringify(args)},{shell:false,stdio:'inherit',env:{...process.env,PHI_PROBE_GUARDIAN:String(process.pid)}});console.log(JSON.stringify({supervisorPid:h.pid}));setInterval(()=>{},1000);`;
+    if (failure === 'parent' || failure === 'guardian') {
+      // Ordinary libuv children die with their parent's Job. Separately prove
+      // the native guardian wait by detaching ONLY this trusted supervisor;
+      // its untrusted LPAC descendants still use our non-breakaway kill Job.
+      const wrapper = `const{spawn}=require('node:child_process');const h=spawn(${JSON.stringify(helper)},${JSON.stringify(args)},{shell:false,detached:${failure === 'guardian'},stdio:'inherit',env:{...process.env,PHI_PROBE_GUARDIAN:String(process.pid)}});console.log(JSON.stringify({supervisorPid:h.pid}));setInterval(()=>{},1000);`;
       child = spawn(process.execPath, ['-e', wrapper], { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } else child = spawn(helper, args, { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
     const closed = new Promise((resolve, reject) => { child.once('close', resolve); child.once('error', reject); });
@@ -222,18 +225,25 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     else if (failure !== 'timeout') await terminateProbe(child);
     const code = await closed;
     for (const pid of pids) await gone(pid);
-    if (failure === 'parent') { assert.ok(Number.isInteger(row.supervisorPid)); await gone(row.supervisorPid); }
+    if (failure === 'parent' || failure === 'guardian') { assert.ok(Number.isInteger(row.supervisorPid)); await gone(row.supervisorPid); }
     if (failure === 'timeout' || failure === 'role') {
       assert.notEqual(code, 0, 'forced failure must not be reported successful');
       if (failure === 'timeout') assert.equal(code, 124);
       const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
       assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS');
     }
-    assert.equal(recover(scopeId).recovered, failure === 'supervisor' ? 1 : 0);
+    if (failure === 'guardian') {
+      const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
+      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS');
+    }
+    // Killing an ordinary Node parent also forcibly kills its non-detached
+    // supervisor. The flushed receipt is required, not a cleanup defect:
+    // startup recovery must reclaim its positively owned security resources.
+    assert.equal(recover(scopeId).recovered, failure === 'supervisor' || failure === 'parent' ? 1 : 0);
     assert.equal(recover(scopeId).recovered, 0);
   } finally { await terminateProbe(child); if (scopeId) recover(scopeId); await new Promise((resolve) => server.close(resolve)); }
 });
-for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security']) {
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
@@ -241,6 +251,11 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
     assert.equal(recover().quarantined, 0);
   });
 }
+test('native recovery status is read-only and reports actual clean journal metadata', { skip: process.platform !== 'win32', timeout: 20000 }, () => {
+  const result = spawnSync(ownedWindowsHelper(), ['--scope-recovery-status'], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
+  assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
+  assert.deepEqual(JSON.parse(result.stdout), { scope: 'FIXED_NATIVE_SCOPES_ONLY', scanned: 0, active: 0, stale: 0, quarantined: 0, processKills: 0, cleanupPerformed: false, status: 'PASS' });
+});
 test('anchored mutation writes through the verified exclusive handle, not a reopened pathname', () => {
   const source = fs.readFileSync(new URL('../platform/windows/native/AnchoredFile.cs', import.meta.url), 'utf8').split('internal static int SelfTest')[0];
   assert.match(source, /info\.Links != 1/u);
