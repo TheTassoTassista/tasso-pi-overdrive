@@ -253,7 +253,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -268,6 +268,13 @@ namespace Phi.Native {
           Directory.CreateDirectory(scope.Root);
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
           scope.RootCreated(); scope.Ready();
+          if (name == "nested-entries") {
+            string nested = scope.Root;
+            for (int level = 0; level < 4; level++) {
+              nested = Path.Combine(nested, "level-" + level); Directory.CreateDirectory(nested);
+              for (int file = 0; file < 128; file++) File.WriteAllText(Path.Combine(nested, "entry-" + file + "-é.txt"), "synthetic-bounded-enumeration");
+            }
+          }
           if (name == "root-swap-security" || name == "partially-missing-security") {
             IntPtr profileSid;
             int created = CreateAppContainerProfile(scope.Profile, "Phi recovery fixture", "Synthetic recovery fixture only", IntPtr.Zero, 0, out profileSid);

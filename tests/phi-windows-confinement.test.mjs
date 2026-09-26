@@ -95,7 +95,9 @@ test('scope recovery uses bounded durable receipts, generation checks and opened
   assert.match(filesystem, /HandleIdentity\(handle\) != expected/u);
   assert.match(filesystem, /SetFileInformationByHandle\(handle, 4/u);
   assert.match(filesystem, /depth > 16/u);
-  assert.doesNotMatch(filesystem, /Directory\.Delete|File\.Delete/u);
+  assert.doesNotMatch(filesystem, /Directory\.Delete|File\.Delete|Directory\.EnumerateFileSystemEntries/u);
+  assert.match(filesystem, /QueryDirectory\(directory, restart \? 15 : 14/u);
+  assert.match(filesystem, /OpenRelative\(directory, name,/u);
   assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
 });
 
@@ -228,13 +230,13 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     if (failure === 'parent' || failure === 'guardian') { assert.ok(Number.isInteger(row.supervisorPid)); await gone(row.supervisorPid); }
     if (failure === 'timeout' || failure === 'role') {
       assert.notEqual(code, 0, 'forced failure must not be reported successful');
-      if (failure === 'timeout') assert.equal(code, 124);
+      if (failure === 'timeout') assert.equal(code, 124, probeMetadata(stdout, stderr, code));
       const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
-      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS');
+      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS', probeMetadata(stdout, stderr, code));
     }
     if (failure === 'guardian') {
       const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
-      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS');
+      assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS', probeMetadata(stdout, stderr, code));
     }
     // Killing an ordinary Node parent also forcibly kills its non-detached
     // supervisor. The flushed receipt is required, not a cleanup defect:
@@ -243,7 +245,7 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     assert.equal(recover(scopeId).recovered, 0);
   } finally { await terminateProbe(child); if (scopeId) recover(scopeId); await new Promise((resolve) => server.close(resolve)); }
 });
-for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt']) {
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
@@ -268,7 +270,8 @@ test('anchored mutation writes through the verified exclusive handle, not a reop
   const filesystem = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
   assert.match(filesystem, /OpenRelative\(parents\[parents.Count - 1\], leaf, 0x12019f, 0/u);
   assert.match(filesystem, /attributes.Root = parent/u);
-  assert.match(filesystem, /attributes.Attributes = 0x1040/u);
+  assert.match(filesystem, /attributes.Attributes = unlinkReparse \? 0x40U : 0x1040U/u);
+  assert.match(filesystem, /bool unlinkReparse = false/u);
   assert.match(filesystem, /PinRelativeParent\(part\)/u);
   assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
 });

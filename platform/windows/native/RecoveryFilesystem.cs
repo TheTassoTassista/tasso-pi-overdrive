@@ -23,9 +23,11 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr file, out Info info);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandleEx(IntPtr file, int type, out Identity info, uint size);
+    [DllImport("kernel32.dll", EntryPoint="GetFileInformationByHandleEx", SetLastError=true)] static extern bool QueryDirectory(IntPtr file, int type, IntPtr buffer, uint size);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetFileInformationByHandle(IntPtr file, int type, ref Disposition info, uint size);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
+    readonly string directoryPath;
     internal static void LogFailure(Exception error) {
       Win32Exception native = error as Win32Exception;
       string code = native == null ? "OBJECT_REJECTED" : native.NativeErrorCode == 32 || native.NativeErrorCode == 33 ? "SHARING_VIOLATION" : native.NativeErrorCode == 5 ? "ACCESS_DENIED" : native.NativeErrorCode == 145 ? "DIRECTORY_NOT_EMPTY" : "NATIVE_OTHER";
@@ -33,6 +35,7 @@ namespace Phi.Native {
     }
     internal RecoveryFilesystem(string directory) {
       string full = Path.GetFullPath(directory), drive = Path.GetPathRoot(full);
+      directoryPath = full;
       if (drive.Length != 3 || drive[1] != ':' || full.StartsWith("\\\\")) throw new InvalidDataException();
       try {
         string current = drive;
@@ -59,7 +62,7 @@ namespace Phi.Native {
     static void Leaf(string name) {
       if (String.IsNullOrEmpty(name) || name.Length > 1024 || name == "." || name == ".." || name.IndexOfAny(new char[] { '\\', '/', ':', '\0' }) >= 0) throw new InvalidDataException();
     }
-    static IntPtr OpenRelative(IntPtr parent, string name, uint access, uint share, uint disposition, uint options, IntPtr descriptor, out Info info) {
+    static IntPtr OpenRelative(IntPtr parent, string name, uint access, uint share, uint disposition, uint options, IntPtr descriptor, out Info info, bool unlinkReparse = false) {
       Leaf(name); Info parentInfo;
       if (!GetFileInformationByHandle(parent, out parentInfo)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if ((parentInfo.Attributes & 0x400) != 0 || (parentInfo.Attributes & 0x10) == 0) throw new InvalidDataException();
@@ -67,12 +70,14 @@ namespace Phi.Native {
       try {
         UnicodeString value = new UnicodeString(); value.Length = checked((ushort)(name.Length * 2)); value.MaximumLength = checked((ushort)(value.Length + 2)); value.Buffer = text;
         unicode = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UnicodeString))); Marshal.StructureToPtr(value, unicode, false);
-        ObjectAttributes attributes = new ObjectAttributes(); attributes.Length = (uint)Marshal.SizeOf(typeof(ObjectAttributes)); attributes.Root = parent; attributes.Name = unicode; attributes.Attributes = 0x1040; attributes.Descriptor = descriptor;
+        ObjectAttributes attributes = new ObjectAttributes(); attributes.Length = (uint)Marshal.SizeOf(typeof(ObjectAttributes)); attributes.Root = parent; attributes.Name = unicode; attributes.Attributes = unlinkReparse ? 0x40U : 0x1040U; attributes.Descriptor = descriptor;
         IoStatus status;
         int result = NtCreateFile(out handle, access | 0x100000, ref attributes, out status, IntPtr.Zero, 0, share, disposition, options | 0x200020, IntPtr.Zero, 0);
         if (result != 0) throw new Win32Exception((int)RtlNtStatusToDosError(result));
         if (!GetFileInformationByHandle(handle, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        if ((info.Attributes & 0x400) != 0) throw new InvalidDataException();
+        // Only owned-tree unlinking may open a final reparse point itself.
+        // FILE_OPEN_REPARSE_POINT always applies; never follow its target.
+        if (!unlinkReparse && (info.Attributes & 0x400) != 0) throw new InvalidDataException();
         return handle;
       } catch { if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); throw; }
       finally { if (unicode != IntPtr.Zero) Marshal.FreeHGlobal(unicode); Marshal.FreeHGlobal(text); }
@@ -132,28 +137,60 @@ namespace Phi.Native {
       finally { Marshal.FreeHGlobal(descriptor); }
     }
     internal void DeleteOwnedTree(string root, string expected) {
+      string full = Path.GetFullPath(root);
+      if (!String.Equals(Path.GetDirectoryName(full), directoryPath, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException();
       Info info; IntPtr handle;
-      try { handle = Open(root, true, out info); }
+      try { handle = OpenRelative(parents[parents.Count - 1], Path.GetFileName(full), 0x10081, 1, 1, 1, IntPtr.Zero, out info); }
       catch (Win32Exception ex) { if (ex.NativeErrorCode == 2 || ex.NativeErrorCode == 3) return; throw; }
       try {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || HandleIdentity(handle) != expected) throw new InvalidDataException();
         int remaining = 2048; DateTime deadline = DateTime.UtcNow.AddSeconds(5);
-        DeleteContents(root, 0, ref remaining, deadline);
+        DeleteContents(handle, 0, ref remaining, deadline);
         DeleteHandle(handle);
       } finally { CloseHandle(handle); }
     }
-    static void DeleteContents(string directory, int depth, ref int remaining, DateTime deadline) {
+    static void DeleteContents(IntPtr directory, int depth, ref int remaining, DateTime deadline) {
       if (depth > 16) throw new InvalidDataException();
-      foreach (string entry in Directory.EnumerateFileSystemEntries(directory)) {
-        if (--remaining < 0 || DateTime.UtcNow >= deadline) throw new InvalidDataException();
-        Info info; IntPtr handle = Open(entry, true, out info);
-        try {
-          // All intermediate parents remain pinned. Never recurse through a
-          // reparse point; disposing the opened entry unlinks only that alias.
-          if ((info.Attributes & 0x10) != 0 && (info.Attributes & 0x400) == 0) DeleteContents(entry, depth + 1, ref remaining, deadline);
-          DeleteHandle(handle);
-        } finally { CloseHandle(handle); }
-      }
+      // FILE_FULL_DIR_INFO: name length at byte 60, UTF-16 name at byte 68.
+      // Enumerate the actual pinned object, not a substituted DOS pathname.
+      const int BufferSize = 32768;
+      IntPtr buffer = Marshal.AllocHGlobal(BufferSize);
+      try {
+        bool restart = true;
+        while (true) {
+          if (DateTime.UtcNow >= deadline) throw new InvalidDataException();
+          Marshal.Copy(new byte[BufferSize], 0, buffer, BufferSize);
+          if (!QueryDirectory(directory, restart ? 15 : 14, buffer, BufferSize)) {
+            int error = Marshal.GetLastWin32Error();
+            if (error == 18) break; // ERROR_NO_MORE_FILES only; no fallback.
+            throw new Win32Exception(error);
+          }
+          restart = false;
+          int offset = 0;
+          while (true) {
+            if (offset > BufferSize - 68 || DateTime.UtcNow >= deadline) throw new InvalidDataException();
+            IntPtr entry = IntPtr.Add(buffer, offset);
+            uint next = unchecked((uint)Marshal.ReadInt32(entry, 0));
+            uint bytes = unchecked((uint)Marshal.ReadInt32(entry, 60));
+            if (bytes < 2 || (bytes & 1) != 0 || bytes > 2048 || bytes > BufferSize - offset - 68 || (next != 0 && (next < 68 + bytes || (next & 7) != 0 || next > BufferSize - offset - 68))) throw new InvalidDataException();
+            string name = Marshal.PtrToStringUni(IntPtr.Add(entry, 68), (int)bytes / 2);
+            if (name != "." && name != "..") {
+              Leaf(name);
+              if (--remaining < 0) throw new InvalidDataException();
+              Info info;
+              // Open just this enumerated leaf relative to the held parent.
+              // No mutation of content/ACLs/attributes, even for hard links.
+              IntPtr handle = OpenRelative(directory, name, 0x10081, 1, 1, 0, IntPtr.Zero, out info, true);
+              try {
+                if ((info.Attributes & 0x10) != 0 && (info.Attributes & 0x400) == 0) DeleteContents(handle, depth + 1, ref remaining, deadline);
+                DeleteHandle(handle);
+              } finally { CloseHandle(handle); }
+            }
+            if (next == 0) break;
+            offset += (int)next;
+          }
+        }
+      } finally { Marshal.FreeHGlobal(buffer); }
     }
     static void DeleteHandle(IntPtr handle) {
       Disposition value = new Disposition(); value.Delete = 1;
