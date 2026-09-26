@@ -1,21 +1,27 @@
 {
   "schemaVersion": 1,
   "scope": "FIXED_NATIVE_SCOPE_RECOVERY_NOT_FULL_CODING_CRASH_CERTIFICATION",
-  "functionalHead": "ef648dab3d5bda2a840ed72ba62229a6a7113b6c",
+  "functionalHead": "c5995c68e6d9bb4ef3e55a82eef8345915ccf2aa",
   "branch": "feature/routing-presets-quality",
-  "runId": 36259826266,
-  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36259826266",
+  "runId": 36265238676,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36265238676",
   "conclusion": "success",
   "newPiModelCalls": 0,
   "privateAuthCopied": false,
   "wsl": false,
+  "implementation": ["platform/windows/native/OwnedProcess.cs", "platform/windows/native/AppContainerScope.cs", "platform/windows/native/ScopeRecovery.cs", "platform/windows/native/RecoveryFilesystem.cs", "platform/windows/process.mjs", "lib/phi-doctor.mjs"],
+  "tests": ["tests/phi-windows-confinement.test.mjs", "tests/phi-windows-process.test.mjs", "scripts/phi-clean-room.mjs"],
   "runners": [
-    { "os": "windows-latest", "tests": 74, "passed": 67, "failed": 0, "skipped": 7, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 74, "passed": 67, "failed": 0, "skipped": 7 }, "cleanup": "PASS" },
-    { "os": "ubuntu-latest", "tests": 74, "passed": 48, "failed": 0, "skipped": 26, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 74, "passed": 48, "failed": 0, "skipped": 26 }, "cleanup": "PASS" }
+    { "os": "windows-latest", "tests": 112, "passed": 105, "failed": 0, "skipped": 7, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 112, "passed": 105, "failed": 0, "skipped": 7 }, "fixedScopeRecoveryDoctorRow": "PASS", "wholeCloneDoctor": "FAIL", "fullEngine": "BLOCKED_NOT_INSTALLED", "cleanup": "PASS" },
+    { "os": "ubuntu-latest", "tests": 112, "passed": 52, "failed": 0, "skipped": 60, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 112, "passed": 52, "failed": 0, "skipped": 60 }, "fixedScopeRecoveryDoctorRow": "NOT_NATIVE_WINDOWS", "wholeCloneDoctor": "FAIL", "fullEngine": "BLOCKED_NOT_INSTALLED", "cleanup": "PASS" }
   ],
-  "localAuthoritativeLinux": { "tests": 607, "passed": 581, "failed": 0, "windowsOnlySkipped": 26, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS" },
-  "proofs": ["live scope untouched", "Worker/Tester/reviewer supervisor SIGKILL: child disappears", "durable owned scope recovered", "repeat recovery idempotent", "before-cleanup exception remains failure", "during-cleanup exception recovered", "corrupt/unknown/oversized receipts quarantined", "live reused PID generation never killed", "missing root handled", "replacement root preserved", "junction target preserved", "hardlink target preserved", "LPAC cannot read recovery journal"],
+  "localAuthoritativeLinux": { "tests": 645, "passed": 585, "failed": 0, "windowsOnlySkipped": 60, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS", "packageSecretScan": "PASS" },
+  "proofs": ["live leased scope untouched", "Worker/Tester/reviewer supervisor SIGKILL kills observed nested process tree", "ordinary parent death uses durable startup recovery", "detached trusted guardian death cleans owned scope", "Worker/Tester role death fails and cleans scope", "Worker/Tester tool death propagates 73 through both parents and cleans scope", "timeout preserves 124 when cleanup succeeds", "cleanup failure preserves 70", "durable owned scope recovered and repeat recovery idempotent", "before/during-cleanup and early-creation exceptions", "corrupt/unknown/oversized receipts quarantined", "reused PID generation never killed", "missing root handled", "replacement root preserved", "junction/hardlink targets preserved", "nested 512 Unicode entries enumerated through directory handles", "actual SEC_IMAGE initial unlink denial and delayed release require same-handle retry", "permanent mapped-image denial bounded and preserved", "readonly/depth overflow bounded and preserved", "LPAC cannot read recovery journal", "read-only status reports stale/corrupt without persistent writes or cleanup"],
+  "bounds": { "scopes": 64, "recoveryMilliseconds": 10000, "treeCleanupMilliseconds": 5000, "treeDepth": 16, "treeEntries": 2048, "receiptBytes": 4096, "receiptFields": 8 },
   "processKillsByRecovery": 0,
+  "startupMetadata": "COUNTS_ONLY",
   "windowsAutonomousReady": false,
-  "limitations": ["allocation-to-commit windows quarantine unknown resources", "not transactional EditEngine crash recovery", "not generic mutating filesystem", "not native coding E2E", "not full disaster recovery"]
+  "nativeCodingE2E": "NOT_RUN_BLOCKED",
+  "fullDisasterRecovery": "NOT_CERTIFIED",
+  "limitations": ["allocation-to-positive-journal-commit windows quarantine unknown resources", "not transactional EditEngine crash recovery", "not generic tool/LSP/DAP integration", "cooperative loop bounds plus external helper timeout are not hard syscall-latency guarantees", "source/binary hashes are not signed/private-ACL build attestation", "Doctor fixed-scope recovery row is not doctor --full acceptance"]
 }

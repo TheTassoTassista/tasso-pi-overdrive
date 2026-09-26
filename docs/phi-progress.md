@@ -2,6 +2,8 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+Latest verified native recovery/filesystem checkpoint: `c5995c68e6d9bb4ef3e55a82eef8345915ccf2aa`, native CI 36265238676 SUCCESS; full Linux 585 PASS / 0 FAIL / 60 native-Windows skips; native Windows 105 PASS / 0 FAIL / 7 Linux-only skips. See checkpoint 9 at the end for the authoritative continuation point. Older pending/next entries below are historical, not instructions to redo completed work.
+
 ## Verified starting checkpoint
 
 - Branch: `feature/routing-presets-quality`.
@@ -217,3 +219,27 @@ Next candidate proves the cleanup is still fail-closed: a section held past the 
 Self-test setup now uses the same exclusive native private-root creation as normal scopes. Fix a test-evidence weakness: an exception before the saved snapshot/Ready marker previously skipped root deletion but could still claim `fixtureCleanup=true`. Cleanup now uses the already-flushed actual root identity independently of profile/registry failure and retains a failed journal rather than dropping its ownership evidence. Add a real early-creation exception case which must reclaim its known root/receipt. No production authority expansion or unknown resource deletion. Native proof pending for this refinement.
 
 Early-creation source `9cffa477a54d17f9bd5bb2bea57c025b56233ede`, real run [36264845278](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36264845278): **SUCCESS** on both OSes and independent source clones. Windows **110 / 103 PASS / 0 FAIL / 7 Linux-only skips**, Ubuntu **110 / 52 PASS / 0 FAIL / 58 native-Windows skips**. Permanent mapped-image denial obeys the fixed deadline; readonly/depth overflow preserve protected data and normal recovery subsequently succeeds; early-creation cleanup removes its known root/receipt. Required cases retained. Next candidate adds actual grandchild/tool termination for Worker and Tester, propagating a distinct nonzero 73 through both waiting parents and requiring all observed PIDs gone, complete security-resource cleanup and no stale receipt. Still fixed scoped workflows, not real Pi coding E2E or transactional edits.
+
+## Checkpoint 9 — native recovery and anchored filesystem closure VERIFIED
+
+Resumed this continuation from `301c2024f860f46196a74eb276e921ddd5a5c03e`, preserving the existing user modification and completed foundation. Final functional source **`c5995c68e6d9bb4ef3e55a82eef8345915ccf2aa`**, branch `feature/routing-presets-quality`, ordinarily pushed to the existing PRIVATE remote. Report-only delivery commit follows; read its exact hash from Git. Protected document never staged.
+
+Native [run 36265238676](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36265238676) **SUCCESS**:
+
+- Real Windows **112 total / 105 PASS / 0 FAIL / 7 Linux-only skips**.
+- Real Ubuntu focused **112 / 52 PASS / 0 FAIL / 60 native-Windows skips**.
+- Both independent source-with-spaces clones rebuild all five native sources and repeat corresponding counts: PASS_FOUNDATION_ONLY, cleanup PASS, no auth/ignored runtimes copied, 0 new Pi model calls. Windows actual read-only recovery Doctor row PASS. Whole clone Doctor FAIL and full engine BLOCKED_NOT_INSTALLED by design.
+- Actual tool-grandchild death for Worker and Tester now propagates **73** through both waiting parents; all three observed PIDs disappear, files/profile/registry cleanup PASS and no stale receipt. This resolves the last pending candidate above without permissions/coverage relaxation.
+- Authoritative current-source Linux gate: **645 total / 585 PASS / 0 FAIL / 60 native-Windows skips**; syntax, installed-Pi TypeScript, package/pinned-policy/secret validation PASS. Command: `PI_OVERDRIVE_LSP_RUNTIME="$PWD/runtime/lsp" npm run check`.
+- Functional index audit: 576 blobs, 0 FAIL, 13 classified WARN. HEAD-ancestry audit: 1,549 blobs, 0 FAIL, 126 WARN; not other branches/messages or unstaged user content, not exhaustive secret proof. Report delivery is separately indexed/rescanned.
+- Actual host Doctor WARN / 0 FAIL / 0 model calls. Pi 0.87.1 and auth/default/routes/Council/Judge/Second Brain/governors/retries unchanged; concurrency3/depth1/correction2/spawn42. Protected SHA256 still `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`. Auth fingerprint unchanged. Other worktrees preserved.
+
+Precise receipts: `docs/phi-native-recovery-evidence.json`, `docs/phi-native-filesystem-evidence.json`; current bounded report: `docs/phi-portability-report.md`. Historic confinement receipt remains historic.
+
+Document-only delivery recheck: focused **112 / 52 PASS / 0 FAIL / 60 native-Windows skips**, new receipt JSON syntax PASS, staged whitespace PASS; staged Git audit **577 blobs / 0 FAIL / 13 WARN**. No source change after the successful functional gate. The complete Linux gate belongs to the exact tested source above, not a manufactured Windows/full-engine claim.
+
+**PHI PORTABILITY: IN PROGRESS.** Fixed native scope recovery/handle operations are proven, but phase 1/2 whole-engine integration is not complete: anchored writes are not transactional/crash-atomic, generic ResourceFS/EditEngine/worktree/receipts still need adapters. Native coding/security/transactional-crash E2Es NOT RUN; Windows autonomy stays BLOCKED. Full clean recovery is NOT CERTIFIED, Windows backup/restore blocked and Doctor --full not implemented. Allocation/positive-journal windows preserve unknown resources; no broad deletion. Helper hashes do not prove signed/private-ACL build trust. Native limits do not supply complete resource quotas.
+
+### Exact next step — do not restart or repeat completed fixtures
+
+At the requested low-quota boundary, close this coherent tested/pushed checkpoint and stop. Next continuation starts with a trusted native confined launch/stdio broker: Node 22.23.2/libuv non-LOCAL named pipes currently prevent generic LPAC piped tool/LSP transport, while inherited stdio trees work. Do not broaden token/filesystem/network permissions or update Pi to paper over it. Connect handle-anchored operations and durable transactional edit recovery to actual tools; add real coding/debug/test crash workflows, then phase 3 deterministic Windows coding/denial/failure E2Es. Only after evidence passes may the autonomous feature gate change. Complete phase 4 pinned full Git-only reconstruction/backup/Doctor afterward. No new Pi model calls needed for these deterministic adapters.
