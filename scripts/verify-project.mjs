@@ -4,14 +4,20 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
+import { requireCodingBackend, sandboxInvocation } from "../platform/shared/coding-execution.mjs";
 
 const argv = new Set(process.argv.slice(2));
 const mode = argv.has("--full") ? "full" : "quick";
 const listOnly = argv.has("--list");
 const asJson = argv.has("--json");
+try { requireCodingBackend("verification"); }
+catch (error) {
+  const summary = { status: "FAIL", error: "PHI_CODING_BACKEND_UNAVAILABLE", results: [] };
+  process.stdout.write(asJson ? `${JSON.stringify(summary)}\n` : "Verification: FAIL (secure production backend unavailable)\n");
+  process.exit(1);
+}
 const cwdIndex = process.argv.indexOf("--cwd");
 const cwd = path.resolve(cwdIndex >= 0 && process.argv[cwdIndex + 1] ? process.argv[cwdIndex + 1] : process.cwd());
-const sandbox = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "sandbox-run.sh");
 const allocation = findRuntimeAllocation(cwd);
 const checks = [];
 
@@ -79,9 +85,10 @@ const results = checks.map((check) => {
     "--schema", allocation.schema,
   ] : [];
   const directGitRead = check.name === "git-diff-check";
+  const invocation = directGitRead ? null : sandboxInvocation("verification", [...runtimeArgs, cwd, "--cwd", ".", "--", check.command, ...check.args]);
   const run = directGitRead
     ? spawnSync(check.command, check.args, { cwd, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, NO_COLOR: "1", CI: "1" } })
-    : spawnSync(sandbox, [...runtimeArgs, cwd, "--cwd", ".", "--", check.command, ...check.args], { cwd, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
+    : spawnSync(invocation.command, invocation.args, { cwd, shell: invocation.shell, encoding: "utf8", timeout: 15 * 60 * 1000, maxBuffer: 16 * 1024 * 1024 });
   const combined = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim();
   const output = combined.length > 5000 ? `[output truncated]\n${combined.slice(-5000)}` : combined;
   return {

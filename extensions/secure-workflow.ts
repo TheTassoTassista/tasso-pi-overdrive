@@ -26,6 +26,7 @@ import { AgentAttemptController, requestExactUserCancellation } from "../lib/age
 import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
+import { requireCodingBackend } from "../platform/shared/coding-execution.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -200,6 +201,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Params,
     executionMode: "sequential",
     async execute(toolCallId, params, signal, _update, ctx) {
+      requireCodingBackend("workflow");
       if (running) throw new WorkflowFailure("Another secure workflow is already active.");
       const spawnBudgetPlan = workflowSpawnBudgetForRequest({ includeOracle: params.includeOracle ?? false, includeSecurity: params.includeSecurity ?? true });
       const configuredSpawnLimit = readConfiguredSpawnLimit();

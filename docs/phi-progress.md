@@ -243,3 +243,15 @@ Document-only delivery recheck: focused **112 / 52 PASS / 0 FAIL / 60 native-Win
 ### Exact next step — do not restart or repeat completed fixtures
 
 At the requested low-quota boundary, close this coherent tested/pushed checkpoint and stop. Next continuation starts with a trusted native confined launch/stdio broker: Node 22.23.2/libuv non-LOCAL named pipes currently prevent generic LPAC piped tool/LSP transport, while inherited stdio trees work. Do not broaden token/filesystem/network permissions or update Pi to paper over it. Connect handle-anchored operations and durable transactional edit recovery to actual tools; add real coding/debug/test crash workflows, then phase 3 deterministic Windows coding/denial/failure E2Es. Only after evidence passes may the autonomous feature gate change. Complete phase 4 pinned full Git-only reconstruction/backup/Doctor afterward. No new Pi model calls needed for these deterministic adapters.
+
+## Checkpoint 10 candidate — shared real-engine execution boundary
+
+Resumed exact `d618ed1bc8d2d9796e6598cd56d4b380fa98f2e5`, expected branch/private remote and protected SHA256 confirmed. Only pre-existing protected user modification was dirty. Foundation/native primitives not redesigned or reimplemented.
+
+Actual workflow/verification/safe_exec/LSP/debug/eval/edit/removal paths now use a shared code-owned backend admission/dispatch. Native Windows rejects before new caller options/path IO/spawn overrides; direct verification CLI cannot bypass it through enable-looking environment variables. Linux runner/vector/cwd/signal/timeout/worktree/routing/model policy unchanged. No Job-only execution fallback or autonomy activation. Full trace: `docs/phi-engine-platform-integration.md`.
+
+Local source gate: **654 total / 591 PASS / 0 FAIL / 63 native-Windows skips**, syntax/installed-Pi TypeScript/package validation required before commit. Focused: **121 / 58 PASS / 0 FAIL / 63 skips**; new dispatch suite **9 / 6 PASS / 0 FAIL / 3 native-Windows skips**. Native proof for new entry-point tests is PENDING until real hosted CI.
+
+Validation history retained: restricted execution initially reported file-level test summaries and unrelated process/audit failures, so it was not accepted as authoritative. Actual unsandboxed host gate first encountered Second Brain ACCEPTED/REJECTED assertion once; isolated memory suite 3/3 and subsequent full gate PASS without any memory change. Do not infer a root cause or introduce a preventive memory fix. Actual typecheck found the disposable source copy lacked `platform`; include it and retain source-wiring regression, no permissive declarations/dependencies.
+
+Next after this native-tested checkpoint: implement the real confined native transport/profile broker behind the shared dispatch, then transaction-safe filesystem integration. Generic LPAC tool/LSP transport and native coding/security/failure engine E2Es still NOT IMPLEMENTED/NOT RUN. Windows stays BLOCKED. Complete full Doctor/backup/reconstruction afterward. At low quota finish tests, commit/push and stop here; do not start a half-built native broker.

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { requireCodingBackend } from "../platform/shared/coding-execution.mjs";
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
 const Params = Type.Object({
@@ -16,6 +17,7 @@ export default function (pi: ExtensionAPI) {
     description: "Detect and run repository-appropriate checks in Bubblewrap. PASS requires at least one real check and every command exiting zero; NO_CHECKS is an unresolved error.",
     parameters: Params,
     async execute(_id, params, signal, _update, ctx) {
+      requireCodingBackend("verification");
       const args = [script, "--json", params.mode === "full" ? "--full" : "--quick", "--cwd", ctx.cwd];
       if (params.listOnly) args.push("--list");
       const result = await pi.exec(process.execPath, args, { cwd: ctx.cwd, ...(signal ? { signal } : {}), timeout: 16 * 60 * 1000 });

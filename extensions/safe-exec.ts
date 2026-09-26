@@ -1,14 +1,13 @@
-import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
 import { inspectWorkspacePath, removeVerifiedWorkspaceFile } from "../lib/safety.mjs";
+import { requireCodingBackend, sandboxInvocation } from "../platform/shared/coding-execution.mjs";
 
 const PROGRAMS = ["git", "rg", "fd", "jq", "node", "npm", "pnpm", "python", "python3", "pytest", "pyright", "cargo", "go", "cmake", "ctest", "make", "gcc", "g++"] as const;
 const READ_ONLY_GIT = new Set(["status", "diff", "show", "log", "rev-parse", "ls-files", "branch"]);
 const READ_ONLY_PROGRAMS = new Set(["rg", "fd", "jq"]);
-const sandbox = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/sandbox-run.sh");
 
 const Params = Type.Object({
   program: Type.Union(PROGRAMS.map((value) => Type.Literal(value))),
@@ -59,6 +58,7 @@ export default function (pi: ExtensionAPI) {
     parameters: RemoveParams,
     executionMode: "sequential",
     async execute(_id, params, _signal, _update, ctx) {
+      requireCodingBackend("safe-remove");
       const allocation = findRuntimeAllocation(ctx.cwd);
       if (!allocation) throw new Error("File removal requires an Overdrive-managed worktree allocation.");
       removeVerifiedWorkspaceFile(ctx.cwd, params.path);
@@ -73,6 +73,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Params,
     executionMode: "sequential",
     async execute(_id, params, signal, _update, ctx) {
+      requireCodingBackend("safe-exec");
       const args = params.args ?? [];
       if (args.some((arg) => arg.includes("\0"))) {
         throw new Error("NUL bytes are not allowed in arguments");
@@ -107,7 +108,8 @@ export default function (pi: ExtensionAPI) {
         params.program,
         ...args,
       ];
-      const result = await pi.exec(sandbox, sandboxArgs, { cwd: inspected.workspace, ...(signal ? { signal } : {}), timeout: params.timeoutMs ?? 120000 });
+      const invocation = sandboxInvocation("safe-exec", sandboxArgs);
+      const result = await pi.exec(invocation.command, [...invocation.args], { cwd: inspected.workspace, ...(signal ? { signal } : {}), timeout: params.timeoutMs ?? 120000 });
       const output = `${result.stdout}${result.stderr}`.trim() || `[exit ${result.code}]`;
       if (result.code !== 0) throw new Error(`Sandboxed command failed with exit ${result.code}: ${output}`);
       return {
