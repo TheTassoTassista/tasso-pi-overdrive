@@ -73,7 +73,7 @@ namespace Phi.Native {
     }
     internal static void WithDirectoryAuthority(string directory, string expectedIdentity, Action<IntPtr> operation) {
       using (RecoveryFilesystem pins = new RecoveryFilesystem(directory)) {
-        IntPtr handle = CreateFileW(directory, 0xc0080, 3, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+        IntPtr handle = CreateFileW(directory, 0xe0080, 3, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
         if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
         try {
           Info info;

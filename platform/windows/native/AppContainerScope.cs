@@ -241,8 +241,11 @@ namespace Phi.Native {
           bool present, defaulted; IntPtr dacl;
           if (!GetSecurityDescriptorDacl(descriptor, out present, out dacl, out defaulted) || !present || dacl == IntPtr.Zero) throw new InvalidDataException();
           uint result = SetSecurityInfo(handle, 1, 0x80000004, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero);
+          if (result != 0) Console.Error.WriteLine("PHI_ACL_DACL_FAILED");
           if (result != 0) throw new Win32Exception((int)result);
-          if (writable) LowLabel(handle);
+          if (writable) {
+            try { LowLabel(handle); } catch { Console.Error.WriteLine("PHI_ACL_LABEL_FAILED"); throw; }
+          }
         } finally { Marshal.FreeHGlobal(descriptor); }
       });
     }

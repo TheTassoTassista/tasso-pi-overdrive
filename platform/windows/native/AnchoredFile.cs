@@ -135,7 +135,7 @@ namespace Phi.Native {
         string expected = name == "replace-before-open" ? "synthetic-replacement" : name == "changed-content" ? "synthetic-changed" : name == "hardlink" ? "synthetic-unrelated" : shouldDeny ? "synthetic-original" : "synthetic-edited";
         if (File.ReadAllText(file) != expected) throw new InvalidDataException();
         passed = true;
-      } catch { Console.Error.WriteLine("PHI_ANCHORED_FILE_SELFTEST_FAILED"); }
+      } catch (Exception error) { RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_ANCHORED_FILE_SELFTEST_FAILED"); }
       finally { try { if (scope != null) { scope.CleanupFiles(); scope.Complete(true); } } catch { clean = false; if (scope != null) scope.Dispose(); Console.Error.WriteLine("PHI_ANCHORED_FILE_CLEANUP_FAILED"); } }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, scope = "HANDLE_MUTATION_PRIMITIVE_NOT_TRANSACTIONAL_ENGINE" }));
       return passed && clean ? 0 : 70;
