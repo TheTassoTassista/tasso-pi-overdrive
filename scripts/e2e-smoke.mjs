@@ -5,13 +5,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateWorkflowEvidence } from "../lib/e2e-evidence.mjs";
+import { summarizePiCalls, validateWorkflowEvidence } from "../lib/e2e-evidence.mjs";
 import { createEvidenceRun, initialWorkflowJournal, openEvidenceRun, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { runEnforcedWorkflow } from "../lib/workflow-state.mjs";
 import { admitRoleReceipt, listRoleReceipts, openRoleReceiptStore } from "../lib/workflow-receipts.mjs";
 
 const pi = process.env.PI_BIN || "pi";
-const model = process.env.PI_SMOKE_MODEL || "openai-codex/gpt-5.6-luna";
+const model = process.env.PI_SMOKE_MODEL || "openai-codex/gpt-6-luna";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-e2e-"));
 const repo = path.join(root, "repo");
 const runtimeRoot = path.join(root, "runtime");
@@ -28,6 +28,8 @@ let negativeControl;
 let reviewerFailureControl;
 let interruptionControl;
 let malformedJournalControl;
+let ownerCalls;
+let governorEvidence;
 const controllerTestPolicy = { digest: "e2e-controller-test-policy", roles: {} };
 
 function deterministicStructuredValue(agent) {
@@ -241,6 +243,7 @@ try {
   let invocation;
   try {
     invocation = await runPiWorkflow();
+    ownerCalls = { ...summarizePiCalls(invocation.events), thinking: "low" };
     check("pi-rpc-prompt-accepted", invocation.accepted.success === true, { success: invocation.accepted.success });
     const tool = workflowToolSummary(invocation);
     check("workflow-tool-runtime-status", tool.present && !tool.isError && tool.status === "PASS", tool);
@@ -345,6 +348,14 @@ try {
   const traces = findFiles(traceRoot, "metadata.jsonl").concat(fs.existsSync(traceRoot) ? fs.readdirSync(traceRoot).filter((name) => name.endsWith(".jsonl")).map((name) => path.join(traceRoot, name)) : []);
   const freshTraces = [...new Set(traces)].filter((file) => fs.statSync(file).mtimeMs >= startedAt - 1000);
   const traceText = freshTraces.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+  const traceEvents = traceText.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  governorEvidence = {
+    toolGovernorMode: "explicit-cli",
+    activeTools: ["secure_coding_workflow"],
+    contextFitPasses: traceEvents.filter((entry) => entry.kind === "context_fit" && entry.status === "PASS").length,
+    providerAttestationPasses: traceEvents.filter((entry) => entry.kind === "context_fit_provider_attestation" && entry.status === "PASS").length,
+  };
+  check("context-governor-attested-real-provider-call", governorEvidence.contextFitPasses > 0 && governorEvidence.providerAttestationPasses > 0, governorEvidence);
   check("metadata-trace-created", freshTraces.length > 0 && /"event":"tool_start"/u.test(traceText), { files: freshTraces.length });
   check("metadata-trace-private", freshTraces.every((file) => (fs.statSync(file).mode & 0o077) === 0), "mode 600");
   check("metadata-trace-value-free", !/"(?:prompt|args|output|url|command|content|text)"\s*:/iu.test(traceText), "no value-bearing fields");
@@ -356,5 +367,8 @@ check("temporary-repository-removed", !process.env.PI_OVERDRIVE_KEEP_E2E && !fs.
 const status = results.length >= 24 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 let finalVerdict;
 try { finalVerdict = readEvidenceReceipt({ root: evidenceRoot, runId: evidenceRunId, taskDigest: taskDigest(workflowTask) }).receipt.finalVerdict; } catch {}
-process.stdout.write(`${JSON.stringify({ status, model, evidenceRoot, negativeControl, reviewerFailureControl, interruptionControl, malformedJournalControl, finalVerdict, results }, null, 2)}\n`);
+const summary = { status, runId: evidenceRunId, model, evidenceRoot, ownerCalls, governorEvidence, negativeControl, reviewerFailureControl, interruptionControl, malformedJournalControl, finalVerdict, results };
+const evidenceDirectory = path.join(evidenceRoot, evidenceRunId);
+if (fs.existsSync(evidenceDirectory)) fs.writeFileSync(path.join(evidenceDirectory, "smoke-summary.json"), `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);

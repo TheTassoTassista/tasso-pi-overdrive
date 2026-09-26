@@ -6,7 +6,7 @@
     "write"
   ],
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-terra",
+  "defaultModel": "gpt-6-sol",
   "defaultThinkingLevel": "medium",
   "enabledModels": [
     "openai-codex/gpt-5.3-codex-spark",
@@ -34,7 +34,7 @@
     "keepRecentTokens": 16000
   },
   "subagents": {
-    "defaultModel": "openai-codex/gpt-5.6-terra",
+    "defaultModel": "openai-codex/gpt-6-sol",
     "defaultProvider": "openai-codex",
     "defaultThinking": "medium",
     "maxThinking": "max",

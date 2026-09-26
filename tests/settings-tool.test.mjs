@@ -10,6 +10,31 @@ import { merge, removeSelectedPackages, replaceLocalPackageRoot, restoreFields, 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tool = path.join(root, "scripts", "settings-tool.mjs");
 
+test("shipped GPT-6 daily defaults migrate only defaults without altering role routes or auth", () => {
+  const shipped = JSON.parse(fs.readFileSync(path.join(root, "config/settings-patch.json"), "utf8"));
+  assert.equal(shipped.defaultProvider, "openai-codex");
+  assert.equal(shipped.defaultModel, "gpt-6-sol");
+  assert.equal(shipped.defaultThinkingLevel, "medium");
+  assert.equal(shipped.subagents.defaultModel, "openai-codex/gpt-6-sol");
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-gpt6-default-"));
+  try {
+    const settings = path.join(temporary, "settings.json");
+    const patch = path.join(temporary, "patch.json");
+    const manifest = path.join(temporary, "manifest.json");
+    const auth = path.join(temporary, "auth.json");
+    const original = { defaultProvider: "openai-codex", defaultModel: "gpt-5.6-terra", defaultThinkingLevel: "medium", subagents: structuredClone(shipped.subagents) };
+    fs.writeFileSync(settings, JSON.stringify(original));
+    fs.writeFileSync(auth, '{"fixture":"untouched"}');
+    const authBefore = fs.readFileSync(auth);
+    fs.writeFileSync(patch, JSON.stringify(Object.fromEntries(["defaultProvider", "defaultModel", "defaultThinkingLevel"].map(k => [k, shipped[k]]))));
+    for (const action of ["snapshot", "enable"]) assert.equal(spawnSync(process.execPath, [tool, action, settings, patch, manifest, root], { encoding: "utf8" }).status, 0);
+    const activated = JSON.parse(fs.readFileSync(settings));
+    assert.equal(activated.defaultModel, "gpt-6-sol");
+    assert.deepEqual(activated.subagents, original.subagents);
+    assert.deepEqual(fs.readFileSync(auth), authBefore);
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
+
 test("enable/disable is reversible, preserves later user changes, and keeps the first snapshot", () => {
   const settingsPath = "/tmp/pi-overdrive-settings/agent/settings.json";
   const packageRoot = "/tmp/pi-overdrive-settings/package";

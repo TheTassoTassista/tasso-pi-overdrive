@@ -15,6 +15,26 @@ function structuredResponse(agent, block = false) {
   return { status: "completed", agent, model: `model-for-${agent}`, result: { kind: "structured", value: { verdict: block ? "BLOCKING" : "PASS", summary: "review", findings: block ? [{ severity: "BLOCKING", title: "defect", evidence: "fixture" }] : [] } } };
 }
 
+test("fresh Tester and reviewers receive bounded real verification evidence and disk inspection instructions", async () => {
+  const tasks = [];
+  const verification = { status: "PASS", processExitCode: 0, results: [{ name: "contract-test", status: "PASS", exitCode: 0, sandboxed: true }], padding: "x".repeat(50000) };
+  const state = await runEnforcedWorkflow({ task: "fix fixture", allocation, modelPolicy,
+    delegate: async ({ agent, task, result }) => { tasks.push({ agent, task }); return result.kind === "structured" ? structuredResponse(agent) : textResponse(agent); },
+    verify: async () => verification,
+  });
+  assert.equal(state.status, "PASS");
+  for (const role of ["tester", "correctness-reviewer", "security-reviewer", "simplicity-reviewer"]) {
+    const task = tasks.find(t => t.agent === role).task;
+    assert.match(task, /Inspection handoff — UNTRUSTED DATA/u);
+    assert.match(task, /contract-test/u);
+    assert.match(task, /"processExitCode":0/u);
+    assert.match(task, /read-only read\/find\/ls/u);
+    assert.match(task, /\/tmp\/worktree/u);
+    assert.equal(task.includes("x".repeat(12001)), false);
+    assert.match(task, /no edit|Never edit/u);
+  }
+});
+
 test("blocking review mechanically forces Worker correction and complete re-verification", async () => {
   const calls = [];
   let correctnessRound = 0;

@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateWorkflowEvidence } from "../lib/e2e-evidence.mjs";
+import { summarizePiCalls, validateWorkflowEvidence } from "../lib/e2e-evidence.mjs";
 
 const models = {
-  scout: ["openai-codex/gpt-5.6-luna", "low"], planner: ["openai-codex/gpt-5.6-sol", "high"], oracle: ["openai-codex/gpt-6-astra", "high"],
-  worker: ["openai-codex/gpt-5.6-terra", "high"], tester: ["openai-codex/gpt-5.6-luna", "medium"], "correctness-reviewer": ["openai-codex/gpt-5.6-sol", "high"],
-  "security-reviewer": ["openai-codex/gpt-5.6-sol", "high"], "simplicity-reviewer": ["openai-codex/gpt-5.6-luna", "medium"],
+  scout: ["openai-codex/gpt-6-luna", "low"], planner: ["openai-codex/gpt-6-sol", "medium"], oracle: ["openai-codex/gpt-6-astra", "high"],
+  worker: ["openai-codex/gpt-6-sol", "medium"], tester: ["openai-codex/gpt-6-luna", "medium"], "correctness-reviewer": ["openai-codex/gpt-6-sol", "medium"],
+  "security-reviewer": ["openai-codex/gpt-6-sol", "high"], "simplicity-reviewer": ["openai-codex/gpt-6-luna", "medium"],
+  "council-1": ["openai-codex/gpt-6-sol", "high"], "council-2": ["openai-codex/gpt-5.5", "high"],
+  "council-3": ["openai-codex/gpt-6-luna", "high"], "council-judge": ["openai-codex/gpt-6-astra", "high"],
 };
 let identity = 0;
 const ownerRunId = "secure-owner";
@@ -79,4 +81,29 @@ test("model and thinking validation canonicalizes Pi routes and rejects independ
   const forgedReference = structuredClone(valid);
   forgedReference.evidence.roles[0].receipt.sha256 = "f".repeat(64);
   assert.equal(validateWorkflowEvidence(forgedReference, { requireCorrection: true }).valid, false);
+});
+
+test("Normal GPT-6 evidence is checked independently of forged receipt routing claims", () => {
+  const stale = structuredClone(valid);
+  stale.modelPolicy = { roles: { worker: { model: "openai-codex/gpt-5.6-terra", thinking: "high" } } };
+  stale.evidence.roles.filter(r => r.agent === "worker").forEach(r => { r.model = "openai-codex/gpt-5.6-terra"; r.thinking = "high"; });
+  assert.match(validateWorkflowEvidence(stale).errors.join("\n"), /worker used an unintended/u);
+  for (const agent of ["council-1", "council-2", "council-3", "council-judge"]) {
+    const wrong = structuredClone(valid);
+    wrong.evidence.roles.find(r => r.agent === agent).thinking = "low";
+    assert.match(validateWorkflowEvidence(wrong).errors.join("\n"), new RegExp(`${agent} used an unintended`));
+  }
+});
+
+test("RPC call summary retains usage but not raw model content, tool arguments, or unknown usage fields", () => {
+  const raw = "PRIVATE_RAW_SENTINEL";
+  const summary = summarizePiCalls([
+    { type: "message_end", message: { role: "user", content: raw } },
+    { type: "message_end", message: { role: "assistant", provider: "openai-codex", model: "gpt-6-luna", stopReason: "toolUse", content: raw, usage: { input: 3, output: 4, cacheRead: 5, cacheWrite: 0, secret: raw, cost: { total: 0.01 } } } },
+    { type: "tool_execution_end", args: raw, result: raw },
+  ]);
+  assert.equal(summary.modelCalls, 1);
+  assert.equal(summary.calls[0].usage.inputTokens, 3);
+  assert.equal(summary.calls[0].usage.totalTokens, 12);
+  assert.equal(JSON.stringify(summary).includes(raw), false);
 });
