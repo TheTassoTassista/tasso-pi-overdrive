@@ -27,6 +27,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./bootstrap/windows.ps1
+      - name: Build trusted native Windows process owner (not a sandbox)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
       - name: Native Linux foundation bootstrap
         if: runner.os == 'Linux'
         run: sh bootstrap/linux.sh

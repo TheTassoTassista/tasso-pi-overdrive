@@ -26,6 +26,7 @@ try {
   if (fs.existsSync(path.join(clone, 'runtime', 'lsp', 'node_modules')) || fs.existsSync(path.join(clone, 'runtime', 'dap', 'python'))) throw new Error('PHI_CLEAN_ROOM_UNTRACKED_RUNTIME_COPIED');
   const npm = path.resolve(path.dirname(process.execPath), process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : '../lib/node_modules/npm/bin/npm-cli.js');
   run(process.execPath, [npm, 'ci', '--legacy-peer-deps', '--ignore-scripts', '--no-audit', '--no-fund'], clone);
+  if (process.platform === 'win32') run('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(clone, 'scripts', 'build-windows-process.ps1')], clone);
   const dirs = Object.fromEntries(['bin', 'config', 'state', 'agent', 'legacyConfig'].map((key) => [key, path.join(temp, 'machine', key)]));
   const env = { ...process.env, PHI_PI_ROOT: path.join(temp, 'not-installed-pi'), PI_CODING_AGENT_DIR: dirs.agent, XDG_CONFIG_HOME: path.join(temp, 'xdg-config'), XDG_STATE_HOME: path.join(temp, 'xdg-state') };
   const { bootstrapFoundation } = await import(pathToFileURL(path.join(clone, 'bootstrap', 'core.mjs')).href);
