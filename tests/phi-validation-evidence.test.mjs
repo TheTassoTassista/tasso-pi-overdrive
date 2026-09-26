@@ -11,3 +11,8 @@ test('failure metadata fails closed for unknown stages and records timeout witho
   assert.equal(evidence.failureStage, 'UNKNOWN'); assert.equal(evidence.exitCode, null); assert.equal(evidence.timedOut, true);
   assert.doesNotMatch(JSON.stringify(evidence), /private/u);
 });
+test('native PowerShell policy failure is reduced to a fixed code, never its path or command', () => {
+  const evidence = validationFailureEvidence('windows-process-build', { status: 1, stderr: 'private-script-path cannot be loaded because running scripts is disabled on this system private-command' });
+  assert.deepEqual(evidence.diagnosticCodes, ['PHI_BUILD_SCRIPT_POLICY_BLOCKED']);
+  assert.doesNotMatch(JSON.stringify(evidence), /private/u);
+});
