@@ -5,6 +5,7 @@ tools: read, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, sem
 subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ~/.pi/agent/npm/node_modules/@juicesharp/rpiv-web-tools/index.ts, ../extensions/lsp.ts, ../extensions/context-governor.ts
 defaultContext: fresh
 acceptanceRole: read-only
+completionGuard: false
 inheritGlobalContext: false
 inheritProjectContext: true
 inheritSkills: true

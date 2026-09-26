@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { summarizePiCalls, validateWorkflowEvidence } from "../lib/e2e-evidence.mjs";
+import { cleanupE2EChildSessions } from "../lib/e2e-child-cleanup.mjs";
 import { createEvidenceRun, initialWorkflowJournal, openEvidenceRun, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { runEnforcedWorkflow } from "../lib/workflow-state.mjs";
 import { admitRoleReceipt, listRoleReceipts, openRoleReceiptStore } from "../lib/workflow-receipts.mjs";
@@ -30,6 +31,7 @@ let interruptionControl;
 let malformedJournalControl;
 let ownerCalls;
 let governorEvidence;
+let childSessionCleanup;
 const controllerTestPolicy = { digest: "e2e-controller-test-policy", roles: {} };
 
 function deterministicStructuredValue(agent) {
@@ -259,6 +261,8 @@ try {
   }
   if (loaded) {
     const { file: receiptFile, executionFile, execution, receipt } = loaded;
+    childSessionCleanup = cleanupE2EChildSessions(receipt);
+    check("owned-temporary-child-sessions-cleaned", childSessionCleanup.status === "PASS", childSessionCleanup);
     check("run-specific-structured-workflow-receipt", true, { runId: receipt.runId, taskDigest: receipt.taskDigest });
     check("receipt-owner-only", (fs.statSync(receiptFile).mode & 0o077) === 0, { mode: (fs.statSync(receiptFile).mode & 0o777).toString(8) });
     check("pre-cleanup-execution-snapshot-private", execution.status === receipt.status && (fs.statSync(executionFile).mode & 0o077) === 0, { executionFile, status: execution.status });
@@ -367,7 +371,7 @@ check("temporary-repository-removed", !process.env.PI_OVERDRIVE_KEEP_E2E && !fs.
 const status = results.length >= 24 && results.every((item) => item.status === "PASS") ? "PASS" : "FAIL";
 let finalVerdict;
 try { finalVerdict = readEvidenceReceipt({ root: evidenceRoot, runId: evidenceRunId, taskDigest: taskDigest(workflowTask) }).receipt.finalVerdict; } catch {}
-const summary = { status, runId: evidenceRunId, model, evidenceRoot, ownerCalls, governorEvidence, negativeControl, reviewerFailureControl, interruptionControl, malformedJournalControl, finalVerdict, results };
+const summary = { status, runId: evidenceRunId, model, evidenceRoot, ownerCalls, governorEvidence, childSessionCleanup, negativeControl, reviewerFailureControl, interruptionControl, malformedJournalControl, finalVerdict, results };
 const evidenceDirectory = path.join(evidenceRoot, evidenceRunId);
 if (fs.existsSync(evidenceDirectory)) fs.writeFileSync(path.join(evidenceDirectory, "smoke-summary.json"), `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600, flag: "wx" });
 process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
