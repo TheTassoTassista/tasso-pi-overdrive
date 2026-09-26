@@ -16,9 +16,11 @@ function run(command, args, cwd = source, env = process.env) {
 let report;
 try {
   const head = run('git', ['rev-parse', 'HEAD']).trim();
-  const branch = run('git', ['branch', '--show-current']).trim();
-  if (!/^[0-9a-f]{40}$/u.test(head) || !branch) throw new Error('PHI_CLEAN_ROOM_GIT_STATE_INVALID');
-  run('git', ['clone', '--quiet', '--no-local', '--no-hardlinks', '--single-branch', '--branch', branch, source, clone]);
+  if (!/^[0-9a-f]{40}$/u.test(head)) throw new Error('PHI_CLEAN_ROOM_GIT_STATE_INVALID');
+  // Actions normally checks out detached HEAD. Clone exact Git source without
+  // requiring a branch name, then select only the proven source commit.
+  run('git', ['clone', '--quiet', '--no-local', '--no-hardlinks', source, clone]);
+  run('git', ['checkout', '--quiet', '--detach', head], clone);
   if (run('git', ['rev-parse', 'HEAD'], clone).trim() !== head) throw new Error('PHI_CLEAN_ROOM_HEAD_MISMATCH');
   // The source-only foundation must not depend on ignored development runtimes.
   if (fs.existsSync(path.join(clone, 'runtime', 'lsp', 'node_modules')) || fs.existsSync(path.join(clone, 'runtime', 'dap', 'python'))) throw new Error('PHI_CLEAN_ROOM_UNTRACKED_RUNTIME_COPIED');
