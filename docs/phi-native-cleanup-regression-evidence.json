@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "scope": "FIXED_NATIVE_CLEANUP_REGRESSION_NOT_WINDOWS_CODING_CERTIFICATION",
+  "functionalHead": "94c6b4d3e36c3ac2ad4ba800e42d359f82815acb",
+  "branch": "feature/routing-presets-quality",
+  "runId": 36279000733,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36279000733",
+  "conclusion": "success",
+  "nativeWindows": { "total": 134, "passed": 127, "failed": 0, "linuxOnlySkipped": 7, "retainedDispatchTestsPassed": 9 },
+  "ubuntuFocused": { "total": 134, "passed": 64, "failed": 0, "windowsOnlySkipped": 70 },
+  "linuxFull": { "total": 667, "passed": 597, "failed": 0, "windowsOnlySkipped": 70, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS", "packageSecretScan": "PASS" },
+  "affectedCases": { "individualPassed": 13, "sequentialPassed": 13, "sequentialFailed": 0, "zeroMatchCanPass": false },
+  "sourceClones": {
+    "windows": { "status": "PASS_FOUNDATION_ONLY", "total": 134, "passed": 127, "failed": 0, "skipped": 7, "fixedScopeRecovery": "PASS", "doctor": "FAIL", "fullEngine": "BLOCKED_NOT_INSTALLED", "cleanup": "PASS", "authCopied": false, "ignoredRuntimesCopied": false },
+    "ubuntu": { "status": "PASS_FOUNDATION_ONLY", "total": 134, "passed": 64, "failed": 0, "skipped": 70, "doctor": "FAIL", "fullEngine": "BLOCKED_NOT_INSTALLED", "cleanup": "PASS", "authCopied": false, "ignoredRuntimesCopied": false }
+  },
+  "provenNativeStates": [
+    { "api": "NtCreateFile", "operation": "NT_OPEN", "access": "00110080", "share": 1, "options": "00200060", "nativeStatus": "c0000043", "nativeError": 32, "fixture": "open-sharing-control" },
+    { "api": "NtCreateFile", "operation": "NT_OPEN", "access": "00110081", "share": 1, "options": "00200021", "nativeStatus": "c0000056", "nativeError": 5, "fixture": "delete-pending-control" },
+    { "api": "SetFileInformationByHandle", "operation": "DISPOSITION", "requiredAuthority": "DELETE", "informationClass": 4, "nativeError": 145, "fixture": "pending-directory-control", "alsoObservedInRealCases": ["worker role cleanup in source clone", "reviewer supervisor recovery"] }
+  ],
+  "rootDefect": "transient acquisition states were outside disposition retry; pending child-directory lifetime was excluded from same-handle directory disposition retry",
+  "historicalOriginalNtStatus": "NOT_RECORDED_NOT_RETROSPECTIVELY_PROVEN",
+  "historicalExternalHandleOwner": "NOT_IDENTIFIED_NO_AV_ATTRIBUTION",
+  "originalFiveFollowingFailures": "STARTUP_RECOVERY_QUARANTINE_CASCADE_BEFORE_FIXTURE_CREATION",
+  "permanentLocksFailClosed": true,
+  "unknownResourcesPreserved": true,
+  "sharedCleanupBudgetMs": 5000,
+  "recoveryPassBudgetMs": 10000,
+  "recoveryProcessKills": 0,
+  "newPiModelCalls": 0,
+  "authChanged": false,
+  "routingChanged": false,
+  "protectedFileChanged": false,
+  "windowsAutonomousReady": false,
+  "nextStep": "generic trusted LPAC launch/stdio broker, then native LSP, then crash-atomic writes",
+  "limitations": ["cooperative native-call deadlines", "no full Windows engine coding/denial/crash E2E", "no generic LPAC/LSP transport", "no native transactional writes", "no full Doctor/Windows backup/restore/disaster-recovery certification", "historical runner handle-owner details unavailable"]
+}

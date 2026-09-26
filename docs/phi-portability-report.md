@@ -2,7 +2,20 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current continuation — production dispatch partial, native gate FAIL
+## Current continuation — cleanup regression fixed; whole engine still BLOCKED
+
+Functional source **`94c6b4d3e36c3ac2ad4ba800e42d359f82815acb`**, same branch/private remote. Real [CI 36279000733](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36279000733) **SUCCESS** on Windows/Ubuntu and both independent Git-source clones. Later commits are evidence-only.
+
+- Complete post-native Linux gate: **667 total / 597 PASS / 0 FAIL / 70 Windows-only skips**; syntax, installed-Pi TypeScript, package/pinned-policy/secret validation PASS.
+- Supported native Windows suite: **134 / 127 PASS / 0 FAIL / 7 Linux-only skips**. Ubuntu focused: **134 / 64 PASS / 0 FAIL / 70 skips**. Thirteen affected cases pass individually and together in sequence, then the whole supported suite passes in suite order. Existing dispatch/ownership/quarantine/readonly/mapped-image/anchored-filesystem/forced-failure cases retained.
+- Both independent source-with-spaces clones: **PASS_FOUNDATION_ONLY**, matching OS counts, cleanup PASS, no auth/ignored runtime copy, 0 Pi model calls. Windows recovery Doctor row PASS; whole Doctor intentionally FAIL and full engine BLOCKED_NOT_INSTALLED. This is not full product reconstruction.
+- Proven root defect: missing bounded retry at **NtCreateFile acquisition** (sharing `c0000043` / 32 and delete-pending `c0000056` / 5) plus same-directory **SetFileInformationByHandle disposition** 145 while an already-deleted child remains referenced. Controlled held/released handles reproduce all three. Five old subsequent cases failed startup recovery before creating fixtures: quarantine cascade. The original log cannot retrospectively identify its NTSTATUS or historical handle owner; no AV attribution is made.
+- Fix preserves minimum access/sharing, pinned parents, actual root IDs, no-follow links and the original shared 5-second budget. Directory 145 retry is through the same verified ordinary-directory handle, without rescanning new data. Genuine/persistent denial, unknown ownership, readonly and budget/depth limits still FAIL/preserve evidence. No broad cleaner or unsandboxed fallback.
+- Pi 0.87.1, authentication/defaults/routing/Council/Judge/Second Brain/governors/model retry/spawn policy unchanged. New model/provider calls **0**. Protected document unchanged byte-for-byte and unstaged. [Exact technical proof and investigation history](phi-native-cleanup-regression.md), [current receipt](phi-native-cleanup-regression-evidence.json).
+
+**Next:** generic trusted LPAC launch/stdio broker, then real Windows LSP confinement and crash-atomic writes in the required order. Whole-engine coding/security/crash E2Es, full Doctor, native backup/restore and full disaster recovery remain unimplemented/certified. **Windows autonomy stays BLOCKED.** Recovery green is necessary, not sufficient for activation.
+
+## Historical preceding continuation — production dispatch partial, native gate FAIL
 
 This section supersedes the older green snapshot below for current delivery. Functional HEAD **`bdfb1b21440df23506fad9f7083a39c849640fe8`**, same branch/private remote. Later commits are evidence-only. Real CI [36267318046](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36267318046): **FAIL**, Ubuntu SUCCESS / Windows FAIL.
 
