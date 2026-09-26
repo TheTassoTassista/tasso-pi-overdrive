@@ -9,7 +9,8 @@ import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 
 function probeMetadata(stdout, stderr, status) {
   const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'journalRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
-  const receipts = stdout.trim().split(/\r?\n/u).slice(0, 4).flatMap((line) => {
+  fields.push('nestedHostReadDenied', 'nestedAllPackagesDenied', 'nestedWorkspaceWrite', 'nestedWorkspaceWriteDenied', 'nestedNetworkDenied');
+  const receipts = stdout.trim().split(/\r?\n/u).slice(0, 8).flatMap((line) => {
     try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
     catch { return []; }
   });
@@ -184,12 +185,12 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
     } finally { await new Promise((resolve) => server.close(resolve)); }
   });
 }
-test('native LPAC nested subprocess tree: inherited denial, crash containment and durable cleanup', { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+for (const role of ['worker', 'tester', 'reviewer']) test(`native LPAC ${role} nested subprocess tree: inherited denial, crash containment and durable cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
   const server = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   let child, scopeId;
   try {
-    child = spawn(ownedWindowsHelper(), ['--confinement-failure-probe', process.execPath, 'worker', String(server.address().port), 'hold-tree'], { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
+    child = spawn(ownedWindowsHelper(), ['--confinement-failure-probe', process.execPath, role, String(server.address().port), 'hold-tree'], { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', (value) => { stdout += value; if (stdout.length > 65536) child.kill('SIGKILL'); });
     child.stderr.on('data', (value) => { stderr += value; if (stderr.length > 65536) child.kill('SIGKILL'); });
@@ -202,7 +203,11 @@ test('native LPAC nested subprocess tree: inherited denial, crash containment an
     scopeId = row.scopeId;
     assert.match(scopeId, /^[0-9a-f]{32}$/u);
     assert.equal(row.nestedHostReadDenied, true, 'actual nested token cannot read private fixture');
-    assert.equal(row.workspaceWrite, true);
+    assert.equal(row.nestedAllPackagesDenied, true, 'LPAC ALL_APPLICATION_PACKAGES opt-out must survive actual child creation');
+    assert.equal(row.workspaceWrite, role === 'worker');
+    assert.equal(row.nestedWorkspaceWrite, role === 'worker');
+    if (role !== 'worker') assert.equal(row.nestedWorkspaceWriteDenied, true);
+    assert.equal(row.nestedNetworkDenied, true);
     assert.equal(row.networkDenied, true);
     const pids = [row.ownedPid, row.middlePid, row.leafPid];
     assert.equal(new Set(pids).size, 3);

@@ -94,16 +94,19 @@ namespace Phi.Native {
           bool blocked = false;
           if (name == "parent-reparse-while-pinned") {
             using (RecoveryFilesystem pins = new RecoveryFilesystem(empty)) {
-              AppContainerScope.CreateOwnedJunction(empty, target);
-              try { pins.CreateChildDirectory("escape", Directory.GetAccessControl(target)); }
-              catch (InvalidDataException) { blocked = true; }
+              try { AppContainerScope.CreateOwnedJunction(empty, target); }
+              catch (Win32Exception error) { if (error.NativeErrorCode != 32 && error.NativeErrorCode != 33) throw; blocked = true; }
+              if (!blocked) {
+                try { pins.CreateChildDirectory("escape", Directory.GetAccessControl(target)); }
+                catch (InvalidDataException) { blocked = true; }
+              }
               if (Directory.Exists(Path.Combine(target, "escape"))) throw new InvalidDataException();
             }
             if (!blocked) throw new InvalidDataException();
           }
           // Positive control: with the authority handles closed, the identical
           // reparse operation must succeed and its real target must be readable.
-          if (name != "parent-reparse-while-pinned") AppContainerScope.CreateOwnedJunction(empty, target);
+          if ((File.GetAttributes(empty) & FileAttributes.ReparsePoint) == 0) AppContainerScope.CreateOwnedJunction(empty, target);
           if (File.ReadAllText(Path.Combine(empty, "sentinel.txt")) != "synthetic-unrelated") throw new InvalidDataException();
           if (name == "create-through-junction") {
             try { RecoveryFilesystem.CreateDirectory(Path.Combine(empty, "escape"), Directory.GetAccessControl(target), false); }
