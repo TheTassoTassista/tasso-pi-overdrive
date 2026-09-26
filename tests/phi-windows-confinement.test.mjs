@@ -11,16 +11,26 @@ function probeMetadata(stdout, stderr, status) {
   const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'journalRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'existingJunctionReadDenied', 'existingPrivateHardlinkReadDenied', 'existingReadOnlyHardlinkReadable', 'existingReadOnlyHardlinkWriteDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
   fields.push('nestedHostReadDenied', 'nestedAllPackagesDenied', 'nestedWorkspaceWrite', 'nestedWorkspaceWriteDenied', 'nestedNetworkDenied');
   const receipts = stdout.trim().split(/\r?\n/u).slice(0, 8).flatMap((line) => {
-    try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
+    try {
+      const row = JSON.parse(line), receipt = Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]));
+      if (typeof row.scopeId === 'string' && /^[0-9a-f]{32}$/u.test(row.scopeId)) receipt.scopeId = row.scopeId;
+      for (const key of ['ownedPid', 'middlePid', 'leafPid', 'supervisorPid']) if (Number.isInteger(row[key]) && row[key] > 0 && row[key] <= 2147483647) receipt[key] = row[key];
+      return [receipt];
+    }
     catch { return []; }
   });
   return JSON.stringify({ ...validationFailureEvidence('foundation-tests', { status, stderr }), receipts });
 }
 
-test('native probe failure details contain only whitelisted boolean metadata', () => {
+test('native probe failure details redact unknown private metadata', () => {
   const result = probeMetadata('{"hostReadDenied":false,"secret":"DO_NOT_ECHO","path":"PRIVATE_PATH"}', 'PHI_APPCONTAINER_PROBE_FAILED secret=DO_NOT_ECHO', 70);
   assert.doesNotMatch(result, /DO_NOT_ECHO|PRIVATE_PATH/u);
   assert.deepEqual(JSON.parse(result).receipts, [{ hostReadDenied: false }]);
+});
+test('primary native failure metadata retains only validated scope/PID correlation', () => {
+  const id = 'a'.repeat(32);
+  assert.deepEqual(JSON.parse(probeMetadata(JSON.stringify({ scopeId: id, ownedPid: 42, middlePid: -1, leafPid: 'PRIVATE', secret: 'DO_NOT_ECHO' }), '', 70)).receipts, [{ scopeId: id, ownedPid: 42 }]);
+  assert.deepEqual(JSON.parse(probeMetadata('{"scopeId":"PRIVATE","ownedPid":-1}', '', 70)).receipts, [{}]);
 });
 
 test('experimental LPAC primitive is separate from autonomous authority', () => {
@@ -194,7 +204,7 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
 for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'guardian'], ['worker', 'role'], ['tester', 'role'], ['worker', 'tool'], ['tester', 'tool'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
   const server = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  let child, scopeId;
+  let child, scopeId, stdout = '', stderr = '';
   try {
     const helper = ownedWindowsHelper();
     const args = ['--confinement-failure-probe', process.execPath, role, String(server.address().port), failure === 'timeout' ? 'timeout-tree' : 'hold-tree'];
@@ -206,7 +216,6 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
       child = spawn(process.execPath, ['-e', wrapper], { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     } else child = spawn(helper, args, { shell: false, windowsHide: true, env: { ...process.env, PHI_PROBE_GUARDIAN: String(process.pid) }, stdio: ['ignore', 'pipe', 'pipe'] });
     const closed = new Promise((resolve, reject) => { child.once('close', resolve); child.once('error', reject); });
-    let stdout = '', stderr = '';
     child.stdout.on('data', (value) => { stdout += value; if (stdout.length > 65536) child.kill('SIGKILL'); });
     child.stderr.on('data', (value) => { stderr += value; if (stderr.length > 65536) child.kill('SIGKILL'); });
     const deadline = Date.now() + 8000; const row = {};
@@ -249,12 +258,17 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     // startup recovery must reclaim its positively owned security resources.
     assert.equal(recover(scopeId).recovered, failure === 'supervisor' || failure === 'parent' ? 1 : 0);
     assert.equal(recover(scopeId).recovered, 0);
+  } catch (error) {
+    // Preserve the safe PRIMARY receipt before finally recovery can fail too.
+    // Never print the assertion message/stack or unfiltered child output.
+    console.error(`PHI_RECOVERY_PRIMARY_FAILURE:${probeMetadata(stdout, stderr, child?.exitCode ?? null)}`);
+    throw error;
   } finally {
     try { await terminateProbe(child); if (scopeId) recover(scopeId); }
     finally { await new Promise((resolve) => server.close(resolve)); }
   }
 });
-for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception', 'open-sharing-control', 'delete-pending-control', 'sharing-release', 'pending-release', 'sharing-cascade', 'pending-directory-control']) {
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception', 'open-sharing-control', 'delete-pending-control', 'sharing-release', 'pending-release', 'sharing-cascade', 'pending-directory-control', 'pending-directory-release']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     if (['open-sharing-control', 'delete-pending-control', 'pending-directory-control'].includes(name)) for (const failure of validationFailureEvidence('foundation-tests', result).filesystemFailures ?? []) console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
@@ -282,6 +296,7 @@ test('cleanup acquisition retries only proven native sharing/delete-pending stat
   assert.match(source, /out info, false, deadline/u);
   assert.match(source, /out info, true, deadline/u);
   assert.match(source, /if \(cleanupDeadline == null \|\| !transient \|\| cleanupDeadline.ElapsedMilliseconds >= 5000\) throw/u);
+  assert.match(source, /pendingDirectory = error == 145 && \(info.Attributes & 0x410\) == 0x10/u);
 });
 test('native recovery status is read-only and reports actual clean journal metadata', { skip: process.platform !== 'win32', timeout: 20000 }, () => {
   const result = spawnSync(ownedWindowsHelper(), ['--scope-recovery-status'], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });

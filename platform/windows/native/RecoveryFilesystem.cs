@@ -32,7 +32,7 @@ namespace Phi.Native {
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly string directoryPath;
-    internal static int TransientDeleteRetries;
+    internal static volatile int TransientDeleteRetries;
     internal static volatile int TransientOpenRetries;
     static void Failure(string operation, IntPtr parent, string name, uint access, uint share, uint options, int status, int error) {
       // Fixed operation names plus numeric/object metadata only. Never emit a
@@ -250,7 +250,12 @@ namespace Phi.Native {
         // Terminated process image/mapped sections can delay unlinking. Retry
         // only the SAME pinned object within the existing shared 5s deadline.
         // Never reopen paths or alter ACLs, attributes, content or identities.
-        if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33) || deadline.ElapsedMilliseconds >= 5000) {
+        // A child directory marked for deletion remains a directory entry
+        // until its last reference closes. Native control proves 145 here even
+        // after anchored enumeration completed. Retry ONLY this verified,
+        // ordinary directory handle; never rescan/delete newly appeared data.
+        bool pendingDirectory = error == 145 && (info.Attributes & 0x410) == 0x10;
+        if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33 && !pendingDirectory) || deadline.ElapsedMilliseconds >= 5000) {
           Console.Error.WriteLine("PHI_FILESYSTEM_HANDLE_DISPOSITION_FAILED");
           Failure("DISPOSITION", handle, null, 0x10000, 1, 4, 0, error);
           throw new Win32Exception(error);

@@ -277,7 +277,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception", "open-sharing-control", "delete-pending-control", "sharing-release", "pending-release", "sharing-cascade", "pending-directory-control" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception", "open-sharing-control", "delete-pending-control", "sharing-release", "pending-release", "sharing-cascade", "pending-directory-control", "pending-directory-release" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -318,18 +318,26 @@ namespace Phi.Native {
             throw new InvalidOperationException("PHI_FIXED_CREATION_EXCEPTION");
           }
           scope.Ready();
-          if (name == "pending-directory-control") {
+          if (name == "pending-directory-control" || name == "pending-directory-release") {
             string child = Path.Combine(scope.Root, "pending-child"); Directory.CreateDirectory(child);
             string identity = RecoveryFilesystem.DirectoryIdentity(child);
             IntPtr hold = CreateFileW(child, 0x80, 7, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
             if (hold == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
             try {
               if (RecoveryFilesystem.HandleIdentity(hold) != identity) throw new InvalidDataException();
-              bool denied = false;
-              try { scope.CleanupFiles(); }
-              catch (Win32Exception error) { if (error.NativeErrorCode != 145) throw; denied = true; }
-              if (!denied || RecoveryFilesystem.DirectoryIdentity(scope.Root) != (string)scope.record["rootIdentity"] || RecoveryFilesystem.HandleIdentity(hold) != identity) throw new InvalidDataException();
-            } finally { CloseHandle(hold); }
+              RecoveryFilesystem.TransientDeleteRetries = 0;
+              if (name == "pending-directory-release") {
+                using (Timer release = new Timer(delegate(object state) {
+                  if (RecoveryFilesystem.TransientDeleteRetries > 0) { IntPtr handle = Interlocked.Exchange(ref hold, IntPtr.Zero); if (handle != IntPtr.Zero) CloseHandle(handle); }
+                }, null, 0, 10)) scope.CleanupFiles();
+                if (RecoveryFilesystem.TransientDeleteRetries < 1 || Directory.Exists(scope.Root)) throw new InvalidDataException();
+              } else {
+                bool denied = false; Stopwatch elapsed = Stopwatch.StartNew();
+                try { scope.CleanupFiles(); }
+                catch (Win32Exception error) { if (error.NativeErrorCode != 145) throw; denied = true; }
+                if (!denied || elapsed.ElapsedMilliseconds < 4500 || elapsed.ElapsedMilliseconds > 7000 || RecoveryFilesystem.TransientDeleteRetries < 1 || RecoveryFilesystem.DirectoryIdentity(scope.Root) != (string)scope.record["rootIdentity"] || RecoveryFilesystem.HandleIdentity(hold) != identity) throw new InvalidDataException();
+              }
+            } finally { IntPtr handle = Interlocked.Exchange(ref hold, IntPtr.Zero); if (handle != IntPtr.Zero) CloseHandle(handle); }
           }
           if (name == "sharing-release") {
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");

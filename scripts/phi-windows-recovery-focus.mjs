@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 if (process.platform !== 'win32') throw new Error('PHI_NATIVE_WINDOWS_REQUIRED');
-const patterns = ['^native recovery pending-directory-control:', '^native LPAC worker timeout failure with nested tree:', ...['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'open-sharing-control', 'delete-pending-control', 'sharing-release', 'pending-release', 'sharing-cascade'].map((name) => `^native recovery ${name}:`)];
+const patterns = ['^native recovery pending-directory-control:', '^native recovery pending-directory-release:', '^native LPAC worker timeout failure with nested tree:', ...['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'open-sharing-control', 'delete-pending-control', 'sharing-release', 'pending-release', 'sharing-cascade'].map((name) => `^native recovery ${name}:`)];
 const runs = [...patterns.map((pattern) => ({ mode: 'INDIVIDUAL', pattern, required: 1 })), { mode: 'SEQUENTIAL', pattern: patterns.join('|'), required: patterns.length }];
 let failed = false;
 for (const { mode, pattern, required } of runs) {
