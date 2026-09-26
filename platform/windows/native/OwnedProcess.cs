@@ -162,7 +162,7 @@ namespace Phi.Native {
         Check(DuplicateHandle(self, GetStdHandle(-12), self, out error, 0, true, 2));
         phase = "ATTRIBUTES";
         IntPtr size = IntPtr.Zero;
-        int attributeCount = scope == null ? 2 : 4;
+        int attributeCount = scope == null ? 2 : scope.AttributeCount;
         InitializeProcThreadAttributeList(IntPtr.Zero, attributeCount, 0, ref size);
         if (size == IntPtr.Zero) throw new InvalidDataException();
         list = Marshal.AllocHGlobal(size); Check(InitializeProcThreadAttributeList(list, attributeCount, 0, ref size)); listReady = true;
@@ -203,6 +203,14 @@ namespace Phi.Native {
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
         catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:" + phase); return 70; }
       finally {
+        // On pre-resume attestation failure, closing a Job initiates asynchronous
+        // termination. Drain it before the outer scope deletes profile/state.
+        if (job != IntPtr.Zero) {
+          try {
+            Check(TerminateJobObject(job, 137)); DateTime end = DateTime.UtcNow.AddSeconds(5);
+            while (!EmptyJob(job) && DateTime.UtcNow < end) Thread.Sleep(10);
+          } catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_CLEANUP_UNATTESTED"); }
+        }
         // Closing the non-inherited last Job handle kills owned children even on exception.
         Close(ref job); Close(ref child.Thread); Close(ref child.Process); Close(ref guardian);
         Close(ref inputRead); Close(ref inputWrite); Close(ref output); Close(ref error);

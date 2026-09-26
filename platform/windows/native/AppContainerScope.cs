@@ -21,6 +21,8 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetTokenInformation(IntPtr token, int type, out uint value, uint size, out uint returned);
+    [DllImport("advapi32.dll", SetLastError=true, EntryPoint="GetTokenInformation")] static extern bool TokenBuffer(IntPtr token, int type, IntPtr buffer, uint size, out uint returned);
+    [DllImport("advapi32.dll")] static extern bool EqualSid(IntPtr first, IntPtr second);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -30,6 +32,8 @@ namespace Phi.Native {
     readonly IntPtr sid;
     IntPtr capabilities, policy;
     bool disposed;
+    bool optOut = true;
+    internal int AttributeCount { get { return optOut ? 4 : 3; } }
     internal bool TokenVerified { get; private set; }
     internal AppContainerScope() {
       profile = "Phi.Probe." + Guid.NewGuid().ToString("N");
@@ -43,8 +47,9 @@ namespace Phi.Native {
       } catch { Dispose(); throw; }
     }
     internal void ApplyAttributes(IntPtr list) {
+      TokenVerified = false;
       if (!UpdateProcThreadAttribute(list, 0, new IntPtr(0x20009), capabilities, new IntPtr(Marshal.SizeOf(typeof(Capabilities))), IntPtr.Zero, IntPtr.Zero) ||
-          !UpdateProcThreadAttribute(list, 0, new IntPtr(0x2000f), policy, new IntPtr(4), IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+          (optOut && !UpdateProcThreadAttribute(list, 0, new IntPtr(0x2000f), policy, new IntPtr(4), IntPtr.Zero, IntPtr.Zero))) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
     internal void VerifyToken(IntPtr process) {
       IntPtr token; if (!OpenProcessToken(process, 8, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -52,10 +57,27 @@ namespace Phi.Native {
         uint value, returned;
         if (!GetTokenInformation(token, 29, out value, 4, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
         if (returned != 4 || value != 1) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:APP:" + value + ":" + returned); throw new InvalidDataException(); }
-        if (!GetTokenInformation(token, 46, out value, 4, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        if (returned != 4 || value != 1) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:LPAC:" + value + ":" + returned); throw new InvalidDataException(); }
+        // Class 46 is rejected with ERROR_INVALID_PARAMETER by actual user-mode
+        // Windows. Do not fabricate that flag: query documented SID/capabilities,
+        // and prove ALL_APPLICATION_PACKAGES opt-out using an access canary below.
+        IntPtr buffer = Marshal.AllocHGlobal(256);
+        try {
+          if (!TokenBuffer(token, 30, buffer, 256, out returned) || returned < 4 || Marshal.ReadInt32(buffer) != 0) throw new InvalidDataException();
+          if (!TokenBuffer(token, 31, buffer, 256, out returned) || returned != IntPtr.Size || !EqualSid(Marshal.ReadIntPtr(buffer), sid)) throw new InvalidDataException();
+        } finally { Marshal.FreeHGlobal(buffer); }
         TokenVerified = true;
       } finally { CloseHandle(token); }
+    }
+    int RunAllPackagesControl(Dictionary<string, object> request, string runtime, string file) {
+      // Fixed, read-only positive control only. Never expose this mode in a
+      // request schema or route arbitrary code through ordinary AppContainer.
+      Dictionary<string, object> control = new Dictionary<string, object>(request);
+      control["cwd"] = runtime;
+      control["args"] = new string[] { "--no-addons", "-e", "let ok=false;try{ok=require('node:fs').readFileSync(process.argv[1],'utf8')==='synthetic-all-packages';}catch{}console.log(JSON.stringify({allPackagesReadControl:ok}));process.exit(ok?0:1);", file };
+      optOut = false;
+      try {
+        using (MemoryStream input = new MemoryStream(Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(control) + "\n"))) return OwnedProcess.Execute(input, this);
+      } finally { optOut = true; TokenVerified = false; }
     }
     static void LowLabel(string directory) {
       IntPtr descriptor = IntPtr.Zero;
@@ -107,6 +129,12 @@ namespace Phi.Native {
         string executable = Path.Combine(runtime, "node.exe"); File.Copy(node, executable, false);
         File.WriteAllText(Path.Combine(workspace, "fixture.txt"), "synthetic-input");
         File.WriteAllText(Path.Combine(secret, ".env"), "SYNTHETIC_PRIVATE_PROBE_ONLY");
+        string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
+        FileSecurity allAcl = new FileSecurity(); allAcl.SetAccessRuleProtection(true, false);
+        allAcl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, AccessControlType.Allow));
+        allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-15-2-1"), FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+        allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, AccessControlType.Allow));
+        File.SetAccessControl(allPackages, allAcl);
         string script = @"const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
 const [work,scratch,runtime,secret,port,role]=process.argv.slice(1);
 const result={role,workspaceRead:fs.readFileSync(path.join(work,'fixture.txt'),'utf8')==='synthetic-input'};
@@ -114,13 +142,14 @@ function denied(key,fn){try{fn();result[key]=false;}catch(e){result[key]=['EACCE
 denied('hostReadDenied',()=>fs.readFileSync(path.join(secret,'.env')));
 denied('hostWriteDenied',()=>fs.writeFileSync(path.join(secret,'escape.txt'),'synthetic'));
 denied('runtimeWriteDenied',()=>fs.writeFileSync(path.join(runtime,'escape.txt'),'synthetic'));
+denied('allPackagesReadDenied',()=>fs.readFileSync(path.join(runtime,'all-packages.txt')));
 try{fs.writeFileSync(path.join(scratch,'scratch.txt'),'synthetic');result.scratchWrite=true;}catch{result.scratchWrite=false;}
 try{fs.writeFileSync(path.join(work,'edit.txt'),'synthetic');result.workspaceWrite=true;}catch(e){result.workspaceWrite=false;result.workspaceWriteDenied=['EACCES','EPERM'].includes(e.code);}
 const s=net.connect({host:'127.0.0.1',port:Number(port)});s.setTimeout(1500);
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
-let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
@@ -136,6 +165,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         // to this fixed probe, never exposed as sandbox authority.
         int guardian; if (!Int32.TryParse(Environment.GetEnvironmentVariable("PHI_PROBE_GUARDIAN"), out guardian)) throw new InvalidDataException();
         request["guardianPid"] = guardian;
+        if (scope.RunAllPackagesControl(request, runtime, allPackages) != 0) throw new InvalidOperationException("PHI_APPCONTAINER_CONTROL_FAILED");
         byte[] input = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(request) + "\n");
         using (MemoryStream stream = new MemoryStream(input)) code = OwnedProcess.Execute(stream, scope);
         if (!scope.TokenVerified) code = 70;

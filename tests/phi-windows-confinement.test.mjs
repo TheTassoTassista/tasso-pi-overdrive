@@ -11,7 +11,9 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   const source = fs.readFileSync(new URL('../platform/windows/native/AppContainerScope.cs', import.meta.url), 'utf8');
   assert.match(source, /new IntPtr\(0x20009\)/u);
   assert.match(source, /new IntPtr\(0x2000f\)/u);
-  assert.match(source, /GetTokenInformation\(token, 46/u);
+  assert.match(source, /TokenBuffer\(token, 30/u);
+  assert.match(source, /EqualSid\(Marshal\.ReadIntPtr\(buffer\), sid\)/u);
+  assert.match(source, /allPackagesReadDenied/u);
   assert.match(source, /"S-1-3-4"/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
 });
@@ -29,9 +31,10 @@ for (const role of ['worker', 'tester', 'reviewer']) {
       const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
       clearTimeout(timer);
       assert.equal(code, 0, stderr);
-      const [receipt, cleanup] = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
+      const [control, receipt, cleanup] = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
+      assert.deepEqual(control, { allPackagesReadControl: true });
       assert.equal(receipt.role, role);
-      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
+      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
       assert.equal(receipt.workspaceWrite, role === 'worker');
       assert.deepEqual(cleanup, { tokenVerified: true, cleanup: 'PASS', scope: 'FIXED_SYNTHETIC_PROBE_ONLY' });
     } finally { child?.kill('SIGKILL'); await new Promise((resolve) => server.close(resolve)); }
