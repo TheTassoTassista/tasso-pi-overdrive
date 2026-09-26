@@ -12,18 +12,20 @@ Phi 1.0.0 uses pinned Pi 0.87.1 and Node >=22.19.0. It is private/unpublished; t
 
 ## Start and customize
 
-From the source checkout with the existing verified Linux Pi installation:
+With the existing verified Linux Pi installation, migrate the command without changing credentials or routing:
 
 ```sh
-node bin/phi.mjs doctor
-node bin/phi.mjs
-node bin/phi.mjs --theme aurora
-node bin/phi.mjs theme set gold
+sh bootstrap/linux.sh --plan
+sh bootstrap/linux.sh
+phi doctor
+phi
+phi --theme aurora
+phi theme set gold
 ```
 
-The installer for the short `phi` command is the next migration checkpoint. Until then, the direct Node entry point is equivalent and does not change your existing `pi` command, credentials or routing.
+The foundation installer creates the user-local wrapper; add its reported directory to PATH if necessary. `node bin/phi.mjs` is the equivalent direct entry point. Existing `pi`, credentials and routing remain untouched. Native Windows foundation: `powershell -NoProfile -File bootstrap/windows.ps1` (engine remains blocked). See [migration and recovery](docs/phi-recovery.md).
 
-Built-in themes: `aurora`, `cyber`, `gold`, `gothic`, `mono`. Themes are local preferences. `NO_COLOR`, non-interactive output, narrow terminals and ambiguous Unicode consoles have readable fallbacks. RPC/print protocol output never gets a splash injected into it.
+Built-in header/splash themes: `aurora`, `cyber`, `gold`, `gothic`, `mono`. Preferences persist locally; the upstream editor/footer theme is unchanged. `NO_COLOR`, non-interactive output, narrow terminals and ambiguous Unicode consoles have readable fallbacks. RPC/print protocol output never gets a splash injected into it.
 
 ## Doctor
 

@@ -17,7 +17,7 @@ const temp = mkdtempSync(path.join(tmpdir(), 'pi-overdrive-typecheck-'));
 const project = path.join(temp, 'project');
 try {
   mkdirSync(project, { recursive: true });
-  for (const item of ['extensions', 'lib', 'config', 'package.json', 'tsconfig.json']) cpSync(path.join(root, item), path.join(project, item), { recursive: true });
+  for (const item of ['extensions', 'lib', 'config', 'branding', 'themes', 'package.json', 'tsconfig.json']) cpSync(path.join(root, item), path.join(project, item), { recursive: true });
   symlinkSync(path.join(root, 'runtime'), path.join(project, 'runtime'), 'dir');
   const modules = path.join(project, 'node_modules');
   mkdirSync(path.join(modules, '@earendil-works'), { recursive: true });

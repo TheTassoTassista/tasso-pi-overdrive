@@ -7,7 +7,7 @@ This is a migration matrix, not a parity certificate. The current complete engin
 | Identity / themes | branding + portable CLI | ANSI / UTF-8 / ASCII | same renderer, conservative legacy console fallback | Linux unit PASS; native Windows pending |
 | Config discovery | platform directory adapter | XDG + existing private Pi state | LocalAppData + existing Pi state | path units PASS; NTFS ACL attestation pending |
 | Protected config I/O | canonical/no-link/identity checks | owner UID, mode, inode, no-follow | junction checks; ACL enforcement still needed | Linux negative tests PASS; not autonomous confinement |
-| Launcher process ownership | runOwnedEngine | owned POSIX group + exit/timeout cleanup | Job Object backend required | Linux descendant test PASS; Windows BLOCKED |
+| Launcher process ownership | launchEngine / runOwnedEngine | interactive exec/same PID; local-check owned groups + exit/timeout cleanup | Job Object backend required | Linux PID/arguments/exit and descendant termination tests PASS; Windows BLOCKED |
 | Command sandbox | SandboxBackend readiness contract | existing argument-vector + Bubblewrap | AppContainer/restricted-token backend required | Linux existing baseline PASS; Windows BLOCKED |
 | Worktree / runtime | existing Git + allocation policy | existing secure native worktrees, ports/state/profile | Git for Windows + ACL/reparse validation required | Windows pending |
 | Governors / role routing | current shared policy/controller | unchanged verified implementation | enforcement requires adapter integration | no route/policy changes |

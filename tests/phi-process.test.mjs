@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { runOwnedEngine } from '../platform/shared/process.mjs';
 
-test('Linux owned launcher reaps a descendant after parent exit', { skip: process.platform !== 'linux' }, async () => {
+test('Linux owned local verification terminates a descendant after parent exit', { skip: process.platform !== 'linux' }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-process-'));
   const pidFile = path.join(root, 'child.pid');
   try {
@@ -15,6 +16,14 @@ test('Linux owned launcher reaps a descendant after parent exit', { skip: proces
     await new Promise((resolve) => setTimeout(resolve, 30));
     try { const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); assert.equal(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0], 'Z'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+test('Linux interactive engine exec preserves PID/arguments/environment/exit without a wrapper child', { skip: process.platform !== 'linux' }, () => {
+  const module = new URL('../platform/shared/process.mjs', import.meta.url).href;
+  const engine = "console.log(JSON.stringify({samePid:process.pid===Number(process.env.PHI_EXPECT_PID),argument:process.argv[1],environment:process.env.PHI_MARKER}));process.exit(7);";
+  const script = `import {launchEngine} from ${JSON.stringify(module)}; await launchEngine(process.execPath, ['-e',${JSON.stringify(engine)},'fixture argument'], {...process.env,PHI_EXPECT_PID:String(process.pid),PHI_MARKER:'preserved'});`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', shell: false });
+  assert.equal(result.status, 7, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { samePid: true, argument: 'fixture argument', environment: 'preserved' });
 });
 test('Linux owned process timeout is bounded and propagates failure', { skip: process.platform !== 'linux' }, async () => {
   assert.equal(await runOwnedEngine(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore', timeoutMs: 60 }), 124);

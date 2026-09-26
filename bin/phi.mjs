@@ -1,14 +1,26 @@
 #!/usr/bin/env node
-import { PRODUCT, THEMES, renderSplash, terminalCapabilities, themeName } from '../branding/terminal.mjs';
+import { fileURLToPath } from 'node:url';
+import { PRODUCT, THEMES, renderSplash, themeName } from '../branding/terminal.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
-import { runOwnedEngine } from '../platform/shared/process.mjs';
+import { launchEngine, runOwnedEngine } from '../platform/shared/process.mjs';
 import { readPhiConfig, setPhiTheme } from '../lib/phi-config.mjs';
-import { phiDoctor, doctorStartupState } from '../lib/phi-doctor.mjs';
+import { phiDoctor } from '../lib/phi-doctor.mjs';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
 
 async function main(args) {
   if (args[0] === '--version') { console.log(`Phi ${PRODUCT.version} (Pi ${PRODUCT.piVersion})`); return; }
-  if (args[0] === '--help') { console.log('Phi — intelligent coding system\n\nphi [--theme NAME] [Pi arguments]\nphi doctor [--json]\nphi theme list|set NAME\nphi splash [--compact] [--theme NAME]\n\nLinux engine available; Windows engine fails closed pending native sandbox.'); return; }
+  if (args[0] === '--help') { console.log('Phi — intelligent coding system\n\nphi [--theme NAME] [Pi arguments]\nphi doctor [--json]\nphi verify\nphi theme list|set NAME\nphi splash [--compact] [--theme NAME]\nphi backup\nphi restore BACKUP [--apply]\n\nLinux engine available; Windows engine fails closed pending native sandbox.'); return; }
+  if (args[0] === 'backup' || args[0] === 'restore') {
+    const { createPhiBackup, restorePhiBackup } = await import('../lib/phi-backup.mjs');
+    if (args[0] === 'backup' && args.length === 1) console.log(JSON.stringify(createPhiBackup(), null, 2));
+    else if (args[0] === 'restore' && args.length >= 2 && args.length <= 3 && (!args[2] || args[2] === '--apply')) console.log(JSON.stringify(restorePhiBackup(args[1], { apply: args[2] === '--apply' }), null, 2));
+    else throw new Error('PHI_USAGE: phi backup | phi restore BACKUP --apply');
+    return;
+  }
+  if (args[0] === 'verify' && args.length === 1) {
+    process.exitCode = await runOwnedEngine(process.execPath, [fileURLToPath(new URL('../scripts/phi-check.mjs', import.meta.url))]);
+    return;
+  }
   if (args[0] === 'theme') {
     if (args[1] === 'list' && args.length === 2) { console.log(Object.keys(THEMES).join('\n')); return; }
     if (args[1] === 'set' && args.length === 3) { console.log(`Phi theme: ${setPhiTheme(args[2]).theme}`); return; }
@@ -38,10 +50,8 @@ async function main(args) {
   for (const name of ['Pi runtime', 'Package configuration', 'GPT default', 'Sandbox']) {
     if (!report.checks.some((row) => row.capability === name && row.status === 'PASS')) throw new Error(`PHI_STARTUP_BLOCKED: ${name}; run phi doctor`);
   }
-  const protocol = args.includes('--mode') || args.includes('--print') || args.includes('-p') || args.includes('--list-models') || args.includes('--list-tools');
-  if (process.stdout.isTTY && !protocol) process.stdout.write(renderSplash({ theme, state: doctorStartupState(report) }));
   const runtime = discoverPiRuntime();
-  process.exitCode = await runOwnedEngine(runtime.node, [runtime.entry, ...args]);
+  await launchEngine(runtime.node, [runtime.entry, ...args], { ...process.env, PHI_LAUNCH: '1', PHI_THEME: theme });
 }
 
 main(process.argv.slice(2)).catch((error) => {

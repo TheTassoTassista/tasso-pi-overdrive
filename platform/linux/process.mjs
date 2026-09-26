@@ -1,5 +1,12 @@
 import { spawn } from 'node:child_process';
 
+export function execEngine(command, args, env = process.env) {
+  if (typeof process.execve !== 'function') throw new Error('PHI_EXEC_BACKEND_UNAVAILABLE');
+  // Preserve the legacy launcher's exec semantics: same PID and no additional
+  // supervisor that could leave Pi behind if the wrapper itself is SIGKILLed.
+  process.execve(command, [command, ...args], env);
+}
+
 // Trusted launcher process ownership, NOT sandboxing. Autonomous tools continue
 // to use their existing Bubblewrap backend. Never kill arbitrary stored PIDs.
 export async function runOwnedEngine(command, args, { env = process.env, stdio = 'inherit', timeoutMs = 0 } = {}) {

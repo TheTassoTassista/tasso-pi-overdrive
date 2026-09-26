@@ -105,6 +105,7 @@
   },
   "pi": {
     "extensions": [
+      "./extensions/phi-branding.ts",
       "./extensions/omniroute.ts",
       "./extensions/secure-workflow.ts",
       "./extensions/agent-hub.ts",

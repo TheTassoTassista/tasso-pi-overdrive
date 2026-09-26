@@ -53,7 +53,17 @@ if [[ \"\${1:-}\" == --hold ]]; then /usr/bin/sleep 2; fi`);
   return { root, calls, env };
 }
 
-test("launcher starts each service once, uses true headless mode, and execs real Pi", () => {
+async function waitForDashboardCalls(setup, expected) {
+  const file = path.join(setup.calls, 'browser');
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    if (existsSync(file) && readFileSync(file, 'utf8').split('\n').filter(Boolean).length === expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.fail(`dashboard mock did not durably record ${expected} calls within the bounded wait`);
+}
+
+test("launcher starts each service once, uses true headless mode, and execs real Pi", async () => {
   const setup = fixture();
   try {
     for (let run = 0; run < 2; run += 1) {
@@ -63,11 +73,26 @@ test("launcher starts each service once, uses true headless mode, and execs real
     assert.equal(readFileSync(path.join(setup.calls, "omniroute"), "utf8"), "--headless\n");
     assert.equal(readFileSync(path.join(setup.calls, "sudo"), "utf8"), `-n ${path.join(setup.root, "bin", "docker")} start pi-overdrive-searxng\n`);
     assert.equal(readFileSync(path.join(setup.calls, "pi"), "utf8"), "--version\n--version\n");
+    // Dashboard launch intentionally runs in the background. Pi exit cannot
+    // certify that the mock has already written its independent receipt.
+    await waitForDashboardCalls(setup, 2);
     assert.equal(readFileSync(path.join(setup.calls, "browser"), "utf8"), "http://127.0.0.1:20128\nhttp://127.0.0.1:20128\n");
     assert.equal(readFileSync(path.join(setup.calls, "memory"), "utf8"), "start\nstart\n");
   } finally {
     rmSync(setup.root, { recursive: true, force: true });
   }
+});
+
+test("launcher dashboard evidence waits for actual asynchronous completion, not Pi exit", async () => {
+  const setup = fixture();
+  try {
+    executable(path.join(setup.root, 'bin', 'xdg-open'), '/usr/bin/sleep 0.15\nprintf "%s\\n" "$*" >> "$PI_TEST_ROOT/calls/browser"');
+    const result = spawnSync(launcher, ['--version'], { env: setup.env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    await waitForDashboardCalls(setup, 1);
+    assert.equal(readFileSync(path.join(setup.calls, 'browser'), 'utf8'), 'http://127.0.0.1:20128\n');
+    assert.equal(readFileSync(path.join(setup.calls, 'pi'), 'utf8'), '--version\n');
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
 });
 
 test("launcher fails closed and never runs Pi when OmniRoute stays unhealthy", () => {

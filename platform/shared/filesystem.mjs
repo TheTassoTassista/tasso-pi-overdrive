@@ -43,20 +43,24 @@ export function readLocalJson(file, fallback = null) {
   } finally { fs.closeSync(fd); }
 }
 
-export function writeLocalJson(file, value) {
+export function writeLocalText(file, value, mode = 0o600) {
   inspectLocalPath(file);
   const parent = path.dirname(file);
   if (!inspectLocalPath(parent, { directory: true }).exists) fs.mkdirSync(parent, { recursive: true, mode: 0o700 });
   inspectLocalPath(parent, { directory: true });
-  if (process.platform !== 'win32' && (fs.lstatSync(parent).mode & 0o077) !== 0) throw new Error('PHI_CONFIG_PERMISSIONS_DENIED');
+  if (process.platform !== 'win32' && (fs.lstatSync(parent).mode & 0o022) !== 0) throw new Error('PHI_CONFIG_PERMISSIONS_DENIED');
   const canonical = fs.realpathSync(parent);
   const temp = path.join(canonical, `.phi-${randomUUID()}.tmp`);
-  const fd = fs.openSync(temp, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
+  const fd = fs.openSync(temp, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), mode);
   try {
-    fs.writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    fs.writeFileSync(fd, value, 'utf8');
     fs.fsyncSync(fd);
     if (fs.realpathSync(parent) !== canonical) throw new Error('PHI_CONFIG_PARENT_CHANGED');
     inspectLocalPath(file);
     fs.renameSync(temp, file);
   } finally { fs.closeSync(fd); if (fs.existsSync(temp)) fs.unlinkSync(temp); }
+}
+
+export function writeLocalJson(file, value) {
+  writeLocalText(file, `${JSON.stringify(value, null, 2)}\n`);
 }

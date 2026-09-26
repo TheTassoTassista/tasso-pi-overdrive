@@ -5,3 +5,8 @@ runtime/lsp/.managed-install-*/
 runtime/lsp/.managed-previous-*/
 runtime/dap/python/
 runtime/dap/.install-*/
+/node_modules/
+/.phi/
+/.phi-cache/
+.env
+.env.*
