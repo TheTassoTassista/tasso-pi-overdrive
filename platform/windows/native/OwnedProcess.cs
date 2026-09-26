@@ -201,7 +201,7 @@ namespace Phi.Native {
         writeHandle.Dispose();
         return code <= 255 ? (int)code : 1;
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
-        catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED"); return 70; }
+        catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:" + phase); return 70; }
       finally {
         // Closing the non-inherited last Job handle kills owned children even on exception.
         Close(ref job); Close(ref child.Thread); Close(ref child.Process); Close(ref guardian);

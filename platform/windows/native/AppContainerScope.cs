@@ -50,8 +50,10 @@ namespace Phi.Native {
       IntPtr token; if (!OpenProcessToken(process, 8, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
       try {
         uint value, returned;
-        if (!GetTokenInformation(token, 29, out value, 4, out returned) || returned != 4 || value != 1 ||
-            !GetTokenInformation(token, 46, out value, 4, out returned) || returned != 4 || value != 1) throw new InvalidOperationException("PHI_APPCONTAINER_TOKEN_REJECTED");
+        if (!GetTokenInformation(token, 29, out value, 4, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (returned != 4 || value != 1) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:APP:" + value + ":" + returned); throw new InvalidDataException(); }
+        if (!GetTokenInformation(token, 46, out value, 4, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (returned != 4 || value != 1) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:LPAC:" + value + ":" + returned); throw new InvalidDataException(); }
         TokenVerified = true;
       } finally { CloseHandle(token); }
     }
