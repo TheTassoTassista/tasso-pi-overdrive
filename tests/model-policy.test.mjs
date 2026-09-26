@@ -62,6 +62,12 @@ test("Normal Work exact direct role targets and efforts are explicit", () => {
   assert.ok(Object.values(resolved.roles).filter((route) => route.provider === "openai-codex").every((route) => ["low", "medium", "high"].includes(route.thinking)));
 });
 
+test("fresh-bootstrap subagent overrides match the resolved callable Normal route", () => {
+  const patch = JSON.parse(fs.readFileSync(new URL("../config/settings-patch.json", import.meta.url), "utf8"));
+  const resolved = resolveModelPolicy(directCatalog, policy(), options(directCatalog));
+  assert.deepEqual(patch.subagents.agentOverrides, settingsAgentOverrides(resolved));
+});
+
 test("Token Saver is Luna-first and skips unpriced gateway routes even when fixture-callable", () => {
   const resolved = resolveModelPolicy(fullCatalog, policy("token-saver"), options(fullCatalog));
   assert.equal(resolved.roles.scout.model, "openai-codex/gpt-6-luna");

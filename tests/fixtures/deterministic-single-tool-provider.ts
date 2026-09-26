@@ -83,8 +83,8 @@ export default function registerSingleToolProvider(pi: ExtensionAPI): void {
 		apiKey: "$PI_OVERDRIVE_TOOL_AUDIT_KEY",
 		api: "pi-overdrive-tool-audit-api",
 		models: [
-			{ id: "single-tool-driver", name: "Pi Overdrive deterministic single-tool driver", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 },
-			{ id: "single-tool-driver-alt", name: "Pi Overdrive deterministic alternate model", reasoning: true, input: ["text"], cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.5 }, contextWindow: 16384, maxTokens: 2048 },
+			{ id: "single-tool-driver", name: "Pi Overdrive deterministic single-tool driver", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 1024 },
+			{ id: "single-tool-driver-alt", name: "Pi Overdrive deterministic alternate model", reasoning: true, input: ["text"], cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.5 }, contextWindow: 32768, maxTokens: 2048 },
 		],
 		streamSimple: streamSingleTool,
 	});

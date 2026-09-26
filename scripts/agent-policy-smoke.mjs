@@ -51,7 +51,7 @@ try {
   const details = event?.result?.details;
   const serialized = JSON.stringify(details ?? text);
   const expected = ["scout", "planner", "oracle", "worker", "tester", "correctness-reviewer", "security-reviewer", "simplicity-reviewer", "council-1", "council-2", "council-3", "council-judge"];
-  check("subagent-capability-call-succeeded", event?.isError === false, event ? { isError: event.isError } : stderr || "missing tool result");
+  check("subagent-capability-call-succeeded", event?.isError === false, event ? { isError: event.isError } : { stderr: stderr || undefined, eventTypes: events.map((item) => item.type).slice(-30), stops: events.filter((item) => item.type === "message_end").map((item) => ({ role: item.message?.role, reason: item.message?.stopReason })) });
   check("all-twelve-agents-discovered", expected.every((agent) => serialized.includes(`\"${agent}\"`) || serialized.includes(agent)), expected);
   check("tester-runtime-surface-is-read-only", serialized.includes("tester") && !/^tools:.*\b(?:bash|safe_exec|safe_remove_file|edit|write)\b/mu.test(fs.readFileSync(path.join(packageRoot, "agents", "tester.md"), "utf8")), "Tester definition excludes mutation and general command tools; runtime capability listing loaded it");
   check("worker-runtime-surface-has-no-shell", serialized.includes("worker") && !/^tools:.*\bbash\b/mu.test(fs.readFileSync(path.join(packageRoot, "agents", "worker.md"), "utf8")), "Worker definition excludes bash; runtime capability listing loaded it");

@@ -82,7 +82,7 @@ export default function registerRuntimeAuditProvider(pi: ExtensionAPI): void {
 		baseUrl: "http://127.0.0.1.invalid",
 		apiKey: "$PI_OVERDRIVE_RUNTIME_AUDIT_KEY",
 		api: "pi-overdrive-runtime-audit-api",
-		models: [{ id: modelId, name: "Pi Overdrive deterministic runtime driver", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 }],
+		models: [{ id: modelId, name: "Pi Overdrive deterministic runtime driver", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 32768, maxTokens: 1024 }],
 		streamSimple: streamRuntimeAudit,
 	});
 }

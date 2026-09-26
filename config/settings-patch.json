@@ -63,39 +63,39 @@
     },
     "agentOverrides": {
       "scout": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "openai-codex/gpt-6-luna",
         "thinking": "low"
       },
       "planner": {
-        "model": "openai-codex/gpt-5.6-sol",
-        "thinking": "high"
+        "model": "openai-codex/gpt-6-sol",
+        "thinking": "medium"
       },
       "oracle": {
         "model": "openai-codex/gpt-6-astra",
         "thinking": "high"
       },
       "worker": {
-        "model": "openai-codex/gpt-5.6-terra",
-        "thinking": "high"
+        "model": "openai-codex/gpt-6-sol",
+        "thinking": "medium"
       },
       "tester": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "openai-codex/gpt-6-luna",
         "thinking": "medium"
       },
       "correctness-reviewer": {
-        "model": "openai-codex/gpt-5.6-sol",
-        "thinking": "high"
+        "model": "openai-codex/gpt-6-sol",
+        "thinking": "medium"
       },
       "security-reviewer": {
-        "model": "openai-codex/gpt-5.6-sol",
+        "model": "openai-codex/gpt-6-sol",
         "thinking": "high"
       },
       "simplicity-reviewer": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "openai-codex/gpt-6-luna",
         "thinking": "medium"
       },
       "council-1": {
-        "model": "openai-codex/gpt-5.6-sol",
+        "model": "openai-codex/gpt-6-sol",
         "thinking": "high"
       },
       "council-2": {
@@ -103,7 +103,7 @@
         "thinking": "high"
       },
       "council-3": {
-        "model": "openai-codex/gpt-5.6-luna",
+        "model": "openai-codex/gpt-6-luna",
         "thinking": "high"
       },
       "council-judge": {

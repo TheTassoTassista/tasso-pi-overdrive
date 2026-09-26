@@ -92,7 +92,9 @@ if (action === 'enable') {
   manifest.appliedFields = Object.fromEntries(Object.keys(patch).map((key) => [key, clone(enabled[key])]));
   manifest.packageRoot = packageRoot ?? manifest.packageRoot;
   manifest.enabledAt = new Date().toISOString();
-  await atomicWrite(settingsPath, enabled, manifest.settingsMode ?? 0o600);
+  // Active routing synchronizes subagent overrides only from owner-only settings.
+  // Preserve the original mode in the manifest for disable/restore, not enable.
+  await atomicWrite(settingsPath, enabled, 0o600);
   await atomicWrite(manifestPath, manifest);
   process.stdout.write('Pi Overdrive settings enabled.\n');
   process.exit(0);

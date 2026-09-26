@@ -17,6 +17,7 @@ import { availableContextFromPiUsage, resolveTaskPolicy, taskPolicyMetadata, val
 import { classifyDelegationFailure } from "../lib/delegation-failure.mjs";
 import { executeDelegationWithRetry } from "../lib/delegation-retry.mjs";
 import { canonicalizeDelegationResponse } from "../lib/delegation-response.mjs";
+import { subagentDelegationRequest } from "../lib/subagent-delegation-request.mjs";
 import { assertConfiguredSpawnBudget, createWorkflowSpawnBudgetGuard, readConfiguredSpawnLimit, workflowSpawnBudgetForRequest } from "../lib/workflow-spawn-budget.mjs";
 import { aggregateUsageAttempts, normalizeProviderUsage, usageAttemptFromReceipt } from "../lib/usage-accounting.mjs";
 import { createSecondBrainRuntime } from "../lib/second-brain-runtime.mjs";
@@ -407,16 +408,15 @@ export default function (pi: ExtensionAPI) {
           failWithReceipt("timed_out", `${agent} delegation timed out`);
         }, 20 * 60 * 1000);
         signal?.addEventListener("abort", abort, { once: true });
-          pi.events.emit(REQUEST_EVENT, {
-          requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
-          model: route.model,
-          thinking: route.thinking,
-          timeoutMs: 18 * 60 * 1000,
-          toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
-          harnessProfile: modelHarnessProfileMetadata(harnessProfile, harnessSelection),
-          artifacts: false,
+        pi.events.emit(REQUEST_EVENT, subagentDelegationRequest({
+            requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
+            model: route.model,
+            thinking: route.thinking,
+            timeoutMs: 18 * 60 * 1000,
+            toolBudget: { soft: 24, hard: 40, block: ["subagent", "bash"] },
+            artifacts: false,
             result,
-          });
+        }));
       });
       const delegate = async (input: DelegationInput): Promise<Record<string, any>> => executeDelegationWithRetry(async (attempt: number) => {
         if (signal?.aborted) throw new Error(`${input.agent} delegation cancelled`);
