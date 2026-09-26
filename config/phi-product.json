@@ -1,0 +1,11 @@
+{
+  "name": "Phi",
+  "symbol": "Φ",
+  "command": "phi",
+  "version": "1.0.0",
+  "piVersion": "0.87.1",
+  "nodeMinimum": "22.19.0",
+  "defaultTheme": "aurora",
+  "phase": "portable-foundation",
+  "windowsAutonomousReady": false
+}

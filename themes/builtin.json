@@ -1,0 +1,7 @@
+{
+  "aurora": { "colors": ["#63e6be", "#74c0fc", "#b197fc"] },
+  "cyber": { "colors": ["#22d3ee", "#a78bfa", "#f472b6"] },
+  "gold": { "colors": ["#ffe8a1", "#fcc419", "#ff922b"] },
+  "gothic": { "colors": ["#ced4da", "#9775fa", "#e599f7"] },
+  "mono": { "colors": [] }
+}
