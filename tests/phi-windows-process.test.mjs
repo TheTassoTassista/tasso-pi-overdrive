@@ -7,6 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsProcessRequest, WINDOWS_PROCESS_LIMITS, runOwnedEngine } from '../platform/windows/process.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
+import { buildWindowsProcess } from '../platform/windows/build-process.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 20000 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,6 +49,10 @@ test('non-native process execution fails closed instead of using a mock backend'
   assert.throws(() => ownedWindowsHelper(), /PLATFORM_UNSUPPORTED/u);
   assert.throws(() => windowsProcessRequest(process.execPath, []), /PLATFORM_UNSUPPORTED/u);
   assert.deepEqual(windowsBuildEnvironment(), { status: 'NOT_NATIVE_WINDOWS' });
+  assert.throws(() => buildWindowsProcess(), /PLATFORM_UNSUPPORTED/u);
+});
+test('native Windows tracked-source process build is idempotent with matching hashes', native, () => {
+  assert.deepEqual(buildWindowsProcess(), { status: 'ALREADY_BUILT', abi: 1, scope: 'TRUSTED_PROCESS_OWNERSHIP_NOT_SANDBOX' });
 });
 test('native Windows stdio, cwd, Unicode environment and CRT argv roundtrip', native, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-win-process-'));
