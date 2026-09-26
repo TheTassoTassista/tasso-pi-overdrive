@@ -8,7 +8,7 @@ This is a migration matrix, not a parity certificate. The current complete engin
 | Config discovery | platform directory adapter | XDG + existing private Pi state | LocalAppData + existing Pi state | path units PASS; NTFS ACL attestation pending |
 | Protected config I/O | canonical/no-link/identity checks | owner UID, mode, inode, no-follow | junction/hard-link tests PASS; ACL enforcement still needed | native Linux/Windows foundation negative tests PASS; not autonomous confinement |
 | Launcher process ownership | launchEngine / runOwnedEngine | interactive exec/same PID; local-check owned groups + exit/timeout cleanup | trusted non-interactive atomic Job assignment, guardian handle, kill-on-close | actual native argv/stdio/cancellation/timeout/caller/helper death and descendant cleanup PASS; interactive/untrusted coding still BLOCKED |
-| Command sandbox | SandboxBackend readiness contract | existing argument-vector + Bubblewrap | AppContainer/restricted-token backend required | Linux existing baseline PASS; Windows BLOCKED |
+| Command sandbox | SandboxBackend readiness contract | existing argument-vector + Bubblewrap | actual LPAC + Job + role-ACL fixed synthetic primitive; generic backend/tool authority not integrated | native primitive evidence recorded separately; Windows coding BLOCKED |
 | Worktree / runtime | existing Git + allocation policy | existing secure native worktrees, ports/state/profile | Git for Windows + ACL/reparse validation required | Windows pending |
 | Governors / role routing | current shared policy/controller | unchanged verified implementation | enforcement requires adapter integration | no route/policy changes |
 | Receipts / recovery / locks | current journal contracts | immutable private links/permissions + boot/start identity | atomic NTFS/ACL and process-creation identity required | Windows pending |
@@ -30,6 +30,8 @@ Native foundation evidence: hosted Actions run [36229995302](https://github.com/
 [Microsoft Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) provides process-tree lifecycle/resource controls, including kill-on-close. It does not on its own supply filesystem/network isolation; process security must be established separately. Child creation must be suspended until job assignment and restricted token/AppContainer setup succeed. Neither ACL-only confinement nor `taskkill` alone is an acceptable sandbox substitute.
 
 Windows engine launch is refused until those properties and native tests are implemented. Do not advertise WSL or Docker/Linux containers as Windows support.
+
+Later native checkpoint adds separately tested LPAC role confinement, exact token/capability attestation, private registry/process-handle denial, actual file/alias/network tests and ordinary cleanup. This is **FIXED_SYNTHETIC_PROBE_ONLY**, not Windows core parity. See `docs/phi-native-confinement-evidence.json` for its source/run identity and counts; historical foundation counts above are not the current expanded-suite total. Generic untrusted execution, controller crash journals and native filesystem/tool integration remain required before flipping readiness.
 
 ## Naming disposition
 

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "scope": "FIXED_SYNTHETIC_LPAC_PROBE_ONLY_NOT_WINDOWS_CODING_SANDBOX",
+  "functionalHead": "2b743cd7274470ba8b8c621a2c2a04ea9caacc12",
+  "branch": "feature/routing-presets-quality",
+  "runId": 36246587895,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36246587895",
+  "conclusion": "success",
+  "newPiModelCalls": 0,
+  "privateAuthCopied": false,
+  "ignoredRuntimesCopied": false,
+  "wsl": false,
+  "runners": [
+    { "os": "windows-latest", "tests": 58, "passed": 51, "failed": 0, "skipped": 7, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 58, "passed": 51, "failed": 0, "skipped": 7 }, "cleanup": "PASS" },
+    { "os": "ubuntu-latest", "tests": 58, "passed": 46, "failed": 0, "skipped": 12, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 58, "passed": 46, "failed": 0, "skipped": 12 }, "cleanup": "PASS" }
+  ],
+  "localAuthoritativeLinux": { "tests": 591, "passed": 579, "failed": 0, "windowsOnlySkipped": 12, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS" },
+  "roles": ["worker", "tester", "reviewer"],
+  "processBackend": "WINDOWS_JOB_OBJECT_ATOMIC_CREATEPROCESS_ASSIGNMENT",
+  "probeConfinement": "LPAC_FIXED_CAPABILITY_ROLE_ACL_LOW_INTEGRITY_OWNED_FIXTURES",
+  "capabilities": ["registryRead"],
+  "attestation": ["suspended child AppContainer token", "exact random profile SID", "exact single enabled capability", "ordinary read-only ALL_APPLICATION_PACKAGES control", "LPAC denial of same control file"],
+  "runtimeDenials": ["private synthetic registry ACCESS_DENIED", "guardian PROCESS_DUP_HANDLE ACCESS_DENIED", "protected/runtime WRITE_DAC", "private file read/write", "runtime file write/rename", "extended private path", "existing alternate data stream", "pre-existing NTFS junction read", "pre-existing private hardlink read", "pre-existing read-only hardlink write", "attempted junction/hardlink escape", "live listening loopback network"],
+  "positiveControls": ["host reads real ADS bytes", "host reads real junction/hardlink targets", "role reads allowed read-only hardlink", "scratch writable", "Worker workspace writable", "Tester/reviewer workspace read-only", "host originals unchanged after role execution", "junction target survives non-recursive unlink"],
+  "cleanup": "PASS_NORMAL_PROBE_PROFILE_FILES_REGISTRY_AND_OWNED_PROCESS_TREE",
+  "autonomousReady": false,
+  "windowsCodingE2E": "NOT_RUN_UNSAFE_ENGINE_BLOCKED",
+  "fullDisasterRecovery": "NOT_CERTIFIED_FOUNDATION_ONLY",
+  "limitations": ["no generic agent/tool authority", "no crash-atomic AppContainer cleanup journal", "controller path replacement races not handle-anchored", "registryRead system metadata scope not exhaustively audited", "no complete native ResourceFS/EditEngine/Git/LSP/governor integration", "no Linux sandbox equivalence claim"]
+}
