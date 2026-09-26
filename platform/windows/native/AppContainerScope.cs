@@ -27,6 +27,12 @@ namespace Phi.Native {
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetTokenInformation(IntPtr token, int type, out uint value, uint size, out uint returned);
     [DllImport("advapi32.dll", SetLastError=true, EntryPoint="GetTokenInformation")] static extern bool TokenBuffer(IntPtr token, int type, IntPtr buffer, uint size, out uint returned);
     [DllImport("advapi32.dll")] static extern bool EqualSid(IntPtr first, IntPtr second);
+    [DllImport("advapi32.dll", SetLastError=true)] static extern bool DuplicateToken(IntPtr token, int level, out IntPtr duplicate);
+    [DllImport("advapi32.dll", SetLastError=true)] static extern bool SetThreadToken(IntPtr thread, IntPtr token);
+    [DllImport("advapi32.dll", SetLastError=true)] static extern bool RevertToSelf();
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegOpenKeyExW(IntPtr root, string subkey, uint options, uint access, out IntPtr key);
+    [DllImport("advapi32.dll")] static extern int RegCloseKey(IntPtr key);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -40,6 +46,8 @@ namespace Phi.Native {
     bool optOut = true;
     internal int AttributeCount { get { return optOut ? 4 : 3; } }
     internal bool TokenVerified { get; private set; }
+    string privateRegistry;
+    uint guardianPid;
     internal AppContainerScope() {
       profile = "Phi.Probe." + Guid.NewGuid().ToString("N");
       try {
@@ -77,7 +85,7 @@ namespace Phi.Native {
           (optOut && !UpdateProcThreadAttribute(list, 0, new IntPtr(0x2000f), policy, new IntPtr(4), IntPtr.Zero, IntPtr.Zero))) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
     internal void VerifyToken(IntPtr process) {
-      IntPtr token; if (!OpenProcessToken(process, 8, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      IntPtr token; if (!OpenProcessToken(process, 10, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
       try {
         uint value, returned;
         if (!GetTokenInformation(token, 29, out value, 4, out returned)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -94,8 +102,32 @@ namespace Phi.Native {
           // TOKEN_APPCONTAINER_INFORMATION pointer-sized header.
           if (returned < IntPtr.Size || returned > 256 || !EqualSid(Marshal.ReadIntPtr(buffer), sid)) { Console.Error.WriteLine("PHI_APPCONTAINER_TOKEN_REJECTED:SID:" + returned); throw new InvalidDataException(); }
         } finally { Marshal.FreeHGlobal(buffer); }
+        if (optOut) VerifyRegistryAndHostProcess(token);
         TokenVerified = true;
       } finally { CloseHandle(token); }
+    }
+    void VerifyRegistryAndHostProcess(IntPtr token) {
+      IntPtr duplicate = IntPtr.Zero, publicKey = IntPtr.Zero, privateKey = IntPtr.Zero, hostProcess = IntPtr.Zero;
+      bool impersonating = false;
+      try {
+        if (!DuplicateToken(token, 2, out duplicate) || !SetThreadToken(IntPtr.Zero, duplicate)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        impersonating = true;
+        // Direct, documented registry APIs using the real child's effective
+        // token. No reg.exe/shell subprocess or virtualized HKCU false negative.
+        int publicResult = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000002)), "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, 0x20019 | 0x100, out publicKey);
+        int privateResult = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000003)), privateRegistry, 0, 0x20019 | 0x100, out privateKey);
+        hostProcess = OpenProcess(0x40, false, guardianPid); // PROCESS_DUP_HANDLE, not a destructive operation
+        int processError = Marshal.GetLastWin32Error();
+        bool registryRead = publicResult == 0, privateDenied = privateResult == 5, hostHandleDenied = hostProcess == IntPtr.Zero && processError == 5;
+        if (!registryRead || !privateDenied || !hostHandleDenied) throw new InvalidDataException();
+      } finally {
+        if (publicKey != IntPtr.Zero) RegCloseKey(publicKey);
+        if (privateKey != IntPtr.Zero) RegCloseKey(privateKey);
+        if (hostProcess != IntPtr.Zero) CloseHandle(hostProcess);
+        if (impersonating && !RevertToSelf()) Environment.FailFast("PHI_APPCONTAINER_REVERT_FAILED");
+        if (duplicate != IntPtr.Zero) CloseHandle(duplicate);
+      }
+      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"hostHandleDuplicationDenied\":true}");
     }
     int RunAllPackagesControl(Dictionary<string, object> request, string runtime, string file) {
       // Fixed, read-only positive control only. Never expose this mode in a
@@ -158,6 +190,9 @@ namespace Phi.Native {
         scope.SetDirectoryAuthority(runtime, true, false); scope.SetDirectoryAuthority(workspace, true, role == "worker");
         scope.SetDirectoryAuthority(scratch, true, true); scope.SetDirectoryAuthority(secret, false, false);
         string executable = Path.Combine(runtime, "node.exe"); File.Copy(node, executable, false);
+        // Copying a read-only runtime asset must not make owned cleanup fail.
+        // This changes attributes only on this fresh owned copy; never source.
+        File.SetAttributes(executable, FileAttributes.Normal);
         File.WriteAllText(Path.Combine(workspace, "fixture.txt"), "synthetic-input");
         File.WriteAllText(Path.Combine(secret, ".env"), "SYNTHETIC_PRIVATE_PROBE_ONLY");
         string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
@@ -170,23 +205,17 @@ namespace Phi.Native {
         RegistrySecurity privateAcl = new RegistrySecurity(); privateAcl.SetAccessRuleProtection(true, false);
         privateAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, privateAcl)) { key.SetValue("Fixture", "synthetic-private-value"); if ((string)key.GetValue("Fixture") != "synthetic-private-value") throw new InvalidDataException(); }
-        string privateRegistry = "HKU\\" + WindowsIdentity.GetCurrent().User.Value + "\\" + registryKey;
+        scope.privateRegistry = WindowsIdentity.GetCurrent().User.Value + "\\" + registryKey;
         string script = @"console.error('PHI_CONFINEMENT_ENTERED');const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
-const [work,scratch,runtime,secret,port,role,privateRegistry]=process.argv.slice(1);
+const [work,scratch,runtime,secret,port,role]=process.argv.slice(1);
 const result={role,workspaceRead:fs.readFileSync(path.join(work,'fixture.txt'),'utf8')==='synthetic-input'};
 function denied(key,fn){try{fn();result[key]=false;}catch(e){result[key]=['EACCES','EPERM'].includes(e.code);}}
 denied('hostReadDenied',()=>fs.readFileSync(path.join(secret,'.env')));
 denied('hostWriteDenied',()=>fs.writeFileSync(path.join(secret,'escape.txt'),'synthetic'));
 denied('runtimeWriteDenied',()=>fs.writeFileSync(path.join(runtime,'escape.txt'),'synthetic'));
 denied('allPackagesReadDenied',()=>fs.readFileSync(path.join(runtime,'all-packages.txt')));
-const {spawnSync}=require('node:child_process'),reg=path.join(process.env.SystemRoot,'System32','reg.exe');
-function query(key){return spawnSync(reg,['query',key],{shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],timeout:1500,maxBuffer:65536});}
-const publicQuery=query('HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion');
-result.registryReadAvailable=publicQuery.status===0;
-const privateQuery=query(privateRegistry);
-result.privateRegistryDenied=privateQuery.status===1&&!privateQuery.stdout?.includes('synthetic-private-value');
 result.cleanEnvironment=!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|PHI_PROBE/i.test(k));
-console.error('PHI_CONFINEMENT_REGISTRY_CHECKED');
+console.error('PHI_CONFINEMENT_FILES_CHECKED');
 try{fs.writeFileSync(path.join(scratch,'scratch.txt'),'synthetic');result.scratchWrite=true;}catch{result.scratchWrite=false;}
 try{fs.writeFileSync(path.join(work,'edit.txt'),'synthetic');result.workspaceWrite=true;}catch(e){result.workspaceWrite=false;result.workspaceWriteDenied=['EACCES','EPERM'].includes(e.code);}
 const s=net.connect({host:'127.0.0.1',port:Number(port)});s.setTimeout(1500);
@@ -194,10 +223,10 @@ console.error('PHI_CONFINEMENT_NETWORK_WAIT');
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
-let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.registryReadAvailable&&result.privateRegistryDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
-        request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role, privateRegistry };
+        request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
         string system = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         request["env"] = new Dictionary<string, string> {
           { "SystemRoot", system }, { "windir", system }, { "SystemDrive", Path.GetPathRoot(system).TrimEnd('\\') },
@@ -210,6 +239,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         // to this fixed probe, never exposed as sandbox authority.
         int guardian; if (!Int32.TryParse(Environment.GetEnvironmentVariable("PHI_PROBE_GUARDIAN"), out guardian)) throw new InvalidDataException();
         request["guardianPid"] = guardian;
+        scope.guardianPid = (uint)guardian;
         if (scope.RunAllPackagesControl(request, runtime, allPackages) != 0) throw new InvalidOperationException("PHI_APPCONTAINER_CONTROL_FAILED");
         byte[] input = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(request) + "\n");
         using (MemoryStream stream = new MemoryStream(input)) code = OwnedProcess.Execute(stream, scope);

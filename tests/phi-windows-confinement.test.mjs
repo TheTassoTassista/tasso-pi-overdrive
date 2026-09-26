@@ -8,7 +8,7 @@ import { requireAutonomousBackend } from '../platform/index.mjs';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 
 function probeMetadata(stdout, stderr, status) {
-  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
+  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
   const receipts = stdout.trim().split(/\r?\n/u).slice(0, 4).flatMap((line) => {
     try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
     catch { return []; }
@@ -52,10 +52,11 @@ for (const role of ['worker', 'tester', 'reviewer']) {
       const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
       clearTimeout(timer);
       assert.equal(code, 0, probeMetadata(stdout, stderr, code));
-      const [control, receipt, cleanup] = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
+      const [control, nativeRights, receipt, cleanup] = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
       assert.deepEqual(control, { allPackagesReadControl: true });
+      assert.deepEqual(nativeRights, { registryReadAvailable: true, privateRegistryDenied: true, hostHandleDuplicationDenied: true });
       assert.equal(receipt.role, role);
-      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
+      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
       assert.equal(receipt.workspaceWrite, role === 'worker');
       assert.deepEqual(cleanup, { tokenVerified: true, cleanup: 'PASS', scope: 'FIXED_SYNTHETIC_PROBE_ONLY' });
     } finally { child?.kill('SIGKILL'); await new Promise((resolve) => server.close(resolve)); }
