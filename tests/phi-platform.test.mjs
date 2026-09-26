@@ -21,6 +21,16 @@ test('Windows sandbox is explicitly unavailable and cannot permit engine executi
   assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
   assert.equal(platformAdapter('win32').sandbox.implemented, false);
 });
+test('platform adapters keep their own path semantics on either native runner', () => {
+  assert.equal(platformAdapter('linux').path, path.posix);
+  assert.equal(platformAdapter('win32').path, path.win32);
+  const linux = localDirectories({ platform: 'linux', home: '/users/example', env: {} });
+  assert.deepEqual(linux, {
+    config: '/users/example/.config/phi', state: '/users/example/.local/state/phi',
+    bin: '/users/example/.local/bin', agent: '/users/example/.pi/agent',
+    legacyConfig: '/users/example/.config/pi-overdrive',
+  });
+});
 test('containment rejects different Windows drives, UNC roots, and traversal', () => {
   assert.equal(containsPath('C:\\repo', 'D:\\escape', path.win32), false);
   assert.equal(containsPath('C:\\repo', 'C:\\repository\\escape', path.win32), false);

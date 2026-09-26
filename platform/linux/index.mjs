@@ -1,4 +1,4 @@
-import path from 'node:path';
+import { posix as path } from 'node:path';
 
 export const linuxPlatform = Object.freeze({
   id: 'linux',
