@@ -276,7 +276,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -292,7 +292,28 @@ namespace Phi.Native {
           Directory.CreateDirectory(scope.Root);
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
           scope.RootCreated(); scope.Ready();
-          if (name == "mapped-file") {
+          if (name == "readonly-file") {
+            string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            File.SetAttributes(sentinel, File.GetAttributes(sentinel) | FileAttributes.ReadOnly);
+            bool denied = false; Stopwatch elapsed = Stopwatch.StartNew();
+            try { scope.CleanupFiles(); }
+            catch (Win32Exception error) { if (error.NativeErrorCode != 5) throw; denied = true; }
+            if (!denied || elapsed.ElapsedMilliseconds > 2000 || (File.GetAttributes(sentinel) & FileAttributes.ReadOnly) == 0 || File.ReadAllText(sentinel) != "synthetic-scope-owned") throw new InvalidDataException();
+            // Fixed fixture restores only the exact attribute it just set.
+            // Production cleanup must never clear readonly to bypass a denial.
+            File.SetAttributes(sentinel, File.GetAttributes(sentinel) & ~FileAttributes.ReadOnly);
+          }
+          if (name == "depth-limit") {
+            string deep = scope.Root;
+            for (int level = 0; level < 17; level++) { deep = Path.Combine(deep, "d"); Directory.CreateDirectory(deep); }
+            File.WriteAllText(Path.Combine(deep, "sentinel.txt"), "synthetic-depth-limit");
+            bool denied = false;
+            try { scope.CleanupFiles(); } catch (InvalidDataException) { denied = true; }
+            if (!denied || File.ReadAllText(Path.Combine(deep, "sentinel.txt")) != "synthetic-depth-limit") throw new InvalidDataException();
+            // Shorten this known generated fixture, not an unknown saved path.
+            Directory.Move(deep, Path.Combine(scope.Root, "relieved"));
+          }
+          if (name == "mapped-file" || name == "mapped-file-stuck") {
             string sentinel = Path.Combine(scope.Root, "owned-image.exe");
             mappingPhase = "SETUP";
             File.Copy(Process.GetCurrentProcess().MainModule.FileName, sentinel);
@@ -305,7 +326,14 @@ namespace Phi.Native {
               if (!denied || !File.Exists(sentinel)) throw new InvalidDataException();
               RecoveryFilesystem.TransientDeleteRetries = 0;
               mappingPhase = "RETRY_CONTROL";
-              using (Timer release = new Timer(delegate(object state) { mapping.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
+              if (name == "mapped-file") {
+                using (Timer release = new Timer(delegate(object state) { mapping.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
+              } else {
+                bool boundedFailure = false; Stopwatch elapsed = Stopwatch.StartNew();
+                try { scope.CleanupFiles(); }
+                catch (Win32Exception error) { if (error.NativeErrorCode != 5) throw; boundedFailure = true; }
+                if (!boundedFailure || elapsed.ElapsedMilliseconds < 4500 || elapsed.ElapsedMilliseconds > 7000 || !File.Exists(sentinel)) throw new InvalidDataException();
+              }
               if (RecoveryFilesystem.TransientDeleteRetries < 1) throw new InvalidDataException();
             }
           }
@@ -393,7 +421,7 @@ namespace Phi.Native {
         }
       } catch (Exception error) {
         RecoveryFilesystem.LogFailure(error);
-        if (name == "mapped-file") Console.Error.WriteLine("PHI_RECOVERY_MAPPING_" + mappingPhase + "_FAILED");
+        if (name == "mapped-file" || name == "mapped-file-stuck") Console.Error.WriteLine("PHI_RECOVERY_MAPPING_" + mappingPhase + "_FAILED");
         Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED");
       }
       finally {
