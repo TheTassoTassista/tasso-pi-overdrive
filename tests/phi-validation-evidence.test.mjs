@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
+test('native failure preserves bounded Win32 error numbers without raw context', () => {
+  const result = validationFailureEvidence('foundation-tests', { stderr: 'PHI_APPCONTAINER_FAILED:32 private-file PHI_NATIVE_PROCESS_FAILED:5:CREATE PHI_APPCONTAINER_FAILED:99999 secret' });
+  assert.deepEqual(result.nativeErrorNumbers, [32, 5]);
+  assert.doesNotMatch(JSON.stringify(result), /private-file|secret|99999/u);
+});
 test('clean-room failure receipt identifies its stage/codes/counts without leaking output', () => {
   const evidence = validationFailureEvidence('foundation-tests', { status: 1, stdout: 'not ok 12 - secret-fixture-value\n# tests 47\n# pass 39\n# fail 1', stderr: 'private-path secret-fixture-value error CS1234 PHI_NATIVE_PROCESS_FAILED PHI_USER_PRIVATE_SECRET_VALUE PHI_WINDOWS_BUILD_SECRET_VALUE private contents' });
   assert.deepEqual(evidence, { failureStage: 'foundation-tests', exitCode: 1, timedOut: false, diagnosticCodes: ['CS1234', 'PHI_NATIVE_PROCESS_FAILED'], testCounts: { total: 47, passed: 39, failed: 1 }, failedTestNumbers: [12] });

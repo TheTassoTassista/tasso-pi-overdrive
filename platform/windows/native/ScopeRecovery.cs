@@ -61,12 +61,17 @@ namespace Phi.Native {
       if (key == null) throw new InvalidDataException();
       try { ValidateRegistry(key); return key; } catch { key.Dispose(); throw; }
     }
-    static void EnsureRootBase() {
+    static DirectorySecurity PrivateDirectoryAcl() {
       DirectorySecurity acl = new DirectorySecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(User);
       foreach (SecurityIdentifier sid in new SecurityIdentifier[] { User, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
         acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
       acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-      Directory.CreateDirectory(RootBase, acl);
+      return acl;
+    }
+    static void EnsureRootBase() {
+      DirectorySecurity acl = PrivateDirectoryAcl();
+      RecoveryFilesystem.CreateDirectory(Path.GetDirectoryName(RootBase), acl, true);
+      RecoveryFilesystem.CreateDirectory(RootBase, acl, true);
       using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) {
         DirectorySecurity actual = Directory.GetAccessControl(RootBase);
         if (!actual.AreAccessRulesProtected || !User.Equals(actual.GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
@@ -125,6 +130,10 @@ namespace Phi.Native {
     internal void ProfileCreated() { record["profile"] = true; Save(); }
     internal void ProfileRemoved() { record["profile"] = false; Save(); }
     internal void RootCreated() { record["rootIdentity"] = RecoveryFilesystem.DirectoryIdentity(Root); Save(); }
+    internal void CreateRoot() {
+      RecoveryFilesystem.CreateDirectory(Root, PrivateDirectoryAcl(), false);
+      RootCreated();
+    }
     internal void CleanupFiles() { using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(Root, (string)record["rootIdentity"]); }
     internal void RegistryCreated() { record["registry"] = true; Save(); }
     internal void Ready() { record["ready"] = true; Save(); }

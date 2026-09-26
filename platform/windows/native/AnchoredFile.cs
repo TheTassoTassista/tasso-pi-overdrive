@@ -78,7 +78,7 @@ namespace Phi.Native {
       if (parentPins != null) parentPins.Dispose(); if (rootPins != null) rootPins.Dispose();
     }
     internal static int SelfTest(string name) {
-      string[] cases = { "write", "replace-before-open", "rename-while-open", "delete-while-open", "directory-swap", "hardlink", "junction", "case-alias", "ads", "protected", "changed-content" };
+      string[] cases = { "write", "replace-before-open", "rename-while-open", "delete-while-open", "directory-swap", "hardlink", "junction", "case-alias", "ads", "protected", "changed-content", "parent-reparse-while-pinned", "create-through-junction" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; bool passed = false, clean = true;
       try {
@@ -87,6 +87,28 @@ namespace Phi.Native {
         Directory.CreateDirectory(directory);
         string file = Path.Combine(directory, "fixture.txt"), outside = Path.Combine(scope.Root, "unrelated.txt");
         File.WriteAllText(file, "synthetic-original"); File.WriteAllText(outside, "synthetic-unrelated");
+        if (name == "parent-reparse-while-pinned" || name == "create-through-junction") {
+          string empty = Path.Combine(scope.Root, "empty"), target = Path.Combine(scope.Root, "unrelated-directory");
+          Directory.CreateDirectory(empty); Directory.CreateDirectory(target);
+          File.WriteAllText(Path.Combine(target, "sentinel.txt"), "synthetic-unrelated");
+          bool blocked = false;
+          if (name == "parent-reparse-while-pinned") {
+            using (RecoveryFilesystem pins = new RecoveryFilesystem(empty)) {
+              try { AppContainerScope.CreateOwnedJunction(empty, target); }
+              catch (Win32Exception error) { if (error.NativeErrorCode != 32 && error.NativeErrorCode != 33) throw; blocked = true; }
+            }
+            if (!blocked) throw new InvalidDataException();
+          }
+          // Positive control: with the authority handles closed, the identical
+          // reparse operation must succeed and its real target must be readable.
+          AppContainerScope.CreateOwnedJunction(empty, target);
+          if (File.ReadAllText(Path.Combine(empty, "sentinel.txt")) != "synthetic-unrelated") throw new InvalidDataException();
+          if (name == "create-through-junction") {
+            try { RecoveryFilesystem.CreateDirectory(Path.Combine(empty, "escape"), Directory.GetAccessControl(target), false); }
+            catch (InvalidDataException) { blocked = true; }
+            if (!blocked || Directory.Exists(Path.Combine(target, "escape"))) throw new InvalidDataException();
+          }
+        }
         string id, hash;
         using (AnchoredFile snapshot = new AnchoredFile(scope.Root, rootId, "src/fixture.txt")) { id = snapshot.Identity; hash = snapshot.Digest; }
         if (name == "replace-before-open") { File.Move(file, file + ".old"); File.WriteAllText(file, "synthetic-replacement"); }

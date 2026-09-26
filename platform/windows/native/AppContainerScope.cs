@@ -267,8 +267,7 @@ namespace Phi.Native {
         if ((File.GetAttributes(node) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
         scope = new AppContainerScope();
         root = scope.recovery.Root;
-        Directory.CreateDirectory(root); scope.SetDirectoryAuthority(root, true, false);
-        scope.recovery.RootCreated();
+        scope.recovery.CreateRoot(); scope.SetDirectoryAuthority(root, true, false);
         string runtime = Path.Combine(root, "runtime"), workspace = Path.Combine(root, "workspace"), scratch = Path.Combine(root, "scratch"), secret = Path.Combine(root, "host-private");
         foreach (string directory in new string[] { runtime, workspace, scratch, secret }) Directory.CreateDirectory(directory);
         scope.SetDirectoryAuthority(runtime, true, false); scope.SetDirectoryAuthority(workspace, true, role == "worker");

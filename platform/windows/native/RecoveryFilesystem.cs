@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 
 namespace Phi.Native {
   internal sealed class RecoveryFilesystem : IDisposable {
@@ -14,6 +15,8 @@ namespace Phi.Native {
     }
     [StructLayout(LayoutKind.Sequential)] struct Identity { public ulong Volume, Low, High; }
     [StructLayout(LayoutKind.Sequential)] struct Disposition { public byte Delete; }
+    [StructLayout(LayoutKind.Sequential)] struct SecurityAttributes { public int Size; public IntPtr Descriptor; public int Inherit; }
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateDirectoryW(string path, ref SecurityAttributes attributes);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr file, out Info info);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandleEx(IntPtr file, int type, out Identity info, uint size);
@@ -79,6 +82,22 @@ namespace Phi.Native {
           operation(handle);
           if (HandleIdentity(handle) != expectedIdentity) throw new InvalidDataException();
         } finally { CloseHandle(handle); }
+      }
+    }
+    internal static void CreateDirectory(string directory, DirectorySecurity acl, bool allowExisting) {
+      // Single-component native create while every existing parent is pinned.
+      // No recursive path traversal or ACL rewrite of an existing object.
+      using (RecoveryFilesystem pins = new RecoveryFilesystem(Path.GetDirectoryName(directory))) {
+        byte[] bytes = acl.GetSecurityDescriptorBinaryForm(); IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
+        try {
+          Marshal.Copy(bytes, 0, descriptor, bytes.Length);
+          SecurityAttributes attributes = new SecurityAttributes(); attributes.Size = Marshal.SizeOf(typeof(SecurityAttributes)); attributes.Descriptor = descriptor;
+          if (!CreateDirectoryW(directory, ref attributes)) {
+            int error = Marshal.GetLastWin32Error();
+            if (!allowExisting || error != 183) throw new Win32Exception(error);
+          }
+          using (RecoveryFilesystem child = new RecoveryFilesystem(directory)) { DirectoryIdentity(directory); }
+        } finally { Marshal.FreeHGlobal(descriptor); }
       }
     }
     internal void DeleteOwnedTree(string root, string expected) {

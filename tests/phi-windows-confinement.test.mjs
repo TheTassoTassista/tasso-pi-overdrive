@@ -116,7 +116,7 @@ test('probe termination is bounded and idempotent after signal exit', async () =
 });
 function recover(id) {
   const result = spawnSync(ownedWindowsHelper(), id ? ['--recover-scope', id] : ['--recover-scopes'], { encoding: 'utf8', shell: false, windowsHide: true, timeout: 16000, maxBuffer: 8192 });
-  assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
+  assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
   const receipt = JSON.parse(result.stdout);
   assert.equal(receipt.status, 'PASS');
   assert.equal(receipt.processKills, 0);
@@ -216,7 +216,7 @@ test('native LPAC nested subprocess tree: inherited denial, crash containment an
 for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
-    assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
+    assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
     assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, processKills: 0 });
     assert.equal(recover().quarantined, 0);
   });
@@ -234,10 +234,10 @@ test('anchored mutation writes through the verified exclusive handle, not a reop
   assert.match(filesystem, /CreateFileW\(file, 0xc0000000U, 0, IntPtr.Zero, 3, 0x200000/u);
   assert.throws(() => requireAutonomousBackend('win32'), /SANDBOX_UNAVAILABLE/u);
 });
-for (const name of ['write', 'replace-before-open', 'rename-while-open', 'delete-while-open', 'directory-swap', 'hardlink', 'junction', 'case-alias', 'ads', 'protected', 'changed-content']) {
+for (const name of ['write', 'replace-before-open', 'rename-while-open', 'delete-while-open', 'directory-swap', 'hardlink', 'junction', 'case-alias', 'ads', 'protected', 'changed-content', 'parent-reparse-while-pinned', 'create-through-junction']) {
   test(`native anchored mutation ${name}: actual handle identity and swap protection`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--anchored-file-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
-    assert.equal(result.status, 0, validationFailureEvidence('foundation-tests', result));
+    assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
     assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, scope: 'HANDLE_MUTATION_PRIMITIVE_NOT_TRANSACTIONAL_ENGINE' });
     assert.equal(recover().quarantined, 0);
   });
