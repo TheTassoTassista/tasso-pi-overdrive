@@ -100,15 +100,20 @@ namespace Phi.Native {
     }
     public static int Main(string[] args) {
       if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("Phi owned-process ABI 1; Windows Job Object; NOT a sandbox"); return 0; }
+      if (args.Length == 4 && args[0] == "--confinement-probe") return AppContainerScope.Probe(args[1], args[2], args[3]);
       // API capability checks below fail closed on pre-Windows-10 systems.
       // Unmanifested .NET Framework OSVersion can report a legacy version.
       if (args.Length != 0 || IntPtr.Size != 8) return 70;
+      return Execute(Console.OpenStandardInput(), null);
+    }
+    // Only the fixed native probe can supply confinement. No model/tool input
+    // can request a full-trust fallback from this entry point.
+    internal static int Execute(Stream input, AppContainerScope scope) {
       IntPtr job = IntPtr.Zero, list = IntPtr.Zero, jobs = IntPtr.Zero, handles = IntPtr.Zero, environment = IntPtr.Zero;
       IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, output = IntPtr.Zero, error = IntPtr.Zero;
       IntPtr guardian = IntPtr.Zero;
       ProcessInfo child = new ProcessInfo(); bool listReady = false;
       try {
-        Stream input = Console.OpenStandardInput();
         JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = MaxRequest;
         Dictionary<string, object> request = serializer.Deserialize<Dictionary<string, object>>(ReadRequest(input));
         string[] keys = { "command", "args", "cwd", "env", "timeoutMs", "guardianPid" };
@@ -153,9 +158,11 @@ namespace Phi.Native {
         Check(DuplicateHandle(self, GetStdHandle(-11), self, out output, 0, true, 2));
         Check(DuplicateHandle(self, GetStdHandle(-12), self, out error, 0, true, 2));
         IntPtr size = IntPtr.Zero;
-        InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref size);
+        int attributeCount = scope == null ? 2 : 4;
+        InitializeProcThreadAttributeList(IntPtr.Zero, attributeCount, 0, ref size);
         if (size == IntPtr.Zero) throw new InvalidDataException();
-        list = Marshal.AllocHGlobal(size); Check(InitializeProcThreadAttributeList(list, 2, 0, ref size)); listReady = true;
+        list = Marshal.AllocHGlobal(size); Check(InitializeProcThreadAttributeList(list, attributeCount, 0, ref size)); listReady = true;
+        if (scope != null) scope.ApplyAttributes(list);
         jobs = Marshal.AllocHGlobal(IntPtr.Size); Marshal.WriteIntPtr(jobs, job);
         Check(UpdateProcThreadAttribute(list, 0, new IntPtr(JobListAttribute), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero));
         handles = Marshal.AllocHGlobal(3 * IntPtr.Size);
@@ -166,6 +173,7 @@ namespace Phi.Native {
         // Atomic job assignment at CreateProcess closes the suspended-unassigned orphan window.
         Check(CreateProcessW(command, encoded, IntPtr.Zero, IntPtr.Zero, true, ExtendedStartup | UnicodeEnvironment | Suspended | NoWindow, environment, cwd, ref startup, out child));
         bool inside; Check(IsProcessInJob(child.Process, job, out inside)); if (!inside) throw new InvalidDataException();
+        if (scope != null) scope.VerifyToken(child.Process);
         Close(ref inputRead); Close(ref output); Close(ref error);
         SafeFileHandle writeHandle = new SafeFileHandle(inputWrite, true); inputWrite = IntPtr.Zero;
         Thread copy = new Thread(delegate() {
