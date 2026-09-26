@@ -6,6 +6,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
+using System.Text;
+using System.Web.Script.Serialization;
 
 namespace Phi.Native {
   internal sealed class RecoveryFilesystem : IDisposable {
@@ -30,6 +33,19 @@ namespace Phi.Native {
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly string directoryPath;
     internal static int TransientDeleteRetries;
+    static void Failure(string operation, IntPtr parent, string name, uint access, uint share, uint options, int status, int error) {
+      // Fixed operation names plus numeric/object metadata only. Never emit a
+      // DOS path, leaf name, ACL text, environment, exception or file contents.
+      string identity = "unavailable";
+      try { if (parent != IntPtr.Zero) identity = HandleIdentity(parent); } catch { }
+      string digest = "";
+      if (name != null) using (SHA256 hash = SHA256.Create()) digest = BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(name))).Replace("-", "").ToLowerInvariant();
+      Console.Error.WriteLine("PHI_FILESYSTEM_FAILURE:" + new JavaScriptSerializer().Serialize(new {
+        operation, access = access.ToString("x8"), share, options = options.ToString("x8"),
+        nativeStatus = unchecked((uint)status).ToString("x8"), nativeError = error,
+        objectIdentity = identity, leafDigest = digest
+      }));
+    }
     internal static void LogFailure(Exception error) {
       Win32Exception native = error as Win32Exception;
       string code = native == null ? "OBJECT_REJECTED" : native.NativeErrorCode == 32 || native.NativeErrorCode == 33 ? "SHARING_VIOLATION" : native.NativeErrorCode == 5 ? "ACCESS_DENIED" : native.NativeErrorCode == 145 ? "DIRECTORY_NOT_EMPTY" : "NATIVE_OTHER";
@@ -53,7 +69,7 @@ namespace Phi.Native {
       // No FILE_SHARE_DELETE: once opened, this actual object cannot be renamed
       // out from under path-based enumeration. Final reparse is opened, not followed.
       IntPtr handle = CreateFileW(file, 0x80U | (delete ? 0x10000U : 0U), 1, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
-      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if (handle == new IntPtr(-1)) { int error = Marshal.GetLastWin32Error(); Failure("ROOT_OPEN", IntPtr.Zero, null, 0x80U | (delete ? 0x10000U : 0U), 1, 0x2200000, 0, error); throw new Win32Exception(error); }
       if (!GetFileInformationByHandle(handle, out info)) { int error = Marshal.GetLastWin32Error(); CloseHandle(handle); throw new Win32Exception(error); }
       return handle;
     }
@@ -76,7 +92,7 @@ namespace Phi.Native {
         ObjectAttributes attributes = new ObjectAttributes(); attributes.Length = (uint)Marshal.SizeOf(typeof(ObjectAttributes)); attributes.Root = parent; attributes.Name = unicode; attributes.Attributes = unlinkReparse ? 0x40U : 0x1040U; attributes.Descriptor = descriptor;
         IoStatus status;
         int result = NtCreateFile(out handle, access | 0x100000, ref attributes, out status, IntPtr.Zero, 0, share, disposition, options | 0x200020, IntPtr.Zero, 0);
-        if (result != 0) throw new Win32Exception((int)RtlNtStatusToDosError(result));
+        if (result != 0) { int error = (int)RtlNtStatusToDosError(result); Failure("NT_OPEN", parent, name, access | 0x100000, share, options | 0x200020, result, error); throw new Win32Exception(error); }
         if (!GetFileInformationByHandle(handle, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
         // Only owned-tree unlinking may open a final reparse point itself.
         // FILE_OPEN_REPARSE_POINT always applies; never follow its target.
@@ -166,6 +182,7 @@ namespace Phi.Native {
           if (!QueryDirectory(directory, restart ? 15 : 14, buffer, BufferSize)) {
             int error = Marshal.GetLastWin32Error();
             if (error == 18) break; // ERROR_NO_MORE_FILES only; no fallback.
+            Failure("ENUMERATE", directory, null, 0x10081, 1, 1, 0, error);
             throw new Win32Exception(error);
           }
           restart = false;
@@ -207,6 +224,7 @@ namespace Phi.Native {
         // Never reopen paths or alter ACLs, attributes, content or identities.
         if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33) || deadline.ElapsedMilliseconds >= 5000) {
           Console.Error.WriteLine("PHI_FILESYSTEM_HANDLE_DISPOSITION_FAILED");
+          Failure("DISPOSITION", handle, null, 0x10000, 1, 4, 0, error);
           throw new Win32Exception(error);
         }
         TransientDeleteRetries++;

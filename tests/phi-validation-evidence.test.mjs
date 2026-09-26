@@ -1,6 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
+const failure = { operation: 'NT_OPEN', access: '00110080', share: 1, options: '00200060', nativeStatus: 'c0000043', nativeError: 32, objectIdentity: `${'a'.repeat(16)}:${'b'.repeat(32)}`, leafDigest: 'c'.repeat(64) };
+test('native operation evidence preserves actual rights/status/identity but no resource names', () => {
+  const result = validationFailureEvidence('foundation-tests', { stderr: `PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}\nprivate-path private-content` });
+  assert.deepEqual(result.filesystemFailures, [failure]);
+  assert.doesNotMatch(JSON.stringify(result), /private-path|private-content/u);
+});
+test('native operation evidence rejects malformed, private, coercible or unknown metadata', () => {
+  for (const value of [{ ...failure, path: 'private' }, { ...failure, operation: 'private' }, { ...failure, access: 12345678 }, { ...failure, share: 8 }, { ...failure, nativeError: -1 }, { ...failure, objectIdentity: 'private' }, { ...failure, leafDigest: 'private' }, null]) {
+    assert.equal(validationFailureEvidence('foundation-tests', { stderr: `PHI_FILESYSTEM_FAILURE:${JSON.stringify(value)}` }).filesystemFailures, undefined);
+  }
+  assert.equal(validationFailureEvidence('foundation-tests', { stderr: 'PHI_FILESYSTEM_FAILURE:{private malformed}' }).filesystemFailures, undefined);
+});
+test('native operation evidence is limited to four validated records', () => {
+  const result = validationFailureEvidence('foundation-tests', { stderr: Array.from({ length: 8 }, () => `PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`).join('\n') });
+  assert.deepEqual(result.filesystemFailures, Array(4).fill(failure));
+});
 test('native failure preserves bounded Win32 error numbers without raw context', () => {
   const result = validationFailureEvidence('foundation-tests', { stderr: 'PHI_APPCONTAINER_FAILED:32 private-file PHI_NATIVE_PROCESS_FAILED:5:CREATE PHI_APPCONTAINER_FAILED:99999 secret' });
   assert.deepEqual(result.nativeErrorNumbers, [32, 5]);
