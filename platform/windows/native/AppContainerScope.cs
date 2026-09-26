@@ -141,7 +141,7 @@ namespace Phi.Native {
       if (registryEntry != IntPtr.Zero) Marshal.FreeHGlobal(registryEntry);
       if (registrySid != IntPtr.Zero) Marshal.FreeHGlobal(registrySid);
       if (sid != IntPtr.Zero) FreeSid(sid);
-      if (result != 0) throw new InvalidOperationException("PHI_APPCONTAINER_CLEANUP_FAILED");
+      if (result != 0) { Console.Error.WriteLine("PHI_APPCONTAINER_PROFILE_CLEANUP_FAILED:" + result); throw new InvalidOperationException("PHI_APPCONTAINER_CLEANUP_FAILED"); }
     }
     internal static int Probe(string node, string role, string portText) {
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
@@ -171,7 +171,7 @@ namespace Phi.Native {
         privateAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, privateAcl)) { key.SetValue("Fixture", "synthetic-private-value"); if ((string)key.GetValue("Fixture") != "synthetic-private-value") throw new InvalidDataException(); }
         string privateRegistry = "HKU\\" + WindowsIdentity.GetCurrent().User.Value + "\\" + registryKey;
-        string script = @"const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
+        string script = @"console.error('PHI_CONFINEMENT_ENTERED');const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
 const [work,scratch,runtime,secret,port,role,privateRegistry]=process.argv.slice(1);
 const result={role,workspaceRead:fs.readFileSync(path.join(work,'fixture.txt'),'utf8')==='synthetic-input'};
 function denied(key,fn){try{fn();result[key]=false;}catch(e){result[key]=['EACCES','EPERM'].includes(e.code);}}
@@ -186,9 +186,11 @@ result.registryReadAvailable=publicQuery.status===0;
 const privateQuery=query(privateRegistry);
 result.privateRegistryDenied=privateQuery.status===1&&!privateQuery.stdout?.includes('synthetic-private-value');
 result.cleanEnvironment=!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|PHI_PROBE/i.test(k));
+console.error('PHI_CONFINEMENT_REGISTRY_CHECKED');
 try{fs.writeFileSync(path.join(scratch,'scratch.txt'),'synthetic');result.scratchWrite=true;}catch{result.scratchWrite=false;}
 try{fs.writeFileSync(path.join(work,'edit.txt'),'synthetic');result.workspaceWrite=true;}catch(e){result.workspaceWrite=false;result.workspaceWriteDenied=['EACCES','EPERM'].includes(e.code);}
 const s=net.connect({host:'127.0.0.1',port:Number(port)});s.setTimeout(1500);
+console.error('PHI_CONFINEMENT_NETWORK_WAIT');
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
@@ -215,8 +217,12 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_APPCONTAINER_FAILED:" + ex.NativeErrorCode); code = 70; }
         catch { Console.Error.WriteLine("PHI_APPCONTAINER_PROBE_FAILED"); code = 70; }
       finally {
-        try { if (scope != null) scope.Dispose(); if (root != null) Directory.Delete(root, true); if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); cleaned = true; }
-        catch { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }
+        bool profileClean = true, filesClean = true, registryClean = true;
+        try { if (scope != null) scope.Dispose(); } catch { profileClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_PROFILE_CLEANUP_FAILED"); }
+        try { if (root != null) Directory.Delete(root, true); } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
+        try { if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); } catch { registryClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_REGISTRY_CLEANUP_FAILED"); }
+        cleaned = profileClean && filesClean && registryClean;
+        if (!cleaned) { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }
       }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { tokenVerified = scope != null && scope.TokenVerified, cleanup = cleaned ? "PASS" : "FAIL", scope = "FIXED_SYNTHETIC_PROBE_ONLY" }));
       return code;
