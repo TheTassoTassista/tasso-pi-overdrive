@@ -29,6 +29,7 @@ namespace Phi.Native {
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int CreateAppContainerProfile(string name, string display, string description, IntPtr capabilities, uint count, out IntPtr sid);
     [DllImport("advapi32.dll")] static extern IntPtr FreeSid(IntPtr sid);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileMappingW(IntPtr file, IntPtr attributes, uint protection, uint high, uint low, string name);
     [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr MapViewOfFile(IntPtr mapping, uint access, uint high, uint low, UIntPtr bytes);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool UnmapViewOfFile(IntPtr address);
@@ -301,12 +302,21 @@ namespace Phi.Native {
             // Deterministic native API controls: the only blocking handle is
             // ours, on a fresh private fixture, released before final recovery.
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            IntPtr heldRoot = IntPtr.Zero;
+            try {
+              if (name == "delete-pending-control") {
+                // A descendant handle alone does not reliably retain its
+                // directory. Pin the known root directly, sharing DELETE so
+                // the first cleanup can mark this very object delete-pending.
+                heldRoot = CreateFileW(scope.Root, 0x80, 7, IntPtr.Zero, 3, 0x2200000, IntPtr.Zero);
+                if (heldRoot == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (RecoveryFilesystem.HandleIdentity(heldRoot) != (string)scope.record["rootIdentity"]) throw new InvalidDataException();
+              }
             using (FileStream hold = new FileStream(sentinel, FileMode.Open, FileAccess.Read, name == "open-sharing-control" ? FileShare.Read : FileShare.ReadWrite | FileShare.Delete)) {
               if (name == "delete-pending-control") {
                 File.Delete(sentinel);
-                // Enumeration omits a delete-pending leaf, but a still-open
-                // descendant keeps its now-delete-pending root alive. Prove
-                // the second handle-relative cleanup, not a guessed leaf error.
+                // Enumeration omits a delete-pending leaf. Prove the second
+                // handle-relative root open, not a guessed leaf-open error.
                 scope.CleanupFiles();
               }
               bool denied = false;
@@ -318,6 +328,7 @@ namespace Phi.Native {
               if (!denied) throw new InvalidDataException();
               if (name == "open-sharing-control" && File.ReadAllText(sentinel) != "synthetic-scope-owned") throw new InvalidDataException();
             }
+            } finally { if (heldRoot != IntPtr.Zero && heldRoot != new IntPtr(-1)) CloseHandle(heldRoot); }
           }
           if (name == "readonly-file") {
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");

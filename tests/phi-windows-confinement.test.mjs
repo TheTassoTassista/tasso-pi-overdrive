@@ -257,6 +257,7 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
 for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception', 'open-sharing-control', 'delete-pending-control']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
+    if (name === 'open-sharing-control' || name === 'delete-pending-control') for (const failure of validationFailureEvidence('foundation-tests', result).filesystemFailures ?? []) console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
     assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
     assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, processKills: 0 });
     if (name === 'open-sharing-control' || name === 'delete-pending-control') {
@@ -266,7 +267,6 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
       assert.equal(failure?.share, 1);
       assert.equal(failure?.nativeStatus, name === 'open-sharing-control' ? 'c0000043' : 'c0000056');
       assert.equal(failure?.nativeError, name === 'open-sharing-control' ? 32 : 5);
-      console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
     }
     assert.equal(recover().quarantined, 0);
   });
