@@ -26,6 +26,8 @@ namespace Phi.Native {
     [DllImport("advapi32.dll")] static extern int RegFlushKey(IntPtr key);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegQueryValueExW(IntPtr key, string name, IntPtr reserved, out uint type, byte[] data, ref uint size);
     [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int DeleteAppContainerProfile(string name);
+    [DllImport("userenv.dll", CharSet=CharSet.Unicode)] static extern int CreateAppContainerProfile(string name, string display, string description, IntPtr capabilities, uint count, out IntPtr sid);
+    [DllImport("advapi32.dll")] static extern IntPtr FreeSid(IntPtr sid);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
     static readonly Regex IdPattern = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex IdentityPattern = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
@@ -165,19 +167,37 @@ namespace Phi.Native {
                 // A reused PID is NOT authority to kill that unrelated process.
                 if (live && generation == (string)value["created"]) { active++; continue; }
                 string directory = RootFor(id), identity = (string)value["rootIdentity"];
+                // A failed filesystem identity check must not prevent cleanup
+                // of separately proven profile/registry ownership. Preserve
+                // the quarantined receipt and never delete the unknown tree.
+                bool failed = false;
                 phase = "FILES";
-                using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) {
-                  if (identity == "") { if (Directory.Exists(directory) || (!(bool)value["profile"] && !(bool)value["registry"] && !(bool)value["ready"])) throw new InvalidDataException(); }
-                  else pins.DeleteOwnedTree(directory, identity);
-                }
-                if ((bool)value["registry"]) {
-                  phase = "REGISTRY";
-                  string fixture = "Software\\PhiProbe-" + id;
-                  using (RegistryKey key = Registry.CurrentUser.OpenSubKey(fixture)) if (key != null) { if (!User.Equals(key.GetAccessControl().GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException(); }
-                  Registry.CurrentUser.DeleteSubKeyTree(fixture, false);
-                }
+                try {
+                  using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) {
+                    if (identity == "") { if (Directory.Exists(directory) || (!(bool)value["profile"] && !(bool)value["registry"] && !(bool)value["ready"])) throw new InvalidDataException(); }
+                    else pins.DeleteOwnedTree(directory, identity);
+                  }
+                } catch { failed = true; Console.Error.WriteLine("PHI_RECOVERY_FILES_FAILED"); }
+                phase = "REGISTRY";
+                try {
+                  if ((bool)value["registry"]) {
+                    string fixture = "Software\\PhiProbe-" + id;
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(fixture)) if (key != null) { if (!User.Equals(key.GetAccessControl().GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException(); }
+                    Registry.CurrentUser.DeleteSubKeyTree(fixture, false);
+                    value["registry"] = false;
+                    using (RegistryKey key = root.OpenSubKey(id, true)) Write(key, value);
+                  }
+                } catch { failed = true; Console.Error.WriteLine("PHI_RECOVERY_REGISTRY_FAILED"); }
                 phase = "PROFILE";
-                if ((bool)value["profile"]) { int result = DeleteAppContainerProfile("Phi.Probe." + id); if (result != 0 && result != unchecked((int)0x80070002) && result != unchecked((int)0x80070003)) throw new InvalidDataException(); }
+                try {
+                  if ((bool)value["profile"]) {
+                    int result = DeleteAppContainerProfile("Phi.Probe." + id);
+                    if (result != 0 && result != unchecked((int)0x80070002) && result != unchecked((int)0x80070003)) throw new InvalidDataException();
+                    value["profile"] = false;
+                    using (RegistryKey key = root.OpenSubKey(id, true)) Write(key, value);
+                  }
+                } catch { failed = true; Console.Error.WriteLine("PHI_RECOVERY_PROFILE_FAILED"); }
+                if (failed) { quarantined++; continue; }
                 phase = "COMMIT";
                 root.DeleteSubKeyTree(id); if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException(); recovered++;
               } catch { quarantined++; Console.Error.WriteLine("PHI_RECOVERY_" + phase + "_FAILED"); }
@@ -192,12 +212,12 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
       string extra = null, extraIdentity = null, replacementIdentity = null;
-      bool passed = false, fixtureClean = true;
+      bool passed = false, fixtureClean = true, profileOwned = false, registryOwned = false;
       try {
         scope = Begin();
         if (name == "clean") {
@@ -207,6 +227,19 @@ namespace Phi.Native {
           Directory.CreateDirectory(scope.Root);
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
           scope.RootCreated(); scope.Ready();
+          if (name == "root-swap-security" || name == "partially-missing-security") {
+            IntPtr profileSid;
+            int created = CreateAppContainerProfile(scope.Profile, "Phi recovery fixture", "Synthetic recovery fixture only", IntPtr.Zero, 0, out profileSid);
+            if (created != 0 || profileSid == IntPtr.Zero) throw new InvalidDataException();
+            profileOwned = true; FreeSid(profileSid); scope.ProfileCreated();
+            using (RegistryKey existing = Registry.CurrentUser.OpenSubKey(scope.FixtureRegistry)) if (existing != null) throw new InvalidDataException();
+            using (RegistryKey fixture = Registry.CurrentUser.CreateSubKey(scope.FixtureRegistry, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, PrivateRegistryAcl())) fixture.SetValue("Fixture", "synthetic-owned");
+            registryOwned = true; scope.RegistryCreated();
+            if (name == "partially-missing-security") {
+              if (DeleteAppContainerProfile(scope.Profile) != 0) throw new InvalidDataException();
+              Registry.CurrentUser.DeleteSubKeyTree(scope.FixtureRegistry);
+            }
+          }
           // A live unrelated generation with the recorded PID must not be
           // killed. The record deliberately refers to a different generation.
           scope.record["created"] = "0000000000000001"; scope.Save();
@@ -218,9 +251,9 @@ namespace Phi.Native {
             }
           }
           if (name == "missing") scope.CleanupFiles();
-          if (name == "root-swap" || name == "hardlink" || name == "junction") {
+          if (name == "root-swap" || name == "root-swap-security" || name == "hardlink" || name == "junction") {
             extra = RootFor(Guid.NewGuid().ToString("N"));
-            if (name == "root-swap") {
+            if (name == "root-swap" || name == "root-swap-security") {
               Directory.Move(scope.Root, extra); extraIdentity = RecoveryFilesystem.DirectoryIdentity(extra);
               Directory.CreateDirectory(scope.Root);
               File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-replacement-not-owned-by-receipt");
@@ -234,11 +267,25 @@ namespace Phi.Native {
           }
           scope.Dispose();
           int result = Recover(false, scope.Id);
-          if (name == "corrupt" || name == "unknown-field" || name == "oversized" || name == "root-swap") {
+          if (name == "corrupt" || name == "unknown-field" || name == "oversized" || name == "root-swap" || name == "root-swap-security") {
             if (result != 70 || !Directory.Exists(scope.Root)) throw new InvalidDataException();
-            string expected = name == "root-swap" ? "synthetic-replacement-not-owned-by-receipt" : "synthetic-scope-owned";
+            string expected = name == "root-swap" || name == "root-swap-security" ? "synthetic-replacement-not-owned-by-receipt" : "synthetic-scope-owned";
             if (File.ReadAllText(Path.Combine(scope.Root, "sentinel.txt")) != expected) throw new InvalidDataException();
-            if (name == "root-swap") {
+            if (name == "root-swap" || name == "root-swap-security") {
+              if (name == "root-swap-security") {
+                using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(scope.Id)) {
+                  Dictionary<string, object> remaining = Read(key, scope.Id);
+                  if ((bool)remaining["profile"] || (bool)remaining["registry"]) throw new InvalidDataException();
+                  saved = remaining;
+                }
+                using (RegistryKey fixture = Registry.CurrentUser.OpenSubKey(scope.FixtureRegistry)) if (fixture != null) throw new InvalidDataException();
+                // Creating the exact same name must succeed: a live residual
+                // profile would return ALREADY_EXISTS. No SID derivation guess.
+                IntPtr recreatedSid;
+                if (CreateAppContainerProfile(scope.Profile, "Phi recovery control", "Synthetic absence control", IntPtr.Zero, 0, out recreatedSid) != 0 || recreatedSid == IntPtr.Zero) throw new InvalidDataException();
+                FreeSid(recreatedSid);
+                if (DeleteAppContainerProfile(scope.Profile) != 0) throw new InvalidDataException();
+              }
               using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(scope.Root, replacementIdentity);
               replacementIdentity = null;
               Directory.Move(extra, scope.Root); extra = null;
@@ -258,6 +305,11 @@ namespace Phi.Native {
         try {
           if (scope != null) {
             scope.Dispose();
+            if (profileOwned) {
+              int deleted = DeleteAppContainerProfile(scope.Profile);
+              if (deleted != 0 && deleted != unchecked((int)0x80070002) && deleted != unchecked((int)0x80070003)) throw new InvalidDataException();
+            }
+            if (registryOwned) Registry.CurrentUser.DeleteSubKeyTree(scope.FixtureRegistry, false);
             if (saved != null && Directory.Exists(scope.Root)) {
               string expected = replacementIdentity ?? (string)saved["rootIdentity"];
               using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(scope.Root, expected);

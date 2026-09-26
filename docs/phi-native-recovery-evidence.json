@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "scope": "FIXED_NATIVE_SCOPE_RECOVERY_NOT_FULL_CODING_CRASH_CERTIFICATION",
+  "functionalHead": "ef648dab3d5bda2a840ed72ba62229a6a7113b6c",
+  "branch": "feature/routing-presets-quality",
+  "runId": 36259826266,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36259826266",
+  "conclusion": "success",
+  "newPiModelCalls": 0,
+  "privateAuthCopied": false,
+  "wsl": false,
+  "runners": [
+    { "os": "windows-latest", "tests": 74, "passed": 67, "failed": 0, "skipped": 7, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 74, "passed": 67, "failed": 0, "skipped": 7 }, "cleanup": "PASS" },
+    { "os": "ubuntu-latest", "tests": 74, "passed": 48, "failed": 0, "skipped": 26, "gitSourceClone": "PASS_FOUNDATION_ONLY", "cloneTests": { "total": 74, "passed": 48, "failed": 0, "skipped": 26 }, "cleanup": "PASS" }
+  ],
+  "localAuthoritativeLinux": { "tests": 607, "passed": 581, "failed": 0, "windowsOnlySkipped": 26, "syntax": "PASS", "typescript": "PASS", "packageValidation": "PASS" },
+  "proofs": ["live scope untouched", "Worker/Tester/reviewer supervisor SIGKILL: child disappears", "durable owned scope recovered", "repeat recovery idempotent", "before-cleanup exception remains failure", "during-cleanup exception recovered", "corrupt/unknown/oversized receipts quarantined", "live reused PID generation never killed", "missing root handled", "replacement root preserved", "junction target preserved", "hardlink target preserved", "LPAC cannot read recovery journal"],
+  "processKillsByRecovery": 0,
+  "windowsAutonomousReady": false,
+  "limitations": ["allocation-to-commit windows quarantine unknown resources", "not transactional EditEngine crash recovery", "not generic mutating filesystem", "not native coding E2E", "not full disaster recovery"]
+}
