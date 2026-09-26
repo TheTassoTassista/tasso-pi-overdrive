@@ -36,6 +36,9 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.match(source, /Marshal\.ReadInt32\(buffer\) != 1/u);
   assert.doesNotMatch(source, /DeriveCapabilitySidsFromName\("(?:internetClient|privateNetworkClientServer|enterpriseAuthentication)"/u);
   assert.match(source, /"S-1-3-4"/u);
+  assert.match(source, /WriteAlternateStream\(Path\.Combine\(secret, "\.env"\)\)/u);
+  assert.match(source, /ReadFile\(handle, actual/u);
+  assert.doesNotMatch(source, /File\.WriteAllText\([^\n]*\.env:fixture/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
 });
 const completedScopes = new Set();

@@ -34,6 +34,8 @@ namespace Phi.Native {
     [DllImport("advapi32.dll")] static extern int RegCloseKey(IntPtr key);
     [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool WriteFile(IntPtr file, byte[] buffer, uint count, out uint written, IntPtr overlapped);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool ReadFile(IntPtr file, byte[] buffer, uint count, out uint read, IntPtr overlapped);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -140,6 +142,25 @@ namespace Phi.Native {
       if (handle != new IntPtr(-1)) { CloseHandle(handle); return false; }
       return error == 5;
     }
+    static void WriteAlternateStream(string ownedFile) {
+      // .NET Framework path validation rejects ADS syntax before the OS sees
+      // it. Use native handles only for this fixed fresh owned fixture, and
+      // read back its exact bytes so a missing stream cannot pass the denial.
+      byte[] bytes = Encoding.UTF8.GetBytes("SYNTHETIC_PRIVATE_STREAM_ONLY");
+      IntPtr handle = CreateFileW(ownedFile + ":fixture", 0xc0000000, 0, IntPtr.Zero, 1, 0, IntPtr.Zero);
+      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      try {
+        uint written;
+        if (!WriteFile(handle, bytes, (uint)bytes.Length, out written, IntPtr.Zero) || written != bytes.Length) throw new Win32Exception(Marshal.GetLastWin32Error());
+      } finally { CloseHandle(handle); }
+      handle = CreateFileW(ownedFile + ":fixture", 0x80000000, 1, IntPtr.Zero, 3, 0, IntPtr.Zero);
+      if (handle == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      try {
+        uint read; byte[] actual = new byte[bytes.Length + 1];
+        if (!ReadFile(handle, actual, (uint)actual.Length, out read, IntPtr.Zero) || read != bytes.Length) throw new InvalidDataException();
+        for (int index = 0; index < bytes.Length; index++) if (bytes[index] != actual[index]) throw new InvalidDataException();
+      } finally { CloseHandle(handle); }
+    }
     int RunAllPackagesControl(Dictionary<string, object> request, string runtime, string file) {
       // Fixed, read-only positive control only. Never expose this mode in a
       // request schema or route arbitrary code through ordinary AppContainer.
@@ -206,7 +227,7 @@ namespace Phi.Native {
         File.SetAttributes(executable, FileAttributes.Normal);
         File.WriteAllText(Path.Combine(workspace, "fixture.txt"), "synthetic-input");
         File.WriteAllText(Path.Combine(secret, ".env"), "SYNTHETIC_PRIVATE_PROBE_ONLY");
-        File.WriteAllText(Path.Combine(secret, ".env:fixture"), "SYNTHETIC_PRIVATE_STREAM_ONLY");
+        WriteAlternateStream(Path.Combine(secret, ".env"));
         scope.protectedDirectory = secret;
         scope.readOnlyAsset = Path.Combine(runtime, "read-only.txt"); File.WriteAllText(scope.readOnlyAsset, "synthetic-read-only");
         string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
