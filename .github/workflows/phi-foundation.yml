@@ -36,5 +36,7 @@ jobs:
         run: node bin/phi.mjs splash --theme aurora
       - name: Indexed source/artifact/path/secret audit (no raw matches)
         run: node scripts/phi-repository-audit.mjs
+      - name: Clean Git-source clone (foundation only, engine must be unavailable)
+        run: node scripts/phi-clean-room.mjs
       - name: Scope reminder
         run: node -e "console.log('FOUNDATION ONLY. Windows autonomous engine remains BLOCKED; no live auth or sandbox parity claimed. Full Linux regression is a separate mandatory gate.')"

@@ -46,4 +46,6 @@ Do not mark the complete phase PASS before Windows-native confinement, clean-roo
 
 Checkpoint 2 complete serial authoritative gate: **567/567 PASS, 0 FAIL, 0 skipped**, syntax/TypeScript/package validation PASS. Index audit: 553 blobs, 0 FAIL; WARN only narrowly classified invalid fixture/detector/historical paths. HEAD-ancestry scan before checkpoint 2: 1,316 blobs, 0 FAIL; historical warnings retained, not erased. No claim of exhaustive secret detection or private-prose/commit-message audit.
 
-Pending closure for checkpoint 2: local commit and Git-source-only clean clone, then record exact commit/test/evidence state. Native Windows sandbox, filesystem/process/journal parity and full Linux fresh-machine bootstrap remain the next substantial engineering phase; do not begin a half-finished security backend when session quota is low.
+Checkpoint 2 code HEAD: `3a37e1457ec67597ce3c71006f56c1f55b2844f3`. Committed locally; only the protected pre-existing user modification remains outside commits.
+
+Next closure: run the tracked Git-source-only clean-room foundation suite from its committed source. It must demonstrate no copied ignored runtimes/auth and MUST report the uninstalled full engine as blocked, not accidentally use the host configuration. CI has the same explicit scope. Native Windows sandbox, filesystem/process/journal parity and full Linux fresh-machine bootstrap remain the next substantial engineering phase; do not begin a half-finished security backend when session quota is low.
