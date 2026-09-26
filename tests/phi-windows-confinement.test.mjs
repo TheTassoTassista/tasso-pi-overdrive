@@ -191,7 +191,7 @@ for (const failure of ['before-cleanup', 'cleanup-exception']) {
     } finally { await new Promise((resolve) => server.close(resolve)); }
   });
 }
-for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'guardian'], ['worker', 'role'], ['tester', 'role'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
+for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'], ['reviewer', 'supervisor'], ['worker', 'parent'], ['worker', 'guardian'], ['worker', 'role'], ['tester', 'role'], ['worker', 'tool'], ['tester', 'tool'], ['worker', 'timeout']]) test(`native LPAC ${role} ${failure} failure with nested tree: inherited denial and complete cleanup`, { skip: process.platform !== 'win32', timeout: 30000 }, async () => {
   const server = net.createServer((socket) => socket.destroy());
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   let child, scopeId;
@@ -228,13 +228,15 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     assert.equal(new Set(pids).size, 3);
     for (const pid of pids) { assert.ok(Number.isInteger(pid) && pid > 0); assert.equal(alive(pid), true); }
     if (failure === 'role') process.kill(row.ownedPid, 'SIGKILL');
+    else if (failure === 'tool') process.kill(row.leafPid, 'SIGKILL');
     else if (failure !== 'timeout') await terminateProbe(child);
     const code = await closed;
     for (const pid of pids) await gone(pid);
     if (failure === 'parent' || failure === 'guardian') { assert.ok(Number.isInteger(row.supervisorPid)); await gone(row.supervisorPid); }
-    if (failure === 'timeout' || failure === 'role') {
+    if (failure === 'timeout' || failure === 'role' || failure === 'tool') {
       assert.notEqual(code, 0, 'forced failure must not be reported successful');
       if (failure === 'timeout') assert.equal(code, 124, probeMetadata(stdout, stderr, code));
+      if (failure === 'tool') assert.equal(code, 73, probeMetadata(stdout, stderr, code));
       const cleanup = JSON.parse(stdout.trim().split(/\r?\n/u).at(-1));
       assert.equal(cleanup.tokenVerified, true); assert.equal(cleanup.cleanup, 'PASS', probeMetadata(stdout, stderr, code));
     }
