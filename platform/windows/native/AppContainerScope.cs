@@ -45,6 +45,7 @@ namespace Phi.Native {
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern uint SetNamedSecurityInfoW(string name, uint type, uint info, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr pointer);
     readonly string profile;
+    readonly ScopeRecovery recovery;
     readonly IntPtr sid;
     IntPtr capabilities, policy, registrySid, registryEntry;
     bool registered;
@@ -56,7 +57,8 @@ namespace Phi.Native {
     string protectedDirectory, readOnlyAsset;
     uint guardianPid;
     internal AppContainerScope() {
-      profile = "Phi.Probe." + Guid.NewGuid().ToString("N");
+      recovery = ScopeRecovery.Begin();
+      profile = recovery.Profile;
       try {
         // Minimal OS registry-read capability is needed by Node's Winsock
         // initialization. No network/file/identity/service capabilities added.
@@ -66,11 +68,16 @@ namespace Phi.Native {
         int result = CreateAppContainerProfile(profile, "Phi isolated probe", "Synthetic confinement validation only", registryEntry, 1, out sid);
         if (result != 0 || sid == IntPtr.Zero) throw new InvalidOperationException("PHI_APPCONTAINER_PROFILE_FAILED");
         registered = true;
+        recovery.ProfileCreated();
         Capabilities value = new Capabilities(); value.Sid = sid; value.Entries = registryEntry; value.Count = 1;
         capabilities = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(Capabilities)));
         Marshal.StructureToPtr(value, capabilities, false);
         policy = Marshal.AllocHGlobal(4); Marshal.WriteInt32(policy, 1); // ALL_APPLICATION_PACKAGES opt-out / LPAC
-      } catch { Dispose(); throw; }
+      } catch {
+        bool clean = false;
+        try { Dispose(); clean = true; } finally { recovery.Complete(clean); }
+        throw;
+      }
     }
     static IntPtr RegistryReadSid() {
       IntPtr groups = IntPtr.Zero, entries = IntPtr.Zero, result = IntPtr.Zero; uint groupCount = 0, entryCount = 0;
@@ -114,7 +121,7 @@ namespace Phi.Native {
       } finally { CloseHandle(token); }
     }
     void VerifyRegistryAndHostProcess(IntPtr token) {
-      IntPtr duplicate = IntPtr.Zero, publicKey = IntPtr.Zero, privateKey = IntPtr.Zero, hostProcess = IntPtr.Zero;
+      IntPtr duplicate = IntPtr.Zero, publicKey = IntPtr.Zero, privateKey = IntPtr.Zero, journalKey = IntPtr.Zero, hostProcess = IntPtr.Zero;
       bool impersonating = false;
       try {
         if (!DuplicateToken(token, 2, out duplicate) || !SetThreadToken(IntPtr.Zero, duplicate)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -123,19 +130,21 @@ namespace Phi.Native {
         // token. No reg.exe/shell subprocess or virtualized HKCU false negative.
         int publicResult = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000002)), "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, 0x20019 | 0x100, out publicKey);
         int privateResult = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000003)), privateRegistry, 0, 0x20019 | 0x100, out privateKey);
+        int journalResult = RegOpenKeyExW(new IntPtr(unchecked((int)0x80000003)), WindowsIdentity.GetCurrent().User.Value + "\\" + ScopeRecovery.RegistryBase + "\\" + recovery.Id, 0, 0x20019 | 0x100, out journalKey);
         hostProcess = OpenProcess(0x40, false, guardianPid); // PROCESS_DUP_HANDLE, not a destructive operation
         int processError = Marshal.GetLastWin32Error();
         bool registryRead = publicResult == 0, privateDenied = privateResult == 5, hostHandleDenied = hostProcess == IntPtr.Zero && processError == 5;
         bool protectedDaclDenied = WriteDaclDenied(protectedDirectory, true), runtimeDaclDenied = WriteDaclDenied(readOnlyAsset, false);
-        if (!registryRead || !privateDenied || !hostHandleDenied || !protectedDaclDenied || !runtimeDaclDenied) throw new InvalidDataException();
+        if (!registryRead || !privateDenied || journalResult != 5 || !hostHandleDenied || !protectedDaclDenied || !runtimeDaclDenied) throw new InvalidDataException();
       } finally {
         if (publicKey != IntPtr.Zero) RegCloseKey(publicKey);
         if (privateKey != IntPtr.Zero) RegCloseKey(privateKey);
+        if (journalKey != IntPtr.Zero) RegCloseKey(journalKey);
         if (hostProcess != IntPtr.Zero) CloseHandle(hostProcess);
         if (impersonating && !RevertToSelf()) Environment.FailFast("PHI_APPCONTAINER_REVERT_FAILED");
         if (duplicate != IntPtr.Zero) CloseHandle(duplicate);
       }
-      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"hostHandleDuplicationDenied\":true,\"protectedDaclChangeDenied\":true,\"runtimeDaclChangeDenied\":true}");
+      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"journalRegistryDenied\":true,\"hostHandleDuplicationDenied\":true,\"protectedDaclChangeDenied\":true,\"runtimeDaclChangeDenied\":true}");
     }
     static bool WriteDaclDenied(string file, bool directory) {
       // Opening WRITE_DAC is enough to test the owner-rights escape without
@@ -232,8 +241,10 @@ namespace Phi.Native {
       if (registrySid != IntPtr.Zero) Marshal.FreeHGlobal(registrySid);
       if (sid != IntPtr.Zero) FreeSid(sid);
       if (result != 0) { Console.Error.WriteLine("PHI_APPCONTAINER_PROFILE_CLEANUP_FAILED:" + result); throw new InvalidOperationException("PHI_APPCONTAINER_CLEANUP_FAILED"); }
+      recovery.ProfileRemoved();
     }
-    internal static int Probe(string node, string role, string portText) {
+    internal static int Probe(string node, string role, string portText, string failure = "normal") {
+      if (failure != "normal" && failure != "hold-child" && failure != "before-cleanup" && failure != "cleanup-exception") return 70;
       if (IntPtr.Size != 8 || (role != "worker" && role != "tester" && role != "reviewer")) return 70;
       int port;
       if (!Int32.TryParse(portText, out port) || port < 1 || port > 65535 || !Path.IsPathRooted(node) || node.StartsWith("\\\\") || !node.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return 70;
@@ -241,8 +252,9 @@ namespace Phi.Native {
       try {
         if ((File.GetAttributes(node) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
         scope = new AppContainerScope();
-        root = Path.Combine(Path.GetTempPath(), "phi-lpac-" + Guid.NewGuid().ToString("N"));
+        root = scope.recovery.Root;
         Directory.CreateDirectory(root); scope.SetDirectoryAuthority(root, true, false);
+        scope.recovery.RootCreated();
         string runtime = Path.Combine(root, "runtime"), workspace = Path.Combine(root, "workspace"), scratch = Path.Combine(root, "scratch"), secret = Path.Combine(root, "host-private");
         foreach (string directory in new string[] { runtime, workspace, scratch, secret }) Directory.CreateDirectory(directory);
         scope.SetDirectoryAuthority(runtime, true, false); scope.SetDirectoryAuthority(workspace, true, role == "worker");
@@ -270,10 +282,11 @@ namespace Phi.Native {
         allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-15-2-1"), FileSystemRights.ReadAndExecute, AccessControlType.Allow));
         allAcl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, AccessControlType.Allow));
         File.SetAccessControl(allPackages, allAcl);
-        registryKey = "Software\\PhiProbe-" + Guid.NewGuid().ToString("N");
+        registryKey = scope.recovery.FixtureRegistry;
         RegistrySecurity privateAcl = new RegistrySecurity(); privateAcl.SetAccessRuleProtection(true, false);
         privateAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
         using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryKey, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, privateAcl)) { key.SetValue("Fixture", "synthetic-private-value"); if ((string)key.GetValue("Fixture") != "synthetic-private-value") throw new InvalidDataException(); }
+        scope.recovery.RegistryCreated();
         scope.privateRegistry = WindowsIdentity.GetCurrent().User.Value + "\\" + registryKey;
         string script = @"console.error('PHI_CONFINEMENT_ENTERED');const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
 const [work,scratch,runtime,secret,port,role]=process.argv.slice(1);
@@ -305,6 +318,7 @@ s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
 let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.existingJunctionReadDenied&&result.existingPrivateHardlinkReadDenied&&result.existingReadOnlyHardlinkReadable&&result.existingReadOnlyHardlinkWriteDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+        if (failure == "hold-child") script = script.Replace("console.log(JSON.stringify(result));process.exit(", "console.log(JSON.stringify({...result,ownedPid:process.pid,scopeId:'" + scope.recovery.Id + "'}));setInterval(()=>{},1000);return;process.exit(");
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
@@ -321,11 +335,13 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         int guardian; if (!Int32.TryParse(Environment.GetEnvironmentVariable("PHI_PROBE_GUARDIAN"), out guardian)) throw new InvalidDataException();
         request["guardianPid"] = guardian;
         scope.guardianPid = (uint)guardian;
+        scope.recovery.Ready();
         if (scope.RunAllPackagesControl(request, runtime, allPackages) != 0) throw new InvalidOperationException("PHI_APPCONTAINER_CONTROL_FAILED");
         byte[] input = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(request) + "\n");
         using (MemoryStream stream = new MemoryStream(input)) code = OwnedProcess.Execute(stream, scope);
         if (!scope.TokenVerified) code = 70;
         if (File.ReadAllText(Path.Combine(secret, ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY" || File.ReadAllText(scope.readOnlyAsset) != "synthetic-read-only") code = 70;
+        if (failure == "before-cleanup") throw new InvalidOperationException("PHI_RECOVERY_INJECTED_BEFORE_CLEANUP");
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_APPCONTAINER_FAILED:" + ex.NativeErrorCode); code = 70; }
         catch { Console.Error.WriteLine("PHI_APPCONTAINER_PROBE_FAILED"); code = 70; }
       finally {
@@ -340,10 +356,14 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
           }
           if (aliasesReady && File.ReadAllText(Path.Combine(root, "host-private", ".env")) != "SYNTHETIC_PRIVATE_PROBE_ONLY") throw new InvalidDataException();
         } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_JUNCTION_CLEANUP_FAILED"); }
-        try { if (root != null) Directory.Delete(root, true); } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
+        try {
+          if (failure == "cleanup-exception") throw new InvalidOperationException("PHI_RECOVERY_INJECTED_CLEANUP_EXCEPTION");
+          if (root != null) scope.recovery.CleanupFiles();
+        } catch { filesClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_FILES_CLEANUP_FAILED"); }
         try { if (registryKey != null) Registry.CurrentUser.DeleteSubKeyTree(registryKey); } catch { registryClean = false; Console.Error.WriteLine("PHI_APPCONTAINER_REGISTRY_CLEANUP_FAILED"); }
         cleaned = profileClean && filesClean && registryClean;
         if (!cleaned) { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }
+        try { if (scope != null) scope.recovery.Complete(cleaned); } catch { cleaned = false; code = 70; Console.Error.WriteLine("PHI_RECOVERY_JOURNAL_FAILED"); }
       }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { tokenVerified = scope != null && scope.TokenVerified, cleanup = cleaned ? "PASS" : "FAIL", scope = "FIXED_SYNTHETIC_PROBE_ONLY", scopeId = scope == null ? null : scope.profile.Substring("Phi.Probe.".Length) }));
       return code;
