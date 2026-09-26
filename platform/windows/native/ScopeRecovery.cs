@@ -276,12 +276,13 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
       string extra = null, extraIdentity = null, replacementIdentity = null;
       bool passed = false, fixtureClean = true, profileOwned = false, registryOwned = false;
+      bool injectedCreationException = false;
       string mappingPhase = "NONE";
       try {
         scope = Begin();
@@ -289,9 +290,13 @@ namespace Phi.Native {
           string id = scope.Id; scope.Complete(true);
           passed = Recover(false, id) == 0;
         } else {
-          Directory.CreateDirectory(scope.Root);
+          scope.CreateRoot();
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
-          scope.RootCreated(); scope.Ready();
+          if (name == "creation-exception") {
+            injectedCreationException = true;
+            throw new InvalidOperationException("PHI_FIXED_CREATION_EXCEPTION");
+          }
+          scope.Ready();
           if (name == "readonly-file") {
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");
             File.SetAttributes(sentinel, File.GetAttributes(sentinel) | FileAttributes.ReadOnly);
@@ -420,29 +425,38 @@ namespace Phi.Native {
           passed = true;
         }
       } catch (Exception error) {
-        RecoveryFilesystem.LogFailure(error);
-        if (name == "mapped-file" || name == "mapped-file-stuck") Console.Error.WriteLine("PHI_RECOVERY_MAPPING_" + mappingPhase + "_FAILED");
-        Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED");
+        if (injectedCreationException && error is InvalidOperationException && error.Message == "PHI_FIXED_CREATION_EXCEPTION") passed = true;
+        else {
+          RecoveryFilesystem.LogFailure(error);
+          if (name == "mapped-file" || name == "mapped-file-stuck") Console.Error.WriteLine("PHI_RECOVERY_MAPPING_" + mappingPhase + "_FAILED");
+          Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED");
+        }
       }
       finally {
         // Only exact fresh self-test objects with their captured identities.
         // Never clean an arbitrary path from corrupt metadata.
-        try {
-          if (scope != null) {
-            scope.Dispose();
+        if (scope != null) {
+          try { scope.Dispose(); } catch { fixtureClean = false; }
+          try {
             if (profileOwned) {
               int deleted = DeleteAppContainerProfile(scope.Profile);
               if (deleted != 0 && deleted != unchecked((int)0x80070002) && deleted != unchecked((int)0x80070003)) throw new InvalidDataException();
             }
-            if (registryOwned) Registry.CurrentUser.DeleteSubKeyTree(scope.FixtureRegistry, false);
-            if (saved != null && Directory.Exists(scope.Root)) {
-              string expected = replacementIdentity ?? (string)saved["rootIdentity"];
+          } catch { fixtureClean = false; }
+          try { if (registryOwned) Registry.CurrentUser.DeleteSubKeyTree(scope.FixtureRegistry, false); } catch { fixtureClean = false; }
+          try {
+            if (Directory.Exists(scope.Root)) {
+              // Ownership was flushed at creation, before a saved snapshot or
+              // Ready marker exists. Never falsely report cleanup on early throw.
+              string expected = replacementIdentity ?? (string)scope.record["rootIdentity"];
+              if (!IdentityPattern.IsMatch(expected)) throw new InvalidDataException();
               using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(scope.Root, expected);
             }
-            using (RegistryKey root = OpenBase()) root.DeleteSubKeyTree(scope.Id, false);
-          }
-          if (extra != null) using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(extra, extraIdentity);
-        } catch { fixtureClean = false; Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_CLEANUP_FAILED"); }
+          } catch { fixtureClean = false; }
+          if (fixtureClean) try { using (RegistryKey root = OpenBase()) root.DeleteSubKeyTree(scope.Id, false); } catch { fixtureClean = false; }
+        }
+        try { if (extra != null) using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(extra, extraIdentity); } catch { fixtureClean = false; }
+        if (!fixtureClean) Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_CLEANUP_FAILED");
       }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, fixtureCleanup = fixtureClean, processKills = 0 }));
       return passed && fixtureClean ? 0 : 70;

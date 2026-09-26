@@ -82,7 +82,7 @@ namespace Phi.Native {
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; bool passed = false, clean = true;
       try {
-        scope = ScopeRecovery.Begin(); Directory.CreateDirectory(scope.Root); scope.RootCreated(); scope.Ready();
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root), directory = Path.Combine(scope.Root, "src");
         Directory.CreateDirectory(directory);
         string file = Path.Combine(directory, "fixture.txt"), outside = Path.Combine(scope.Root, "unrelated.txt");

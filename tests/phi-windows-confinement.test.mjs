@@ -252,7 +252,7 @@ for (const [role, failure] of [['worker', 'supervisor'], ['tester', 'supervisor'
     finally { await new Promise((resolve) => server.close(resolve)); }
   }
 });
-for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit']) {
+for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized', 'missing', 'root-swap', 'hardlink', 'junction', 'root-swap-security', 'partially-missing-security', 'status-stale', 'status-corrupt', 'nested-entries', 'mapped-file', 'mapped-file-stuck', 'readonly-file', 'depth-limit', 'creation-exception']) {
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
