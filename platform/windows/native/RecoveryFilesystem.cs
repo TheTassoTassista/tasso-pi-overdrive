@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -146,12 +147,12 @@ namespace Phi.Native {
       catch (Win32Exception ex) { if (ex.NativeErrorCode == 2 || ex.NativeErrorCode == 3) return; throw; }
       try {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || HandleIdentity(handle) != expected) throw new InvalidDataException();
-        int remaining = 2048; DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        int remaining = 2048; Stopwatch deadline = Stopwatch.StartNew();
         DeleteContents(handle, 0, ref remaining, deadline);
         DeleteHandle(handle, info, deadline);
       } finally { CloseHandle(handle); }
     }
-    static void DeleteContents(IntPtr directory, int depth, ref int remaining, DateTime deadline) {
+    static void DeleteContents(IntPtr directory, int depth, ref int remaining, Stopwatch deadline) {
       if (depth > 16) throw new InvalidDataException();
       // FILE_FULL_DIR_INFO: name length at byte 60, UTF-16 name at byte 68.
       // Enumerate the actual pinned object, not a substituted DOS pathname.
@@ -160,7 +161,7 @@ namespace Phi.Native {
       try {
         bool restart = true;
         while (true) {
-          if (DateTime.UtcNow >= deadline) throw new InvalidDataException();
+          if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
           Marshal.Copy(new byte[BufferSize], 0, buffer, BufferSize);
           if (!QueryDirectory(directory, restart ? 15 : 14, buffer, BufferSize)) {
             int error = Marshal.GetLastWin32Error();
@@ -170,7 +171,7 @@ namespace Phi.Native {
           restart = false;
           int offset = 0;
           while (true) {
-            if (offset > BufferSize - 68 || DateTime.UtcNow >= deadline) throw new InvalidDataException();
+            if (offset > BufferSize - 68 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
             IntPtr entry = IntPtr.Add(buffer, offset);
             uint next = unchecked((uint)Marshal.ReadInt32(entry, 0));
             uint bytes = unchecked((uint)Marshal.ReadInt32(entry, 60));
@@ -197,14 +198,14 @@ namespace Phi.Native {
         }
       } finally { Marshal.FreeHGlobal(buffer); }
     }
-    static void DeleteHandle(IntPtr handle, Info info, DateTime deadline) {
+    static void DeleteHandle(IntPtr handle, Info info, Stopwatch deadline) {
       Disposition value = new Disposition(); value.Delete = 1;
       while (!SetFileInformationByHandle(handle, 4, ref value, (uint)Marshal.SizeOf(typeof(Disposition)))) {
         int error = Marshal.GetLastWin32Error();
         // Terminated process image/mapped sections can delay unlinking. Retry
         // only the SAME pinned object within the existing shared 5s deadline.
         // Never reopen paths or alter ACLs, attributes, content or identities.
-        if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33) || DateTime.UtcNow >= deadline) {
+        if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33) || deadline.ElapsedMilliseconds >= 5000) {
           Console.Error.WriteLine("PHI_FILESYSTEM_HANDLE_DISPOSITION_FAILED");
           throw new Win32Exception(error);
         }

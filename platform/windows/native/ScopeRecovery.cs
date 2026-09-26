@@ -155,7 +155,7 @@ namespace Phi.Native {
     }
     internal static int Recover(bool emit, string only) {
       int scanned = 0, active = 0, recovered = 0, quarantined = 0;
-      DateTime deadline = DateTime.UtcNow.AddSeconds(10);
+      Stopwatch deadline = Stopwatch.StartNew();
       string phase = "ROOT_BASE";
       try {
         EnsureRootBase();
@@ -164,7 +164,7 @@ namespace Phi.Native {
           string[] ids = only == null ? root.GetSubKeyNames() : new string[] { only };
           if (ids.Length > MaxScopes) throw new InvalidDataException();
           foreach (string id in ids.OrderBy(x => x, StringComparer.Ordinal)) {
-            if (DateTime.UtcNow >= deadline) throw new InvalidDataException();
+            if (deadline.ElapsedMilliseconds >= 10000) throw new InvalidDataException();
             scanned++;
             if (!IdPattern.IsMatch(id)) { quarantined++; continue; }
             using (Mutex mutex = ScopeMutex(id)) {
@@ -217,11 +217,12 @@ namespace Phi.Native {
         }
       } catch { quarantined++; Console.Error.WriteLine("PHI_RECOVERY_" + phase + "_FAILED"); }
       if (emit) Console.WriteLine(new JavaScriptSerializer().Serialize(new { scope = "FIXED_NATIVE_SCOPES_ONLY", scanned, active, recovered, quarantined, processKills = 0, status = quarantined == 0 ? "PASS" : "FAIL" }));
+      else if (only == null) Console.Error.WriteLine("PHI_RECOVERY_STARTUP:" + new JavaScriptSerializer().Serialize(new { scanned, active, recovered, quarantined, processKills = 0 }));
       return quarantined == 0 ? 0 : 70;
     }
     internal static int Status(bool emit) {
       int scanned = 0, active = 0, stale = 0, quarantined = 0;
-      DateTime deadline = DateTime.UtcNow.AddSeconds(10);
+      Stopwatch deadline = Stopwatch.StartNew();
       // Read-only acceptance probe: do not create directories/registry bases,
       // delete receipts/resources, flush writes or kill any process.
       try {
@@ -230,7 +231,7 @@ namespace Phi.Native {
             ValidateRegistry(root); string[] ids = root.GetSubKeyNames();
             if (ids.Length > MaxScopes) throw new InvalidDataException();
             foreach (string id in ids) {
-              if (DateTime.UtcNow >= deadline) throw new InvalidDataException();
+              if (deadline.ElapsedMilliseconds >= 10000) throw new InvalidDataException();
               scanned++;
               if (!IdPattern.IsMatch(id)) { quarantined++; continue; }
               using (Mutex mutex = ScopeMutex(id)) {
@@ -260,6 +261,7 @@ namespace Phi.Native {
       Dictionary<string, object> saved = null;
       string extra = null, extraIdentity = null, replacementIdentity = null;
       bool passed = false, fixtureClean = true, profileOwned = false, registryOwned = false;
+      string mappingPhase = "NONE";
       try {
         scope = Begin();
         if (name == "clean") {
@@ -271,15 +273,18 @@ namespace Phi.Native {
           scope.RootCreated(); scope.Ready();
           if (name == "mapped-file") {
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            mappingPhase = "SETUP";
             using (FileStream stream = new FileStream(sentinel, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
             using (MemoryMappedFile mapping = MemoryMappedFile.CreateFromFile(stream, null, 0, MemoryMappedFileAccess.Read, HandleInheritability.None, true))
             using (MemoryMappedViewAccessor view = mapping.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read)) {
               bool denied = false;
+              mappingPhase = "DENIAL_CONTROL";
               try { File.Delete(sentinel); }
               catch (UnauthorizedAccessException) { denied = true; }
               catch (IOException error) { int code = error.HResult & 65535; if (code != 5 && code != 32 && code != 33) throw; denied = true; }
               if (!denied || !File.Exists(sentinel)) throw new InvalidDataException();
               RecoveryFilesystem.TransientDeleteRetries = 0;
+              mappingPhase = "RETRY_CONTROL";
               using (Timer release = new Timer(delegate(object state) { view.Dispose(); mapping.Dispose(); stream.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
               if (RecoveryFilesystem.TransientDeleteRetries < 1) throw new InvalidDataException();
             }
@@ -366,7 +371,11 @@ namespace Phi.Native {
           bool alive; if (ProcessCreation(Process.GetCurrentProcess().Id, out alive) == null || !alive) throw new InvalidDataException();
           passed = true;
         }
-      } catch { Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED"); }
+      } catch (Exception error) {
+        RecoveryFilesystem.LogFailure(error);
+        if (name == "mapped-file") Console.Error.WriteLine("PHI_RECOVERY_MAPPING_" + mappingPhase + "_FAILED");
+        Console.Error.WriteLine("PHI_RECOVERY_SELFTEST_FAILED");
+      }
       finally {
         // Only exact fresh self-test objects with their captured identities.
         // Never clean an arbitrary path from corrupt metadata.

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -202,8 +203,8 @@ namespace Phi.Native {
         // A successful parent exit is not evidence that descendants finished.
         phase = "CLEANUP";
         Check(TerminateJobObject(job, 137));
-        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
-        while (!EmptyJob(job)) { if (DateTime.UtcNow >= deadline) throw new InvalidDataException(); Thread.Sleep(10); }
+        Stopwatch deadline = Stopwatch.StartNew();
+        while (!EmptyJob(job)) { if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException(); Thread.Sleep(10); }
         writeHandle.Dispose();
         return code <= 255 ? (int)code : 1;
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
@@ -213,8 +214,8 @@ namespace Phi.Native {
         // termination. Drain it before the outer scope deletes profile/state.
         if (job != IntPtr.Zero) {
           try {
-            Check(TerminateJobObject(job, 137)); DateTime end = DateTime.UtcNow.AddSeconds(5);
-            while (!EmptyJob(job) && DateTime.UtcNow < end) Thread.Sleep(10);
+            Check(TerminateJobObject(job, 137)); Stopwatch end = Stopwatch.StartNew();
+            while (!EmptyJob(job) && end.ElapsedMilliseconds < 5000) Thread.Sleep(10);
           } catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_CLEANUP_UNATTESTED"); }
         }
         // Closing the non-inherited last Job handle kills owned children even on exception.
