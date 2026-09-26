@@ -28,10 +28,12 @@ namespace Phi.Native {
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly string directoryPath;
+    internal static int TransientDeleteRetries;
     internal static void LogFailure(Exception error) {
       Win32Exception native = error as Win32Exception;
       string code = native == null ? "OBJECT_REJECTED" : native.NativeErrorCode == 32 || native.NativeErrorCode == 33 ? "SHARING_VIOLATION" : native.NativeErrorCode == 5 ? "ACCESS_DENIED" : native.NativeErrorCode == 145 ? "DIRECTORY_NOT_EMPTY" : "NATIVE_OTHER";
       Console.Error.WriteLine("PHI_FILESYSTEM_" + code);
+      if (native != null && native.NativeErrorCode >= 0 && native.NativeErrorCode <= 65535) Console.Error.WriteLine("PHI_FILESYSTEM_NATIVE_ERROR:" + native.NativeErrorCode);
     }
     internal RecoveryFilesystem(string directory) {
       string full = Path.GetFullPath(directory), drive = Path.GetPathRoot(full);
@@ -146,7 +148,7 @@ namespace Phi.Native {
         if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || HandleIdentity(handle) != expected) throw new InvalidDataException();
         int remaining = 2048; DateTime deadline = DateTime.UtcNow.AddSeconds(5);
         DeleteContents(handle, 0, ref remaining, deadline);
-        DeleteHandle(handle);
+        DeleteHandle(handle, info, deadline);
       } finally { CloseHandle(handle); }
     }
     static void DeleteContents(IntPtr directory, int depth, ref int remaining, DateTime deadline) {
@@ -180,10 +182,13 @@ namespace Phi.Native {
               Info info;
               // Open just this enumerated leaf relative to the held parent.
               // No mutation of content/ACLs/attributes, even for hard links.
-              IntPtr handle = OpenRelative(directory, name, 0x10081, 1, 1, 0, IntPtr.Zero, out info, true);
+              uint attributes = unchecked((uint)Marshal.ReadInt32(entry, 56));
+              bool isDirectory = (attributes & 0x10) != 0;
+              // Ordinary-file unlinking needs no READ_DATA authority.
+              IntPtr handle = OpenRelative(directory, name, isDirectory ? 0x10081U : 0x10080U, 1, 1, isDirectory ? 1U : 0x40U, IntPtr.Zero, out info, true);
               try {
                 if ((info.Attributes & 0x10) != 0 && (info.Attributes & 0x400) == 0) DeleteContents(handle, depth + 1, ref remaining, deadline);
-                DeleteHandle(handle);
+                DeleteHandle(handle, info, deadline);
               } finally { CloseHandle(handle); }
             }
             if (next == 0) break;
@@ -192,9 +197,20 @@ namespace Phi.Native {
         }
       } finally { Marshal.FreeHGlobal(buffer); }
     }
-    static void DeleteHandle(IntPtr handle) {
+    static void DeleteHandle(IntPtr handle, Info info, DateTime deadline) {
       Disposition value = new Disposition(); value.Delete = 1;
-      if (!SetFileInformationByHandle(handle, 4, ref value, (uint)Marshal.SizeOf(typeof(Disposition)))) throw new Win32Exception(Marshal.GetLastWin32Error());
+      while (!SetFileInformationByHandle(handle, 4, ref value, (uint)Marshal.SizeOf(typeof(Disposition)))) {
+        int error = Marshal.GetLastWin32Error();
+        // Terminated process image/mapped sections can delay unlinking. Retry
+        // only the SAME pinned object within the existing shared 5s deadline.
+        // Never reopen paths or alter ACLs, attributes, content or identities.
+        if ((info.Attributes & 1) != 0 || (error != 5 && error != 32 && error != 33) || DateTime.UtcNow >= deadline) {
+          Console.Error.WriteLine("PHI_FILESYSTEM_HANDLE_DISPOSITION_FAILED");
+          throw new Win32Exception(error);
+        }
+        TransientDeleteRetries++;
+        System.Threading.Thread.Sleep(10);
+      }
     }
     public void Dispose() { for (int index = parents.Count - 1; index >= 0; index--) CloseHandle(parents[index]); parents.Clear(); }
   }

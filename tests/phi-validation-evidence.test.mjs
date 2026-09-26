@@ -6,6 +6,12 @@ test('native failure preserves bounded Win32 error numbers without raw context',
   assert.deepEqual(result.nativeErrorNumbers, [32, 5]);
   assert.doesNotMatch(JSON.stringify(result), /private-file|secret|99999/u);
 });
+test('filesystem diagnostics publish bounded fixed-code error numbers only', () => {
+  const row = validationFailureEvidence('foundation-tests', { stderr: 'PHI_FILESYSTEM_NATIVE_OTHER PHI_FILESYSTEM_NATIVE_ERROR:87 private-target PHI_FILESYSTEM_NATIVE_ERROR:12345 PHI_FILESYSTEM_NATIVE_ERROR:99999 PHI_USER_ERROR:6' });
+  assert.deepEqual(row.nativeErrorNumbers, [87, 12345]);
+  assert.deepEqual(row.diagnosticCodes, ['PHI_FILESYSTEM_NATIVE_OTHER', 'PHI_FILESYSTEM_NATIVE_ERROR']);
+  assert.doesNotMatch(JSON.stringify(row), /private-target|99999|USER_ERROR/u);
+});
 test('clean-room failure receipt identifies its stage/codes/counts without leaking output', () => {
   const evidence = validationFailureEvidence('foundation-tests', { status: 1, stdout: 'not ok 12 - secret-fixture-value\n# tests 47\n# pass 39\n# fail 1', stderr: 'private-path secret-fixture-value error CS1234 PHI_NATIVE_PROCESS_FAILED PHI_USER_PRIVATE_SECRET_VALUE PHI_WINDOWS_BUILD_SECRET_VALUE private contents' });
   assert.deepEqual(evidence, { failureStage: 'foundation-tests', exitCode: 1, timedOut: false, diagnosticCodes: ['CS1234', 'PHI_NATIVE_PROCESS_FAILED'], testCounts: { total: 47, passed: 39, failed: 1 }, failedTestNumbers: [12] });

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.MemoryMappedFiles;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -253,7 +254,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -268,6 +269,21 @@ namespace Phi.Native {
           Directory.CreateDirectory(scope.Root);
           File.WriteAllText(Path.Combine(scope.Root, "sentinel.txt"), "synthetic-scope-owned");
           scope.RootCreated(); scope.Ready();
+          if (name == "mapped-file") {
+            string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            using (FileStream stream = new FileStream(sentinel, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (MemoryMappedFile mapping = MemoryMappedFile.CreateFromFile(stream, null, 0, MemoryMappedFileAccess.Read, HandleInheritability.None, true))
+            using (MemoryMappedViewAccessor view = mapping.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read)) {
+              bool denied = false;
+              try { File.Delete(sentinel); }
+              catch (UnauthorizedAccessException) { denied = true; }
+              catch (IOException error) { int code = error.HResult & 65535; if (code != 5 && code != 32 && code != 33) throw; denied = true; }
+              if (!denied || !File.Exists(sentinel)) throw new InvalidDataException();
+              RecoveryFilesystem.TransientDeleteRetries = 0;
+              using (Timer release = new Timer(delegate(object state) { view.Dispose(); mapping.Dispose(); stream.Dispose(); }, null, 300, Timeout.Infinite)) scope.CleanupFiles();
+              if (RecoveryFilesystem.TransientDeleteRetries < 1) throw new InvalidDataException();
+            }
+          }
           if (name == "nested-entries") {
             string nested = scope.Root;
             for (int level = 0; level < 4; level++) {

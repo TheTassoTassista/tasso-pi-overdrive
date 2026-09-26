@@ -46,6 +46,8 @@ try {
   stage = 'doctor';
   const doctor = await phiDoctor({ source: clone, dirs, env, probeServices: false });
   if (plan.writes !== 0 || installed.engineReady !== false || !doctor.checks.some((row) => row.capability === 'Pi runtime' && row.status === 'FAIL')) throw new Error('PHI_CLEAN_ROOM_FALSE_ENGINE_READINESS');
+  const recovery = process.platform === 'win32' ? doctor.checks.find((row) => row.capability === 'Windows scope recovery') : null;
+  if (process.platform === 'win32' && recovery?.status !== 'PASS') throw new Error('PHI_CLEAN_ROOM_UNHEALTHY_SCOPE_RECOVERY');
   stage = 'foundation-tests';
   const tests = run(process.execPath, [path.join(clone, 'scripts', 'phi-check.mjs')], clone, env);
   if (!/^# fail 0$/mu.test(tests)) throw new Error('PHI_CLEAN_ROOM_TEST_FAILURE');
@@ -55,7 +57,7 @@ try {
   stage = 'brand-smoke';
   const version = run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env).trim();
   if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
-  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
+  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
 } catch (error) {
   report = { version: 1, status: 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;
