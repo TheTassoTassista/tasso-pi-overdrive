@@ -276,7 +276,7 @@ namespace Phi.Native {
     public void Dispose() { if (disposed) return; disposed = true; lease.ReleaseMutex(); lease.Dispose(); }
     // Fixed owned fixtures only: never a generic metadata import/edit API.
     internal static int SelfTest(string name) {
-      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception" };
+      string[] cases = { "clean", "pid-reuse", "corrupt", "unknown-field", "oversized", "missing", "root-swap", "hardlink", "junction", "root-swap-security", "partially-missing-security", "status-stale", "status-corrupt", "nested-entries", "mapped-file", "mapped-file-stuck", "readonly-file", "depth-limit", "creation-exception", "open-sharing-control", "delete-pending-control" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null;
       Dictionary<string, object> saved = null;
@@ -297,6 +297,22 @@ namespace Phi.Native {
             throw new InvalidOperationException("PHI_FIXED_CREATION_EXCEPTION");
           }
           scope.Ready();
+          if (name == "open-sharing-control" || name == "delete-pending-control") {
+            // Deterministic native API controls: the only blocking handle is
+            // ours, on a fresh private fixture, released before final recovery.
+            string sentinel = Path.Combine(scope.Root, "sentinel.txt");
+            using (FileStream hold = new FileStream(sentinel, FileMode.Open, FileAccess.Read, name == "open-sharing-control" ? FileShare.Read : FileShare.ReadWrite | FileShare.Delete)) {
+              if (name == "delete-pending-control") File.Delete(sentinel);
+              bool denied = false;
+              try { scope.CleanupFiles(); }
+              catch (Win32Exception error) {
+                if (error.NativeErrorCode != (name == "open-sharing-control" ? 32 : 5)) throw;
+                denied = true;
+              }
+              if (!denied) throw new InvalidDataException();
+              if (name == "open-sharing-control" && File.ReadAllText(sentinel) != "synthetic-scope-owned") throw new InvalidDataException();
+            }
+          }
           if (name == "readonly-file") {
             string sentinel = Path.Combine(scope.Root, "sentinel.txt");
             File.SetAttributes(sentinel, File.GetAttributes(sentinel) | FileAttributes.ReadOnly);

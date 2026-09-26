@@ -34,6 +34,9 @@ jobs:
       - name: Native Linux foundation bootstrap
         if: runner.os == 'Linux'
         run: sh bootstrap/linux.sh
+      - name: Native Windows recovery individually and sequentially (no model calls)
+        if: runner.os == 'Windows'
+        run: node scripts/phi-windows-recovery-focus.mjs
       - name: Native platform, filesystem, themes, CLI, backup policy and bootstrap tests
         run: npm run check:phi
       - name: Non-interactive brand smoke (no model calls)
