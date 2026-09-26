@@ -33,6 +33,7 @@ namespace Phi.Native {
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegOpenKeyExW(IntPtr root, string subkey, uint options, uint access, out IntPtr key);
     [DllImport("advapi32.dll")] static extern int RegCloseKey(IntPtr key);
     [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, out uint size);
     [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorSacl(IntPtr descriptor, out bool present, out IntPtr sacl, out bool defaulted);
@@ -47,6 +48,7 @@ namespace Phi.Native {
     internal int AttributeCount { get { return optOut ? 4 : 3; } }
     internal bool TokenVerified { get; private set; }
     string privateRegistry;
+    string protectedDirectory, readOnlyAsset;
     uint guardianPid;
     internal AppContainerScope() {
       profile = "Phi.Probe." + Guid.NewGuid().ToString("N");
@@ -119,7 +121,8 @@ namespace Phi.Native {
         hostProcess = OpenProcess(0x40, false, guardianPid); // PROCESS_DUP_HANDLE, not a destructive operation
         int processError = Marshal.GetLastWin32Error();
         bool registryRead = publicResult == 0, privateDenied = privateResult == 5, hostHandleDenied = hostProcess == IntPtr.Zero && processError == 5;
-        if (!registryRead || !privateDenied || !hostHandleDenied) throw new InvalidDataException();
+        bool protectedDaclDenied = WriteDaclDenied(protectedDirectory, true), runtimeDaclDenied = WriteDaclDenied(readOnlyAsset, false);
+        if (!registryRead || !privateDenied || !hostHandleDenied || !protectedDaclDenied || !runtimeDaclDenied) throw new InvalidDataException();
       } finally {
         if (publicKey != IntPtr.Zero) RegCloseKey(publicKey);
         if (privateKey != IntPtr.Zero) RegCloseKey(privateKey);
@@ -127,7 +130,15 @@ namespace Phi.Native {
         if (impersonating && !RevertToSelf()) Environment.FailFast("PHI_APPCONTAINER_REVERT_FAILED");
         if (duplicate != IntPtr.Zero) CloseHandle(duplicate);
       }
-      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"hostHandleDuplicationDenied\":true}");
+      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"hostHandleDuplicationDenied\":true,\"protectedDaclChangeDenied\":true,\"runtimeDaclChangeDenied\":true}");
+    }
+    static bool WriteDaclDenied(string file, bool directory) {
+      // Opening WRITE_DAC is enough to test the owner-rights escape without
+      // changing any ACL, including when the negative assertion fails.
+      IntPtr handle = CreateFileW(file, 0x40000, 7, IntPtr.Zero, 3, 0x200000 | (directory ? 0x2000000U : 0U), IntPtr.Zero);
+      int error = Marshal.GetLastWin32Error();
+      if (handle != new IntPtr(-1)) { CloseHandle(handle); return false; }
+      return error == 5;
     }
     int RunAllPackagesControl(Dictionary<string, object> request, string runtime, string file) {
       // Fixed, read-only positive control only. Never expose this mode in a
@@ -195,6 +206,9 @@ namespace Phi.Native {
         File.SetAttributes(executable, FileAttributes.Normal);
         File.WriteAllText(Path.Combine(workspace, "fixture.txt"), "synthetic-input");
         File.WriteAllText(Path.Combine(secret, ".env"), "SYNTHETIC_PRIVATE_PROBE_ONLY");
+        File.WriteAllText(Path.Combine(secret, ".env:fixture"), "SYNTHETIC_PRIVATE_STREAM_ONLY");
+        scope.protectedDirectory = secret;
+        scope.readOnlyAsset = Path.Combine(runtime, "read-only.txt"); File.WriteAllText(scope.readOnlyAsset, "synthetic-read-only");
         string allPackages = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(allPackages, "synthetic-all-packages");
         FileSecurity allAcl = new FileSecurity(); allAcl.SetAccessRuleProtection(true, false);
         allAcl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, AccessControlType.Allow));
@@ -214,6 +228,14 @@ denied('hostReadDenied',()=>fs.readFileSync(path.join(secret,'.env')));
 denied('hostWriteDenied',()=>fs.writeFileSync(path.join(secret,'escape.txt'),'synthetic'));
 denied('runtimeWriteDenied',()=>fs.writeFileSync(path.join(runtime,'escape.txt'),'synthetic'));
 denied('allPackagesReadDenied',()=>fs.readFileSync(path.join(runtime,'all-packages.txt')));
+denied('extendedPathReadDenied',()=>fs.readFileSync(path.toNamespacedPath(path.join(secret,'.env'))));
+denied('alternateStreamReadDenied',()=>fs.readFileSync(path.join(secret,'.env:fixture')));
+denied('readOnlyAssetWriteDenied',()=>fs.appendFileSync(path.join(runtime,'read-only.txt'),'mutation'));
+denied('runtimeRenameDenied',()=>fs.renameSync(path.join(runtime,'read-only.txt'),path.join(scratch,'stolen.txt')));
+function escapedLink(key,create,target,mutate){try{create();denied(key,()=>mutate?fs.appendFileSync(target,'mutation'):fs.readFileSync(target));}catch(e){result[key]=['EACCES','EPERM'].includes(e.code);}}
+escapedLink('junctionEscapeDenied',()=>fs.symlinkSync(secret,path.join(scratch,'junction'),'junction'),path.join(scratch,'junction','.env'),false);
+escapedLink('privateHardlinkEscapeDenied',()=>fs.linkSync(path.join(secret,'.env'),path.join(scratch,'private-link')),path.join(scratch,'private-link'),false);
+escapedLink('readOnlyHardlinkWriteDenied',()=>fs.linkSync(path.join(runtime,'read-only.txt'),path.join(scratch,'read-only-link')),path.join(scratch,'read-only-link'),true);
 result.cleanEnvironment=!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|PHI_PROBE/i.test(k));
 console.error('PHI_CONFINEMENT_FILES_CHECKED');
 try{fs.writeFileSync(path.join(scratch,'scratch.txt'),'synthetic');result.scratchWrite=true;}catch{result.scratchWrite=false;}
@@ -223,7 +245,7 @@ console.error('PHI_CONFINEMENT_NETWORK_WAIT');
 s.on('connect',()=>{result.networkDenied=false;s.destroy();finish();});
 s.on('error',e=>{result.networkDenied=['EACCES','EPERM'].includes(e.code);finish();});
 s.on('timeout',()=>{result.networkDenied=false;s.destroy();finish();});
-let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
+let done=false;function finish(){if(done)return;done=true;console.log(JSON.stringify(result));process.exit(result.workspaceRead&&result.hostReadDenied&&result.hostWriteDenied&&result.runtimeWriteDenied&&result.allPackagesReadDenied&&result.extendedPathReadDenied&&result.alternateStreamReadDenied&&result.readOnlyAssetWriteDenied&&result.runtimeRenameDenied&&result.junctionEscapeDenied&&result.privateHardlinkEscapeDenied&&result.readOnlyHardlinkWriteDenied&&result.cleanEnvironment&&result.scratchWrite&&result.networkDenied&&(role==='worker'?result.workspaceWrite:!result.workspaceWrite&&result.workspaceWriteDenied)?0:1);}";
         Dictionary<string, object> request = new Dictionary<string, object>();
         request["command"] = executable; request["cwd"] = workspace;
         request["args"] = new string[] { "--no-addons", "-e", script, workspace, scratch, runtime, secret, portText, role };
@@ -254,7 +276,7 @@ let done=false;function finish(){if(done)return;done=true;console.log(JSON.strin
         cleaned = profileClean && filesClean && registryClean;
         if (!cleaned) { Console.Error.WriteLine("PHI_APPCONTAINER_CLEANUP_FAILED"); code = 70; }
       }
-      Console.WriteLine(new JavaScriptSerializer().Serialize(new { tokenVerified = scope != null && scope.TokenVerified, cleanup = cleaned ? "PASS" : "FAIL", scope = "FIXED_SYNTHETIC_PROBE_ONLY" }));
+      Console.WriteLine(new JavaScriptSerializer().Serialize(new { tokenVerified = scope != null && scope.TokenVerified, cleanup = cleaned ? "PASS" : "FAIL", scope = "FIXED_SYNTHETIC_PROBE_ONLY", scopeId = scope == null ? null : scope.profile.Substring("Phi.Probe.".Length) }));
       return code;
     }
   }

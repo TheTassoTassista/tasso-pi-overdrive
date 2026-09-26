@@ -8,7 +8,7 @@ import { requireAutonomousBackend } from '../platform/index.mjs';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 
 function probeMetadata(stdout, stderr, status) {
-  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
+  const fields = ['allPackagesReadControl', 'workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'registryReadAvailable', 'privateRegistryDenied', 'hostHandleDuplicationDenied', 'protectedDaclChangeDenied', 'runtimeDaclChangeDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied', 'workspaceWrite', 'workspaceWriteDenied', 'tokenVerified'];
   const receipts = stdout.trim().split(/\r?\n/u).slice(0, 4).flatMap((line) => {
     try { const row = JSON.parse(line); return [Object.fromEntries(fields.filter((key) => typeof row[key] === 'boolean').map((key) => [key, row[key]]))]; }
     catch { return []; }
@@ -38,6 +38,7 @@ test('experimental LPAC primitive is separate from autonomous authority', () => 
   assert.match(source, /"S-1-3-4"/u);
   assert.doesNotMatch(source, /ALL_APPLICATION_PACKAGES.*Allow/u);
 });
+const completedScopes = new Set();
 for (const role of ['worker', 'tester', 'reviewer']) {
   test(`native LPAC ${role}: real token, file permissions, live network denial and cleanup`, { skip: process.platform !== 'win32', timeout: 25000 }, async () => {
     const server = net.createServer((socket) => socket.destroy());
@@ -54,11 +55,15 @@ for (const role of ['worker', 'tester', 'reviewer']) {
       assert.equal(code, 0, probeMetadata(stdout, stderr, code));
       const [control, nativeRights, receipt, cleanup] = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
       assert.deepEqual(control, { allPackagesReadControl: true });
-      assert.deepEqual(nativeRights, { registryReadAvailable: true, privateRegistryDenied: true, hostHandleDuplicationDenied: true });
+      assert.deepEqual(nativeRights, { registryReadAvailable: true, privateRegistryDenied: true, hostHandleDuplicationDenied: true, protectedDaclChangeDenied: true, runtimeDaclChangeDenied: true });
       assert.equal(receipt.role, role);
-      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
+      for (const key of ['workspaceRead', 'hostReadDenied', 'hostWriteDenied', 'runtimeWriteDenied', 'allPackagesReadDenied', 'extendedPathReadDenied', 'alternateStreamReadDenied', 'readOnlyAssetWriteDenied', 'runtimeRenameDenied', 'junctionEscapeDenied', 'privateHardlinkEscapeDenied', 'readOnlyHardlinkWriteDenied', 'cleanEnvironment', 'scratchWrite', 'networkDenied']) assert.equal(receipt[key], true, key);
       assert.equal(receipt.workspaceWrite, role === 'worker');
-      assert.deepEqual(cleanup, { tokenVerified: true, cleanup: 'PASS', scope: 'FIXED_SYNTHETIC_PROBE_ONLY' });
+      const { scopeId, ...result } = cleanup;
+      assert.deepEqual(result, { tokenVerified: true, cleanup: 'PASS', scope: 'FIXED_SYNTHETIC_PROBE_ONLY' });
+      assert.match(scopeId, /^[0-9a-f]{32}$/u);
+      assert.equal(completedScopes.has(scopeId), false, 'profile reused across roles');
+      completedScopes.add(scopeId);
     } finally { child?.kill('SIGKILL'); await new Promise((resolve) => server.close(resolve)); }
   });
 }
