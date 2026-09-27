@@ -111,6 +111,10 @@ namespace Phi.Native {
         scope.CreateBrokerRoot();
         string runtime = Path.Combine(scope.Root, "runtime"), workspace = Path.Combine(scope.Root, "workspace"), scratch = Path.Combine(scope.Root, "scratch"), assets = Path.Combine(scope.Root, "assets");
         foreach (string directory in new string[] { runtime, workspace, scratch, assets }) Directory.CreateDirectory(directory);
+        // CreateProcess reroutes TEMP/TMP beneath the supplied LOCALAPPDATA.
+        // Provision only this fresh profile's exact nested temp authority;
+        // never grant the host home or patch the suspended process environment.
+        Directory.CreateDirectory(Path.Combine(scratch, "Packages", "Phi.Probe." + scope.Id, "AC", "Temp"));
         failure = "RUNTIME"; string command = Path.Combine(runtime, "program.exe"); CopyRuntime(executable, command);
         failure = "GRANTS";
         foreach (var collection in collections) foreach (var file in collection.Value) {

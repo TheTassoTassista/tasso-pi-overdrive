@@ -126,7 +126,7 @@ deny('runtimeWrite',()=>fs.writeFileSync(process.execPath,'x'));
 deny('aapRead',()=>fs.readFileSync(path.join(root,'runtime','all-packages.txt')));
 deny('extendedRead',()=>fs.readFileSync(path.toNamespacedPath(path.join(root,'private','control.txt'))));
 try{fs.writeFileSync('edit.txt','changed');checks.write=true;}catch(e){checks.write=false;checks.writeDenied=['EACCES','EPERM'].includes(e.code);}
-phase='SCRATCH';fs.writeFileSync(path.join(process.env.TEMP,'temp.txt'),'allowed');checks.tempWrite=true;phase='NETWORK';
+phase='SCRATCH';checks.tempScoped=process.env.TEMP.toLowerCase()===path.join(root,'scratch','Packages','Phi.Probe.'+path.basename(root),'AC','Temp').toLowerCase();checks.tmpScoped=process.env.TMP===process.env.TEMP;fs.writeFileSync(path.join(process.env.TEMP,'temp.txt'),'allowed');checks.tempWrite=true;phase='NETWORK';
 console.error('ERROR required diagnostic');const socket=net.connect({host:'127.0.0.1',port:${server.address().port}});socket.setTimeout(1500);
 let done=false;function finish(denied){if(done)return;done=true;checks.networkDenied=denied;socket.destroy();console.log(JSON.stringify(checks));process.exit(0);}
 socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EPERM'].includes(e.code)));socket.on('timeout',()=>finish(false));`;
@@ -134,7 +134,7 @@ socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EP
       const result = await runWindowsSecureBroker({ ...request(role, script), argv: [...windowsNodeToolArguments('task.cjs', args)] });
       assert.equal(result.code, 0, diagnostic(result));
       const row = JSON.parse(result.stdout); assert.deepEqual(row.args, args);
-      for (const key of ['read', 'input', 'cleanEnv', 'privateRead', 'privateWrite', 'runtimeWrite', 'aapRead', 'extendedRead', 'tempWrite', 'networkDenied']) assert.equal(row[key], true, key);
+      for (const key of ['read', 'input', 'cleanEnv', 'privateRead', 'privateWrite', 'runtimeWrite', 'aapRead', 'extendedRead', 'tempScoped', 'tmpScoped', 'tempWrite', 'networkDenied']) assert.equal(row[key], true, key);
       assert.equal(row.write, role === 'worker'); if (role !== 'worker') assert.equal(row.writeDenied, true);
       assert.equal(result.stderr.trim(), 'ERROR required diagnostic');
       assert.equal(result.receipt.tokenVerified, true); assert.equal(result.receipt.jobAttested, true); assert.equal(result.receipt.cleanup, 'PASS');
@@ -189,7 +189,7 @@ test('native generic broker cancellation reuses scope recovery and removes obser
   const running = runWindowsSecureBroker(request('worker', treeScript(false)), { signal: abort.signal, onAdmission: (value) => { scope = value.scopeId; } });
   let pids; const end = Date.now() + 10000;
   while (Date.now() < end) {
-    try { if (scope) pids = JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope, 'scratch', 'pids.json'), 'utf8')); } catch {}
+    try { if (scope) pids = JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope, 'scratch', 'Packages', 'Phi.Probe.' + scope, 'AC', 'Temp', 'pids.json'), 'utf8')); } catch {}
     if (pids?.length === 2 && pids.every(alive)) break; await delay(20);
   }
   try { assert.ok(pids?.length === 2 && pids.every(alive)); }
@@ -206,7 +206,7 @@ test('native generic broker supervisor crash preserves journal and recovers only
   while (Date.now() < end) {
     try {
       if (!scope && output.includes('\n')) scope = JSON.parse(output.slice(0, output.indexOf('\n'))).scopeId;
-      if (scope) pids = JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope, 'scratch', 'pids.json'), 'utf8'));
+      if (scope) pids = JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope, 'scratch', 'Packages', 'Phi.Probe.' + scope, 'AC', 'Temp', 'pids.json'), 'utf8'));
     } catch {}
     if (pids?.length === 2 && pids.every(alive)) break; await delay(20);
   }
