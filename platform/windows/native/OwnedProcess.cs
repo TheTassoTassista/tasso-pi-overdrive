@@ -332,8 +332,8 @@ namespace Phi.Native {
               if (capture != null && capture.OnStarted != null) {
                 // Interactive LSP requests must reach the server before the
                 // next blocking read; FileStream's buffered CopyTo deadlocks.
-                byte[] frame = new byte[8192]; int size;
-                while ((size = input.Read(frame, 0, frame.Length)) != 0) { pipe.Write(frame, 0, size); pipe.Flush(); }
+                byte[] frame = new byte[8192]; int frameLength;
+                while ((frameLength = input.Read(frame, 0, frame.Length)) != 0) { pipe.Write(frame, 0, frameLength); pipe.Flush(); }
               } else input.CopyTo(pipe);
             }
           }
