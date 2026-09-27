@@ -2,7 +2,15 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current candidate — B2 draft continuity implemented, native certification pending
+## Current checkpoint — B2 COMPLETE (governed Node subsystem)
+
+Verified functional local/remote **8324189f538753616cddf251253e1c0970139287**, branch `feature/routing-presets-quality`, [CI36319986645](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36319986645) SUCCESS. Windows201/192PASS/0FAIL/9Linux-only skips; Ubuntu201/98PASS/0FAIL/103Windows-only skips; Worker16/16PASS/0FAIL/0skip; complete local Linux734/631PASS/0FAIL/103native skips plus syntax/installed-Pi TypeScript/package validation PASS. Both independent clones PASS_FOUNDATION_ONLY and cleanupPASS; Windows1 attempt/553ms/9 owned validation Jobs empty/drained/residual0; Ubuntu29ms, native process counter unavailable. Whole clone Doctor still FAIL/fullEngine BLOCKED_NOT_INSTALLED. Documentation-only delivery reuses the exact functional proof, not a new CI claim on its later hash.
+
+Actual real-Pi foreground factory under Task/Tool authority reaches LPAC/Job and proves edit/read/failing partial edit/preserved read/same-draft TEST verification (6 deterministic turns/5 broker calls), plus post-edit revoke/built-in host-write denial (3 turns/1 broker call). Both PASS, receipt draft/session/version/digest/native-ID lineage, source unchanged, payload cleared/authority revoked/temp removed, external model/provider requests0. [Actual metadata receipts](phi-worker-transport-evidence.json). Alias EBUSY/-4082 is qualified sharing denial, not ACL proof; no weakened grants/retry.
+
+B1 COMPLETE; B2 COMPLETE only for governed offline Node subsystem. Draft persists in controller memory for the bound session, not host restart; fresh native execution copies carry one logical lineage. Host read/grep/find/ls remain governed host reads; no host publication. C/D NOT_STARTED; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS. Exact next action C real Windows brokered LSP against that same draft, then D only after native C green. Full coding/security/crash E2Es/Doctor/backup/full reconstruction remain pending. Stable Pi/auth/routing/protected file unchanged. Existing protected user edit remains unstaged.
+
+## Historical candidate — before final native certification
 
 B1 COMPLETE. Controller-owned, immutable session draft plus version-bound TEST verification implemented; successful native readback requires anchored workspace, empty owned Job and PASS cleanup. Failure discards partial execution copy; revocation clears draft payload while retaining metadata. Execution copies have new native IDs but one logical draft ID/content lineage; this is session persistence, NOT disk/restart durability. No host publication or PUBLISHED state. Required real Windows edit/read/failure/verify and post-edit revocation fixtures added; candidate validation pending next CI. Linux native skips are not Windows proof. C/D NOT_STARTED; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS. Exact next action in phi-progress.md. Active Pi/auth/routes and protected document unchanged;0external provider/model calls.
 

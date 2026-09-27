@@ -1,6 +1,6 @@
-# B2 governed Worker transport — IN_PROGRESS, not Windows-ready
+# B2 governed Worker transport — COMPLETE bounded subsystem, not Windows-ready
 
-## Persistent draft candidate (native proof pending)
+## Persistent draft (native proof accepted)
 
 The controller seeds lib/phi-worker-draft.mjs once from the approved native
 source snapshot. The immutable bounded payload persists in controller memory
@@ -27,9 +27,14 @@ separate and still blocked. Stale/replayed leases and copied tokens fail closed.
 
 Mandatory native tests and actual Pi factory fixtures cover command persistence,
 same-draft verification, nonzero partial-copy preservation, post-edit revoke and
-owned cleanup. Linux units/binding pass but native proof is pending the new CI.
-Historical receipt below only proves preceding transport. Once accepted, start
-C streaming LSP, then D crash-atomic publication preparation. Autonomy BLOCKED.
+owned cleanup. Exact functional8324189 / CI36319986645 SUCCESS proves all16
+Worker controls, Windows192PASS/0FAIL, Ubuntu98PASS/0FAIL and both clones/cleanup.
+Actual Pi foreground normal6 deterministic turns/5 broker calls and revoked3
+turns/1 broker call PASS, zero external requests. Current metadata receipt:
+phi-worker-transport-evidence.json. Complete Linux631PASS/0FAIL; platform-only
+skips are explicitly classified, not security proof. B2 COMPLETE for this Node
+subsystem, no host publication/restart durability/full workflow certificate.
+Next C real LSP, then D crash-atomic publication. Autonomy BLOCKED.
 
 ## Production path and authority
 
@@ -81,7 +86,7 @@ No new worker tool calls a shell/exec/spawn. Broker spawns only the verified nat
 supervisor; its target is assigned LPAC/Job before resume. Source inspection is
 not native security proof; native tests must demonstrate actual kernel denial.
 
-## Evidence contract and remaining work
+## Evidence contract and historical transport checkpoints
 
 tests/phi-worker-transport.test.mjs uses deterministic orchestration events on the
 actual Worker hook/controller/registered handler, not a broker or denial mock.

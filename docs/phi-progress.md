@@ -2,7 +2,19 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current candidate — B2 persistent draft implemented, native validation PENDING
+## Current verified checkpoint — B2 COMPLETE (governed Node subsystem)
+
+Functional local/remote `8324189f538753616cddf251253e1c0970139287`, branch `feature/routing-presets-quality`; [native CI36319986645](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36319986645) SUCCESS on Windows and Ubuntu, including both independent clones. Windows201/192PASS/0FAIL/9Linux-only skips; Ubuntu201/98PASS/0FAIL/103Windows-only skips. All16 Worker controls PASS with no skips; all13 individual/sequential recovery cases retained. Complete Linux734/631PASS/0FAIL/103native skips, syntax/installed-Pi TypeScript/package-secret validation PASS. This exact functional proof is reused for the documentation-only checkpoint, not claimed as CI on its later delivery hash.
+
+B2 COMPLETE within the governed offline Node subsystem: actual Pi0.87.1/pi-subagents0.66.0 foreground factory, Task/Tool-approved opaque authority, LPAC token/Job, persistent logical draft/version/digest and actual native IDs, same-draft TEST verification, partial-failure preservation, post-edit revocation, unauthorized children denial, receipt continuity and owned cleanup proven natively. Normal real-Pi fixture6 local deterministic turns/5 broker calls; revoked fixture3 turns/1 broker call. Both PASS, external provider/model calls0, source unchanged, authority revoked/draft payload cleared/temporary removed. Windows clone cleanup1 attempt/553ms/9 empty drained owned validation Jobs/residual0; Ubuntu29ms cleanupPASS, native residual counter unavailable, not invented as zero. Metadata-only evidence: [phi-worker-transport-evidence.json](phi-worker-transport-evidence.json).
+
+The qualified alias control is exact EBUSY/-4082 sharing denial, NOT ACL proof. Ordinary host link positive, readable single-link confined source/no new alias, prior draft preserved; no rights relaxation or retry. Protected/non-UTF8 exports still require70/DRAFT.
+
+Limits: controller-memory session persistence, not restart durability; logical identity persists across fresh physical LPAC copies. Host read/grep/find/ls remain governed host reads, not draft-backed. No real-project publication. Full clone Doctor FAIL/fullEngine BLOCKED_NOT_INSTALLED, foundation-only reconstruction. B1 COMPLETE; C/D NOT_STARTED; WINDOWS AUTONOMY BLOCKED, PHI PORTABILITY IN_PROGRESS. Protected user document and auth fingerprints unchanged; only the pre-existing protected edit is outside commits.
+
+Exact next action: C production Windows LSP against the same draft, with restricted profile, real server diagnostics/on-write, failure/revocation/timeout/crash and owned cleanup; native CI required. Do not redo B1/B2, do not start D until C green. D crash-atomic publication/concurrent-user protection remains pending.
+
+## Historical candidate — B2 persistent draft before final native proof
 
 Resume baseline3bea9c3 verified local/remote on feature/routing-presets-quality; CI36315617834 SUCCESS applies to preceding functional1a74cab, not this candidate. B1 COMPLETE, never redone. B2 controller now captures the source once, keeps an immutable bounded draft in memory across the bound foreground session, commits native handle-anchored readback only after successful LPAC/Job execution and owned cleanup, and verifies that same version under TEST. Draft ID/revision/content digest/base native root ID/actual execution-copy native identity are metadata; raw payload is never a receipt. One exclusive lease across a verification batch; stale leases cannot unlock/commit later tools. Errors preserve prior content; revocation erases payload but preserves identity/digest evidence. No host publication or restart durability claim.
 

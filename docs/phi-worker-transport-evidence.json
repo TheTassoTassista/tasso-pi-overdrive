@@ -1,68 +1,403 @@
 {
-  "version": 1,
-  "status": "VERIFIED_BOUNDED_TRANSPORT_ONLY",
-  "functionalCommit": "1a74cab9aceadb6b04535cf27b5f674928030c10",
+  "version": 2,
+  "status": "B2_COMPLETE_GOVERNED_NODE_SUBSYSTEM",
+  "functionalCommit": "8324189f538753616cddf251253e1c0970139287",
   "nativeRun": {
-    "id": 36315617834,
-    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36315617834",
+    "id": 36319986645,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36319986645",
     "conclusion": "SUCCESS",
-    "windows": { "tests": 190, "pass": 181, "fail": 0, "linuxOnlySkipped": 9 },
-    "ubuntu": { "tests": 190, "pass": 90, "fail": 0, "windowsOnlySkipped": 100 },
-    "focusedNativeWorker": { "tests": 12, "pass": 12, "fail": 0, "skipped": 0 },
+    "windows": {
+      "tests": 201,
+      "pass": 192,
+      "fail": 0,
+      "linuxOnlySkipped": 9
+    },
+    "ubuntu": {
+      "tests": 201,
+      "pass": 98,
+      "fail": 0,
+      "windowsOnlySkipped": 103
+    },
+    "focusedNativeWorker": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "skipped": 0
+    },
     "independentClones": {
-      "windows": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "attempts": 1, "elapsedMs": 387, "ownedResidualProcesses": 0 },
-      "ubuntu": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" }
+      "windows": {
+        "primary": "PASS_FOUNDATION_ONLY",
+        "cleanup": "PASS",
+        "attempts": 1,
+        "elapsedMs": 553,
+        "ownedValidationJobs": 9,
+        "ownedResidualProcesses": 0
+      },
+      "ubuntu": {
+        "primary": "PASS_FOUNDATION_ONLY",
+        "cleanup": "PASS",
+        "attempts": 1,
+        "elapsedMs": 29,
+        "ownedResidualProcesses": null
+      }
     }
   },
   "realPiForegroundProof": {
+    "status": "PASS",
     "platform": "win32",
     "piVersion": "0.87.1",
     "subagentsVersion": "0.66.0",
-    "proof": "REAL_FOREGROUND_WORKER_PI_FACTORY_TO_LPAC_JOB",
+    "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB",
     "foregroundExitCode": 0,
     "boundEvents": 1,
-    "localDeterministicTurns": 2,
+    "localDeterministicTurns": 6,
     "externalProviderCalls": 0,
     "sourceUnchanged": true,
-    "backend": "windows-lpac-broker",
-    "profile": "EDIT",
-    "role": "worker",
-    "operation": "safe-exec",
-    "tokenVerified": true,
-    "jobAttested": true,
-    "targetStarted": true,
-    "exitCode": 0,
-    "cleanup": "PASS",
-    "projectPublished": false,
-    "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
-    "depth": 1,
-    "toolCallNumber": 1,
-    "toolCallLimit": 40,
-    "actualSnapshotWriteReadback": true,
-    "actualPrivateReadDenied": true,
-    "observedToolPidGone": true,
-    "temporaryRemoved": true,
-    "authorityRevoked": true
+    "receipts": [
+      {
+        "sessionId": "01a0e2ede26874cf8815fc45e1f8fade",
+        "scopeId": "92d23a449e614b50bf4452cded536516",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 0,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "bc9fc79a-437d-4cd7-9f43-12b86b3bc27c",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 1,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 0,
+          "contentDigest": "645f14fa5ac480c33362ea60f41031170431848b791b288c2249d8127d4fb4fa",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "state": "DRAFT_CREATED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00040000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      },
+      {
+        "sessionId": "01a0e2ede26874cf8815fc45e1f8fade",
+        "scopeId": "894fd5703b7f4396b1e2cbc0f265a01a",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 0,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "bc9fc79a-437d-4cd7-9f43-12b86b3bc27c",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 2,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00040000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00050000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      },
+      {
+        "sessionId": "01a0e2ede26874cf8815fc45e1f8fade",
+        "scopeId": "6664c072e7694f288b3fff6cfeb1e566",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 73,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "bc9fc79a-437d-4cd7-9f43-12b86b3bc27c",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 3,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00050000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00050000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      },
+      {
+        "sessionId": "01a0e2ede26874cf8815fc45e1f8fade",
+        "scopeId": "18920b8f4b4846a19338ed448800be26",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 0,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "bc9fc79a-437d-4cd7-9f43-12b86b3bc27c",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 4,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00050000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00070000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      },
+      {
+        "sessionId": "01a0e2ede26874cf8815fc45e1f8fade",
+        "scopeId": "6c793d262eb441958f733ca2b8580722",
+        "profile": "TEST",
+        "role": "tester",
+        "operation": "verification",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 0,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "bc9fc79a-437d-4cd7-9f43-12b86b3bc27c",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 5,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00070000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "a29b86dc800a4db5befb8947612b8f2d",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:00050000000477300000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00080000000478ce0000000000000000",
+          "state": "VERIFIED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      }
+    ],
+    "cleanup": {
+      "temporaryRemoved": true,
+      "authorityRevoked": true,
+      "draftPayloadCleared": true
+    },
+    "externalRequests": 0
   },
-  "localLinux": { "tests": 723, "pass": 623, "fail": 0, "nativeWindowsSkipped": 100, "syntax": "PASS", "installedPiTypeScript": "PASS", "packageValidation": "PASS" },
   "realPiRevocationProof": {
+    "status": "PASS",
     "platform": "win32",
+    "piVersion": "0.87.1",
+    "subagentsVersion": "0.66.0",
     "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
     "foregroundExitCode": 0,
-    "localDeterministicTurns": 2,
+    "boundEvents": 1,
+    "localDeterministicTurns": 3,
     "externalProviderCalls": 0,
-    "externalRequests": 0,
     "sourceUnchanged": true,
-    "brokerReceipts": 0,
-    "temporaryRemoved": true,
-    "authorityRevoked": true
+    "receipts": [
+      {
+        "sessionId": "01a0e2ee07d8713a91de51dbf55c38c0",
+        "scopeId": "d72f974486df43e784964c4ad9b35fcb",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "jobEmptyVerified": true,
+        "exitCode": 0,
+        "cleanup": "PASS",
+        "projectPublished": false,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "d1f514da-ac2c-4e66-97d3-8bb92c7bb900",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "e0b51c0d7f1a33a370fafc8d89565ee836a15241a3babd76627b30a314be2ef6",
+          "toolCallNumber": 1,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "23618ab6840f40f2a7c77acfadcf2272",
+          "revision": 0,
+          "contentDigest": "645f14fa5ac480c33362ea60f41031170431848b791b288c2249d8127d4fb4fa",
+          "baseRootIdentity": "f42c40802c403fba:000500000004772c0000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000500000004772c0000000000000000",
+          "state": "DRAFT_CREATED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "23618ab6840f40f2a7c77acfadcf2272",
+          "revision": 1,
+          "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+          "baseRootIdentity": "f42c40802c403fba:000500000004772c0000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00090000000478ce0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        }
+      }
+    ],
+    "revocationBefore": {
+      "executionId": "d1f514da-ac2c-4e66-97d3-8bb92c7bb900",
+      "sessionId": "01a0e2ee-07d8-713a-91de-51dbf55c38c0",
+      "revoked": false,
+      "busy": false,
+      "draft": {
+        "draftId": "23618ab6840f40f2a7c77acfadcf2272",
+        "revision": 1,
+        "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+        "baseRootIdentity": "f42c40802c403fba:000500000004772c0000000000000000",
+        "nativeSnapshotIdentity": "f42c40802c403fba:00090000000478ce0000000000000000",
+        "state": "EDITED",
+        "payloadCleared": false,
+        "projectPublished": false
+      }
+    },
+    "revocationAfter": {
+      "executionId": "d1f514da-ac2c-4e66-97d3-8bb92c7bb900",
+      "sessionId": "01a0e2ee-07d8-713a-91de-51dbf55c38c0",
+      "revoked": true,
+      "busy": false,
+      "draft": {
+        "draftId": "23618ab6840f40f2a7c77acfadcf2272",
+        "revision": 1,
+        "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+        "baseRootIdentity": "f42c40802c403fba:000500000004772c0000000000000000",
+        "nativeSnapshotIdentity": "f42c40802c403fba:00090000000478ce0000000000000000",
+        "state": "REVOKED",
+        "payloadCleared": true,
+        "projectPublished": false
+      }
+    },
+    "cleanup": {
+      "temporaryRemoved": true,
+      "authorityRevoked": true,
+      "draftPayloadCleared": true
+    },
+    "externalRequests": 0
+  },
+  "localLinux": {
+    "tests": 734,
+    "pass": 631,
+    "fail": 0,
+    "nativeWindowsSkipped": 103,
+    "syntax": "PASS",
+    "installedPiTypeScript": "PASS",
+    "packageValidation": "PASS"
+  },
+  "aliasControl": {
+    "hostPositive": "PASS",
+    "confinedError": "EBUSY",
+    "errno": -4082,
+    "classification": "ACTUAL_SHARING_DENIAL_NOT_ACL_PROOF",
+    "rightsRelaxed": false,
+    "retryAdded": false
   },
   "limits": [
-    "Deterministic local model output, no live GPT/provider call or billing",
-    "Supported offline Node transport only; narrowed tool surface, no whole workflow certificate",
-    "Snapshot edits remain ephemeral and are not published to the host project",
-    "Durable draft continuity and attempt-aware verification are still unfinished",
-    "No global host process census; process evidence is scoped to owned executions",
-    "Windows autonomy remains BLOCKED; C and D are NOT_STARTED"
+    "Deterministic local model output; zero live provider calls, credentials or billing",
+    "Governed offline Node subsystem only, not complete Worker/autonomy coding E2E",
+    "Draft payload persists in controller memory for the bound session, not across host restart",
+    "Fresh physical LPAC copies retain logical draft/version/content lineage; their native IDs differ",
+    "Governed host read/grep/find/ls still read the host, not the persistent draft",
+    "No real-project publication; projectPublished remains false",
+    "No global host process census; empty Job/PID evidence covers owned executions",
+    "Clone Doctor FAIL/fullEngine BLOCKED_NOT_INSTALLED; foundation-only, not full reconstruction",
+    "C and D NOT_STARTED at this checkpoint; Windows autonomy BLOCKED"
   ]
 }
