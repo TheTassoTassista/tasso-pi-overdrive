@@ -6,7 +6,7 @@ import os from 'node:os';
 import net from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { validateWindowsBrokerRequest, validateWindowsBrokerReceipt, runWindowsSecureBroker, WINDOWS_CAPABILITY_PROFILES } from '../platform/windows/secure-broker.mjs';
+import { validateWindowsBrokerRequest, validateWindowsBrokerReceipt, runWindowsSecureBroker, windowsNodeToolArguments, WINDOWS_CAPABILITY_PROFILES } from '../platform/windows/secure-broker.mjs';
 import { ownedWindowsHelper } from '../platform/windows/process.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
 
@@ -16,7 +16,7 @@ let executable;
 function request(role = 'tester', script = 'process.exit(0)', options = {}) {
   executable ??= process.platform === 'win32' ? { path: process.execPath, sha256: createHash('sha256').update(fs.readFileSync(process.execPath)).digest('hex') } : { path: 'C:\\tools\\node.exe', sha256: 'a'.repeat(64) };
   return {
-    version: 1, executable, argv: ['--no-addons', 'task.cjs'], cwd: '.', environment: { CI: '1', NO_COLOR: '1' },
+    version: 1, executable, argv: [...windowsNodeToolArguments('task.cjs')], cwd: '.', environment: { CI: '1', NO_COLOR: '1' },
     profile: { worker: 'EDIT', tester: 'TEST', reviewer: 'READ_ONLY', scout: 'READ_ONLY' }[role], grants: { workspace: { 'task.cjs': script, 'input.txt': 'input' }, assets: {} },
     network: 'DENY', timeoutMs: 8000, guardianPid: process.pid, context: { sessionId, operation: role === 'tester' ? 'verification' : 'safe-exec', role }, ...options,
   };
@@ -50,6 +50,11 @@ test('broker receipts strictly whitelist metadata and reject fabricated successf
   const valid = { version: 1, platform: 'win32', backend: 'windows-lpac-broker', profile: 'TEST', role: 'tester', operation: 'verification', sessionId, scopeId: sessionId, tokenVerified: true, jobAttested: true, targetStarted: true, exitCode: 0, timedOut: false, cleanup: 'PASS', securityFailure: null };
   assert.deepEqual(validateWindowsBrokerReceipt(valid), valid);
   for (const patch of [{ env: 'NEVER_EMIT_PRIVATE_SENTINEL' }, { tokenVerified: false }, { jobAttested: false }, { targetStarted: false }, { cleanup: 'FAIL' }, { securityFailure: 'LAUNCH' }, { profile: 'EDIT' }, { timedOut: true }]) assert.throws(() => validateWindowsBrokerReceipt({ ...valid, ...patch }), /BROKER_/u);
+});
+test('Windows Node file launcher preserves scoped paths without changing permissions or hiding failures', () => {
+  assert.deepEqual(windowsNodeToolArguments('task.cjs', ['a']), ['--no-addons', '--no-global-search-paths', '--preserve-symlinks-main', '--preserve-symlinks', 'task.cjs', 'a']);
+  assert.throws(() => windowsNodeToolArguments('--eval'), /BROKER_/u);
+  assert.throws(() => windowsNodeToolArguments('../outside.cjs'), /BROKER_/u);
 });
 test('Linux cannot execute the Windows broker or substitute it for Bubblewrap', { skip: process.platform === 'win32' }, async () => {
   await assert.rejects(runWindowsSecureBroker(request()), /PLATFORM_UNSUPPORTED/u);
@@ -118,7 +123,7 @@ console.error('ERROR required diagnostic');const socket=net.connect({host:'127.0
 let done=false;function finish(denied){if(done)return;done=true;checks.networkDenied=denied;socket.destroy();console.log(JSON.stringify(checks));process.exit(0);}
 socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EPERM'].includes(e.code)));socket.on('timeout',()=>finish(false));`;
     try {
-      const result = await runWindowsSecureBroker({ ...request(role, script), argv: ['--no-addons', 'task.cjs', ...args] });
+      const result = await runWindowsSecureBroker({ ...request(role, script), argv: [...windowsNodeToolArguments('task.cjs', args)] });
       assert.equal(result.code, 0, diagnostic(result));
       const row = JSON.parse(result.stdout); assert.deepEqual(row.args, args);
       for (const key of ['read', 'input', 'cleanEnv', 'privateRead', 'privateWrite', 'runtimeWrite', 'aapRead', 'extendedRead', 'tempWrite', 'networkDenied']) assert.equal(row[key], true, key);
@@ -133,6 +138,15 @@ test('native tool output cannot forge a broker receipt; real nonzero exit remain
   assert.equal(result.code, 73, diagnostic(result)); assert.equal(result.receipt.exitCode, 73); assert.equal(result.receipt.cleanup, 'PASS');
   assert.equal(JSON.parse(result.stdout).receipt.exitCode, 0); assert.match(result.stderr, /FATAL/u);
   assert.doesNotMatch(JSON.stringify(result.receipt), /FATAL|stdout|stderr|environment|argv/u);
+});
+test('native Node realpath failure control and real file/module execution share identical LPAC authority', native, async () => {
+  const script = "console.log(require('./helper.cjs'));process.exit(0);";
+  const input = request('tester', script); input.grants.workspace['helper.cjs'] = "module.exports='scoped-module';";
+  const rejected = await runWindowsSecureBroker({ ...input, argv: ['--no-addons', 'task.cjs'] });
+  assert.equal(rejected.code, 1, diagnostic(rejected)); assert.match(rejected.stderr, /EPERM/u); assert.match(rejected.stderr, /lstat/u);
+  assert.equal(rejected.receipt.cleanup, 'PASS'); assert.equal(rejected.receipt.tokenVerified, true);
+  const result = await runWindowsSecureBroker(input); assert.equal(result.code, 0, diagnostic(result));
+  assert.equal(result.stdout.trim(), 'scoped-module'); assert.equal(result.receipt.cleanup, 'PASS');
 });
 test('native inherited LPAC child cannot use junction/hardlink aliases to mutate protected assets', native, async () => {
   const script = `const{spawn}=require('node:child_process');const body="const fs=require('node:fs'),path=require('node:path');const row={};function denied(k,fn){try{fn();row[k]=false;}catch(e){row[k]=['EACCES','EPERM'].includes(e.code);}}const privateDir=path.join(path.dirname(process.cwd()),'private');denied('privateRead',()=>fs.readFileSync(path.join(privateDir,'control.txt')));denied('privateWrite',()=>fs.writeFileSync(path.join(privateDir,'escape.txt'),'x'));try{fs.symlinkSync(privateDir,process.env.TEMP+'/alias','junction');denied('junctionDenied',()=>fs.readFileSync(process.env.TEMP+'/alias/control.txt'));}catch(e){row.junctionDenied=['EACCES','EPERM'].includes(e.code);}try{fs.linkSync(process.env.PHI_TOOL_ASSETS+'/input.txt',process.env.TEMP+'/hardlink');denied('hardlinkDenied',()=>fs.appendFileSync(process.env.TEMP+'/hardlink','mutation'));}catch(e){row.hardlinkDenied=['EACCES','EPERM'].includes(e.code);}denied('workspaceWrite',()=>fs.writeFileSync('child-edit.txt','x'));console.log(JSON.stringify(row));process.exit(Object.values(row).every(v=>v===true)?0:92);";const c=spawn(process.execPath,['--no-addons','-e',body],{stdio:'inherit'});c.on('error',()=>process.exit(93));c.on('exit',code=>process.exit(code));`;

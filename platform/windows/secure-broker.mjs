@@ -25,6 +25,14 @@ const relative = (value, root = false) => {
   if (parts.length > 12 || parts.some((part) => !/^[A-Za-z0-9_.-]+$/u.test(part) || ['.', '..'].includes(part) || part.endsWith('.') || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)|^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|auth\.json|credentials(?:\.json)?|id_rsa|id_ed25519)$|\.(?:pem|p12|pfx|key)$/iu.test(part))) fail('PATH_INVALID');
 };
 const profileForRole = (role) => ({ worker: 'EDIT', tester: 'TEST', scout: 'READ_ONLY', reviewer: 'READ_ONLY' })[role];
+// Node's default realpath loader lstat()s ungranted host ancestors. Preserve
+// the already-controlled snapshot path instead; the kernel LPAC boundary, not
+// Node canonicalization, remains the security authority. No ancestor ACL grant.
+export function windowsNodeToolArguments(script, args = []) {
+  relative(script);
+  if (script.startsWith('-') || !/\.(?:cjs|mjs|js)$/u.test(script) || !Array.isArray(args) || args.some((arg) => !string(arg))) fail('NODE_ENTRY_INVALID');
+  return Object.freeze(['--no-addons', '--no-global-search-paths', '--preserve-symlinks-main', '--preserve-symlinks', script, ...args]);
+}
 export function validateWindowsBrokerRequest(request) {
   object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context']);
   object(request.executable, ['path', 'sha256']); object(request.context, ['sessionId', 'operation', 'role']); object(request.grants, ['workspace', 'assets']);

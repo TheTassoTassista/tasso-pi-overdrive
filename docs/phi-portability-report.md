@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Generic broker continuation — candidate, native workload FAIL
+
+Structured reusable broker/profile implementation exists (a4b3fba), existing LPAC/Job/recovery reused, no host ACL grants or Windows autonomy switch. Real CI36295119646: native compilation/recovery and previous127 Windows cases PASS, but7 new workload cases FAIL (147/132PASS/7FAIL/8Linux-only skips). Tokens/Job/start/cleanup are proved in failed workload receipts; Node exits1 before intended file-script behavior. Root cause is NOT yet attributed. No Windows source-clone result or broker certificate. Bounded safe diagnostics and required alias/overflow controls follow; never broaden capabilities to hide the failure. Complete Linux683/601PASS/0FAIL/82skips and syntax/TypeScript/package-secret validation PASS. Exact execution map and remaining contract limits: phi-windows-broker.md. Production transport/LSP/transactions not yet enabled or certified.
+
 ## Current continuation — cleanup regression fixed; whole engine still BLOCKED
 
 Functional source **`94c6b4d3e36c3ac2ad4ba800e42d359f82815acb`**, same branch/private remote. Real [CI 36279000733](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36279000733) **SUCCESS** on Windows/Ubuntu and both independent Git-source clones. Later commits are evidence-only.

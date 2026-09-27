@@ -4,6 +4,8 @@ Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
 ## Checkpoint 12 candidate — generic non-interactive LPAC broker
 
+Native first candidate a4b3fbab81abd556799ccbd6e8a0fb11a0f6b07d, CI36295119646: **FAIL**. System compiler and prior127 Windows cases PASS; current147total /132PASS /7FAIL /8Linux-only skips. Seven new workload tests fail: launched Node exits1 with real tokenVerified/jobAttested/targetStarted true and cleanupPASS; live-tree tests cannot observe their marker. No unsandboxed fallback, permission change or ignored failure. Source-clone Windows stage not reached. Diagnostic-only follow-up adds strict fixed error-code/API-operation classification, never raw tool stderr/path/stack; actual Node failure cause pending that evidence. Additional requested alias/output controls added, focusedLinux150/68PASS/0FAIL/82skips; complete Linux683/601PASS/0FAIL/82skips. Do not infer native broker success from Linux.
+
 Resumed exact 7b9126bb740b0673919c29238233d453b34a59b2. Only protected pre-existing user edit dirty; hashes/auth unchanged. No completed recovery work redone. Execution surface mapped in phi-windows-broker.md, including shared dispatch and independent Git/browser/editor/controller paths.
 
 Structured generic broker implemented using existing LPAC/Job/recovery, independent native schema validation, role-bound READ_ONLY/EDIT/TEST profiles, explicit bounded snapshots (no host ACL grants), handle-pinned/hash-checked executable snapshot, scrubbed environment, pre-resume token/denial checks, output/control separation and metadata-only receipts. Cancellation/crash reuses the same owned-scope recovery; unknown proofs remain null. No Windows readiness switch, direct Pi/tool fallback or Linux backend change.
