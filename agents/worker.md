@@ -2,7 +2,7 @@
 name: worker
 description: Focused implementation agent for an approved, well-scoped plan.
 tools: read, safe_exec, safe_remove_file, transactional_edit, edit, write, grep, find, ls, fffind, ffgrep, ast_grep_outline, ast_grep_run, ast_grep_scan, transactional_ast_edit, ast_grep_rewrite, semantic_nav, debug_engine, persistent_python, persistent_javascript, verification_gate
-subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ../extensions/safety.ts, ../extensions/safe-exec.ts, ../extensions/lsp.ts, ../extensions/debug-engine.ts, ../extensions/persistent-eval.ts, ../extensions/edit-engine.ts, ../extensions/output-optimizer.ts, ../extensions/verification-gate.ts, ../extensions/context-governor.ts
+subagentOnlyExtensions: ~/.pi/agent/npm/node_modules/@ff-labs/pi-fff/src/index.ts, ~/.pi/agent/npm/node_modules/@juvio15/pi-ast-grep/src/index.ts, ../extensions/safety.ts, ../extensions/windows-worker.ts, ../extensions/safe-exec.ts, ../extensions/lsp.ts, ../extensions/debug-engine.ts, ../extensions/persistent-eval.ts, ../extensions/edit-engine.ts, ../extensions/output-optimizer.ts, ../extensions/verification-gate.ts, ../extensions/context-governor.ts
 defaultContext: fresh
 acceptanceRole: writer
 permission:

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper } from './process.mjs';
 import { runWindowsSecureBroker, windowsNodeToolArguments, validateWindowsBrokerRequest } from './secure-broker.mjs';
+import { admitWindowsWorkerTool } from '../../lib/phi-worker-authority.mjs';
 
 const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -53,25 +54,32 @@ export function codingFailureReason(receipt) {
 
 export async function executeWindowsCodingTool(input, context) {
   if (process.platform !== 'win32') fail('PHI_CODING_BACKEND_UNAVAILABLE');
-  if (!shape(input, ['program', 'args', 'cwd', 'timeoutMs']) || !context || Object.keys(context).some((key) => !['operation', 'sessionId', 'signal', 'snapshot'].includes(key))) fail('PHI_TOOL_REQUEST_INVALID');
+  if (!shape(input, ['program', 'args', 'cwd', 'timeoutMs']) || !context || Object.keys(context).some((key) => !['operation', 'sessionId', 'signal', 'snapshot', 'workerAuthority'].includes(key))) fail('PHI_TOOL_REQUEST_INVALID');
   const intent = windowsCodingIntent(input.program, input.args, context.operation);
   if (!Number.isSafeInteger(input.timeoutMs) || input.timeoutMs < 1 || input.timeoutMs > 120000 ||
       typeof input.cwd !== 'string') fail('PHI_TOOL_REQUEST_INVALID');
   const sessionId = context.sessionId?.replaceAll('-', '');
   if (!/^[0-9a-f]{32}$/u.test(sessionId ?? '')) fail('PHI_TOOL_SESSION_INVALID');
   if (context.signal?.aborted) fail('PHI_TOOL_CANCELLED');
+  if (Object.hasOwn(context, 'workerAuthority') && (context.operation !== 'safe-exec' || context.snapshot)) fail('PHI_TOOL_REQUEST_INVALID');
+  const worker = Object.hasOwn(context, 'workerAuthority') ? admitWindowsWorkerTool(context.workerAuthority, {
+    cwd: input.cwd, sessionId: context.sessionId, syntax: input.args[0] === '--check', signal: context.signal,
+  }) : null;
+  try {
   // Controller-only reuse: tools cannot submit grants/base data.
   const snapshot = context.snapshot ?? readWindowsProjectSnapshot(input.cwd);
+  if (worker && snapshot.rootIdentity !== worker.expectedRootIdentity) fail('PHI_WORKER_WORKSPACE_CHANGED');
   if (!Object.hasOwn(snapshot.files, intent.script)) fail('PHI_TOOL_ENTRY_MISSING');
   const request = { version: 1, executable: { path: process.execPath, sha256: hash(fs.readFileSync(process.execPath)) },
-    argv: [...intent.argv], cwd: '.', environment: { CI: '1', NO_COLOR: '1' }, profile: intent.profile,
-    grants: { workspace: snapshot.files, assets: {} }, network: 'DENY', timeoutMs: input.timeoutMs, guardianPid: process.pid,
-    context: { sessionId, operation: context.operation, role: intent.role } };
-  const result = await runWindowsSecureBroker(request, { signal: context.signal });
+    argv: [...intent.argv], cwd: '.', environment: { CI: '1', NO_COLOR: '1' }, profile: worker?.profile ?? intent.profile,
+    grants: { workspace: snapshot.files, assets: {} }, network: 'DENY', timeoutMs: worker ? Math.min(input.timeoutMs, worker.remainingMs) : input.timeoutMs, guardianPid: process.pid,
+    context: { sessionId, operation: context.operation, role: worker?.role ?? intent.role } };
+  const result = await runWindowsSecureBroker(request, { signal: worker?.signal ?? context.signal });
   const failureReason = codingFailureReason(result.receipt);
   return { ...result, metadata: Object.freeze({ ...result.receipt, productionPath: context.operation === 'safe-exec' ? 'safe_exec' : 'verification',
     snapshotDigest: snapshot.digest, publicationState: failureReason === null ? 'VERIFIED' : result.receipt.cleanup === 'PASS' ? 'ROLLED_BACK' : 'FAILED', projectPublished: false,
-    failureReason }) };
+    failureReason, ...(worker ? { workerAuthority: worker.metadata } : {}) }) };
+  } finally { worker?.release(); }
 }
 
 // No shell parser: only explicit registered single Node command forms.

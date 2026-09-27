@@ -25,6 +25,7 @@ const relative = (value, root = false) => {
   if (parts.length > 12 || parts.some((part) => !/^[A-Za-z0-9_.-]+$/u.test(part) || ['.', '..'].includes(part) || part.endsWith('.') || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)|^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|auth\.json|credentials(?:\.json)?|id_rsa|id_ed25519)$|\.(?:pem|p12|pfx|key)$/iu.test(part))) fail('PATH_INVALID');
 };
 const profileForRole = (role) => ({ worker: 'EDIT', tester: 'TEST', scout: 'READ_ONLY', reviewer: 'READ_ONLY' })[role];
+const profileAllowed = (role, profile) => role === 'worker' ? ['READ_ONLY', 'TEST', 'EDIT'].includes(profile) : profile === profileForRole(role);
 // Node's default realpath loader lstat()s ungranted host ancestors. Preserve
 // the already-controlled snapshot path instead; the kernel LPAC boundary, not
 // Node canonicalization, remains the security authority. No ancestor ACL grant.
@@ -36,7 +37,7 @@ export function windowsNodeToolArguments(script, args = []) {
 export function validateWindowsBrokerRequest(request) {
   object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context']);
   object(request.executable, ['path', 'sha256']); object(request.context, ['sessionId', 'operation', 'role']); object(request.grants, ['workspace', 'assets']);
-  if (request.version !== 1 || !id(request.context.sessionId) || !['safe-exec', 'verification'].includes(request.context.operation) || !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, request.profile) || request.profile !== profileForRole(request.context.role) || request.context.operation === 'verification' && request.context.role !== 'tester' || request.network !== 'DENY') fail('POLICY_INVALID');
+  if (request.version !== 1 || !id(request.context.sessionId) || !['safe-exec', 'verification'].includes(request.context.operation) || !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, request.profile) || !profileAllowed(request.context.role, request.profile) || request.context.operation === 'verification' && request.context.role !== 'tester' || request.network !== 'DENY') fail('POLICY_INVALID');
   const executable = request.executable.path;
   if (!string(executable) || !/^[A-Za-z]:[\\/]/u.test(executable) || executable.slice(2).includes(':') || !executable.toLowerCase().endsWith('.exe') || /^(?:cmd|powershell|pwsh|wscript|cscript|mshta|rundll32|regsvr32)\.exe$/iu.test(path.win32.basename(executable)) || !/^[0-9a-f]{64}$/u.test(request.executable.sha256)) fail('EXECUTABLE_INVALID');
   if (!Array.isArray(request.argv) || request.argv.length > 128 || request.argv.some((arg) => !string(arg) || arg.length > 4096)) fail('ARGUMENT_INVALID');
@@ -61,7 +62,7 @@ export function validateWindowsBrokerReceipt(value) {
   const interrupted = ['CANCELLED', 'SUPERVISOR'].includes(value.securityFailure);
   if (value.version !== 1 || value.platform !== 'win32' || value.backend !== 'windows-lpac-broker' || ![null, 'REQUEST', 'SCOPE', 'RUNTIME', 'GRANTS', 'LAUNCH', 'EXECUTION', 'CLEANUP', 'CANCELLED', 'SUPERVISOR'].includes(value.securityFailure) || !['PASS', 'FAIL'].includes(value.cleanup) || !Number.isInteger(value.exitCode) || value.exitCode < 0 || value.exitCode > 255 || typeof value.timedOut !== 'boolean' || ['tokenVerified', 'jobAttested', 'targetStarted'].some((key) => typeof value[key] !== 'boolean' && !(interrupted && value[key] === null))) fail('RECEIPT_INVALID');
   if (value.scopeId !== null && !id(value.scopeId) || value.sessionId !== null && !id(value.sessionId) || value.profile !== null && !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, value.profile) || value.role !== null && !Object.hasOwn({ worker: 1, tester: 1, scout: 1, reviewer: 1 }, value.role) || value.operation !== null && !['safe-exec', 'verification'].includes(value.operation)) fail('RECEIPT_INVALID');
-  if (value.securityFailure === null && (!value.tokenVerified || !value.jobAttested || !value.targetStarted || value.cleanup !== 'PASS' || value.scopeId === null || value.profile !== profileForRole(value.role)) || value.exitCode === 0 && value.securityFailure !== null || value.timedOut !== (value.exitCode === 124)) fail('RECEIPT_INVALID');
+  if (value.securityFailure === null && (!value.tokenVerified || !value.jobAttested || !value.targetStarted || value.cleanup !== 'PASS' || value.scopeId === null || !profileAllowed(value.role, value.profile)) || value.exitCode === 0 && value.securityFailure !== null || value.timedOut !== (value.exitCode === 124)) fail('RECEIPT_INVALID');
   return Object.freeze({ ...value });
 }
 

@@ -106,7 +106,8 @@ namespace Phi.Native {
         session = Text(context["sessionId"]); operation = Text(context["operation"]); role = Text(context["role"]); profile = Text(request["profile"]);
         if (!Regex.IsMatch(session, "\\A[0-9a-f]{32}\\z")) throw new InvalidDataException();
         string intended = role == "worker" ? "EDIT" : role == "tester" ? "TEST" : role == "reviewer" || role == "scout" ? "READ_ONLY" : null;
-        if (profile != intended || intended == null || (operation != "safe-exec" && operation != "verification") || (operation == "verification" && role != "tester")) throw new InvalidDataException();
+        bool profileAllowed = role == "worker" ? new string[] { "EDIT", "TEST", "READ_ONLY" }.Contains(profile) : profile == intended;
+        if (!profileAllowed || intended == null || (operation != "safe-exec" && operation != "verification") || (operation == "verification" && role != "tester")) throw new InvalidDataException();
         IList argv = request["argv"] as IList;
         if (argv == null || argv.Count > 128 || argv.Cast<object>().Any(v => Text(v).Length > 4096)) throw new InvalidDataException();
         string cwd = Relative(Text(request["cwd"]), true);

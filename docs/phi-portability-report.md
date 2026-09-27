@@ -2,7 +2,13 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current checkpoint — B1 IN_PROGRESS; latest bookkeeping clone FAIL
+## Current checkpoint — B1 COMPLETE on latest native run; B2 IN_PROGRESS
+
+Latest committed B1 `569e23de8042742672af4ea8d6560d69ba39ae74`, [CI36313233404](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36313233404) SUCCESS on Windows/Ubuntu and both clones. Windows178/169PASS/0FAIL/9skips; clone primary/cleanupPASS, one282ms removal,9 owned Jobs empty/drained/residual0. Focused broker/tools/cleanup and13 recovery cases retained. f006 pre-receipt error did not reproduce; exact historical cause remains UNKNOWN, now fixed phase/code-only diagnostics if repeated. No speculative security/policy change to hide it.
+
+B2 candidate: real controller-authorized opaque Worker capability -> registered safe_exec -> actual platform dispatch -> LPAC broker, code-selected EDIT/TEST/READ_ONLY, no model escalation. Bound to task/governor digests/session/attempt/workspace/native root ID;3 reservations/depth1/40tool attempts/remaining18minute ceiling, revoke+abort and fail-closed session tombstones. Host edit/alternate execution tools blocked by actual Worker-only hook on Windows. Tester/reviewer grants unchanged. Worker focused12/8PASS/0FAIL/4native skips; complete Linux723/623PASS/0FAIL/100skips plus syntax/TypeScript/package-secret validation PASS. Earlier single browser15s startup timeout did not reproduce in isolated4/4 or unchanged full rerun; cause UNKNOWN, no browser/policy changes. Native proof pending and not credited. Actual Pi/whole workflow/durable draft still unproved; async/external roles fail closed. B2 IN_PROGRESS, C/D NOT_STARTED; Windows autonomy BLOCKED. [Architecture and bypass scope](phi-worker-tool-transport.md).0models; protected/auth and stable Linux/routing/governors preserved.
+
+## Historical checkpoint — bookkeeping clone FAIL before diagnostics
 
 Report-only f006b7a, [CI36312574277](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36312574277) FAILURE: direct Windows168PASS/0FAIL and all focused/recovery controls PASS, Ubuntu/clone PASS; Windows clone fails at git-source before a command receipt (exitnull, no timeout evidence). Primary and cleanup retained separately; cleanup OWNERSHIP_UNVERIFIED, no attempted removal, data retained. Exact controller exception was discarded and is now reduced to fixed phase/code metadata for native diagnosis, not guessed. No waiver based on fbb's earlier green proof. B1 IN_PROGRESS. Initial B2 source/unit work preserved locally but no B2 native claim/push until B1 restored; C/D NOT_STARTED; Windows autonomy BLOCKED;0model calls and stable invariants preserved.
 

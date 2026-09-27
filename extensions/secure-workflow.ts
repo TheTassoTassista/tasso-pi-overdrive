@@ -27,6 +27,7 @@ import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
 import { requireCodingBackend } from "../platform/shared/coding-execution.mjs";
+import { reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -331,11 +332,15 @@ export default function (pi: ExtensionAPI) {
           hubReservation = reservationMetadata;
           publishHub(reservationMetadata);
         } catch {}
+        const workerTransport = process.platform === "win32" && agent === "worker"
+          ? reserveWindowsWorker({ executionId, parentSessionId: ctx.sessionManager.getSessionId(), cwd, task, taskPolicy: activeTaskPolicy })
+          : undefined;
         let settled = false;
         let attemptStarted = false;
         const finish = (callback: (value: any) => void, value: any, terminalStatus: string) => {
           if (settled) return;
           settled = true;
+          workerTransport?.revoke();
           agentControl?.terminal(executionId, terminalStatus);
           clearTimeout(timer);
           unsubscribeStarted();

@@ -1,12 +1,12 @@
 # Production Windows tool transport — B1 bounded proof verified
 
-State: B1 IN_PROGRESS after report-only f006b7a/CI36312574277 fails before the
-Windows clone's first command receipt. Prior functional fbb6069/CI36305193845
-SUCCESS remains exact-run proof, not a waiver. Windows direct168PASS/0FAIL;
-local Linux614PASS/0FAIL on fbb. Metadata-only pre-receipt diagnosis pending.
+State: B1 COMPLETE on569e23d/CI36313233404 SUCCESS, both native runners/clones.
+Windows178/169PASS/0FAIL/9skips, separate primary/cleanupPASS. Historical f006
+pre-receipt failure did not reproduce, cause UNKNOWN; fixed-code diagnostics
+now preserve future controller failures. Prior fbb proof remains exact-run only.
 Separate primary/cleanup proof and exact budget contract: phi-clean-clone-cleanup.md.
-A remains COMPLETE. B2 initial source work preserved locally, native unverified
-and advancement suspended. C LSP/D publication NOT_STARTED; autonomy BLOCKED.
+A remains COMPLETE. B2 controller/Worker candidate IN_PROGRESS, native unverified;
+see phi-worker-tool-transport.md. C LSP/D publication NOT_STARTED; autonomy BLOCKED.
 
 Historical report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5:
 [CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518)

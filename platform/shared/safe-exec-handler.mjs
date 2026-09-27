@@ -1,13 +1,16 @@
 import { executeCodingTool } from './coding-execution.mjs';
+import { windowsWorkerAuthority } from '../../lib/phi-worker-authority.mjs';
 
 // Actual Windows branch of the registered safe_exec tool, importable by the
 // source-only native gate without emulating Pi's virtual schema loader.
 export async function executeBrokeredSafeExec(params, ctx, signal, emitMetadata) {
   if (!params || Object.keys(params).some((key) => !['program', 'args', 'cwd', 'timeoutMs'].includes(key))) throw new Error('PHI_TOOL_REQUEST_INVALID');
   if (params.cwd && params.cwd !== '.') throw new Error('PHI_TOOL_CWD_UNSUPPORTED');
+  const sessionId = ctx.sessionManager.getSessionId();
+  const authority = windowsWorkerAuthority(sessionId);
   const result = await executeCodingTool({
     program: params.program, args: params.args ?? [], cwd: ctx.cwd, timeoutMs: params.timeoutMs ?? 120000,
-  }, { operation: 'safe-exec', sessionId: ctx.sessionManager.getSessionId(), signal });
+  }, { operation: 'safe-exec', sessionId, signal, ...(authority ? { workerAuthority: authority } : {}) });
   emitMetadata?.(result.metadata);
   const output = (result.stdout ?? '') + (result.stderr ?? '');
   if (result.code !== 0) {

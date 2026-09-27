@@ -43,6 +43,9 @@ jobs:
       - name: Native Windows production safe_exec and verification (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-windows-coding-tools.test.mjs
+      - name: Native Windows governed Worker transport (no model calls, autonomy blocked)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-worker-transport.test.mjs
       - name: Native Windows recovery individually and sequentially (no model calls)
         if: runner.os == 'Windows'
         run: node scripts/phi-windows-recovery-focus.mjs

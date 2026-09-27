@@ -151,6 +151,8 @@ test('native model-shaped authority and unavailable helper fail without weaker t
     // the shared helper while other native test files execute concurrently.
     const copy = path.join(item.root, 'isolated-source');
     fs.cpSync(fileURLToPath(new URL('../platform', import.meta.url)), path.join(copy, 'platform'), { recursive: true });
+    fs.cpSync(fileURLToPath(new URL('../lib', import.meta.url)), path.join(copy, 'lib'), { recursive: true });
+    fs.cpSync(fileURLToPath(new URL('../config', import.meta.url)), path.join(copy, 'config'), { recursive: true });
     const isolated = await import(pathToFileURL(path.join(copy, 'platform/shared/safe-exec-handler.mjs')).href);
     await assert.rejects(isolated.executeBrokeredSafeExec({ program: 'node', args: ['run.cjs'] }, ctx(item.project)), /BUILD_REQUIRED/u);
     assert.throws(() => requireCodingBackend('workflow'), /BACKEND_UNAVAILABLE/u);
