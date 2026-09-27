@@ -177,20 +177,24 @@ namespace Phi.Native {
     // Hold only the caller's newly-created validation fixture, then release.
     static int ValidationLock(string kind, string root) {
       IntPtr handle = IntPtr.Zero;
+      string phase = "ROOT_VALIDATION";
       try {
         string full = Path.GetFullPath(root), parent = Path.GetDirectoryName(full);
         if (!String.Equals(parent, Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ||
             !Path.GetFileName(full).StartsWith("phi-clone-cleanup-", StringComparison.Ordinal) ||
             (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0 ||
             (kind != "file" && kind != "directory" && kind != "inherited-directory")) throw new InvalidDataException();
+        phase = "PIN_ROOT";
         using (RecoveryFilesystem pins = new RecoveryFilesystem(full)) {
           string target = kind == "file" ? Path.Combine(full, "locked.txt") : full;
           SecurityAttributes attributes = new SecurityAttributes(); attributes.Size = Marshal.SizeOf(typeof(SecurityAttributes));
           attributes.Inherit = kind == "inherited-directory" ? 1 : 0;
+          phase = "OPEN_LOCK";
           handle = ValidationCreateFile(target, 0x80, 3, ref attributes, 3, 0x02200000, IntPtr.Zero);
           if (handle == new IntPtr(-1)) { handle = IntPtr.Zero; throw new Win32Exception(Marshal.GetLastWin32Error()); }
         }
         if (kind == "inherited-directory") {
+          phase = "INHERITED_CHILD";
           ProcessInfo descendant = new ProcessInfo();
           try {
             string self = System.Reflection.Assembly.GetExecutingAssembly().Location;
@@ -201,9 +205,10 @@ namespace Phi.Native {
             if (WaitForSingleObject(descendant.Process, 5000) != 0) return 70;
             uint code; Check(GetExitCodeProcess(descendant.Process, out code)); if (code != 0) return 70;
           } finally { Close(ref descendant.Thread); Close(ref descendant.Process); }
-        } else { ValidationDenial(full, kind == "file", false); Thread.Sleep(1200); }
+        } else { phase = "DENIAL_CONTROL"; ValidationDenial(full, kind == "file", false); Thread.Sleep(1200); }
         return 0;
-      } catch { return 70; }
+      } catch (Win32Exception error) { Console.Error.WriteLine("PHI_VALIDATION_LOCK:" + phase + ":" + error.NativeErrorCode); return 70; }
+        catch { Console.Error.WriteLine("PHI_VALIDATION_LOCK:" + phase + ":0"); return 70; }
       finally { Close(ref handle); }
     }
     [DllImport("kernel32.dll", EntryPoint="CreateFileW", SetLastError=true, CharSet=CharSet.Unicode)]
@@ -214,7 +219,7 @@ namespace Phi.Native {
     static void ValidationDenial(string root, bool file, bool inherited) {
       bool removed = file ? ValidationDeleteFile(Path.Combine(root, "locked.txt")) : ValidationRemoveDirectory(root);
       int nativeError = Marshal.GetLastWin32Error();
-      if (removed || (nativeError != 32 && nativeError != 5)) throw new InvalidDataException();
+      if (removed || (nativeError != 32 && nativeError != 5)) { Console.Error.WriteLine("PHI_VALIDATION_LOCK:DENIAL_RESULT:" + nativeError); throw new InvalidDataException(); }
       File.WriteAllText(Path.Combine(root, "ready"), new JavaScriptSerializer().Serialize(new {
         operation = file ? "DELETE_FILE" : "REMOVE_DIRECTORY", nativeError,
         inheritedHandle = inherited, currentCwdInside = String.Equals(Environment.CurrentDirectory, root, StringComparison.OrdinalIgnoreCase)

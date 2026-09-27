@@ -10,9 +10,15 @@ const native = { skip: process.platform !== 'win32', timeout: 20000 };
 const fixture = () => fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clone-cleanup-'));
 const unitReceipt = { scope: 'TRUSTED_VALIDATION_JOB_NOT_SANDBOX', jobAttested: true, jobEmptyVerified: true, pipesDrained: true, residualOwnedProcesses: 0 };
 const releaseFixture = root => fs.rmSync(root, { recursive: true, force: true });
-async function ready(root) {
+async function ready(root, running) {
   const started = performance.now();
+  let ended;
+  running?.then(result => { ended = result; }, () => { ended = { status: 70 }; });
   while (!fs.existsSync(path.join(root, 'ready'))) {
+    if (ended && ended.status !== 0) {
+      const codes = [...(ended.stderr ?? '').matchAll(/PHI_VALIDATION_LOCK:([A-Z_]+):(\d{1,5})/gu)].map(m => ({ phase: m[1], nativeError: Number(m[2]) }));
+      throw new Error(JSON.stringify({ status: ended.status, receipt: ended.receipt, lockDiagnostics: codes }));
+    }
     if (performance.now() - started > 5000) throw new Error('FIXTURE_NOT_READY');
     await new Promise(r => setTimeout(r, 10));
   }
@@ -53,7 +59,7 @@ test('cleanup refuses unknown process ownership and root identity substitution w
   try {
     const unknown = await cleanupClone(root, identity, { platform: 'win32', receipts: [] });
     assert.equal(unknown.error.code, 'OWNERSHIP_UNVERIFIED'); assert.equal(unknown.cleanupAttempted, false);
-    const changed = await cleanupClone(root, { ...identity, ino: identity.ino + 1n });
+    const changed = await cleanupClone(root, { ...identity, ino: identity.ino + 1n }, { platform: 'win32', receipts: [unitReceipt] });
     assert.equal(changed.error.code, 'IDENTITY_CHANGED'); assert.equal(fs.existsSync(root), true);
   } finally { releaseFixture(root); }
 });
@@ -88,7 +94,7 @@ for (const kind of ['file', 'directory', 'inherited-directory']) test(`native ${
   const root = fixture(), identity = cloneIdentity(root); if (kind === 'file') fs.writeFileSync(path.join(root, 'locked.txt'), 'CONTROL');
   const running = runValidationCommand(ownedWindowsHelper(), ['--validation-lock', kind, root], { cwd: process.cwd() });
   try {
-    await ready(root);
+    await ready(root, running);
     const nativeDenial = JSON.parse(fs.readFileSync(path.join(root, 'ready'), 'utf8'));
     assert.ok([5, 32].includes(nativeDenial.nativeError)); assert.equal(nativeDenial.inheritedHandle, kind === 'inherited-directory');
     assert.equal(nativeDenial.currentCwdInside, false);
@@ -107,7 +113,7 @@ test('native child cwd and timeout: primary124 survives, real Job drained before
   const program = "require('node:fs').writeFileSync('ready',process.cwd());require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{cwd:process.cwd(),stdio:'ignore'});setInterval(()=>{},1000);";
   const running = runValidationCommand(process.execPath, ['-e', program], { cwd: root, timeoutMs: 1500 });
   try {
-    await ready(root); assert.equal(fs.readFileSync(path.join(root, 'ready'), 'utf8').toLowerCase(), root.toLowerCase());
+    await ready(root, running); assert.equal(fs.readFileSync(path.join(root, 'ready'), 'utf8').toLowerCase(), root.toLowerCase());
     let denial;
     try { fs.rmSync(root, { recursive: true, force: true }); } catch (error) { denial = cleanupErrorMetadata(error, root); }
     assert.ok(denial);
