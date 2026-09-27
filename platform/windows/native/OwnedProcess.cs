@@ -110,6 +110,21 @@ namespace Phi.Native {
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
       if (args.Length == 1 && args[0] == "--lpac-broker" && IntPtr.Size == 8) return ExecutionBroker.Run(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--project-snapshot" && IntPtr.Size == 8) return ExecutionBroker.Snapshot(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--validation-run" && IntPtr.Size == 8) return ValidationRun();
+      if (args.Length == 3 && args[0] == "--validation-lock") return ValidationLock(args[1], args[2]);
+      if (args.Length == 3 && args[0] == "--validation-inherited-lock") {
+        IntPtr held = IntPtr.Zero;
+        try {
+          long value; uint flags;
+          if (!Int64.TryParse(args[1], out value)) return 70;
+          held = new IntPtr(value);
+          Check(GetHandleInformation(held, out flags)); if ((flags & 1) == 0) return 70;
+          string root = Path.GetFullPath(args[2]);
+          if (!String.Equals(Path.GetDirectoryName(root), Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(root).StartsWith("phi-clone-cleanup-", StringComparison.Ordinal)) return 70;
+          ValidationDenial(root, false, true);
+          Thread.Sleep(1200); return 0;
+        } catch { return 70; } finally { Close(ref held); }
+      }
       // API capability checks below fail closed on pre-Windows-10 systems.
       // Unmanifested .NET Framework OSVersion can report a legacy version.
       if (args.Length != 0 || IntPtr.Size != 8) return 70;
@@ -120,7 +135,10 @@ namespace Phi.Native {
     internal sealed class Capture {
       internal readonly MemoryStream Output = new MemoryStream(), Error = new MemoryStream();
       internal readonly EventWaitHandle Overflow = new EventWaitHandle(false, EventResetMode.ManualReset);
-      internal bool JobAttested, Started, Drained;
+      internal bool JobAttested, Started, Drained, JobEmptyVerified, TimedOut;
+      internal int? PrimaryExitCode;
+      internal uint ChildPid;
+      internal string ChildGeneration;
       int bytes;
       internal Thread Drain(IntPtr handle, MemoryStream destination) {
         Thread thread = new Thread(delegate() {
@@ -137,7 +155,72 @@ namespace Phi.Native {
         thread.IsBackground = true; thread.Start(); return thread;
       }
     }
-    internal static int Execute(Stream input, AppContainerScope scope, Capture capture = null) {
+    // Controller validation only, NOT an agent tool or a sandbox. The longer
+    // aggregate-suite budget is available only to the fixed tracked check entry;
+    // every ordinary request and every LPAC request retains MaxLifetime.
+    static int ValidationRun() {
+      Capture capture = new Capture();
+      int code = Execute(Console.OpenStandardInput(), null, capture, true);
+      Console.WriteLine(new JavaScriptSerializer().Serialize(new {
+        version = 1, scope = "TRUSTED_VALIDATION_JOB_NOT_SANDBOX", resultExitCode = code,
+        primaryExitCode = capture.PrimaryExitCode, timedOut = capture.TimedOut,
+        jobAttested = capture.JobAttested, targetStarted = capture.Started,
+        jobEmptyVerified = capture.JobEmptyVerified, pipesDrained = capture.Drained,
+        residualOwnedProcesses = capture.JobEmptyVerified ? (int?)0 : null,
+        childPid = capture.ChildPid, childGeneration = capture.ChildGeneration,
+        stdoutBase64 = Convert.ToBase64String(capture.Output.ToArray()),
+        stderrBase64 = Convert.ToBase64String(capture.Error.ToArray())
+      }));
+      return code;
+    }
+    // Minimal real Windows lock controls, never called from production tools.
+    // Hold only the caller's newly-created validation fixture, then release.
+    static int ValidationLock(string kind, string root) {
+      IntPtr handle = IntPtr.Zero;
+      try {
+        string full = Path.GetFullPath(root), parent = Path.GetDirectoryName(full);
+        if (!String.Equals(parent, Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFileName(full).StartsWith("phi-clone-cleanup-", StringComparison.Ordinal) ||
+            (File.GetAttributes(full) & FileAttributes.ReparsePoint) != 0 ||
+            (kind != "file" && kind != "directory" && kind != "inherited-directory")) throw new InvalidDataException();
+        using (RecoveryFilesystem pins = new RecoveryFilesystem(full)) {
+          string target = kind == "file" ? Path.Combine(full, "locked.txt") : full;
+          SecurityAttributes attributes = new SecurityAttributes(); attributes.Size = Marshal.SizeOf(typeof(SecurityAttributes));
+          attributes.Inherit = kind == "inherited-directory" ? 1 : 0;
+          handle = ValidationCreateFile(target, 0x80, 3, ref attributes, 3, 0x02200000, IntPtr.Zero);
+          if (handle == new IntPtr(-1)) { handle = IntPtr.Zero; throw new Win32Exception(Marshal.GetLastWin32Error()); }
+        }
+        if (kind == "inherited-directory") {
+          ProcessInfo descendant = new ProcessInfo();
+          try {
+            string self = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            StartupEx start = new StartupEx(); start.Startup.Size = Marshal.SizeOf(typeof(Startup));
+            Check(CreateProcessW(self, new StringBuilder(Quote(self) + " --validation-inherited-lock " + handle.ToInt64() + " " + Quote(full)),
+              IntPtr.Zero, IntPtr.Zero, true, NoWindow, IntPtr.Zero, parent, ref start, out descendant));
+            Close(ref handle); // only the actual inherited child handle now locks the root
+            if (WaitForSingleObject(descendant.Process, 5000) != 0) return 70;
+            uint code; Check(GetExitCodeProcess(descendant.Process, out code)); if (code != 0) return 70;
+          } finally { Close(ref descendant.Thread); Close(ref descendant.Process); }
+        } else { ValidationDenial(full, kind == "file", false); Thread.Sleep(1200); }
+        return 0;
+      } catch { return 70; }
+      finally { Close(ref handle); }
+    }
+    [DllImport("kernel32.dll", EntryPoint="CreateFileW", SetLastError=true, CharSet=CharSet.Unicode)]
+    static extern IntPtr ValidationCreateFile(string path, uint access, uint share, ref SecurityAttributes attributes, uint creation, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetHandleInformation(IntPtr handle, out uint flags);
+    [DllImport("kernel32.dll", EntryPoint="DeleteFileW", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool ValidationDeleteFile(string path);
+    [DllImport("kernel32.dll", EntryPoint="RemoveDirectoryW", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool ValidationRemoveDirectory(string path);
+    static void ValidationDenial(string root, bool file, bool inherited) {
+      bool removed = file ? ValidationDeleteFile(Path.Combine(root, "locked.txt")) : ValidationRemoveDirectory(root);
+      int nativeError = Marshal.GetLastWin32Error();
+      if (removed || (nativeError != 32 && nativeError != 5)) throw new InvalidDataException();
+      File.WriteAllText(Path.Combine(root, "ready"), new JavaScriptSerializer().Serialize(new {
+        operation = file ? "DELETE_FILE" : "REMOVE_DIRECTORY", nativeError,
+        inheritedHandle = inherited, currentCwdInside = String.Equals(Environment.CurrentDirectory, root, StringComparison.OrdinalIgnoreCase)
+      }));
+    }
+    internal static int Execute(Stream input, AppContainerScope scope, Capture capture = null, bool validation = false) {
       IntPtr job = IntPtr.Zero, list = IntPtr.Zero, jobs = IntPtr.Zero, handles = IntPtr.Zero, environment = IntPtr.Zero;
       IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, output = IntPtr.Zero, error = IntPtr.Zero;
       IntPtr guardian = IntPtr.Zero;
@@ -159,7 +242,10 @@ namespace Phi.Native {
         if (encoded.Length > 30000) throw new InvalidDataException();
         if (!(request["timeoutMs"] is int)) throw new InvalidDataException();
         int timeout = (int)request["timeoutMs"];
-        if (timeout < 1 || timeout > MaxLifetime) throw new InvalidDataException();
+        bool suite = validation && scope == null && String.Equals(Path.GetFileName(command), "node.exe", StringComparison.OrdinalIgnoreCase) &&
+          arguments.Count == 2 && String.Equals(StringValue(arguments[0]), Path.Combine(cwd, "scripts", "phi-check.mjs"), StringComparison.OrdinalIgnoreCase) &&
+          StringValue(arguments[1]) == "--owned-validation";
+        if (timeout < 1 || timeout > (suite ? 600000 : MaxLifetime)) throw new InvalidDataException();
         if (!(request["guardianPid"] is int) || (int)request["guardianPid"] < 1) throw new InvalidDataException();
         guardian = OpenProcess(0x00100000 | 0x1000, false, (uint)(int)request["guardianPid"]); Check(guardian != IntPtr.Zero);
         FileTime parentCreated, selfCreated, unused1, unused2, unused3;
@@ -221,6 +307,10 @@ namespace Phi.Native {
         bool inside; Check(IsProcessInJob(child.Process, job, out inside)); if (!inside) throw new InvalidDataException();
         if (scope != null) scope.VerifyToken(child.Process);
         if (capture != null) capture.JobAttested = true;
+        if (capture != null) {
+          FileTime created, a, b, c; Check(GetProcessTimes(child.Process, out created, out a, out b, out c));
+          capture.ChildPid = child.ProcessId; capture.ChildGeneration = created.Value.ToString();
+        }
         Close(ref inputRead); Close(ref output); Close(ref error);
         SafeFileHandle writeHandle = new SafeFileHandle(inputWrite, true); inputWrite = IntPtr.Zero;
         Thread copy = new Thread(delegate() {
@@ -237,11 +327,13 @@ namespace Phi.Native {
         if (waited != 0 && waited != 1 && waited != 258) throw new Win32Exception(Marshal.GetLastWin32Error());
         uint code = waited == 1 ? 125U : 124U;
         if (waited == 0) Check(GetExitCodeProcess(child.Process, out code));
+        if (capture != null) { capture.PrimaryExitCode = code <= 255 ? (int)code : 1; capture.TimedOut = waited == 258; }
         // A successful parent exit is not evidence that descendants finished.
         phase = "CLEANUP";
         Check(TerminateJobObject(job, 137));
         Stopwatch deadline = Stopwatch.StartNew();
         while (!EmptyJob(job)) { if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException(); Thread.Sleep(10); }
+        if (capture != null) capture.JobEmptyVerified = true;
         writeHandle.Dispose();
         if (capture != null) {
           if (!outputThread.Join(5000) || !errorThread.Join(5000) || capture.Overflow.WaitOne(0)) throw new InvalidDataException();
@@ -257,6 +349,7 @@ namespace Phi.Native {
           try {
             Check(TerminateJobObject(job, 137)); Stopwatch end = Stopwatch.StartNew();
             while (!EmptyJob(job) && end.ElapsedMilliseconds < 5000) Thread.Sleep(10);
+            if (capture != null) capture.JobEmptyVerified = EmptyJob(job);
           } catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_CLEANUP_UNATTESTED"); }
         }
         // Closing the non-inherited last Job handle kills owned children even on exception.
