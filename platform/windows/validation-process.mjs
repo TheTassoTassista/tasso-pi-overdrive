@@ -4,6 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ownedWindowsHelper } from './process.mjs';
 
+// Budget is tied to the exact aggregate entry, never to a stale diagnostic stage.
+export function validationCommandTimeout(command, args, cwd) {
+  return command === process.execPath && args.length === 2 && args[0] === path.join(cwd, 'scripts', 'phi-check.mjs') && args[1] === '--owned-validation' ? 600000 : 120000;
+}
+
 export async function runValidationCommand(command, args, { cwd, env = process.env, timeoutMs = 120000 } = {}) {
   if (process.platform !== 'win32') return spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
   if (!path.isAbsolute(command)) {

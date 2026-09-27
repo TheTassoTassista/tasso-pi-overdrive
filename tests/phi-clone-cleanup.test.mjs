@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { cloneIdentity, cleanupClone, cleanupErrorMetadata, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
-import { runValidationCommand } from '../platform/windows/validation-process.mjs';
+import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { ownedWindowsHelper, windowsProcessRequest } from '../platform/windows/process.mjs';
 const native = { skip: process.platform !== 'win32', timeout: 20000 };
 const fixture = () => fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clone-cleanup-'));
@@ -74,6 +74,13 @@ test('cleanup diagnostics contain category/operation/code only, never raw paths,
     assert.equal(result.pathCategory, 'CLONE_ROOT'); assert.equal(result.operation, 'rmdir');
     assert.equal(result.nativeError, 'NOT_EXPOSED_BY_NODE'); assert.doesNotMatch(JSON.stringify(result), /PRIVATE|phi-clone-cleanup-/u);
   } finally { releaseFixture(root); }
+});
+test('aggregate validation budget cannot leak into post-test recovery or other commands', () => {
+  const cwd = process.cwd(), entry = path.join(cwd, 'scripts', 'phi-check.mjs');
+  assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd), 600000);
+  for (const args of [['--scope-recovery-status'], [entry], [entry, '--owned-validation', 'extra'], ['--validation-lock', 'directory', cwd]]) {
+    assert.equal(validationCommandTimeout(process.execPath, args, cwd), 120000);
+  }
 });
 test('native cwd-inside cleanup reproduces EBUSY, leaves cwd and removes only its fixture', native, async () => {
   const root = fixture(), originalCwd = process.cwd(), identity = cloneIdentity(root);

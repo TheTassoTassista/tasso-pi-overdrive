@@ -5,21 +5,24 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
-import { runValidationCommand } from '../platform/windows/validation-process.mjs';
+import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
 const clone = path.join(temp, 'source with spaces');
 const identity = cloneIdentity(temp), commandReceipts = [];
+const commands = [];
 let stage = 'git-source';
 async function run(command, args, cwd = source, env = process.env) {
   // Aggregate suite budget only. Ordinary/LPAC commands keep their 120s cap;
   // the fixed serial validation entry is owned by a real native Job throughout.
   let result;
-  try { result = await runValidationCommand(command, args, { cwd, env, timeoutMs: stage === 'foundation-tests' ? 600000 : 120000 }); }
+  try { result = await runValidationCommand(command, args, { cwd, env, timeoutMs: validationCommandTimeout(command, args, cwd) }); }
   catch { commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' }); throw new Error('PHI_CLEAN_ROOM_OWNER_FAILED'); }
   if (result.receipt) commandReceipts.push(result.receipt);
+  commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
+    ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
   if (result.status !== 0 || result.error || process.platform === 'win32' && (!result.receipt.jobEmptyVerified || !result.receipt.pipesDrained)) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
     error.evidence = { ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
@@ -63,6 +66,7 @@ try {
   const skipped = Number(/^# skipped (\d+)$/mu.exec(tests)?.[1]);
   let recoveryAfterTests = 'NOT_NATIVE_WINDOWS';
   if (process.platform === 'win32') {
+    stage = 'post-test-recovery';
     const { ownedWindowsHelper } = await import('../platform/windows/process.mjs');
     const status = JSON.parse(await run(ownedWindowsHelper(), ['--scope-recovery-status'], source, env));
     if (status.scope !== 'FIXED_NATIVE_SCOPES_ONLY' || status.status !== 'PASS' || ['scanned', 'active', 'stale', 'quarantined', 'processKills'].some(key => status[key] !== 0) || status.cleanupPerformed !== false) throw new Error('PHI_CLEAN_ROOM_RESIDUAL_SCOPE');
@@ -76,6 +80,7 @@ try {
   report = { version: 1, status: error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;
 } finally {
+  report.commands = commands;
   const cleanup = await cleanupClone(temp, identity, { safeCwd: source, receipts: commandReceipts });
   report = combineValidationResults(report, cleanup);
   if (report.status === 'FAIL') process.exitCode = 1;
