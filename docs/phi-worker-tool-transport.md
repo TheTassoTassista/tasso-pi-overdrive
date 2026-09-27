@@ -7,6 +7,8 @@ attempt, using its already-approved Task Governor policy before the real
 delegation event. It revokes on terminal outcome. agents/worker.md loads the
 Windows-only boundary; before_agent_start binds the exact delegated task hash,
 canonical workspace identity and new child session, not a prompt role tag.
+Binding hashes the exact `Task: ` envelope added by the installed foreground
+transport; bare/double-prefixed/normalized prompt variants cannot match.
 Follow-up turns cannot change the original Task/Tool Governor capability ceiling.
 
 lib/phi-worker-authority.mjs derives a validated Tool Governor policy. Syntax
@@ -57,6 +59,15 @@ LPAC/Job/start/cleanup metadata, exited PID, nonzero73/FATAL/timeout124, authori
 forgery rejection and unchanged source. Linux skips are NOT Windows PASS.
 
 This candidate is NOT a fresh native Pi session/full Worker workflow proof.
+Handler/broker controls have native proof on dc12d5d / CI36314208555:
+Windows Worker12/12PASS; full190/181PASS/0FAIL/9Linux-only skips and both
+source clones green. Subsequent scripts/phi-worker-pi-smoke.mjs uses actual
+pi-subagents runSync/default child factory and real Pi SDK with a deterministic
+local-only provider, isolated empty auth/catalog, denied fetch and narrowed
+safe_exec-only tool surface. It already proves binding/revocation locally;
+Windows mandatory execution must still prove the real session -> broker path.
+This bounded transport task intentionally does not request host publication,
+does not disable completion guards and is not the full autonomy coding E2E.
 Whole workflow still blocked. Mutable snapshot is currently ephemeral per
 command: no durable draft, cross-command edits or host publication. VERIFIED
 only means command exit0 and owned cleanup, not PUBLISHED_TO_PROJECT. Required

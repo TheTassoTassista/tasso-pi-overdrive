@@ -57,5 +57,21 @@ jobs:
         run: node scripts/phi-repository-audit.mjs
       - name: Clean Git-source clone (foundation only, engine must be unavailable)
         run: node scripts/phi-clean-room.mjs
+      - name: Isolated pinned Pi runtime for real Worker session proof (no auth, no lifecycle scripts)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          npm install --prefix $workerTestPrefix --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 pi-subagents@0.66.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real Pi foreground Worker factory to native LPAC broker (zero external provider calls)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-worker-pi-smoke.mjs
+          exit $LASTEXITCODE
       - name: Scope reminder
         run: node -e "console.log('FOUNDATION ONLY. Windows autonomous engine remains BLOCKED; no live auth or sandbox parity claimed. Full Linux regression is a separate mandatory gate.')"

@@ -28,7 +28,7 @@ function controller(item, { task = approved, approvedTask = approved } = {}) {
   const hooks = new Map();
   registerWindowsWorkerBoundary({ on: (name, hook) => hooks.set(name, hook) });
   const ctx = { cwd: item.project, sessionManager: { getSessionId: () => sessionId } };
-  hooks.get('before_agent_start')({ prompt: task }, ctx);
+  hooks.get('before_agent_start')({ prompt: `Task: ${task}` }, ctx);
   return { executionId, sessionId, ctx, hooks, reservation, token: windowsWorkerAuthority(sessionId),
     close: () => { hooks.get('session_shutdown')(); reservation.revoke(); } };
 }
@@ -58,9 +58,11 @@ test('unapproved task/cwd/parent binding and copied opaque token cannot mint Wor
   const reservation = reserveWindowsWorker({ executionId, parentSessionId, cwd: item.project, task, taskPolicy: resolveTaskPolicy({ task }) });
   try {
     assert.throws(() => bindWindowsWorker({ cwd: item.project, task: 'Fix every file', sessionId: randomUUID() }), /AUTHORITY_UNAVAILABLE/u);
-    assert.throws(() => bindWindowsWorker({ cwd: item.root, task, sessionId: randomUUID() }), /AUTHORITY_UNAVAILABLE/u);
-    assert.throws(() => bindWindowsWorker({ cwd: item.project, task, sessionId: parentSessionId }), /AUTHORITY_UNAVAILABLE/u);
-    const sessionId = randomUUID(), token = bindWindowsWorker({ cwd: item.project, task, sessionId });
+    assert.throws(() => bindWindowsWorker({ cwd: item.project, task, sessionId: randomUUID() }), /AUTHORITY_UNAVAILABLE/u);
+    assert.throws(() => bindWindowsWorker({ cwd: item.project, task: `Task: Task: ${task}`, sessionId: randomUUID() }), /AUTHORITY_UNAVAILABLE/u);
+    assert.throws(() => bindWindowsWorker({ cwd: item.root, task: `Task: ${task}`, sessionId: randomUUID() }), /AUTHORITY_UNAVAILABLE/u);
+    assert.throws(() => bindWindowsWorker({ cwd: item.project, task: `Task: ${task}`, sessionId: parentSessionId }), /AUTHORITY_UNAVAILABLE/u);
+    const sessionId = randomUUID(), token = bindWindowsWorker({ cwd: item.project, task: `Task: ${task}`, sessionId });
     assert.throws(() => admitWindowsWorkerTool(token, { cwd: item.project, sessionId, syntax: false }), /CAPABILITY_DENIED/u);
     const syntax = admitWindowsWorkerTool(token, { cwd: item.project, sessionId, syntax: true });
     assert.equal(syntax.profile, 'READ_ONLY'); syntax.release();
