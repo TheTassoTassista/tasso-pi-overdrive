@@ -265,15 +265,25 @@ test('native partial failed command and subsequent revocation preserve prior dra
 test('native unsafe draft readback cannot silently omit protected files or accept alias output', native, async () => {
   const item = fixture({ ...persistentFiles(),
     'protected.cjs': "require('node:fs').writeFileSync('.env','not-a-credential');",
-    'alias.cjs': "require('node:fs').linkSync('input.txt','alias.txt');",
+    'alias.cjs': "try{require('node:fs').linkSync('input.txt','alias.txt');}catch(e){console.error('PHI_DRAFT_ALIAS_'+(['EPERM','EACCES'].includes(e.code)?e.code:'UNEXPECTED'));process.exit(['EPERM','EACCES'].includes(e.code)?1:91);}",
     'binary.cjs': "require('node:fs').writeFileSync('invalid.txt',Buffer.from([255]));",
   }), attempt = controller(item);
   try {
     const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx);
     for (const script of ['protected.cjs', 'alias.cjs', 'binary.cjs']) {
       await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: [script] }, attempt.ctx), error => {
-        assert.equal(error.receipt.exitCode, 70); assert.equal(error.receipt.securityFailure, 'DRAFT');
-        assert.equal(error.receipt.cleanup, 'PASS'); assert.deepEqual(error.receipt.draft, edit.details.receipt.draft); return true;
+        // LPAC may deny hardlink creation before readback. That is a stronger
+        // real kernel denial, NOT permission to accept arbitrary tool failure.
+        const kernelAliasDenial = script === 'alias.cjs' && error.receipt.exitCode === 1;
+        if (kernelAliasDenial) {
+          assert.match(error.message, /PHI_DRAFT_ALIAS_(?:EPERM|EACCES)\b/u);
+          assert.equal(error.receipt.securityFailure, null);
+        } else { assert.equal(error.receipt.exitCode, 70); assert.equal(error.receipt.securityFailure, 'DRAFT'); }
+        assert.equal(error.receipt.tokenVerified, true); assert.equal(error.receipt.targetStarted, true);
+        assert.equal(error.receipt.jobEmptyVerified, true); assert.equal(error.receipt.cleanup, 'PASS');
+        assert.deepEqual(error.receipt.draft, edit.details.receipt.draft);
+        console.log(JSON.stringify({ control: script === 'alias.cjs' ? 'ALIAS_OUTPUT' : script === 'protected.cjs' ? 'PROTECTED_OUTPUT' : 'NON_UTF8_OUTPUT',
+          rejection: kernelAliasDenial ? 'ACTUAL_KERNEL_DENIAL' : 'ANCHORED_READBACK_DENIAL', receipt: error.receipt })); return true;
       });
     }
     const read = await executeBrokeredSafeExec({ program: 'node', args: ['read.cjs'] }, attempt.ctx);
