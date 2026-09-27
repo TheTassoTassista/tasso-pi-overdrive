@@ -2,7 +2,17 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current checkpoint B1 — IN_PROGRESS after final clone cleanup failure
+## Current checkpoint B1 — COMPLETE, native clone cleanup verified
+
+Functional HEAD `fbb6069bf012a5e7b55e009503bdfc88b7305451`, real [CI36305193845](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36305193845) SUCCESS on Windows/Ubuntu. Windows177/168PASS/0FAIL/9Linux-only skips; Ubuntu177/81PASS/0FAIL/96Windows-only skips. Native cleanup controls14/14PASS/0FAIL/0skip, broker18/17PASS/0FAIL/1skip, production safe_exec/verification11/10PASS/0FAIL/1skip; all13 recovery controls retained individually and sequentially. Complete local Linux710/614PASS/0FAIL/96native-only skips, syntax/installed-Pi TypeScript/package/pinned-policy/secret validation PASS. Existing valid gates reused, not repeated merely to resume.
+
+Both independent source-with-spaces clones repeat their corresponding suite counts and PASS_FOUNDATION_ONLY with separate primary/cleanup PASS. Windows cleanup: one attempt/408ms, clone removed, all9 recorded validation Jobs attested/drained/empty, residualOwnedProcesses0 in that owned scope. Read-only post-test recovery: active/stale/quarantined/processKills0, cleanupPerformedfalse. No claim of a global host process census. Whole clone Doctor remains FAIL/fullEngine BLOCKED_NOT_INSTALLED by design; not full product reconstruction.
+
+Primary and cleanup evidence coexist; actual native child-CWD timeout124 remains aggregateFAIL even when cleanupPASS. Real native file/directory/inherited-directory handles deny deletion with32; actual Node EBUSY/UV-4082 is reproduced. Only the exact owned suite command receives600s; ordinary recovery/agent commands retain120s. Retain unknown ownership/identity and permanent failures, bounded transient cleanup retry only, no weakened LPAC/Job/recovery checks. Original51460 lock owner/timeout remain UNKNOWN; subsequent readable failure exposed budget leakage and was fixed, not retrospectively attributed. Technical details/receipt: phi-clean-clone-cleanup.md / phi-clean-clone-cleanup-evidence.json.
+
+Index597blobs/0FAIL/13classifiedWARN; functional ancestry1664blobs/0FAIL/126classifiedWARN (heuristic scopes, excludes unstaged user content/other branches/commit messages). Protected/auth hashes unchanged, protected never staged. Only pre-existing protected edit dirty.0model/provider calls; Pi/routing/Council/Judge/Second Brain/Linux/governors/caps unchanged. B1 COMPLETE only; Windows autonomy BLOCKED, B2/C/D NOT_STARTED at this checkpoint. Next authorized action: B2 trusted Worker/session/task/tool capability binding into real platform dispatch, then actual native zero-model proof. No arbitrary model-selected privileges or direct target spawn.
+
+## Historical checkpoint B1 — final clone cleanup failure, subsequently repaired
 
 Final report-only HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5, [CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518) FAILURE. Functional source remains9be8ac0, unchanged since the preceding successful native run. Direct Windows suite still163/154PASS/0FAIL/9Linux-only skips; focused B1/broker and all13 recovery controls PASS. Ubuntu suite and source clone PASS. Windows independent clone fails in scripts/phi-clean-room.mjs:69, finally cleanup, with EBUSY at the clone root. No successful clone receipt is emitted; cleanup FAIL, no claim of no residual processes. The throwing finally masks the preceding report, so underlying command/test counts, timeout and lock owner are UNKNOWN. About183s step duration is compatible with its180s foundation budget but does NOT prove a timeout or identify a leftover process.
 

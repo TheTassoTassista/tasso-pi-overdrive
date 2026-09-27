@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "checkpoint": "B1",
+  "status": "COMPLETE",
+  "functionalHead": "fbb6069bf012a5e7b55e009503bdfc88b7305451",
+  "ci": { "runId": "36305193845", "conclusion": "success", "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36305193845" },
+  "localLinux": { "total": 710, "passed": 614, "failed": 0, "nativeWindowsSkipped": 96, "syntax": "PASS", "installedPiTypeScript": "PASS", "packagePinnedPolicySecretValidation": "PASS" },
+  "nativeWindows": { "total": 177, "passed": 168, "failed": 0, "linuxOnlySkipped": 9 },
+  "nativeUbuntu": { "total": 177, "passed": 81, "failed": 0, "windowsOnlySkipped": 96 },
+  "focusedNativeCleanup": { "total": 14, "passed": 14, "failed": 0, "skipped": 0 },
+  "focusedBroker": { "total": 18, "passed": 17, "failed": 0, "linuxOnlySkipped": 1 },
+  "focusedProductionTools": { "total": 11, "passed": 10, "failed": 0, "linuxOnlySkipped": 1 },
+  "windowsClone": {
+    "primary": "PASS_FOUNDATION_ONLY", "tests": { "total": 177, "passed": 168, "failed": 0, "skipped": 9 },
+    "cleanup": { "status": "PASS", "attemptCount": 1, "elapsedMs": 408, "directoryRemoved": true, "residualOwnedProcesses": 0, "processOwnership": "NATIVE_JOB_HANDLES", "recordedOwnedJobs": 9, "quarantineState": "NONE" },
+    "recoveryAfterTests": { "status": "PASS", "active": 0, "stale": 0, "quarantined": 0, "processKills": 0, "cleanupPerformed": false },
+    "doctor": "FAIL", "fixedScopeRecovery": "PASS", "fullEngine": "BLOCKED_NOT_INSTALLED", "authCopied": false, "ignoredRuntimesCopied": false
+  },
+  "ubuntuClone": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "processOwnership": "NOT_NATIVE_WINDOWS", "tests": { "total": 177, "passed": 81, "failed": 0, "skipped": 96 }, "authCopied": false, "ignoredRuntimesCopied": false },
+  "actualNativeControls": { "fileDirectoryInheritedDirectoryDeletionError": 32, "nodeBusyError": "EBUSY", "uvErrno": -4082, "childCwdTimeoutPrimaryExit": 124, "timeoutCleanup": "PASS", "timeoutAggregate": "FAIL" },
+  "budgetMs": { "exactOwnedSuiteOnly": 600000, "ordinaryAndAgent": 120000, "ownedCleanup": 5000 },
+  "modelCalls": 0,
+  "windowsAutonomy": "BLOCKED",
+  "b2": "NOT_STARTED",
+  "limits": ["Owned Jobs only, not global process census", "No hard OS filesystem syscall deadline", "Historical 51460 timeout and lock owner UNKNOWN", "Not full engine or product reconstruction"]
+}

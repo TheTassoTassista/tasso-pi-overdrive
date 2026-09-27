@@ -1,10 +1,12 @@
-# Production Windows tool transport — bounded proof, final acceptance pending
+# Production Windows tool transport — B1 bounded proof verified
 
-State: B1 IN_PROGRESS after final native independent-clone cleanup failure.
+State: B1 COMPLETE, functional fbb6069, real CI36305193845 SUCCESS on both native
+OSes and source clones. Windows177/168PASS/0FAIL/9skips; local Linux614PASS/0FAIL.
+Separate primary/cleanup proof and exact budget contract: phi-clean-clone-cleanup.md.
 A remains COMPLETE. B2 Worker,
 C LSP and D transactional publication are NOT_STARTED. Windows autonomy BLOCKED.
 
-Final report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5:
+Historical report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5:
 [CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518)
 FAILURE. Direct Windows tests retain154PASS/0FAIL/9skips, Ubuntu suite/clone PASS,
 but independent Windows clone cleanup throws EBUSY in phi-clean-room.mjs finally.
