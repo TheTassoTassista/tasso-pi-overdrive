@@ -1,7 +1,8 @@
 # Real engine platform integration — first production checkpoint
 
 Historical checkpoint10 trace below. Current B1 production safe_exec/verification
-now use the bounded registered LPAC transport; full workflow, Worker identity,
+now use the bounded registered LPAC transport (final B1 independent-clone cleanup
+is not green; see the current progress ledger); full workflow, Worker identity,
 LSP/transactional mutation and Windows autonomy are still blocked.
 See phi-production-tool-transport.md and current phi-progress.md for the actual
 call graph and native evidence; the old all-verification-denied treatment below

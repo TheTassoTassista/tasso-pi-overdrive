@@ -1,7 +1,18 @@
-# Production Windows tool transport — B1 verified bounded subset
+# Production Windows tool transport — bounded proof, final acceptance pending
 
-State: B1 COMPLETE for the registered read-only Node subset. A remains COMPLETE. B2 Worker,
+State: B1 IN_PROGRESS after final native independent-clone cleanup failure.
+A remains COMPLETE. B2 Worker,
 C LSP and D transactional publication are NOT_STARTED. Windows autonomy BLOCKED.
+
+Final report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5:
+[CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518)
+FAILURE. Direct Windows tests retain154PASS/0FAIL/9skips, Ubuntu suite/clone PASS,
+but independent Windows clone cleanup throws EBUSY in phi-clean-room.mjs finally.
+No clone receipt is emitted; underlying report/timeout/lock owner are UNKNOWN,
+cleanup FAIL and no no-orphans certification. No retry or product change follows.
+The prior successful native proof below is historical, not a final gate waiver.
+Next diagnose/preserve primary failure metadata and reproduce ownership/timeout
+before a targeted fix; require green clone cleanup before B1 closure/B2.
 
 Functional9be8ac0f6e41e831bdec0302ae0fef606063792e, real
 [CI36301697234](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36301697234)
@@ -106,12 +117,14 @@ READ_ONLY/TEST token/Job/start/session/backend attestation, scratch writes,
 actual protected/workspace write denial with unchanged source, source extraction
 hardlink/junction positive controls followed by rejection, nonzero73/FATAL,
 timeout124, actual abort, unavailable-helper no-fallback and cleanup.
-Both source clones rebuild all six sources and repeat their corresponding
+In the preceding successful run, both source clones rebuild all six sources and repeat their corresponding
 counts/cleanupPASS without auth or ignored runtime copy. Native read-only recovery
 Doctor row PASS; whole clone Doctor still FAIL/full engine BLOCKED_NOT_INSTALLED.
 This is not full product acceptance. Runtime payload evidence is CJS; js/mjs
 entry grammar is accepted but not independently certified by these B1 cases.
 Candidate push for CI was explicitly authorized after Linux gate green.
+The later report-only recheck failed Windows clone cleanup as recorded above;
+do not carry that prior PASS across runs.
 
 Remaining: actual Worker binding/edit drafts (B2), real Pi Windows startup,
 additional runtimes/dependencies, directory cwd, Unicode/binary snapshots,

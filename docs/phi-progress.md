@@ -2,7 +2,13 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current checkpoint B1 — COMPLETE bounded production transport
+## Current checkpoint B1 — IN_PROGRESS after final clone cleanup failure
+
+Final report-only HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5, [CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518) FAILURE. Functional source remains9be8ac0, unchanged since the preceding successful native run. Direct Windows suite still163/154PASS/0FAIL/9Linux-only skips; focused B1/broker and all13 recovery controls PASS. Ubuntu suite and source clone PASS. Windows independent clone fails in scripts/phi-clean-room.mjs:69, finally cleanup, with EBUSY at the clone root. No successful clone receipt is emitted; cleanup FAIL, no claim of no residual processes. The throwing finally masks the preceding report, so underlying command/test counts, timeout and lock owner are UNKNOWN. About183s step duration is compatible with its180s foundation budget but does NOT prove a timeout or identify a leftover process.
+
+The preceding successful native evidence remains valid for its exact run; it does not override this failure. B1 acceptance is IN_PROGRESS, not certified green on the final HEAD. No retry, timeout increase, weakened assertion, product fix or B2/C/D implementation after this discovery.0model/provider calls. Immediate next work: preserve metadata-only primary failure evidence even if cleanup throws, determine owned-tree/timeout versus unrelated lock using native evidence, add a focused reproducible regression before any fix, then obtain green independent-clone cleanup before closing B1 or beginning B2. Report-only correction is committed locally; no additional push while the native gate is red. Protected/auth hashes unchanged, protected never staged.
+
+## Historical functional B1 — native bounded transport proof before final recheck
 
 Functional9be8ac0f6e41e831bdec0302ae0fef606063792e, real [CI36301697234](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36301697234) SUCCESS. Windows163total/154PASS/0FAIL/9Linux-only skips, all previous144 passes retained. Focused B1 11/10PASS/0FAIL/1Linux-only skip. Ubuntu focused163/74PASS/0FAIL/89Windows-only skips. Post-native complete Linux696/607PASS/0FAIL/89skips, syntax/installed-Pi TypeScript/package/pinned-policy validation PASS. Both independent source-with-spaces clones rebuild all six native sources and repeat counts: PASS_FOUNDATION_ONLY, cleanupPASS, no auth/ignored runtime copy. Existing13 recovery controls pass individually and sequentially. No required Windows case skipped; extra skip is new Linux-only transport rejection.
 

@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current checkpoint — B1 COMPLETE bounded; B overall IN_PROGRESS
+## Current checkpoint — B1 IN_PROGRESS; final native clone cleanup FAIL
+
+Report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5, [CI36302582518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36302582518) FAILURE. Functional code unchanged from9be8ac0. Direct Windows163/154PASS/0FAIL/9Linux-only skips; focused transport/broker/recovery PASS; Ubuntu suite/clone PASS. Independent Windows clone finally cleanup throws EBUSY at scripts/phi-clean-room.mjs:69; no clone receipt, cleanup FAIL and underlying report masked. Timeout/lock owner/test counts/residual processes UNKNOWN, not inferred from roughly183s duration. Prior run below is historical proof, not a waiver of this failure. B1 not closed on latest HEAD; B2/C/D NOT_STARTED, Windows autonomy BLOCKED. No retry/code change/provider call after discovery; corrective bookkeeping local only, not pushed while gate red. Next: preserve primary failure metadata, investigate native ownership/timeout and reproduce before a targeted fix; require actual clone cleanup green before B2.
+
+## Historical functional checkpoint — B1 bounded native proof
 
 Functional9be8ac0f6e41e831bdec0302ae0fef606063792e, [CI36301697234](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36301697234) SUCCESS. Native Windows163/154PASS/0FAIL/9Linux-only skips; all previous144 passing cases retained. Focused B1 11/10PASS/0FAIL/1Linux-only skip. Ubuntu163/74PASS/0FAIL/89Windows-only skips. Full post-native Linux696/607PASS/0FAIL/89skips; syntax/installed-Pi TypeScript/package validation PASS. Both source-with-spaces clones rebuild six sources, repeat counts, PASS_FOUNDATION_ONLY/cleanupPASS, no auth/ignored runtime copy. Native recovery Doctor row PASS, whole clone Doctor still FAIL/full engine BLOCKED_NOT_INSTALLED.
 
