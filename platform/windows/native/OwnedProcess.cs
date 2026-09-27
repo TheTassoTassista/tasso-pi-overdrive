@@ -190,7 +190,10 @@ namespace Phi.Native {
           SecurityAttributes attributes = new SecurityAttributes(); attributes.Size = Marshal.SizeOf(typeof(SecurityAttributes));
           attributes.Inherit = kind == "inherited-directory" ? 1 : 0;
           phase = "OPEN_LOCK";
-          handle = ValidationCreateFile(target, 0x80, 3, ref attributes, 3, 0x02200000, IntPtr.Zero);
+          // Attribute-only opens did not block DeleteFile/RemoveDirectory on
+          // the native runner. READ_DATA/LIST_DIRECTORY is the required real
+          // sharing-denial control, not an assumed lock from share flags alone.
+          handle = ValidationCreateFile(target, 0x81, 3, ref attributes, 3, 0x02200000, IntPtr.Zero);
           if (handle == new IntPtr(-1)) { handle = IntPtr.Zero; throw new Win32Exception(Marshal.GetLastWin32Error()); }
         }
         if (kind == "inherited-directory") {
@@ -199,6 +202,8 @@ namespace Phi.Native {
           try {
             string self = System.Reflection.Assembly.GetExecutingAssembly().Location;
             StartupEx start = new StartupEx(); start.Startup.Size = Marshal.SizeOf(typeof(Startup));
+            start.Startup.Flags = 0x100; start.Startup.Input = GetStdHandle(-10);
+            start.Startup.Output = GetStdHandle(-11); start.Startup.Error = GetStdHandle(-12);
             Check(CreateProcessW(self, new StringBuilder(Quote(self) + " --validation-inherited-lock " + handle.ToInt64() + " " + Quote(full)),
               IntPtr.Zero, IntPtr.Zero, true, NoWindow, IntPtr.Zero, parent, ref start, out descendant));
             Close(ref handle); // only the actual inherited child handle now locks the root
