@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence } from '../lib/phi-validation-evidence.mjs';
 const failure = { operation: 'NT_OPEN', access: '00110080', share: 1, options: '00200060', nativeStatus: 'c0000043', nativeError: 32, objectIdentity: `${'a'.repeat(16)}:${'b'.repeat(32)}`, leafDigest: 'c'.repeat(64) };
+test('pre-receipt controller exceptions preserve fixed phase/code without private exception context', () => {
+  for (const [phase, code] of [['RESOLVE_COMMAND', 'PHI_VALIDATION_COMMAND_UNAVAILABLE'], ['HELPER_VALIDATION', 'PHI_NATIVE_PROCESS_BUILD_INVALID'], ['SUPERVISOR_SPAWN', 'ENOENT'], ['RECEIPT_PARSE', 'PHI_VALIDATION_RECEIPT_MISSING'], ['RECEIPT_VALIDATE', 'PHI_VALIDATION_RECEIPT_INVALID']]) {
+    const row = validationExceptionEvidence({ validationPhase: phase, message: code.startsWith('PHI_') ? code : 'PRIVATE_CONTEXT', code, path: 'PRIVATE_PATH', stack: 'PRIVATE_STACK' });
+    assert.deepEqual(row, { phase, code, ownership: 'UNVERIFIED' });
+    assert.doesNotMatch(JSON.stringify(row), /PRIVATE/u);
+  }
+  assert.deepEqual(validationExceptionEvidence({ validationPhase: 'PRIVATE', message: 'PHI_PRIVATE_VALUE' }), { phase: 'UNKNOWN', code: 'UNKNOWN', ownership: 'UNVERIFIED' });
+});
 test('native operation evidence preserves actual rights/status/identity but no resource names', () => {
   const result = validationFailureEvidence('foundation-tests', { stderr: `PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}\nprivate-path private-content` });
   assert.deepEqual(result.filesystemFailures, [failure]);

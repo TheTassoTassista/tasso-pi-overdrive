@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current checkpoint — B1 COMPLETE; Worker B2 next
+## Current checkpoint — B1 IN_PROGRESS; latest bookkeeping clone FAIL
+
+Report-only f006b7a, [CI36312574277](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36312574277) FAILURE: direct Windows168PASS/0FAIL and all focused/recovery controls PASS, Ubuntu/clone PASS; Windows clone fails at git-source before a command receipt (exitnull, no timeout evidence). Primary and cleanup retained separately; cleanup OWNERSHIP_UNVERIFIED, no attempted removal, data retained. Exact controller exception was discarded and is now reduced to fixed phase/code metadata for native diagnosis, not guessed. No waiver based on fbb's earlier green proof. B1 IN_PROGRESS. Initial B2 source/unit work preserved locally but no B2 native claim/push until B1 restored; C/D NOT_STARTED; Windows autonomy BLOCKED;0model calls and stable invariants preserved.
+
+## Historical checkpoint — B1 functional fbb6069 green, then bookkeeping recheck failed
 
 Verified functional HEAD `fbb6069bf012a5e7b55e009503bdfc88b7305451`, [CI36305193845](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36305193845) SUCCESS, both native runners and independent source clones. Windows177/168PASS/0FAIL/9Linux-only skips; Ubuntu177/81PASS/0FAIL/96Windows-only skips; complete local Linux710/614PASS/0FAIL/96native-only skips plus syntax/installed-Pi TypeScript/package/pinned-policy/secret validation PASS. New native cleanup controls14/14PASS/0FAIL/0skip; all existing broker/production/recovery cases retained. No model calls.
 

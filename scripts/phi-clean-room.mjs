@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -19,7 +19,12 @@ async function run(command, args, cwd = source, env = process.env) {
   // the fixed serial validation entry is owned by a real native Job throughout.
   let result;
   try { result = await runValidationCommand(command, args, { cwd, env, timeoutMs: validationCommandTimeout(command, args, cwd) }); }
-  catch { commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' }); throw new Error('PHI_CLEAN_ROOM_OWNER_FAILED'); }
+  catch (cause) {
+    commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' });
+    const evidence = { ...validationFailureEvidence(stage), controllerException: validationExceptionEvidence(cause) };
+    commands.push({ stage, status: 'FAIL', ...evidence });
+    const error = new Error('PHI_CLEAN_ROOM_OWNER_FAILED'); error.evidence = evidence; throw error;
+  }
   if (result.receipt) commandReceipts.push(result.receipt);
   commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
     ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}) });

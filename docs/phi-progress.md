@@ -2,7 +2,11 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current checkpoint B1 — COMPLETE, native clone cleanup verified
+## Current checkpoint B1 — IN_PROGRESS after bookkeeping-run pre-receipt failure
+
+Report-only HEAD f006b7abc6dc8ed1a21be824c0c240f7e0aac66c, [CI36312574277](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36312574277) FAILURE. Windows direct177/168PASS/0FAIL/9skips, focused cleanup/broker/production/recovery PASS; Ubuntu suite/clone PASS. Windows clone fails before its first Git command receipt: primary git-source/exitnull/timedOutfalse/commands empty; cleanup correctly FAIL/OWNERSHIP_UNVERIFIED/attempts0/retained. No timeout/lock attribution. The controller catch discarded the exact pre-receipt cause; fixed metadata-only exception phase/code is being added, without retry/budget/security relaxation. B2 initial controller/Worker binding was started after fbb green and is preserved uncommitted, but further B2 advancement/push is suspended until B1 latest native gate is green. C/D NOT_STARTED; WINDOWS AUTONOMY BLOCKED. No model calls; protected/auth unchanged.
+
+## Historical checkpoint B1 — native clone cleanup verified on functional fbb6069
 
 Functional HEAD `fbb6069bf012a5e7b55e009503bdfc88b7305451`, real [CI36305193845](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36305193845) SUCCESS on Windows/Ubuntu. Windows177/168PASS/0FAIL/9Linux-only skips; Ubuntu177/81PASS/0FAIL/96Windows-only skips. Native cleanup controls14/14PASS/0FAIL/0skip, broker18/17PASS/0FAIL/1skip, production safe_exec/verification11/10PASS/0FAIL/1skip; all13 recovery controls retained individually and sequentially. Complete local Linux710/614PASS/0FAIL/96native-only skips, syntax/installed-Pi TypeScript/package/pinned-policy/secret validation PASS. Existing valid gates reused, not repeated merely to resume.
 
