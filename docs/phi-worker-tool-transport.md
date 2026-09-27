@@ -74,6 +74,12 @@ The same actual foreground fixture with --revocation proves that a present
 built-in write tool cannot mutate the host fixture after controller revocation.
 Pi's real AUTHORITY_UNAVAILABLE tool error is a fail-closed result, not a bypass.
 Local denial/source preservation/cleanup PASS; mandatory native case pending.
+Subsequent final1a74cab / CI36315617834 SUCCESS proves this mandatory case on
+actual Windows too. Both real-Pi positive transport and revoked-host-write
+controls PASS, two deterministic turns each, source unchanged/authority revoked/
+temporary removed, external requests0. Full native190/181PASS/0FAIL/9Linux-only
+skips and both independent clones PASS; Windows clone cleanup387ms/owned residual0.
+This closes those controls only; draft continuity/verification remain unfinished.
 This bounded transport task intentionally does not request host publication,
 does not disable completion guards and is not the full autonomy coding E2E.
 Whole workflow still blocked. Mutable snapshot is currently ephemeral per

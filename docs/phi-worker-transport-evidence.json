@@ -1,16 +1,16 @@
 {
   "version": 1,
   "status": "VERIFIED_BOUNDED_TRANSPORT_ONLY",
-  "functionalCommit": "d14200e1292fa31861551bbe280d8779157508b7",
+  "functionalCommit": "1a74cab9aceadb6b04535cf27b5f674928030c10",
   "nativeRun": {
-    "id": 36314964435,
-    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36314964435",
+    "id": 36315617834,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36315617834",
     "conclusion": "SUCCESS",
     "windows": { "tests": 190, "pass": 181, "fail": 0, "linuxOnlySkipped": 9 },
     "ubuntu": { "tests": 190, "pass": 90, "fail": 0, "windowsOnlySkipped": 100 },
     "focusedNativeWorker": { "tests": 12, "pass": 12, "fail": 0, "skipped": 0 },
     "independentClones": {
-      "windows": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "attempts": 1, "elapsedMs": 260, "ownedResidualProcesses": 0 },
+      "windows": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "attempts": 1, "elapsedMs": 387, "ownedResidualProcesses": 0 },
       "ubuntu": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" }
     }
   },
@@ -45,12 +45,23 @@
     "authorityRevoked": true
   },
   "localLinux": { "tests": 723, "pass": 623, "fail": 0, "nativeWindowsSkipped": 100, "syntax": "PASS", "installedPiTypeScript": "PASS", "packageValidation": "PASS" },
+  "realPiRevocationProof": {
+    "platform": "win32",
+    "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
+    "foregroundExitCode": 0,
+    "localDeterministicTurns": 2,
+    "externalProviderCalls": 0,
+    "externalRequests": 0,
+    "sourceUnchanged": true,
+    "brokerReceipts": 0,
+    "temporaryRemoved": true,
+    "authorityRevoked": true
+  },
   "limits": [
     "Deterministic local model output, no live GPT/provider call or billing",
     "Supported offline Node transport only; narrowed tool surface, no whole workflow certificate",
     "Snapshot edits remain ephemeral and are not published to the host project",
     "Durable draft continuity and attempt-aware verification are still unfinished",
-    "Revoked-host-write real-Pi native control is pending a later candidate",
     "No global host process census; process evidence is scoped to owned executions",
     "Windows autonomy remains BLOCKED; C and D are NOT_STARTED"
   ]
