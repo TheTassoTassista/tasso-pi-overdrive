@@ -265,7 +265,7 @@ test('native partial failed command and subsequent revocation preserve prior dra
 test('native unsafe draft readback cannot silently omit protected files or accept alias output', native, async () => {
   const item = fixture({ ...persistentFiles(),
     'protected.cjs': "require('node:fs').writeFileSync('.env','not-a-credential');",
-    'alias.cjs': "const f=require('node:fs'),p=require('node:path'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'edited');try{f.linkSync(p.join(process.cwd(),'input.txt'),p.join(process.cwd(),'alias.txt'));}catch(e){a.equal(f.statSync('input.txt').nlink,1);a.equal(f.existsSync('alias.txt'),false);console.error('PHI_DRAFT_ALIAS_DIAGNOSTIC:'+JSON.stringify({code:typeof e.code==='string'&&/^[A-Z_]{1,30}$/.test(e.code)?e.code:'INVALID',errno:Number.isInteger(e.errno)?e.errno:null}));process.exit(['EPERM','EACCES'].includes(e.code)?1:91);}",
+    'alias.cjs': "const f=require('node:fs'),p=require('node:path'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'edited');try{f.linkSync(p.join(process.cwd(),'input.txt'),p.join(process.cwd(),'alias.txt'));}catch(e){a.equal(f.statSync('input.txt').nlink,1);a.equal(f.existsSync('alias.txt'),false);console.error('PHI_DRAFT_ALIAS_DIAGNOSTIC:'+JSON.stringify({code:typeof e.code==='string'&&/^[A-Z_]{1,30}$/.test(e.code)?e.code:'INVALID',errno:Number.isInteger(e.errno)?e.errno:null}));process.exit(['EPERM','EACCES'].includes(e.code)||e.code==='EBUSY'&&e.errno===-4082?1:91);}",
     'binary.cjs': "require('node:fs').writeFileSync('invalid.txt',Buffer.from([255]));",
   });
   // Real ordinary-host positive control, not a mock denial. Restore single-link
@@ -284,18 +284,19 @@ test('native unsafe draft readback cannot silently omit protected files or accep
         const diagnostic = marker ? JSON.parse(marker[1]) : null;
         console.log(JSON.stringify({ control: script === 'alias.cjs' ? 'ALIAS_OUTPUT' : script === 'protected.cjs' ? 'PROTECTED_OUTPUT' : 'NON_UTF8_OUTPUT',
           diagnostic, receipt: error.receipt })); // before asserting: no lost failure code
-        // Only exact permission errors prove a kernel denial. Unsupported or
-        // other errors remain FAIL with their bounded diagnostic preserved.
+        // Permission denial and the observed native sharing denial are
+        // distinct. UNKNOWN/other errors still FAIL; never retry an alias.
         const aliasUnavailable = script === 'alias.cjs' && error.receipt.exitCode === 1;
+        const sharingDenial = aliasUnavailable && diagnostic?.code === 'EBUSY' && diagnostic?.errno === -4082;
         if (aliasUnavailable) {
-          assert.ok(['EPERM', 'EACCES'].includes(diagnostic?.code));
+          assert.ok(['EPERM', 'EACCES'].includes(diagnostic?.code) || sharingDenial);
           assert.equal(error.receipt.securityFailure, null);
         } else { assert.equal(error.receipt.exitCode, 70); assert.equal(error.receipt.securityFailure, 'DRAFT'); }
         assert.equal(error.receipt.tokenVerified, true); assert.equal(error.receipt.targetStarted, true);
         assert.equal(error.receipt.jobEmptyVerified, true); assert.equal(error.receipt.cleanup, 'PASS');
         assert.deepEqual(error.receipt.draft, edit.details.receipt.draft);
         console.log(JSON.stringify({ control: script === 'alias.cjs' ? 'ALIAS_OUTPUT' : script === 'protected.cjs' ? 'PROTECTED_OUTPUT' : 'NON_UTF8_OUTPUT',
-          rejection: aliasUnavailable ? 'ACTUAL_KERNEL_DENIAL' : 'ANCHORED_READBACK_DENIAL',
+          rejection: sharingDenial ? 'ACTUAL_SHARING_DENIAL_NOT_ACL_PROOF' : aliasUnavailable ? 'ACTUAL_KERNEL_DENIAL' : 'ANCHORED_READBACK_DENIAL',
           ordinaryHostLinkSucceeded: true, receipt: error.receipt })); return true;
       });
     }
