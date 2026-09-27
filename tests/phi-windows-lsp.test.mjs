@@ -87,13 +87,14 @@ test('native LSP real file-schema reads only confined files; private schema deni
 });
 test('native LSP timeout, real target crash and broker death retain failure and owned cleanup',native,async()=>{
   for(const mode of['timeout','crash','broker']){
-    let target;
+    let target, crashIssued=false;
     const request=brokerRequest({'config.json':'{}'},mode==='timeout'?{timeoutMs:30}:{});
     const abort=new AbortController();
-    const result=await runWindowsSecureBroker(request,{signal:abort.signal,onTargetStarted:row=>{target=row;if(mode==='crash')process.kill(row.childPid,'SIGKILL');if(mode==='broker')abort.abort();}});
+    const result=await runWindowsSecureBroker(request,{signal:abort.signal,onTargetStarted:row=>{target=row;if(mode==='crash'){process.kill(row.childPid,'SIGKILL');crashIssued=true;}if(mode==='broker')abort.abort();}});
     assert.notEqual(result.code,0);assert.equal(result.receipt.cleanup,'PASS');assert.equal(result.lspResult??null,null);
     if(mode==='timeout')assert.equal(result.code,124);
     if(mode==='broker')assert.equal(result.code,125);
+    if(mode==='crash'){assert.equal(crashIssued,true);assert.equal(result.receipt.targetStarted,true);assert.equal(result.jobEmptyVerified,true);}
     if(target)assert.throws(()=>process.kill(target.childPid,0),e=>e.code==='ESRCH');
     assert.equal(windowsRecoveryStatus().status,'PASS');
   }

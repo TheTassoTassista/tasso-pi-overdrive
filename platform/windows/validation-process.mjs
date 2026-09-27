@@ -4,6 +4,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ownedWindowsHelper } from './process.mjs';
 
+// INTERNAL_TRUSTED prerequisite lookup, not an agent executable allowlist.
+// Do not start an unowned where.exe subprocess, search cwd, interpret PATHEXT
+// scripts or accept relative PATH entries. Execution still requires the Job.
+export function windowsValidationCandidates(command, environment) {
+  if (typeof command !== 'string' || !/^[A-Za-z0-9_-]+(?:\.exe)?$/iu.test(command)) throw new Error('PHI_VALIDATION_COMMAND_UNAVAILABLE');
+  const value = environment?.PATH ?? environment?.Path;
+  if (typeof value !== 'string' || value.length > 32768 || value.includes('\0')) throw new Error('PHI_VALIDATION_COMMAND_UNAVAILABLE');
+  const directories = value.split(';');
+  if (directories.length > 128) throw new Error('PHI_VALIDATION_COMMAND_UNAVAILABLE');
+  const filename = /\.exe$/iu.test(command) ? command : command + '.exe';
+  return [...new Set(directories.filter(directory => /^[A-Za-z]:[\\/]/u.test(directory) && directory.indexOf(':',2) < 0)
+    .map(directory => path.win32.join(directory,filename)))];
+}
+
+function resolveValidationExecutable(command, environment) {
+  for (const candidate of windowsValidationCandidates(command, environment)) {
+    try {
+      const stat = fs.lstatSync(candidate);
+      if (!stat.isFile() || stat.isSymbolicLink()) continue;
+      const canonical = fs.realpathSync(candidate);
+      if (!/^[A-Za-z]:[\\/]/u.test(canonical) || !canonical.toLowerCase().endsWith('.exe')) continue;
+      return canonical;
+    } catch(error) { if (!['ENOENT','ENOTDIR'].includes(error.code)) throw error; }
+  }
+  throw new Error('PHI_VALIDATION_COMMAND_UNAVAILABLE');
+}
+
 // Budget is tied to the exact aggregate entry, never to a stale diagnostic stage.
 export function validationCommandTimeout(command, args, cwd) {
   return command === process.execPath && args.length === 2 && args[0] === path.join(cwd, 'scripts', 'phi-check.mjs') && args[1] === '--owned-validation' ? 600000 : 120000;
@@ -14,9 +41,7 @@ export async function runValidationCommand(command, args, { cwd, env = process.e
   let phase = 'RESOLVE_COMMAND';
   try {
   if (!path.isAbsolute(command)) {
-    const where = spawnSync(path.join(process.env.SystemRoot, 'System32', 'where.exe'), [command], { shell: false, encoding: 'utf8', timeout: 5000, maxBuffer: 8192 });
-    command = where.status === 0 ? where.stdout.split(/\r?\n/u).find(p => p.endsWith('.exe') && fs.statSync(p, { throwIfNoEntry: false })?.isFile()) : null;
-    if (!command) throw new Error('PHI_VALIDATION_COMMAND_UNAVAILABLE');
+    command = resolveValidationExecutable(command, env);
   }
   phase = 'HELPER_VALIDATION';
   const helper = ownedWindowsHelper();
