@@ -2,7 +2,19 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Checkpoint 12 candidate — generic non-interactive LPAC broker
+## Checkpoint 12 — boundary A VERIFIED
+
+Functional **2d8ea910290d38c4252d32c739c088489464b591**, real [CI36295947175](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36295947175) **SUCCESS**, Windows/Ubuntu and both independent source-with-spaces clones. Windows152/144PASS/0FAIL/8Linux-only skips; Ubuntu152/69PASS/0FAIL/83Windows-only skips. Focused native broker18/17PASS/0FAIL/1Linux-only skip. Complete Linux685/602PASS/0FAIL/83skips; syntax/installed-Pi TypeScript/package-secret validation PASS. All prior127 Windows cases retained;13 recovery controls pass individually/sequentially. Clones rebuild six sources, PASS_FOUNDATION_ONLY/cleanupPASS, no auth/ignored runtime copy. Added Linux-only Windows-broker rejection accounts for the eighth native skip; no required native case skipped.
+
+Real proofs resolve EPERM/lstat with code-owned Node file-launch options (negative default-loader control + positive actual file/module execution), then SCRATCH/MARKER ENOENT by provisioning Windows' exact redirected temp directory inside the already-granted scratch. Actual child temp equality/writes, role/private/network/alias denials, separate output/control, nonzero/overflow, timeout/cancel/crash and observed-tree cleanup PASS. LPAC/registryRead/Job/5s recovery rights and bounds unchanged, no home/system grants or process-memory patch. Details/limits: phi-windows-broker.md; machine receipt: phi-native-broker-evidence.json. Earlier failures below remain discovery history, not current status.
+
+This closes **A only**, a coherent tested boundary. Explicit-snapshot standalone execution is reusable infrastructure, but ordinary safe_exec/verification/Worker transport, host extraction/edit publication and streaming are not enabled. **Exact next step B:** integrate existing shared dispatch through controller-owned role/program registration and native handle-validated workspace extraction/authority; preserve Windows workflow/autonomy gate. Then C real supported LSP and normal/crash cleanup; only afterward D transactions. Do not redo completed recovery/broker proof or loosen permissions to pass a tool. Full native coding/denial/crash E2Es, Doctor/backup/reconstruction remain later. WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN PROGRESS.
+
+Pi0.87.1/auth/default/routing/Council/Judge/Second Brain/governors/retries unchanged; concurrency3/depth1/correction2/spawn42. Protected SHA256 f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba unchanged and never staged. Only pre-existing protected user edit remains outside task commits. Zero new Pi/provider/model calls, no dependency/Pi update, force push, PR, tag, release or visibility change. Report-only bookkeeping follows; obtain final delivery HEAD from Git.
+
+Delivery repository heuristic audits: index589 blobs/0FAIL/13 classifiedWARN; functional2d8ea ancestry1620 blobs/0FAIL/126 classifiedWARN. Warnings are historical/machine paths, detector source and known invalid test placeholders, not an exhaustive absence-of-secrets certificate. Unstaged protected user content, other branches and commit messages are outside these scan scopes.
+
+## Historical checkpoint 12 candidate — generic non-interactive LPAC broker
 
 Native first candidate a4b3fbab81abd556799ccbd6e8a0fb11a0f6b07d, CI36295119646: **FAIL**. System compiler and prior127 Windows cases PASS; current147total /132PASS /7FAIL /8Linux-only skips. Seven new workload tests fail: launched Node exits1 with real tokenVerified/jobAttested/targetStarted true and cleanupPASS; live-tree tests cannot observe their marker. No unsandboxed fallback, permission change or ignored failure. Source-clone Windows stage not reached. Diagnostic-only follow-up adds strict fixed error-code/API-operation classification, never raw tool stderr/path/stack; actual Node failure cause pending that evidence. Additional requested alias/output controls added, focusedLinux150/68PASS/0FAIL/82skips; complete Linux683/601PASS/0FAIL/82skips. Do not infer native broker success from Linux.
 
@@ -14,9 +26,9 @@ Candidate complete Linux gate: **680 total / 601 PASS / 0 FAIL / 79 Windows-only
 
 Exact next step: inspect native compilation/broker tests and fix only observed deterministic defects; finish boundary A before integrating safe_exec/verification transport (B), real streaming LSP (C) and transactions (D). This candidate has no host edit publication/streaming/generic Node fork pipe certificate. WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN PROGRESS. Zero provider/model calls, protected document never staged.
 
-Latest verified native recovery/filesystem checkpoint: `94c6b4d3e36c3ac2ad4ba800e42d359f82815acb`, native CI 36279000733 SUCCESS; full Linux 597 PASS / 0 FAIL / 70 native-Windows skips; native Windows 127 PASS / 0 FAIL / 7 Linux-only skips. See checkpoint 11 at the end for the authoritative continuation point. Older pending/next entries below are historical, not instructions to redo completed work.
+Historical checkpoint11 recovery source:94c6b4d3e36c3ac2ad4ba800e42d359f82815acb, native CI36279000733 SUCCESS. Its counts remain historical; checkpoint12 above is current.
 
-Current continuation: functional `94c6b4d`, checkpoint 11 below; Linux **597 PASS / 0 FAIL / 70 skips**, real native CI **36279000733 SUCCESS (127 Windows PASS / 0 FAIL / 7 skips)**, both independent source clones PASS_FOUNDATION_ONLY. Recovery lifetime regression fixed with real native controls; Windows autonomy still BLOCKED. Checkpoint 10 failures remain historical evidence, not the current result.
+Current continuation: checkpoint A verified; next B production tool transport, then C real streaming LSP, then D crash-atomic writes. Windows autonomy remains blocked, full portability in progress. Prior pending/next entries below are history, not instructions to redo completed work.
 
 ## Verified starting checkpoint
 
