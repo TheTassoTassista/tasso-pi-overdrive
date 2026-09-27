@@ -34,6 +34,9 @@ jobs:
       - name: Native Linux foundation bootstrap
         if: runner.os == 'Linux'
         run: sh bootstrap/linux.sh
+      - name: Native Windows structured broker fixtures (no model calls)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-windows-broker.test.mjs
       - name: Native Windows recovery individually and sequentially (no model calls)
         if: runner.os == 'Windows'
         run: node scripts/phi-windows-recovery-focus.mjs

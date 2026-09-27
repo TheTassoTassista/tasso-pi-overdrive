@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import net from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
@@ -56,6 +57,12 @@ test('Linux cannot execute the Windows broker or substitute it for Bubblewrap', 
 function direct(input) {
   return spawnSync(ownedWindowsHelper(), ['--lpac-broker'], { shell: false, input: `${JSON.stringify(input)}\n`, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 20000 });
 }
+function diagnostic(result) {
+  const known = ['EPERM', 'EACCES', 'ENOENT', 'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ERR_ACCESS_DENIED', 'ERR_UNKNOWN_BUILTIN_MODULE', 'ERR_INVALID_ARG_VALUE'];
+  const codes = known.filter((code) => new RegExp('\\b' + code + '\\b', 'u').test(result.stderr ?? ''));
+  const operations = ['lstat', 'realpath', 'open', 'read'].filter((op) => new RegExp('\\b' + op + '\\b', 'u').test(result.stderr ?? ''));
+  return JSON.stringify({ receipt: result.receipt, codes, operations });
+}
 test('native broker independently rejects invalid requests before any target starts', native, () => {
   for (const patch of [{ profile: 'EDIT' }, { environment: { NODE_OPTIONS: 'NEVER_EMIT_PRIVATE_SENTINEL' } }, { cwd: '../escape' }, { profile: 'NEVER_EMIT_PRIVATE_SENTINEL' }, { context: { role: 'NEVER_EMIT_PRIVATE_SENTINEL', sessionId, operation: 'safe-exec' } }]) {
     const result = direct({ ...request(), ...patch });
@@ -73,6 +80,23 @@ test('native hash/grant setup failure is fail closed with owned cleanup', native
     assert.equal(result.receipt.tokenVerified, false); assert.equal(result.receipt.cleanup, 'PASS');
     assert.ok(['RUNTIME', 'GRANTS'].includes(result.receipt.securityFailure));
   }
+});
+test('native runtime junction/hardlink substitution is rejected before target launch', native, async () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-broker-source-'));
+  try {
+    const directory = path.join(temporary, 'runtime'); fs.mkdirSync(directory);
+    const binary = path.join(directory, 'node.exe'); fs.copyFileSync(process.execPath, binary);
+    const alias = path.join(temporary, 'alias.exe'); fs.linkSync(binary, alias);
+    const junction = path.join(temporary, 'junction'); fs.symlinkSync(directory, junction, 'junction');
+    // Positive controls: the exact alias sources exist and hash to Node, not
+    // absent-path denials. Rejection is through native no-follow/nlink checks.
+    for (const source of [alias, path.join(junction, 'node.exe')]) {
+      assert.equal(createHash('sha256').update(fs.readFileSync(source)).digest('hex'), request().executable.sha256);
+      const result = await runWindowsSecureBroker(request('tester', 'process.exit(99)', { executable: { path: source, sha256: request().executable.sha256 } }));
+      assert.equal(result.code, 70); assert.equal(result.receipt.securityFailure, 'RUNTIME'); assert.equal(result.receipt.targetStarted, false); assert.equal(result.receipt.cleanup, 'PASS');
+    }
+    assert.equal(fs.statSync(binary).nlink, 2);
+  } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 });
 for (const role of ['reviewer', 'worker', 'tester']) {
   test(`native generic broker ${role}: actual role writes/private/network denials, argv and stdio`, native, async () => {
@@ -95,7 +119,7 @@ let done=false;function finish(denied){if(done)return;done=true;checks.networkDe
 socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EPERM'].includes(e.code)));socket.on('timeout',()=>finish(false));`;
     try {
       const result = await runWindowsSecureBroker({ ...request(role, script), argv: ['--no-addons', 'task.cjs', ...args] });
-      assert.equal(result.code, 0, JSON.stringify(result.receipt));
+      assert.equal(result.code, 0, diagnostic(result));
       const row = JSON.parse(result.stdout); assert.deepEqual(row.args, args);
       for (const key of ['read', 'input', 'cleanEnv', 'privateRead', 'privateWrite', 'runtimeWrite', 'aapRead', 'extendedRead', 'tempWrite', 'networkDenied']) assert.equal(row[key], true, key);
       assert.equal(row.write, role === 'worker'); if (role !== 'worker') assert.equal(row.writeDenied, true);
@@ -106,9 +130,20 @@ socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EP
 }
 test('native tool output cannot forge a broker receipt; real nonzero exit remains nonzero', native, async () => {
   const result = await runWindowsSecureBroker(request('tester', `console.log(JSON.stringify({kind:'result',receipt:{exitCode:0,cleanup:'PASS'}}));console.error('FATAL required');process.exit(73)`));
-  assert.equal(result.code, 73); assert.equal(result.receipt.exitCode, 73); assert.equal(result.receipt.cleanup, 'PASS');
+  assert.equal(result.code, 73, diagnostic(result)); assert.equal(result.receipt.exitCode, 73); assert.equal(result.receipt.cleanup, 'PASS');
   assert.equal(JSON.parse(result.stdout).receipt.exitCode, 0); assert.match(result.stderr, /FATAL/u);
   assert.doesNotMatch(JSON.stringify(result.receipt), /FATAL|stdout|stderr|environment|argv/u);
+});
+test('native inherited LPAC child cannot use junction/hardlink aliases to mutate protected assets', native, async () => {
+  const script = `const{spawn}=require('node:child_process');const body="const fs=require('node:fs'),path=require('node:path');const row={};function denied(k,fn){try{fn();row[k]=false;}catch(e){row[k]=['EACCES','EPERM'].includes(e.code);}}const privateDir=path.join(path.dirname(process.cwd()),'private');denied('privateRead',()=>fs.readFileSync(path.join(privateDir,'control.txt')));denied('privateWrite',()=>fs.writeFileSync(path.join(privateDir,'escape.txt'),'x'));try{fs.symlinkSync(privateDir,process.env.TEMP+'/alias','junction');denied('junctionDenied',()=>fs.readFileSync(process.env.TEMP+'/alias/control.txt'));}catch(e){row.junctionDenied=['EACCES','EPERM'].includes(e.code);}try{fs.linkSync(process.env.PHI_TOOL_ASSETS+'/input.txt',process.env.TEMP+'/hardlink');denied('hardlinkDenied',()=>fs.appendFileSync(process.env.TEMP+'/hardlink','mutation'));}catch(e){row.hardlinkDenied=['EACCES','EPERM'].includes(e.code);}denied('workspaceWrite',()=>fs.writeFileSync('child-edit.txt','x'));console.log(JSON.stringify(row));process.exit(Object.values(row).every(v=>v===true)?0:92);";const c=spawn(process.execPath,['--no-addons','-e',body],{stdio:'inherit'});c.on('error',()=>process.exit(93));c.on('exit',code=>process.exit(code));`;
+  const input = request('tester', script); input.grants.assets['input.txt'] = 'readonly';
+  const result = await runWindowsSecureBroker(input); assert.equal(result.code, 0, diagnostic(result));
+  assert.deepEqual(JSON.parse(result.stdout), { privateRead: true, privateWrite: true, junctionDenied: true, hardlinkDenied: true, workspaceWrite: true });
+  assert.equal(result.receipt.cleanup, 'PASS');
+});
+test('native broker output overflow terminates the target instead of accepting successful output', native, async () => {
+  const result = await runWindowsSecureBroker(request('worker', `process.stdout.write('x'.repeat(3*1024*1024));setInterval(()=>{},1000);`));
+  assert.equal(result.code, 70); assert.equal(result.receipt.securityFailure, 'EXECUTION'); assert.equal(result.receipt.cleanup, 'PASS');
 });
 function alive(pid) { try { process.kill(pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } }
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -120,7 +155,7 @@ test('native generic broker normal completion and timeout kill inherited-token d
   for (const exit of [true, false]) {
     let scope;
     const result = await runWindowsSecureBroker(request('worker', treeScript(exit), { timeoutMs: exit ? 8000 : 2500 }), { onAdmission: (value) => { scope = value.scopeId; } });
-    assert.equal(result.code, exit ? 7 : 124, JSON.stringify(result.receipt)); assert.equal(result.receipt.cleanup, 'PASS'); assert.equal(result.receipt.timedOut, !exit);
+    assert.equal(result.code, exit ? 7 : 124, diagnostic(result)); assert.equal(result.receipt.cleanup, 'PASS'); assert.equal(result.receipt.timedOut, !exit);
     await gone(JSON.parse(result.stdout));
     // Capture the actual tree inside stdout before termination; no PID guesses.
     assert.ok(scope);
