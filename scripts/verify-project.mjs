@@ -4,12 +4,21 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
-import { requireCodingBackend, sandboxInvocation } from "../platform/shared/coding-execution.mjs";
+import { requireCodingBackend, sandboxInvocation, verifyCodingProject } from "../platform/shared/coding-execution.mjs";
 
 const argv = new Set(process.argv.slice(2));
 const mode = argv.has("--full") ? "full" : "quick";
 const listOnly = argv.has("--list");
 const asJson = argv.has("--json");
+if (process.platform === "win32") {
+  const index = process.argv.indexOf("--cwd");
+  const cwd = index >= 0 ? process.argv[index + 1] : process.cwd();
+  let summary;
+  try { summary = await verifyCodingProject({ cwd, mode, listOnly }); }
+  catch (error) { summary = { status: "FAIL", error: /^[A-Z_]+$/u.test(error.code ?? "") ? error.code : "PHI_CODING_BACKEND_UNAVAILABLE", results: [] }; }
+  process.stdout.write(asJson ? JSON.stringify(summary) + "\n" : "Verification: " + summary.status + "\n");
+  process.exit(summary.status === "PASS" || summary.status === "LIST_ONLY" ? 0 : summary.status === "NO_CHECKS" ? 2 : 1);
+}
 try { requireCodingBackend("verification"); }
 catch (error) {
   const summary = { status: "FAIL", error: "PHI_CODING_BACKEND_UNAVAILABLE", results: [] };

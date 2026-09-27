@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current B1 candidate — production tool transport IN_PROGRESS
+
+Starting520347612f842a4e3eb1b29b121442e5a9bb4ad3. A COMPLETE; B1 safe_exec/verification IN_PROGRESS, actual Windows proof pending. Shared-dispatch registered Node subset and native anchored project extraction implemented; no raw shell, arbitrary profile/env/runner, host publication or unsandboxed fallback. Local full candidate gate696/607PASS/0FAIL/89Windows-only skips; syntax/TypeScript/package validation PASS. Native fixture tests cannot be credited from Linux. Candidate CI push explicitly authorized after local green. B2 Worker, C LSP, D transactions NOT_STARTED. Whole workflow/autonomy BLOCKED, portability IN_PROGRESS;0model/provider calls, protected/auth hashes unchanged. Exact route classifications, states, publication design/limits: phi-production-tool-transport.md. A evidence below remains valid for the preceding source, not native B1 certification.
+
 ## Current continuation — checkpoint A VERIFIED; production transport pending
 
 Functional2d8ea910290d38c4252d32c739c088489464b591, actual [CI36295947175](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36295947175) SUCCESS. Windows152/144PASS/0FAIL/8Linux-only skips, all previous127 passes retained. Focused broker18/17PASS/0FAIL/1Linux-only skip. Complete Linux685/602PASS/0FAIL/83native skips; syntax/installed-Pi TypeScript/package/pinned-policy/secret validation PASS. Ubuntu focused152/69PASS/0FAIL/83skips. Both independent source-with-spaces clones rebuild/test, PASS_FOUNDATION_ONLY/cleanupPASS, no auth/ignored runtime copy. Existing13 recovery cases pass individually and sequentially. Extra native skip is a new explicitly Linux-only broker-platform rejection, not a disabled required case.

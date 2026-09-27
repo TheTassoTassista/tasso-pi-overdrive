@@ -2,6 +2,14 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## Checkpoint B1 — production safe_exec / verification candidate
+
+Resumed exact520347612f842a4e3eb1b29b121442e5a9bb4ad3, same branch, only protected pre-existing user edit. A COMPLETE; B1 IN_PROGRESS (native validation pending); B2 Worker NOT_STARTED; C LSP NOT_STARTED; D transactional publication NOT_STARTED. WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS.
+
+Actual registered safe_exec Windows handler and verification extension/CLI now route through shared actual-platform dispatch to the existing LPAC broker, never pi.exec/target spawn/bare Job/shell fallback. Bounded initial subset: Node files and syntax checks; profile derived in code, no model-selected authority. Native controller project extraction is anchored/identity-checked/no-reparse/single-linked/UTF8/bounded, source handles retained across extraction. No host edit publication. VERIFIED/ROLLED_BACK/FAILED states carry projectPublished=false; no READY_TO_PUBLISH/PUBLISHED claim. Full path/authority/publication design: phi-production-tool-transport.md. Worker workflow/transactional tools/other runtimes remain explicitly blocked.
+
+First local complete candidate gate696total/607PASS/0FAIL/89Windows-only skips; syntax/installed-Pi TypeScript/package validation PASS. New native cases are NOT yet counted PASS. Existing verification invalid-path test now requires native snapshot rejection, retains enable-flag denial and no insecure target. User separately authorized a normal same-private-branch candidate push AFTER Linux green to obtain real Windows CI; candidate is not a green native checkpoint. Final native proof/CI/counts pending.
+
 ## Checkpoint 12 — boundary A VERIFIED
 
 Functional **2d8ea910290d38c4252d32c739c088489464b591**, real [CI36295947175](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36295947175) **SUCCESS**, Windows/Ubuntu and both independent source-with-spaces clones. Windows152/144PASS/0FAIL/8Linux-only skips; Ubuntu152/69PASS/0FAIL/83Windows-only skips. Focused native broker18/17PASS/0FAIL/1Linux-only skip. Complete Linux685/602PASS/0FAIL/83skips; syntax/installed-Pi TypeScript/package-secret validation PASS. All prior127 Windows cases retained;13 recovery controls pass individually/sequentially. Clones rebuild six sources, PASS_FOUNDATION_ONLY/cleanupPASS, no auth/ignored runtime copy. Added Linux-only Windows-broker rejection accounts for the eighth native skip; no required native case skipped.

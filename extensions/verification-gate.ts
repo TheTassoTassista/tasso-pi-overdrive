@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { requireCodingBackend } from "../platform/shared/coding-execution.mjs";
+import { requireCodingBackend, verifyCodingProject } from "../platform/shared/coding-execution.mjs";
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
 const Params = Type.Object({
@@ -14,9 +14,15 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "verification_gate",
     label: "Verification gate",
-    description: "Detect and run repository-appropriate checks in Bubblewrap. PASS requires at least one real check and every command exiting zero; NO_CHECKS is an unresolved error.",
+    description: "Run repository checks through the platform sandbox. Windows accepts registered offline Node file commands in read-only LPAC snapshots. PASS requires a real check and all commands exiting zero; NO_CHECKS is unresolved.",
     parameters: Params,
     async execute(_id, params, signal, _update, ctx) {
+      if (process.platform === "win32") {
+        const summary = await verifyCodingProject({ cwd: ctx.cwd, mode: params.mode ?? "quick", listOnly: params.listOnly ?? false, signal });
+        for (const result of summary.results ?? []) pi.events.emit("pi-overdrive:execution-metadata", result.receipt);
+        if (!["PASS", "LIST_ONLY"].includes(summary.status)) throw new Error(JSON.stringify(summary));
+        return { content: [{ type: "text", text: JSON.stringify(summary) }], details: { status: summary.status } };
+      }
       requireCodingBackend("verification");
       const args = [script, "--json", params.mode === "full" ? "--full" : "--quick", "--cwd", ctx.cwd];
       if (params.listOnly) args.push("--list");

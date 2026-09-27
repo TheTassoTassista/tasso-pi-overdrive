@@ -97,6 +97,6 @@ test('native Windows direct verification CLI denies before project checks even w
     env: { ...process.env, PHI_WINDOWS_AUTONOMY: 'VERIFIED', PHI_PLATFORM: 'linux' },
   });
   assert.equal(result.status, 1);
-  assert.deepEqual(JSON.parse(result.stdout), { status: 'FAIL', error: 'PHI_CODING_BACKEND_UNAVAILABLE', results: [] });
+  assert.deepEqual(JSON.parse(result.stdout), { status: 'FAIL', error: 'PHI_PROJECT_SNAPSHOT_REJECTED', results: [] });
   assert.equal(result.stderr, '');
 });

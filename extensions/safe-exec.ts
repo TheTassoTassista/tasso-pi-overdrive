@@ -4,6 +4,7 @@ import { Type } from "typebox";
 import { findRuntimeAllocation } from "../lib/runtime-isolation.mjs";
 import { inspectWorkspacePath, removeVerifiedWorkspaceFile } from "../lib/safety.mjs";
 import { requireCodingBackend, sandboxInvocation } from "../platform/shared/coding-execution.mjs";
+import { executeBrokeredSafeExec } from "../platform/shared/safe-exec-handler.mjs";
 
 const PROGRAMS = ["git", "rg", "fd", "jq", "node", "npm", "pnpm", "python", "python3", "pytest", "pyright", "cargo", "go", "cmake", "ctest", "make", "gcc", "g++"] as const;
 const READ_ONLY_GIT = new Set(["status", "diff", "show", "log", "rev-parse", "ls-files", "branch"]);
@@ -69,10 +70,14 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "safe_exec",
     label: "Sandboxed command",
-    description: "Run an argument-vector command in Bubblewrap with no network or host home. Mutating/executable commands require an Overdrive-managed disposable worktree. Shell strings are not accepted.",
+    description: "Run an argument-vector command without network or host home. Linux uses Bubblewrap and managed worktrees; Windows permits only registered read-only Node commands in LPAC snapshots, never host publication. Shell strings are not accepted.",
     parameters: Params,
     executionMode: "sequential",
     async execute(_id, params, signal, _update, ctx) {
+      if (process.platform === "win32") {
+        // No tool-supplied role/profile/grants/runner. B1 has no EDIT authority.
+        return executeBrokeredSafeExec(params, ctx, signal, (metadata: Record<string, unknown>) => pi.events.emit("pi-overdrive:execution-metadata", metadata));
+      }
       requireCodingBackend("safe-exec");
       const args = params.args ?? [];
       if (args.some((arg) => arg.includes("\0"))) {

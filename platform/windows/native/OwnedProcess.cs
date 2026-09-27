@@ -109,6 +109,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
       if (args.Length == 1 && args[0] == "--lpac-broker" && IntPtr.Size == 8) return ExecutionBroker.Run(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--project-snapshot" && IntPtr.Size == 8) return ExecutionBroker.Snapshot(Console.OpenStandardInput());
       // API capability checks below fail closed on pre-Windows-10 systems.
       // Unmanifested .NET Framework OSVersion can report a legacy version.
       if (args.Length != 0 || IntPtr.Size != 8) return 70;

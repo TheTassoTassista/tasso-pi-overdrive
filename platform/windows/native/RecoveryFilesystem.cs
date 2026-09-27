@@ -9,6 +9,8 @@ using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web.Script.Serialization;
+using Microsoft.Win32.SafeHandles;
+using System.Text.RegularExpressions;
 
 namespace Phi.Native {
   internal sealed class RecoveryFilesystem : IDisposable {
@@ -129,6 +131,90 @@ namespace Phi.Native {
     internal IntPtr OpenReadFile(string leaf, out Info info) {
       // Broker runtime snapshot: read only, no write/delete sharing, no reparse.
       return OpenRelative(parents[parents.Count - 1], leaf, 0x81, 1, 1, 0x40, IntPtr.Zero, out info);
+    }
+    // Read-only controller extraction. Every component is opened from a held
+    // directory; all source handles remain pinned until the snapshot completes.
+    // No host grants, pathname reads, recursive copies or publication authority.
+    internal object ReadProjectSnapshot() {
+      var handles = new List<IntPtr>();
+      var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
+      var identities = new SortedDictionary<string, string>(StringComparer.Ordinal);
+      int remaining = 2048, bytes = 0;
+      Stopwatch deadline = Stopwatch.StartNew();
+      try {
+        Info info;
+        IntPtr root = OpenRelative(parents[parents.Count - 2], Path.GetFileName(directoryPath), 0x81, 1, 1, 1, IntPtr.Zero, out info);
+        handles.Add(root);
+        if (HandleIdentity(root) != HandleIdentity(parents[parents.Count - 1])) throw new InvalidDataException();
+        SnapshotDirectory(root, "", 0, handles, files, identities, ref remaining, ref bytes, deadline);
+        return new { version = 1, rootIdentity = HandleIdentity(root), files, identities };
+      } finally { for (int i = handles.Count - 1; i >= 0; i--) CloseHandle(handles[i]); }
+    }
+    static void SnapshotDirectory(IntPtr directory, string prefix, int depth, List<IntPtr> handles,
+        SortedDictionary<string, string> files, SortedDictionary<string, string> identities,
+        ref int remaining, ref int totalBytes, Stopwatch deadline) {
+      if (depth > 12 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
+      const int Size = 32768;
+      IntPtr buffer = Marshal.AllocHGlobal(Size);
+      var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      try {
+        bool restart = true;
+        while (true) {
+          if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
+          Marshal.Copy(new byte[Size], 0, buffer, Size);
+          if (!QueryDirectory(directory, restart ? 15 : 14, buffer, Size)) {
+            int error = Marshal.GetLastWin32Error(); if (error == 18) break;
+            throw new Win32Exception(error);
+          }
+          restart = false;
+          int offset = 0;
+          while (true) {
+            if (offset > Size - 68 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
+            IntPtr entry = IntPtr.Add(buffer, offset);
+            uint next = unchecked((uint)Marshal.ReadInt32(entry, 0)), length = unchecked((uint)Marshal.ReadInt32(entry, 60));
+            if (length < 2 || (length & 1) != 0 || length > 2048 || length > Size - offset - 68 ||
+                (next != 0 && (next < 68 + length || (next & 7) != 0 || next > Size - offset - 68))) throw new InvalidDataException();
+            string name = Marshal.PtrToStringUni(IntPtr.Add(entry, 68), (int)length / 2);
+            if (name != "." && name != "..") {
+              if (--remaining < 0 || !names.Add(name)) throw new InvalidDataException();
+              // Names only: protected entries are never opened/read.
+              bool protectedName = Regex.IsMatch(name, "\\A(?:\\.git|node_modules|\\.phi-cache|\\.env(?:\\..*)?|\\.ssh|\\.aws|\\.gnupg|\\.password-store|browser-data|keyrings|auth\\.json|credentials(?:\\.json)?|id_(?:rsa|dsa|ecdsa|ed25519)|known_hosts|netrc)\\z|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase);
+              if (!protectedName) {
+                if (!Regex.IsMatch(name, "\\A[A-Za-z0-9_.-]+\\z") || name.EndsWith(".") ||
+                    Regex.IsMatch(name, "\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)", RegexOptions.IgnoreCase)) throw new InvalidDataException();
+                uint attributes = unchecked((uint)Marshal.ReadInt32(entry, 56));
+                bool isDirectory = (attributes & 0x10) != 0;
+                Info info;
+                IntPtr child = OpenRelative(directory, name, 0x81, 1, 1, isDirectory ? 1U : 0x40U, IntPtr.Zero, out info);
+                handles.Add(child);
+                string relative = prefix + name;
+                if ((info.Attributes & 0x400) != 0) throw new InvalidDataException();
+                if (isDirectory) {
+                  if ((info.Attributes & 0x10) == 0) throw new InvalidDataException();
+                  SnapshotDirectory(child, relative + "/", depth + 1, handles, files, identities, ref remaining, ref totalBytes, deadline);
+                } else {
+                  if ((info.Attributes & 0x10) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 512 * 1024 || files.Count >= 256) throw new InvalidDataException();
+                  byte[] value;
+                  using (FileStream stream = new FileStream(new SafeFileHandle(child, false), FileAccess.Read))
+                  using (MemoryStream data = new MemoryStream()) {
+                    byte[] block = new byte[4096]; int count;
+                    while ((count = stream.Read(block, 0, block.Length)) != 0) {
+                      totalBytes += count; if (totalBytes > 512 * 1024 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
+                      data.Write(block, 0, count);
+                    }
+                    value = data.ToArray();
+                  }
+                  string text = new UTF8Encoding(false, true).GetString(value);
+                  if (text.IndexOf('\0') >= 0) throw new InvalidDataException();
+                  files.Add(relative, text); identities.Add(relative, HandleIdentity(child));
+                }
+              }
+            }
+            if (next == 0) break;
+            offset += (int)next;
+          }
+        }
+      } finally { Marshal.FreeHGlobal(buffer); }
     }
     internal static string HandleIdentity(IntPtr handle) {
       Identity identity;

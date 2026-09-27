@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platformAdapter } from '../index.mjs';
+import { executeWindowsCodingTool, verifyWindowsProject } from '../windows/coding-tools.mjs';
 
 // Production plumbing, not native certification. Only code-owned capabilities
 // may select an adapter. Neither model input nor an environment variable can
@@ -21,6 +22,17 @@ function denied(code) {
   const error = new Error(code);
   error.code = code;
   throw error;
+}
+
+// B1 registered read-only tool transport is separate from whole-workflow
+// readiness. No platform/runner override; unsupported hosts fail, never spawn.
+export async function executeCodingTool(input, context) {
+  if (platformAdapter().id !== 'win32') denied('PHI_CODING_BACKEND_UNAVAILABLE');
+  return executeWindowsCodingTool(input, context);
+}
+export async function verifyCodingProject(input) {
+  if (platformAdapter().id !== 'win32') denied('PHI_CODING_BACKEND_UNAVAILABLE');
+  return verifyWindowsProject(input);
 }
 
 export function requireCodingBackend(operation) {

@@ -37,6 +37,28 @@ namespace Phi.Native {
     static string Hash(byte[] value) {
       using (SHA256 sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(value)).Replace("-", "").ToLowerInvariant();
     }
+    internal static int Snapshot(Stream input) {
+      try {
+        byte[] bytes;
+        using (MemoryStream buffer = new MemoryStream()) {
+          int next; while ((next = input.ReadByte()) != 10) {
+            if (next < 0 || buffer.Length >= 4096) throw new InvalidDataException();
+            buffer.WriteByte((byte)next);
+          }
+          bytes = buffer.ToArray();
+        }
+        JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = 4 * MaxRequest;
+        Dictionary<string, object> request = Object(serializer.DeserializeObject(new UTF8Encoding(false, true).GetString(bytes)), "root");
+        string root = Text(request["root"]);
+        if (!Regex.IsMatch(root, "\\A[A-Za-z]:[\\\\/]") || root.Length > 1024 ||
+            root.IndexOf(':', 2) >= 0 || root.EndsWith("\\") || root.EndsWith("/")) throw new InvalidDataException();
+        using (RecoveryFilesystem pins = new RecoveryFilesystem(root)) Console.WriteLine(serializer.Serialize(pins.ReadProjectSnapshot()));
+        return 0;
+      } catch {
+        Console.WriteLine("{\"status\":\"FAIL\",\"error\":\"PHI_PROJECT_SNAPSHOT_REJECTED\"}");
+        return 70;
+      }
+    }
     static void CopyRuntime(Dictionary<string, object> executable, string destination) {
       string source = Text(executable["path"]), expected = Text(executable["sha256"]);
       if (!Regex.IsMatch(source, "\\A[A-Za-z]:[\\\\/]") || source.IndexOf(':', 2) >= 0 || !source.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !Regex.IsMatch(expected, "\\A[0-9a-f]{64}\\z")) throw new InvalidDataException();
