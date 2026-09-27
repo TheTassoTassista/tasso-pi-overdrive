@@ -49,6 +49,10 @@ try {
   const npm = path.resolve(path.dirname(process.execPath), process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : '../lib/node_modules/npm/bin/npm-cli.js');
   stage = 'source-dependencies';
   await run(process.execPath, [npm, 'ci', '--legacy-peer-deps', '--ignore-scripts', '--no-audit', '--no-fund'], clone);
+  if (process.platform === 'win32') {
+    stage = 'pinned-lsp-runtime';
+    await run(process.execPath, [npm, 'ci', '--prefix', 'runtime/lsp', '--ignore-scripts', '--no-audit', '--no-fund'], clone);
+  }
   stage = 'windows-process-build';
   if (process.platform === 'win32') await run(process.execPath, [path.join(clone, 'scripts', 'build-windows-process.mjs')], clone);
   const dirs = Object.fromEntries(['bin', 'config', 'state', 'agent', 'legacyConfig'].map((key) => [key, path.join(temp, 'machine', key)]));

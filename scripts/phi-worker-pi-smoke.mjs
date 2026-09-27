@@ -14,8 +14,10 @@ import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { reserveWindowsWorker, registerWindowsWorkerBoundary, windowsWorkerAuthority } from '../lib/phi-worker-authority.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-if (process.argv.slice(2).some(argument => argument !== '--revocation')) throw new Error('PHI_WORKER_TEST_USAGE');
+if (process.argv.slice(2).some(argument => !['--revocation','--lsp'].includes(argument))) throw new Error('PHI_WORKER_TEST_USAGE');
 const revokedControl = process.argv.includes('--revocation');
+const lspControl = process.argv.includes('--lsp');
+if (revokedControl && lspControl) throw new Error('PHI_WORKER_TEST_USAGE');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
 const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.homedir(), '.pi', 'agent', 'npm', 'node_modules', 'pi-subagents');
 if (!runtimeRoot) throw new Error('PHI_WORKER_TEST_PI_REQUIRED');
@@ -36,6 +38,10 @@ try {
   fs.writeFileSync(path.join(project, 'fail.cjs'), "require('node:fs').writeFileSync('input.txt','corrupt');console.error('FATAL discard partial draft');process.exit(73);");
   fs.writeFileSync(path.join(project, 'test.cjs'), "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'snapshot-edit');a.throws(()=>f.writeFileSync('input.txt','attack'),e=>['EPERM','EACCES'].includes(e.code));console.log(JSON.stringify({verified:true,pid:process.pid}));");
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ scripts: { test: 'node test.cjs' } }));
+  if (lspControl) {
+    fs.writeFileSync(path.join(project,'config.json'),'{}');
+    fs.appendFileSync(path.join(project,'run.cjs'),"require('node:fs').writeFileSync('config.json','{\"changed\": }');");
+  }
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   process.env.PI_CODING_AGENT_DIR = agentDir;
   globalThis.fetch = async () => { externalRequests++; throw new Error('PHI_WORKER_TEST_EXTERNAL_REQUEST_DENIED'); };
@@ -86,7 +92,7 @@ try {
         input: ['text'], contextWindow: 32768, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
       streamSimple: (model, context) => {
         const results = context.messages.filter(message => message.role === 'toolResult');
-        const plan = process.platform === 'win32' ? revokedControl ? ['run.cjs', 'REVOKED_WRITE'] : ['run.cjs', 'read.cjs', 'fail.cjs', 'read.cjs', 'VERIFY']
+        const plan = process.platform === 'win32' ? revokedControl ? ['run.cjs', 'REVOKED_WRITE'] : lspControl ? ['run.cjs','LSP'] : ['run.cjs', 'read.cjs', 'fail.cjs', 'read.cjs', 'VERIFY']
           : revokedControl ? ['REVOKED_WRITE'] : [];
         const step = plan[results.length];
         if (step === 'REVOKED_WRITE') { revocationBefore = reservation.status(); reservation.revoke(); }
@@ -96,8 +102,8 @@ try {
         const nativeTool = step && step !== 'REVOKED_WRITE';
         const revokedWrite = step === 'REVOKED_WRITE';
         const message = { role: 'assistant', content: revokedWrite ? [{ type: 'toolCall', id: 'revoked-host-write', name: 'write', arguments: { path: 'input.txt', content: 'unauthorized-host-edit' } }]
-          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool-' + results.length, name: step === 'VERIFY' ? 'verification_gate' : 'safe_exec',
-            arguments: step === 'VERIFY' ? { mode: 'quick' } : { program: 'node', args: [step] } }]
+          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool-' + results.length, name: step === 'LSP' ? 'semantic_nav' : step === 'VERIFY' ? 'verification_gate' : 'safe_exec',
+            arguments: step === 'LSP' ? {operation:'diagnostics',path:'config.json'} : step === 'VERIFY' ? { mode: 'quick' } : { program: 'node', args: [step] } }]
           : [{ type: 'text', text: 'SNAPSHOT_ONLY_NO_PROJECT_PUBLICATION' }], api: model.api, provider: model.provider, model: model.id,
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
           stopReason: nativeTool || revokedWrite ? 'toolUse' : 'stop', timestamp: Date.now() };
@@ -110,9 +116,9 @@ try {
   // depth/tool-budget hooks and session. Only model output is deterministic.
   const worker = { name: 'worker', description: 'Bounded Worker transport', source: 'runtime', filePath: path.join(root, 'agents/worker.md'),
     acceptanceRole: 'writer', completionGuard: true, systemPromptMode: 'replace', inheritGlobalContext: false,
-    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: process.platform === 'win32' ? revokedControl ? ['safe_exec', 'write'] : ['safe_exec', 'verification_gate'] : revokedControl ? ['write'] : [],
+    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: process.platform === 'win32' ? revokedControl ? ['safe_exec', 'write'] : lspControl ? ['safe_exec','semantic_nav'] : ['safe_exec', 'verification_gate'] : revokedControl ? ['write'] : [],
     model: 'phi-worker-local/worker', thinking: 'off', systemPrompt: 'Deterministic Worker transport validation. Snapshot only.',
-    subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts'), path.join(root, 'extensions/verification-gate.ts')] : [],
+    subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts'), path.join(root, 'extensions/verification-gate.ts'), ...(lspControl?[path.join(root,'extensions/lsp.ts')]:[])] : [],
   };
   const deterministicFactory = { create: async launch => {
     assert.equal(launch.ambientExtensions, false);
@@ -129,7 +135,7 @@ try {
   assert.ok(sessionId); assert.notEqual(sessionId, parentSessionId);
   assert.equal(foregroundResult.exitCode, 0, foregroundResult.error);
   assert.deepEqual(errors, []); assert.equal(boundEvents, 1);
-  assert.equal(turns, process.platform === 'win32' ? revokedControl ? 3 : 6 : revokedControl ? 2 : 1);
+  assert.equal(turns, process.platform === 'win32' ? revokedControl || lspControl ? 3 : 6 : revokedControl ? 2 : 1);
   assert.equal(child.messages.at(-1).stopReason, 'stop');
   if (revokedControl) {
     const result = child.messages.filter(message => message.role === 'toolResult').at(-1);
@@ -142,6 +148,16 @@ try {
       assert.equal(after.draftId, before.draftId); assert.equal(after.contentDigest, before.contentDigest);
       assert.equal(after.revision, before.revision); assert.equal(after.payloadCleared, true);
     }
+  } else if (process.platform === 'win32' && lspControl) {
+    const results=child.messages.filter(message=>message.role==='toolResult');
+    assert.deepEqual(results.map(r=>r.isError),[false,false]);assert.equal(receipts.length,3);
+    const onWrite=results[0].details.lspOnWrite;assert.equal(onWrite.length,1);assert.equal(onWrite[0].status,'PASS');assert.ok(onWrite[0].entries.some(e=>e.severity==='Error'));
+    assert.equal(onWrite[0].receipt.onWrite,true);
+    const explicit=JSON.parse(results[1].content[0].text);assert.equal(explicit.status,'PASS');assert.ok(explicit.entries.some(e=>e.severity==='Error'));
+    for(const r of receipts){assert.equal(r.draft.draftId,receipts[0].draft.draftId);assert.equal(r.draft.contentDigest,receipts[0].draft.contentDigest);assert.equal(r.draft.revision,1);assert.equal(r.cleanup,'PASS');assert.equal(r.jobEmptyVerified,true);assert.equal(r.projectPublished,false);}
+    for(const r of receipts.slice(1)){assert.equal(r.profile,'LSP_READ_ONLY');assert.equal(r.tokenVerified,true);assert.equal(r.jobAttested,true);assert.equal(r.initialized,true);assert.equal(r.shutdown,true);}
+    assert.equal(fs.readFileSync(path.join(project,'config.json'),'utf8'),'{}');
+    assert.throws(()=>process.kill(JSON.parse(results[0].content[0].text).pid,0),e=>e.code==='ESRCH');
   } else if (process.platform === 'win32') {
     assert.equal(receipts.length, 5);
     const receipt = receipts[0], result = child.messages.find(message => message.role === 'toolResult');
@@ -173,7 +189,7 @@ try {
   assert.throws(() => windowsWorkerAuthority(sessionId), /AUTHORITY_UNAVAILABLE/u);
   assert.equal(externalRequests, 0);
   report = { status: 'PASS', platform: process.platform, piVersion: '0.87.1', subagentsVersion: '0.66.0',
-    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
+    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? lspControl ? 'REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB' : 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
     foregroundExitCode: foregroundResult.exitCode,
     boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts,
     ...(revokedControl ? { revocationBefore, revocationAfter: reservation.status() } : {}) };

@@ -139,6 +139,8 @@ namespace Phi.Native {
       internal int? PrimaryExitCode;
       internal uint ChildPid;
       internal string ChildGeneration;
+      internal Action<byte[], int> OnOutput;
+      internal Action OnStarted;
       int bytes;
       internal Thread Drain(IntPtr handle, MemoryStream destination) {
         Thread thread = new Thread(delegate() {
@@ -148,6 +150,7 @@ namespace Phi.Native {
               while ((count = pipe.Read(block, 0, block.Length)) != 0) {
                 if (Interlocked.Add(ref bytes, count) > 2 * 1024 * 1024) { Overflow.Set(); break; }
                 destination.Write(block, 0, count);
+                if (destination == Output && OnOutput != null) OnOutput(block, count);
               }
             }
           } catch { Overflow.Set(); }
@@ -324,13 +327,23 @@ namespace Phi.Native {
         Close(ref inputRead); Close(ref output); Close(ref error);
         SafeFileHandle writeHandle = new SafeFileHandle(inputWrite, true); inputWrite = IntPtr.Zero;
         Thread copy = new Thread(delegate() {
-          try { using (FileStream pipe = new FileStream(writeHandle, FileAccess.Write)) input.CopyTo(pipe); }
+          try {
+            using (FileStream pipe = new FileStream(writeHandle, FileAccess.Write)) {
+              if (capture != null && capture.OnStarted != null) {
+                // Interactive LSP requests must reach the server before the
+                // next blocking read; FileStream's buffered CopyTo deadlocks.
+                byte[] frame = new byte[8192]; int size;
+                while ((size = input.Read(frame, 0, frame.Length)) != 0) { pipe.Write(frame, 0, size); pipe.Flush(); }
+              } else input.CopyTo(pipe);
+            }
+          }
           catch (IOException) { } catch (ObjectDisposedException) { } catch (ArgumentException) { }
           finally { writeHandle.Dispose(); }
         }); copy.IsBackground = true; copy.Start();
         phase = "RESUME";
         if (ResumeThread(child.Thread) == UInt32.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
         if (capture != null) capture.Started = true;
+        if (capture != null && capture.OnStarted != null) capture.OnStarted();
         IntPtr[] waitHandles = capture == null ? new IntPtr[] { child.Process, guardian } : new IntPtr[] { child.Process, guardian, capture.Overflow.SafeWaitHandle.DangerousGetHandle() };
         uint waited = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, (uint)timeout);
         if (capture != null && waited == 2) throw new InvalidDataException();

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platformAdapter } from '../index.mjs';
 import { executeWindowsCodingTool, verifyWindowsProject } from '../windows/coding-tools.mjs';
+import { executeWindowsLsp } from '../windows/lsp.mjs';
 
 // Production plumbing, not native certification. Only code-owned capabilities
 // may select an adapter. Neither model input nor an environment variable can
@@ -33,6 +34,10 @@ export async function executeCodingTool(input, context) {
 export async function verifyCodingProject(input) {
   if (platformAdapter().id !== 'win32') denied('PHI_CODING_BACKEND_UNAVAILABLE');
   return verifyWindowsProject(input);
+}
+export async function executeCodingLsp(cwd, parameters, context) {
+  if (platformAdapter().id !== 'win32') denied('PHI_CODING_BACKEND_UNAVAILABLE');
+  return executeWindowsLsp(cwd, parameters, context);
 }
 
 export function requireCodingBackend(operation) {

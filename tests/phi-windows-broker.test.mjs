@@ -22,7 +22,7 @@ function request(role = 'tester', script = 'process.exit(0)', options = {}) {
   };
 }
 test('broker registered profiles are least privilege and cannot promote Windows autonomy', () => {
-  assert.deepEqual(Object.keys(WINDOWS_CAPABILITY_PROFILES), ['READ_ONLY', 'EDIT', 'TEST']);
+  assert.deepEqual(Object.keys(WINDOWS_CAPABILITY_PROFILES), ['READ_ONLY', 'EDIT', 'TEST', 'LSP_READ_ONLY']);
   assert.equal(WINDOWS_CAPABILITY_PROFILES.TEST.workspace, 'READ_ONLY');
   assert.equal(WINDOWS_CAPABILITY_PROFILES.READ_ONLY.workspace, 'READ_ONLY');
   assert.equal(WINDOWS_CAPABILITY_PROFILES.EDIT.workspace, 'READ_WRITE');

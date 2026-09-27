@@ -5,7 +5,7 @@ import { ownedWindowsHelper, WINDOWS_PROCESS_LIMITS } from './process.mjs';
 // Controller interface, not a model-selected platform/readiness switch. These
 // profiles do not grant paths from the host: they accept explicit snapshots.
 export const WINDOWS_CAPABILITY_PROFILES = Object.freeze(Object.fromEntries(
-  ['READ_ONLY', 'EDIT', 'TEST'].map((id) => [id, Object.freeze({
+  ['READ_ONLY', 'EDIT', 'TEST', 'LSP_READ_ONLY'].map((id) => [id, Object.freeze({
     id, workspace: id === 'EDIT' ? 'READ_WRITE' : 'READ_ONLY', assets: 'READ_ONLY',
     scratch: 'READ_WRITE', network: 'DENY', registry: 'registryRead',
     children: 'SAME_TOKEN_NON_BREAKAWAY_JOB_32', environment: 'ISOLATED_ALLOWLIST',
@@ -18,14 +18,14 @@ const object = (value, keys) => {
 };
 const string = (value) => typeof value === 'string' && !value.includes('\0');
 const id = (value) => typeof value === 'string' && /^[0-9a-f]{32}$/u.test(value);
-const relative = (value, root = false) => {
+const relative = (value, root = false, scoped = false) => {
   if (!string(value) || value.length > 512) fail('PATH_INVALID');
   if (root && value === '.') return;
   const parts = value.split('/');
-  if (parts.length > 12 || parts.some((part) => !/^[A-Za-z0-9_.-]+$/u.test(part) || ['.', '..'].includes(part) || part.endsWith('.') || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)|^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|auth\.json|credentials(?:\.json)?|id_rsa|id_ed25519)$|\.(?:pem|p12|pfx|key)$/iu.test(part))) fail('PATH_INVALID');
+  if (parts.length > 12 || parts.some((part) => !(scoped ? /^@?[A-Za-z0-9_.-]+$/u : /^[A-Za-z0-9_.-]+$/u).test(part) || ['.', '..'].includes(part) || part.endsWith('.') || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)|^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|auth\.json|credentials(?:\.json)?|id_rsa|id_ed25519)$|\.(?:pem|p12|pfx|key)$/iu.test(part))) fail('PATH_INVALID');
 };
 const profileForRole = (role) => ({ worker: 'EDIT', tester: 'TEST', scout: 'READ_ONLY', reviewer: 'READ_ONLY' })[role];
-const profileAllowed = (role, profile) => role === 'worker' ? ['READ_ONLY', 'TEST', 'EDIT'].includes(profile) : profile === profileForRole(role);
+const profileAllowed = (role, profile) => role === 'worker' ? ['READ_ONLY', 'TEST', 'EDIT', 'LSP_READ_ONLY'].includes(profile) : profile === profileForRole(role);
 // Node's default realpath loader lstat()s ungranted host ancestors. Preserve
 // the already-controlled snapshot path instead; the kernel LPAC boundary, not
 // Node canonicalization, remains the security authority. No ancestor ACL grant.
@@ -35,9 +35,17 @@ export function windowsNodeToolArguments(script, args = []) {
   return Object.freeze(['--no-addons', '--no-global-search-paths', '--preserve-symlinks-main', '--preserve-symlinks', script, ...args]);
 }
 export function validateWindowsBrokerRequest(request) {
-  object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context', ...(Object.hasOwn(request ?? {}, 'draft') ? ['draft'] : [])]);
+  object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context', ...(Object.hasOwn(request ?? {}, 'draft') ? ['draft'] : []), ...(Object.hasOwn(request ?? {}, 'lsp') ? ['lsp'] : [])]);
   object(request.executable, ['path', 'sha256']); object(request.context, ['sessionId', 'operation', 'role']); object(request.grants, ['workspace', 'assets']);
-  if (request.version !== 1 || !id(request.context.sessionId) || !['safe-exec', 'verification'].includes(request.context.operation) || !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, request.profile) || !profileAllowed(request.context.role, request.profile) || request.context.operation === 'verification' && request.context.role !== 'tester' || request.network !== 'DENY') fail('POLICY_INVALID');
+  if (request.version !== 1 || !id(request.context.sessionId) || !['safe-exec', 'verification', 'lsp'].includes(request.context.operation) || !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, request.profile) || !profileAllowed(request.context.role, request.profile) || request.context.operation === 'verification' && request.context.role !== 'tester' || request.network !== 'DENY') fail('POLICY_INVALID');
+  const lsp = Object.hasOwn(request, 'lsp');
+  if (lsp !== (request.context.operation === 'lsp') || lsp !== (request.profile === 'LSP_READ_ONLY')) fail('POLICY_INVALID');
+  if (lsp) {
+    object(request.lsp, ['path', 'onWrite']); relative(request.lsp.path);
+    if (!request.lsp.path.endsWith('.json') || typeof request.lsp.onWrite !== 'boolean' || !Object.hasOwn(request, 'draft') || request.context.role !== 'worker' || !Object.hasOwn(request.grants.workspace, request.lsp.path)) fail('LSP_INVALID');
+    const argv = ['--no-addons', '--no-global-search-paths', '--preserve-symlinks-main', '--preserve-symlinks', '../assets/node_modules/vscode-langservers-extracted/lib/json-language-server/node/jsonServerMain.js', '--stdio'];
+    if (JSON.stringify(request.argv) !== JSON.stringify(argv) || request.cwd !== '.') fail('LSP_INVALID');
+  }
   if (Object.hasOwn(request, 'draft')) {
     object(request.draft, ['id', 'revision', 'digest']);
     if (!id(request.draft.id) || !Number.isSafeInteger(request.draft.revision) || request.draft.revision < 0 || request.draft.revision > 40 || !/^[0-9a-f]{64}$/u.test(request.draft.digest) || !['worker', 'tester'].includes(request.context.role)) fail('DRAFT_INVALID');
@@ -48,36 +56,37 @@ export function validateWindowsBrokerRequest(request) {
   relative(request.cwd, true);
   if (!Number.isSafeInteger(request.timeoutMs) || request.timeoutMs < 1 || request.timeoutMs > WINDOWS_PROCESS_LIMITS.lifetimeMs || !Number.isSafeInteger(request.guardianPid) || request.guardianPid < 1) fail('LIMIT_INVALID');
   if (!request.environment || Array.isArray(request.environment) || typeof request.environment !== 'object' || Object.entries(request.environment).some(([key, value]) => !['CI', 'NO_COLOR'].includes(key) || value !== '1')) fail('ENVIRONMENT_INVALID');
-  let files = 0, bytes = 0;
   for (const space of ['workspace', 'assets']) {
     const grant = request.grants[space];
     if (!grant || Array.isArray(grant) || typeof grant !== 'object') fail('GRANT_INVALID');
-    const seen = new Set();
+    const seen = new Set(); let files = 0, bytes = 0;
     for (const [file, value] of Object.entries(grant)) {
-      relative(file); if (!string(value) || seen.has(file.toLowerCase())) fail('GRANT_INVALID');
+      relative(file, false, lsp && space === 'assets'); if (!string(value) || seen.has(file.toLowerCase()) || lsp && space === 'assets' && (!file.startsWith('node_modules/') || !/\.(?:js|json)$/u.test(file))) fail('GRANT_INVALID');
       seen.add(file.toLowerCase()); files++; bytes += Buffer.byteLength(value);
     }
+    if (files > (lsp && space === 'assets' ? 512 : 256) || bytes > (lsp && space === 'assets' ? 2 * 1024 * 1024 : 512 * 1024)) fail('INPUT_LIMIT');
   }
-  if (files > 256 || bytes > 512 * 1024 || Buffer.byteLength(JSON.stringify(request)) > WINDOWS_PROCESS_LIMITS.inputBytes) fail('INPUT_LIMIT');
+  if (!lsp && (Object.keys(request.grants.workspace).length + Object.keys(request.grants.assets).length > 256 || Object.values(request.grants.workspace).concat(Object.values(request.grants.assets)).reduce((n,x)=>n+Buffer.byteLength(x),0)>512*1024)) fail('INPUT_LIMIT');
+  if (Buffer.byteLength(JSON.stringify(request)) > (lsp ? 4 * 1024 * 1024 : WINDOWS_PROCESS_LIMITS.inputBytes)) fail('INPUT_LIMIT');
   return structuredClone(request);
 }
 export function validateWindowsBrokerReceipt(value) {
   object(value, ['version', 'platform', 'backend', 'profile', 'role', 'operation', 'sessionId', 'scopeId', 'tokenVerified', 'jobAttested', 'targetStarted', 'exitCode', 'timedOut', 'cleanup', 'securityFailure']);
   const interrupted = ['CANCELLED', 'SUPERVISOR'].includes(value.securityFailure);
-  if (value.version !== 1 || value.platform !== 'win32' || value.backend !== 'windows-lpac-broker' || ![null, 'REQUEST', 'SCOPE', 'RUNTIME', 'GRANTS', 'LAUNCH', 'EXECUTION', 'DRAFT', 'CLEANUP', 'CANCELLED', 'SUPERVISOR'].includes(value.securityFailure) || !['PASS', 'FAIL'].includes(value.cleanup) || !Number.isInteger(value.exitCode) || value.exitCode < 0 || value.exitCode > 255 || typeof value.timedOut !== 'boolean' || ['tokenVerified', 'jobAttested', 'targetStarted'].some((key) => typeof value[key] !== 'boolean' && !(interrupted && value[key] === null))) fail('RECEIPT_INVALID');
-  if (value.scopeId !== null && !id(value.scopeId) || value.sessionId !== null && !id(value.sessionId) || value.profile !== null && !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, value.profile) || value.role !== null && !Object.hasOwn({ worker: 1, tester: 1, scout: 1, reviewer: 1 }, value.role) || value.operation !== null && !['safe-exec', 'verification'].includes(value.operation)) fail('RECEIPT_INVALID');
+  if (value.version !== 1 || value.platform !== 'win32' || value.backend !== 'windows-lpac-broker' || ![null, 'REQUEST', 'SCOPE', 'RUNTIME', 'GRANTS', 'LAUNCH', 'EXECUTION', 'LSP', 'DRAFT', 'CLEANUP', 'CANCELLED', 'SUPERVISOR'].includes(value.securityFailure) || !['PASS', 'FAIL'].includes(value.cleanup) || !Number.isInteger(value.exitCode) || value.exitCode < 0 || value.exitCode > 255 || typeof value.timedOut !== 'boolean' || ['tokenVerified', 'jobAttested', 'targetStarted'].some((key) => typeof value[key] !== 'boolean' && !(interrupted && value[key] === null))) fail('RECEIPT_INVALID');
+  if (value.scopeId !== null && !id(value.scopeId) || value.sessionId !== null && !id(value.sessionId) || value.profile !== null && !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, value.profile) || value.role !== null && !Object.hasOwn({ worker: 1, tester: 1, scout: 1, reviewer: 1 }, value.role) || value.operation !== null && !['safe-exec', 'verification', 'lsp'].includes(value.operation)) fail('RECEIPT_INVALID');
   if (value.securityFailure === null && (!value.tokenVerified || !value.jobAttested || !value.targetStarted || value.cleanup !== 'PASS' || value.scopeId === null || !profileAllowed(value.role, value.profile)) || value.exitCode === 0 && value.securityFailure !== null || value.timedOut !== (value.exitCode === 124)) fail('RECEIPT_INVALID');
   return Object.freeze({ ...value });
 }
 
-export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}) {
+export async function runWindowsSecureBroker(input, { signal, onAdmission, onTargetStarted } = {}) {
   if (process.platform !== 'win32') fail('PLATFORM_UNSUPPORTED');
   const request = validateWindowsBrokerRequest(input);
   if (request.guardianPid !== process.pid) fail('GUARDIAN_INVALID');
   if (signal?.aborted) fail('CANCELLED');
   const helper = ownedWindowsHelper();
   const child = spawn(helper, ['--lpac-broker'], { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-  let stdout = '', total = 0, admission = null, cancelled = false, overflow = false, emergency = false;
+  let stdout = '', total = 0, admission = null, started = null, cancelled = false, overflow = false, emergency = false;
   const kill = () => { if (child.pid) child.kill('SIGKILL'); };
   const cancel = () => { cancelled = true; kill(); };
   signal?.addEventListener('abort', cancel, { once: true });
@@ -92,6 +101,14 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}
         const first = JSON.parse(stdout.slice(0, stdout.indexOf('\n')));
         if (Object.keys(first).length === 2 && first.kind === 'admitted' && id(first.scopeId)) { admission = first; onAdmission?.(Object.freeze({ ...first })); }
       } catch { /* final strict parsing rejects invalid controller output */ }
+    }
+    if (request.lsp && !started && stdout.split('\n').length >= 3) {
+      try {
+        const value = JSON.parse(stdout.split('\n')[1]);
+        object(value, ['kind','scopeId','childPid','childGeneration']);
+        if (value.kind !== 'lsp-started' || value.scopeId !== admission?.scopeId || !Number.isSafeInteger(value.childPid) || value.childPid < 1 || !/^[0-9]+$/u.test(value.childGeneration)) fail('PROTOCOL_INVALID');
+        started = value; onTargetStarted?.(Object.freeze({...value}));
+      } catch { /* final strict parsing rejects invalid records */ }
     }
   });
   // Native diagnostics never become tool results/receipts. Bounds still apply.
@@ -114,8 +131,8 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}
   }
   try {
     const records = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
-    if (records.length !== (admission ? 2 : 1)) fail('PROTOCOL_INVALID');
-    const result = records.at(-1); object(result, ['kind', 'stdoutBase64', 'stderrBase64', 'receipt', ...(request.draft ? ['draft'] : [])]);
+    if (records.length !== (admission ? 2 : 1) + (started ? 1 : 0) || started && records[1].kind !== 'lsp-started') fail('PROTOCOL_INVALID');
+    const result = records.at(-1); object(result, ['kind', 'stdoutBase64', 'stderrBase64', 'receipt', ...(request.draft ? ['draft'] : []), ...(request.lsp ? ['lsp'] : [])]);
     if (result.kind !== 'result') fail('PROTOCOL_INVALID');
     const receipt = validateWindowsBrokerReceipt(result.receipt);
     if (status !== receipt.exitCode || receipt.scopeId !== (admission?.scopeId ?? null) || ['profile', 'role', 'operation', 'sessionId'].some((key) => receipt[key] !== (key === 'profile' ? request.profile : request.context[key]))) fail('PROTOCOL_INVALID');
@@ -130,6 +147,7 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}
       if (['id', 'revision', 'digest'].some(key => result.draft[key] !== request.draft[key]) || receipt.exitCode === 0 && result.draft.snapshot === null || receipt.exitCode !== 0 && result.draft.snapshot !== null) fail('DRAFT_INVALID');
       if (typeof result.draft.jobEmptyVerified !== 'boolean' || receipt.exitCode === 0 && !result.draft.jobEmptyVerified) fail('DRAFT_INVALID');
     }
-    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt, ...(request.draft ? { draftSnapshot: result.draft.snapshot, jobEmptyVerified: result.draft.jobEmptyVerified } : {}) };
+    if (request.lsp && (receipt.exitCode === 0 && (!result.lsp || result.lsp.path !== request.lsp.path || result.lsp.onWrite !== request.lsp.onWrite || result.lsp.initialized !== true || result.lsp.shutdown !== true || !Array.isArray(result.lsp.diagnostics)) || receipt.exitCode !== 0 && result.lsp !== null)) fail('LSP_INVALID');
+    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt, ...(request.draft ? { draftSnapshot: result.draft.snapshot, jobEmptyVerified: result.draft.jobEmptyVerified } : {}), ...(request.lsp ? { lspResult: result.lsp, ownedTarget: started } : {}) };
   } catch { recovery(); fail('PROTOCOL_INVALID'); }
 }

@@ -37,6 +37,12 @@ jobs:
       - name: Native Windows clean-clone primary/cleanup and ownership controls (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-clone-cleanup.test.mjs
+      - name: Install existing pinned LSP runtime for native same-draft diagnostics
+        if: runner.os == 'Windows'
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Real Windows LSP via governed draft and LPAC broker (no model calls)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-windows-lsp.test.mjs
       - name: Native Windows structured broker fixtures (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-windows-broker.test.mjs
@@ -81,6 +87,15 @@ jobs:
           $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
           $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
           node scripts/phi-worker-pi-smoke.mjs --revocation
+          exit $LASTEXITCODE
+      - name: Real Pi Worker edit to same-draft LSP on-write and semantic_nav (zero external provider calls)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-worker-pi-smoke.mjs --lsp
           exit $LASTEXITCODE
       - name: Scope reminder
         run: node -e "console.log('FOUNDATION ONLY. Windows autonomous engine remains BLOCKED; no live auth or sandbox parity claimed. Full Linux regression is a separate mandatory gate.')"

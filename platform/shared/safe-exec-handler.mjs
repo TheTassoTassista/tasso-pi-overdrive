@@ -20,5 +20,5 @@ export async function executeBrokeredSafeExec(params, ctx, signal, emitMetadata)
     throw error;
   }
   return { content: [{ type: /** @type {"text"} */ ('text'), text: output.trim() || '[exit ' + result.code + ']' }],
-    details: { sandboxed: true, network: false, receipt: result.metadata } };
+    details: { sandboxed: true, network: false, receipt: result.metadata, lspOnWritePaths: result.lspOnWritePaths ?? [] } };
 }

@@ -10,6 +10,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
+using System.Threading;
+using System.Collections.Concurrent;
 using Microsoft.Win32.SafeHandles;
 
 namespace Phi.Native {
@@ -25,11 +27,11 @@ namespace Phi.Native {
       if (result == null || result.Count != keys.Length || keys.Any(k => !result.ContainsKey(k))) throw new InvalidDataException();
       return result;
     }
-    static string Relative(string value, bool allowRoot = false) {
+    static string Relative(string value, bool allowRoot = false, bool scoped = false) {
       if (allowRoot && value == ".") return value;
       if (value.Length < 1 || value.Length > 512 || value.Split('/').Length > 12) throw new InvalidDataException();
       foreach (string part in value.Split('/')) {
-        if (!Regex.IsMatch(part, "\\A[A-Za-z0-9_.-]+\\z") || part == "." || part == ".." || part.EndsWith(".") ||
+            if (!Regex.IsMatch(part, scoped ? "\\A@?[A-Za-z0-9_.-]+\\z" : "\\A[A-Za-z0-9_.-]+\\z") || part == "." || part == ".." || part.EndsWith(".") ||
             Regex.IsMatch(part, "\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)|\\A(?:\\.git|\\.env(?:\\..*)?|\\.ssh|\\.aws|auth\\.json|credentials(?:\\.json)?|id_rsa|id_ed25519)\\z|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase)) throw new InvalidDataException();
       }
       return value.Replace('/', Path.DirectorySeparatorChar);
@@ -90,6 +92,7 @@ namespace Phi.Native {
     internal static int Run(Stream input) {
       AppContainerScope scope = null; OwnedProcess.Capture capture = new OwnedProcess.Capture();
       RecoveryFilesystem draftPins = null; Dictionary<string, object> draft = null; object draftSnapshot = null;
+      Dictionary<string, object> lsp = null; LspSession languageSession = null; object languageResult = null;
       string profile = null, role = null, operation = null, session = null, failure = "REQUEST";
       int code = 70; bool cleanup = true;
       JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = 4 * MaxRequest;
@@ -97,46 +100,61 @@ namespace Phi.Native {
         byte[] bytes;
         using (MemoryStream buffer = new MemoryStream()) {
           int next; while ((next = input.ReadByte()) != 10) {
-            if (next < 0 || buffer.Length >= MaxRequest) throw new InvalidDataException(); buffer.WriteByte((byte)next);
+            if (next < 0 || buffer.Length >= 4 * MaxRequest) throw new InvalidDataException(); buffer.WriteByte((byte)next);
           }
           bytes = buffer.ToArray();
         }
         object parsed = serializer.DeserializeObject(new UTF8Encoding(false, true).GetString(bytes));
         var raw = parsed as Dictionary<string, object>;
         bool hasDraft = raw != null && raw.ContainsKey("draft");
+        bool hasLsp = raw != null && raw.ContainsKey("lsp");
         string[] keys = new string[] { "version", "executable", "argv", "cwd", "environment", "profile", "grants", "network", "timeoutMs", "guardianPid", "context" };
-        Dictionary<string, object> request = Object(parsed, hasDraft ? keys.Concat(new string[] { "draft" }).ToArray() : keys);
+        if (hasDraft) keys = keys.Concat(new string[] { "draft" }).ToArray();
+        if (hasLsp) keys = keys.Concat(new string[] { "lsp" }).ToArray();
+        Dictionary<string, object> request = Object(parsed, keys);
+        if (!hasLsp && bytes.Length > MaxRequest) throw new InvalidDataException();
         if (!(request["version"] is int) || (int)request["version"] != 1 || Text(request["network"]) != "DENY") throw new InvalidDataException();
         Dictionary<string, object> context = Object(request["context"], "sessionId", "operation", "role");
         session = Text(context["sessionId"]); operation = Text(context["operation"]); role = Text(context["role"]); profile = Text(request["profile"]);
         if (!Regex.IsMatch(session, "\\A[0-9a-f]{32}\\z")) throw new InvalidDataException();
         string intended = role == "worker" ? "EDIT" : role == "tester" ? "TEST" : role == "reviewer" || role == "scout" ? "READ_ONLY" : null;
-        bool profileAllowed = role == "worker" ? new string[] { "EDIT", "TEST", "READ_ONLY" }.Contains(profile) : profile == intended;
-        if (!profileAllowed || intended == null || (operation != "safe-exec" && operation != "verification") || (operation == "verification" && role != "tester")) throw new InvalidDataException();
+        bool profileAllowed = role == "worker" ? new string[] { "EDIT", "TEST", "READ_ONLY", "LSP_READ_ONLY" }.Contains(profile) : profile == intended;
+        if (!profileAllowed || intended == null || (operation != "safe-exec" && operation != "verification" && operation != "lsp") || (operation == "verification" && role != "tester") || hasLsp != (operation == "lsp") || hasLsp != (profile == "LSP_READ_ONLY")) throw new InvalidDataException();
+        if (hasLsp) {
+          lsp = Object(request["lsp"], "path", "onWrite");
+          Relative(Text(lsp["path"]));
+          if (!hasDraft || role != "worker" || !Text(lsp["path"]).EndsWith(".json", StringComparison.Ordinal) || !(lsp["onWrite"] is bool)) throw new InvalidDataException();
+        }
         if (hasDraft) {
           draft = Object(request["draft"], "id", "revision", "digest");
           if (!Regex.IsMatch(Text(draft["id"]), "\\A[0-9a-f]{32}\\z") || !(draft["revision"] is int) || (int)draft["revision"] < 0 || (int)draft["revision"] > 40 || !Regex.IsMatch(Text(draft["digest"]), "\\A[0-9a-f]{64}\\z") || (role != "worker" && role != "tester")) throw new InvalidDataException();
         }
         IList argv = request["argv"] as IList;
         if (argv == null || argv.Count > 128 || argv.Cast<object>().Any(v => Text(v).Length > 4096)) throw new InvalidDataException();
+        if (hasLsp && !argv.Cast<object>().Select(Text).SequenceEqual(new string[] { "--no-addons", "--no-global-search-paths", "--preserve-symlinks-main", "--preserve-symlinks", "../assets/node_modules/vscode-langservers-extracted/lib/json-language-server/node/jsonServerMain.js", "--stdio" })) throw new InvalidDataException();
         string cwd = Relative(Text(request["cwd"]), true);
+        if (hasLsp && cwd != ".") throw new InvalidDataException();
         if (!(request["timeoutMs"] is int) || (int)request["timeoutMs"] < 1 || (int)request["timeoutMs"] > 120000 || !(request["guardianPid"] is int) || (int)request["guardianPid"] < 1) throw new InvalidDataException();
         Dictionary<string, object> environment = request["environment"] as Dictionary<string, object>;
         if (environment == null || environment.Count > 2 || environment.Any(p => (p.Key != "CI" && p.Key != "NO_COLOR") || Text(p.Value) != "1")) throw new InvalidDataException();
         Dictionary<string, object> grants = Object(request["grants"], "workspace", "assets");
         var collections = new Dictionary<string, Dictionary<string, string>>(); int totalBytes = 0, totalFiles = 0;
         foreach (string space in new string[] { "workspace", "assets" }) {
+          int spaceBytes = 0, spaceFiles = 0;
           Dictionary<string, object> files = grants[space] as Dictionary<string, object>;
           if (files == null) throw new InvalidDataException();
           var validated = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
           foreach (var file in files) {
-            string name = Relative(file.Key), value = Text(file.Value);
+            string name = Relative(file.Key, false, hasLsp && space == "assets"), value = Text(file.Value);
+            if (hasLsp && space == "assets" && (!file.Key.StartsWith("node_modules/", StringComparison.Ordinal) || !Regex.IsMatch(file.Key, "\\.(?:js|json)\\z"))) throw new InvalidDataException();
             totalBytes += Encoding.UTF8.GetByteCount(value); totalFiles++;
-            if (totalBytes > 512 * 1024 || totalFiles > 256 || validated.ContainsKey(name)) throw new InvalidDataException();
+            spaceBytes += Encoding.UTF8.GetByteCount(value); spaceFiles++;
+            if (spaceBytes > (hasLsp && space == "assets" ? 2 * MaxRequest : 512 * 1024) || spaceFiles > (hasLsp && space == "assets" ? 512 : 256) || !hasLsp && (totalBytes > 512 * 1024 || totalFiles > 256) || validated.ContainsKey(name)) throw new InvalidDataException();
             validated.Add(name, value);
           }
           collections.Add(space, validated);
         }
+        if (hasLsp && !collections["workspace"].ContainsKey(Relative(Text(lsp["path"])))) throw new InvalidDataException();
         Dictionary<string, object> executable = Object(request["executable"], "path", "sha256");
         failure = "SCOPE"; scope = new AppContainerScope();
         Console.WriteLine(serializer.Serialize(new { kind = "admitted", scopeId = scope.Id })); Console.Out.Flush();
@@ -166,9 +184,19 @@ namespace Phi.Native {
         // Pin the actual workspace and all ancestors BEFORE the untrusted
         // target starts; readback cannot be redirected to a replacement path.
         if (draft != null) draftPins = new RecoveryFilesystem(workspace);
-        using (MemoryStream pipe = new MemoryStream(Encoding.UTF8.GetBytes(serializer.Serialize(launch) + "\n"))) code = OwnedProcess.Execute(pipe, scope, capture);
+        if (hasLsp) {
+          languageSession = new LspSession(serializer.Serialize(launch) + "\n", workspace, Text(lsp["path"]), collections["workspace"][Relative(Text(lsp["path"]))], (bool)lsp["onWrite"]);
+          capture.OnOutput = languageSession.Consume; capture.OnStarted = delegate() {
+            Console.WriteLine(serializer.Serialize(new { kind = "lsp-started", scopeId = scope.Id, childPid = capture.ChildPid, childGeneration = capture.ChildGeneration })); Console.Out.Flush();
+            languageSession.Start();
+          };
+          code = OwnedProcess.Execute(languageSession, scope, capture);
+          languageSession.Stop();
+          if (code == 0 && languageSession.Result == null) { code = 70; failure = "LSP"; }
+          if (code == 0) languageResult = languageSession.Result;
+        } else using (MemoryStream pipe = new MemoryStream(Encoding.UTF8.GetBytes(serializer.Serialize(launch) + "\n"))) code = OwnedProcess.Execute(pipe, scope, capture);
         if (!scope.TokenVerified || !capture.JobAttested || !capture.Started || !capture.Drained) code = 70;
-        failure = code == 70 ? "EXECUTION" : null;
+        failure = code == 70 ? failure == "LSP" ? "LSP" : "EXECUTION" : null;
         if (draft != null && code == 0) {
           failure = "DRAFT";
           if (!capture.JobEmptyVerified) throw new InvalidDataException();
@@ -182,10 +210,12 @@ namespace Phi.Native {
         if (failure == "REQUEST") { profile = null; role = null; operation = null; session = null; }
       }
       finally {
+        if (languageSession != null) languageSession.Dispose();
         if (draftPins != null) draftPins.Dispose();
         if (scope != null) cleanup = scope.FinishBroker();
         if (!cleanup) { code = 70; failure = "CLEANUP"; }
         if (code != 0) draftSnapshot = null;
+        if (code != 0) languageResult = null;
       }
       // Child stdout/stderr never share the control channel: no forged receipt.
       // Tool output is an artifact, explicitly separate from metadata receipt.
@@ -194,8 +224,105 @@ namespace Phi.Native {
         { "receipt", new { version = 1, platform = "win32", backend = "windows-lpac-broker", profile, role, operation, sessionId = session, scopeId = scope == null ? null : scope.Id, tokenVerified = scope != null && scope.TokenVerified, jobAttested = capture.JobAttested, targetStarted = capture.Started, exitCode = code, timedOut = code == 124, cleanup = cleanup ? "PASS" : "FAIL", securityFailure = failure } }
       };
       if (draft != null) result.Add("draft", new { id = draft["id"], revision = draft["revision"], digest = draft["digest"], snapshot = draftSnapshot, jobEmptyVerified = capture.JobEmptyVerified });
+      if (lsp != null) result.Add("lsp", languageResult);
       Console.WriteLine(serializer.Serialize(result));
       capture.Overflow.Dispose(); return code;
+    }
+
+    // Trusted finite protocol driver. It talks through the three inherited
+    // anonymous handles: the LPAC target never spawns an unconfined helper or
+    // opens a host named pipe. No model-selected LSP methods or host paths.
+    sealed class LspSession : Stream {
+      readonly BlockingCollection<byte[]> input = new BlockingCollection<byte[]>();
+      readonly object gate = new object();
+      readonly Dictionary<int, Dictionary<string, object>> responses = new Dictionary<int, Dictionary<string, object>>();
+      readonly JavaScriptSerializer serializer = new JavaScriptSerializer { MaxJsonLength = 2 * MaxRequest };
+      readonly string workspace, relative, text; readonly bool onWrite;
+      byte[] current, received = new byte[0]; int offset, serial = 10;
+      Thread controller; volatile bool stopped;
+      internal object Result;
+      internal LspSession(string launch, string workspace, string relative, string text, bool onWrite) {
+        current = Encoding.UTF8.GetBytes(launch); this.workspace = workspace; this.relative = relative; this.text = text; this.onWrite = onWrite;
+      }
+      void Send(object message) {
+        byte[] body; lock (gate) body = Encoding.UTF8.GetBytes(serializer.Serialize(message));
+        byte[] header = Encoding.ASCII.GetBytes("Content-Length: " + body.Length + "\r\n\r\n");
+        input.Add(header.Concat(body).ToArray());
+      }
+      object Request(string method, object parameters) {
+        int id = ++serial; Send(new { jsonrpc = "2.0", id, method, @params = parameters });
+        var deadline = System.Diagnostics.Stopwatch.StartNew(); int budget = method == "shutdown" ? 2000 : 8000;
+        lock (gate) {
+          while (!responses.ContainsKey(id)) {
+            if (stopped || deadline.ElapsedMilliseconds >= budget) throw new InvalidDataException();
+            Monitor.Wait(gate, 100);
+          }
+          var response = responses[id]; responses.Remove(id);
+          if (response.ContainsKey("error") || !response.ContainsKey("result")) throw new InvalidDataException();
+          return response["result"];
+        }
+      }
+      void Notify(string method, object parameters) { Send(new { jsonrpc = "2.0", method, @params = parameters }); }
+      internal void Start() {
+        controller = new Thread(delegate() {
+          try {
+            string rootUri = new Uri(workspace + Path.DirectorySeparatorChar).AbsoluteUri;
+            string uri = new Uri(Path.Combine(workspace, Relative(relative))).AbsoluteUri;
+            var initialized = Request("initialize", new { processId = (object)null, rootUri, capabilities = new { textDocument = new { diagnostic = new { dynamicRegistration = false } }, workspace = new { configuration = true } }, initializationOptions = new { handledSchemaProtocols = new string[] { "file" }, provideFormatter = false } }) as Dictionary<string, object>;
+            if (initialized == null || !initialized.ContainsKey("capabilities")) throw new InvalidDataException();
+            Notify("initialized", new { });
+            Notify("workspace/didChangeConfiguration", new { settings = new { json = new { validate = new { enable = true }, schemaDownload = new { enable = false }, schemas = new object[0] } } });
+            Notify("textDocument/didOpen", new { textDocument = new { uri, languageId = "json", version = 1, text } });
+            if (onWrite) Notify("textDocument/didChange", new { textDocument = new { uri, version = 2 }, contentChanges = new[] { new { text } } });
+            var report = Request("textDocument/diagnostic", new { textDocument = new { uri } }) as Dictionary<string, object>;
+            if (report == null || !report.ContainsKey("kind") || Text(report["kind"]) != "full" || !(report["items"] is IList)) throw new InvalidDataException();
+            var diagnostics = report["items"];
+            Request("shutdown", null); Notify("exit", null);
+            Result = new { path = relative, onWrite, initialized = true, shutdown = true, diagnostics };
+            input.CompleteAdding();
+          } catch { input.CompleteAdding(); }
+        }); controller.IsBackground = true; controller.Start();
+      }
+      internal void Consume(byte[] bytes, int count) {
+        lock (gate) {
+          received = received.Concat(bytes.Take(count)).ToArray();
+          if (received.Length > 2 * MaxRequest) throw new InvalidDataException();
+          while (true) {
+            int end = -1; for (int i = 0; i + 3 < received.Length; i++) if (received[i] == 13 && received[i+1] == 10 && received[i+2] == 13 && received[i+3] == 10) { end = i; break; }
+            if (end < 0) { if (received.Length > 8192) throw new InvalidDataException(); return; }
+            string header = Encoding.ASCII.GetString(received, 0, end);
+            var length = Regex.Match(header, "\\AContent-Length: ([0-9]{1,7})(?:\\r\\nContent-Type: [^\\r\\n]+)?\\z", RegexOptions.IgnoreCase);
+            int size; if (!length.Success || !Int32.TryParse(length.Groups[1].Value, out size) || size < 1 || size > MaxRequest) throw new InvalidDataException();
+            if (received.Length < end + 4 + size) return;
+            var message = serializer.DeserializeObject(new UTF8Encoding(false, true).GetString(received, end + 4, size)) as Dictionary<string, object>;
+            received = received.Skip(end + 4 + size).ToArray();
+            if (message == null || !message.ContainsKey("jsonrpc") || Text(message["jsonrpc"]) != "2.0") throw new InvalidDataException();
+            if (message.ContainsKey("id") && message.ContainsKey("method")) {
+              string method = Text(message["method"]);
+              if (method == "workspace/configuration") {
+                var parameters = message.ContainsKey("params") ? message["params"] as Dictionary<string, object> : null;
+                var items = parameters != null && parameters.ContainsKey("items") ? parameters["items"] as IList : null;
+                if (items == null || items.Count > 32) throw new InvalidDataException();
+                Send(new { jsonrpc = "2.0", id = message["id"], result = items.Cast<object>().Select(item => (object)new { validate = new { enable = true }, schemaDownload = new { enable = false }, schemas = new object[0] }).ToArray() });
+              } else Send(new { jsonrpc = "2.0", id = message["id"], error = new { code = -32601, message = "Unsupported controller request" } });
+            } else if (message.ContainsKey("id")) {
+              if (!(message["id"] is int) || responses.Count >= 16) throw new InvalidDataException();
+              int id = (int)message["id"]; if (id < 11 || id > serial || responses.ContainsKey(id)) throw new InvalidDataException();
+              responses.Add(id, message); Monitor.PulseAll(gate);
+            }
+          }
+        }
+      }
+      internal void Stop() { stopped = true; lock (gate) Monitor.PulseAll(gate); input.CompleteAdding(); if (controller != null && !controller.Join(1000)) Result = null; }
+      public override int Read(byte[] buffer, int start, int count) {
+        if (count == 0) return 0;
+        while (current == null || offset == current.Length) { if (!input.TryTake(out current, Timeout.Infinite)) return 0; offset = 0; }
+        int length = Math.Min(count, current.Length - offset); Array.Copy(current, offset, buffer, start, length); offset += length; return length;
+      }
+      protected override void Dispose(bool disposing) { Stop(); base.Dispose(disposing); }
+      public override bool CanRead { get { return true; } } public override bool CanSeek { get { return false; } } public override bool CanWrite { get { return false; } }
+      public override long Length { get { throw new NotSupportedException(); } } public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+      public override void Flush() { } public override long Seek(long n, SeekOrigin origin) { throw new NotSupportedException(); } public override void SetLength(long n) { throw new NotSupportedException(); } public override void Write(byte[] b, int o, int n) { throw new NotSupportedException(); }
     }
   }
 }

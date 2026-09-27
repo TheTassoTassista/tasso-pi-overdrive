@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current checkpoint — B2 COMPLETE (governed Node subsystem)
+## Current candidate — C production Windows LSP IN_PROGRESS
+
+B2 bookkeeping5c18b35 is synchronized and reuses exact functional8324189/native36319986645 evidence below, no repeated B1/B2 certification. C candidate wires actual semantic_nav/JSON-on-write to governed persistent Worker draft and the native broker, real pinned JSON language server, LSP_READ_ONLY LPAC/Job, bidirectional inherited stdio and finite shutdown. Workspace remains read-only/networkDENY, no home/ancestor/network capability. Native tests and actual Pi foreground factory proof are mandatory, candidate not yet native verified. Existing lock/runtime reused without new packages; [implementation/security scope](phi-windows-lsp.md). D NOT_STARTED; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS;0live model/provider calls. Current Linux/native validation and next action recorded in phi-progress.md; protected/auth/stable configuration unchanged.
+
+## Verified checkpoint — B2 COMPLETE (governed Node subsystem)
 
 Verified functional local/remote **8324189f538753616cddf251253e1c0970139287**, branch `feature/routing-presets-quality`, [CI36319986645](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36319986645) SUCCESS. Windows201/192PASS/0FAIL/9Linux-only skips; Ubuntu201/98PASS/0FAIL/103Windows-only skips; Worker16/16PASS/0FAIL/0skip; complete local Linux734/631PASS/0FAIL/103native skips plus syntax/installed-Pi TypeScript/package validation PASS. Both independent clones PASS_FOUNDATION_ONLY and cleanupPASS; Windows1 attempt/553ms/9 owned validation Jobs empty/drained/residual0; Ubuntu29ms, native process counter unavailable. Whole clone Doctor still FAIL/fullEngine BLOCKED_NOT_INSTALLED. Documentation-only delivery reuses the exact functional proof, not a new CI claim on its later hash.
 

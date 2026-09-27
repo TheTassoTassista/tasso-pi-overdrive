@@ -2,7 +2,13 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current verified checkpoint — B2 COMPLETE (governed Node subsystem)
+## Current candidate — C real Windows LSP IN_PROGRESS, native proof pending
+
+B2 checkpoint finished as documentation-only5c18b35, local/remote synchronized; exact B2 functional/native proof remains8324189 / CI36319986645 below. C now implements actual semantic_nav + safe_exec JSON-on-write production dispatch against the same B2 draft, opaque governor LSP authority, fixed LSP_READ_ONLY/networkDENY profile and finite bidirectional real JSON LSP session through inherited native handles. No fixture-only diagnostics or unrestricted client proxy. Runtime uses existing pinned vscode-langservers-extracted4.10.0 dependency closure; narrow read-only assets are separate from unchanged workspace limits. Mandatory native real-server and actual Pi foreground on-write controls added, not certified from Linux. [Architecture, limits and tests](phi-windows-lsp.md). Native candidate CI pending; D NOT_STARTED; WINDOWS AUTONOMY BLOCKED;0external model/provider calls. Exact next action: complete Linux candidate gate, push coherent candidate on existing private branch, inspect mandatory C/real-Pi/both-clone results; fix only reproduced defects, mark C COMPLETE only if all required native proofs green.
+
+C candidate pre-push Linux gate742total/635PASS/0FAIL/107native skips; syntax/installed-Pi TypeScript/package validation PASS. Focused LSP/governor/broker/legacy-boundary regressions passed locally; native skips are not Windows credit. Interactive native stdin flushes each chunk before waiting for a response (generic B1/B2 copy path unchanged), so buffered writes cannot falsely stall the finite protocol. No new provider calls, no publication/autonomy change. Native proof is still required on the candidate commit, including the actual Pi on-write path and independent clone reconstruction.
+
+## Verified checkpoint — B2 COMPLETE (governed Node subsystem)
 
 Functional local/remote `8324189f538753616cddf251253e1c0970139287`, branch `feature/routing-presets-quality`; [native CI36319986645](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36319986645) SUCCESS on Windows and Ubuntu, including both independent clones. Windows201/192PASS/0FAIL/9Linux-only skips; Ubuntu201/98PASS/0FAIL/103Windows-only skips. All16 Worker controls PASS with no skips; all13 individual/sequential recovery cases retained. Complete Linux734/631PASS/0FAIL/103native skips, syntax/installed-Pi TypeScript/package-secret validation PASS. This exact functional proof is reused for the documentation-only checkpoint, not claimed as CI on its later delivery hash.
 

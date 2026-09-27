@@ -82,7 +82,8 @@ export async function executeWindowsCodingTool(input, context) {
   const result = await runSnapshot(input, context, intent, snapshot, worker);
   if (!worker) return result;
   const finished = worker.finish(result.draftSnapshot, result.code === 0);
-  return finishDraftResult(result, worker, finished);
+  return { ...finishDraftResult(result, worker, finished), lspOnWritePaths: result.code === 0 && !finished.cancelled && worker.profile === 'EDIT'
+    ? Object.keys(result.draftSnapshot.files).filter(file => file.endsWith('.json') && result.draftSnapshot.files[file] !== snapshot.files[file]) : [] };
   } finally { worker?.release(); }
 }
 
