@@ -79,6 +79,13 @@ export function validateWindowsBrokerReceipt(value) {
   return Object.freeze({ ...value });
 }
 
+// Only the trusted helper's separate stderr channel may supply this marker.
+// Never parse untrusted target stderr (which is encoded in the result record).
+export function nativeBrokerFailureMarker(text) {
+  if (typeof text !== 'string' || text.length > 1024) return null;
+  return text.split(/\r?\n/u).find(line => /^PHI_NATIVE_PROCESS_(?:FAILED:[0-9]{1,10}|INVALID_OR_CLEANUP_FAILED):(?:REQUEST|JOB|STDIO|ATTRIBUTES|CREATE|ATTEST|RESUME|CLEANUP)$/u.test(line)) ?? null;
+}
+
 export async function runWindowsSecureBroker(input, { signal, onAdmission, onTargetStarted } = {}) {
   if (process.platform !== 'win32') fail('PLATFORM_UNSUPPORTED');
   const request = validateWindowsBrokerRequest(input);
@@ -87,6 +94,7 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission, onTar
   const helper = ownedWindowsHelper();
   const child = spawn(helper, ['--lpac-broker'], { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   let stdout = '', total = 0, admission = null, started = null, cancelled = false, overflow = false, emergency = false;
+  let nativeDiagnostics = '';
   const kill = () => { if (child.pid) child.kill('SIGKILL'); };
   const cancel = () => { cancelled = true; kill(); };
   signal?.addEventListener('abort', cancel, { once: true });
@@ -111,8 +119,9 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission, onTar
       } catch { /* final strict parsing rejects invalid records */ }
     }
   });
-  // Native diagnostics never become tool results/receipts. Bounds still apply.
-  child.stderr.on('data', (chunk) => { total += chunk.length; if (total > 4 * 1024 * 1024) { overflow = true; kill(); } });
+  // Retain at most 1 KiB solely for fixed phase/code extraction; raw native
+  // diagnostics never become tool output or receipts. Existing bound unchanged.
+  child.stderr.on('data', (chunk) => { total += chunk.length; nativeDiagnostics += chunk.toString('utf8').slice(0, Math.max(0, 1025-nativeDiagnostics.length)); if (total > 4 * 1024 * 1024) { overflow = true; kill(); } });
   child.stdin.on('error', () => {}); child.stdin.end(`${JSON.stringify(request)}\n`);
   let status;
   try { status = await new Promise((resolve, reject) => { child.once('error', () => reject(new Error('PHI_WINDOWS_BROKER_SPAWN_FAILED'))); child.once('close', resolve); }); }
@@ -127,7 +136,7 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission, onTar
   if (cancelled || emergency || overflow || status === null) {
     const cleaned = recovery();
     const receipt = validateWindowsBrokerReceipt({ version: 1, platform: 'win32', backend: 'windows-lpac-broker', profile: request.profile, ...request.context, scopeId: admission?.scopeId ?? null, tokenVerified: null, jobAttested: null, targetStarted: null, exitCode: cancelled ? 125 : 70, timedOut: false, cleanup: cleaned ? 'PASS' : 'FAIL', securityFailure: cancelled ? 'CANCELLED' : 'SUPERVISOR' });
-    return { code: receipt.exitCode, stdout: '', stderr: '', receipt };
+    return { code: receipt.exitCode, stdout: '', stderr: '', receipt, nativeFailure: nativeBrokerFailureMarker(nativeDiagnostics) };
   }
   try {
     const records = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
@@ -148,6 +157,6 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission, onTar
       if (typeof result.draft.jobEmptyVerified !== 'boolean' || receipt.exitCode === 0 && !result.draft.jobEmptyVerified) fail('DRAFT_INVALID');
     }
     if (request.lsp && (receipt.exitCode === 0 && (!result.lsp || result.lsp.path !== request.lsp.path || result.lsp.onWrite !== request.lsp.onWrite || result.lsp.initialized !== true || result.lsp.shutdown !== true || !Array.isArray(result.lsp.diagnostics)) || receipt.exitCode !== 0 && result.lsp !== null)) fail('LSP_INVALID');
-    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt, ...(request.draft ? { draftSnapshot: result.draft.snapshot, jobEmptyVerified: result.draft.jobEmptyVerified } : {}), ...(request.lsp ? { lspResult: result.lsp, ownedTarget: started } : {}) };
+    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt, nativeFailure: nativeBrokerFailureMarker(nativeDiagnostics), ...(request.draft ? { draftSnapshot: result.draft.snapshot, jobEmptyVerified: result.draft.jobEmptyVerified } : {}), ...(request.lsp ? { lspResult: result.lsp, ownedTarget: started } : {}) };
   } catch { recovery(); fail('PROTOCOL_INVALID'); }
 }

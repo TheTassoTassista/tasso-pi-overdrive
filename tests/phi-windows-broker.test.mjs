@@ -6,12 +6,17 @@ import os from 'node:os';
 import net from 'node:net';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { validateWindowsBrokerRequest, validateWindowsBrokerReceipt, runWindowsSecureBroker, windowsNodeToolArguments, WINDOWS_CAPABILITY_PROFILES } from '../platform/windows/secure-broker.mjs';
+import { validateWindowsBrokerRequest, validateWindowsBrokerReceipt, runWindowsSecureBroker, windowsNodeToolArguments, WINDOWS_CAPABILITY_PROFILES, nativeBrokerFailureMarker } from '../platform/windows/secure-broker.mjs';
 import { ownedWindowsHelper } from '../platform/windows/process.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 30000 };
 const sessionId = '123456789012345678901234567890ab';
+test('native failure diagnostics expose only exact whitelisted code/phase, not prose or private values',()=>{
+  assert.equal(nativeBrokerFailureMarker('PHI_NATIVE_PROCESS_FAILED:5:CREATE\r\n'),'PHI_NATIVE_PROCESS_FAILED:5:CREATE');
+  assert.equal(nativeBrokerFailureMarker('PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:CLEANUP\n'),'PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:CLEANUP');
+  for(const text of ['private: PHI_NATIVE_PROCESS_FAILED:5:CREATE','PHI_NATIVE_PROCESS_FAILED:5:PRIVATE_SENTINEL','PHI_NATIVE_PROCESS_FAILED:5:CREATE private','PHI_NATIVE_PROCESS_FAILED:12345678901:CREATE','x'.repeat(1025),null])assert.equal(nativeBrokerFailureMarker(text),null);
+});
 let executable;
 function request(role = 'tester', script = 'process.exit(0)', options = {}) {
   executable ??= process.platform === 'win32' ? { path: process.execPath, sha256: createHash('sha256').update(fs.readFileSync(process.execPath)).digest('hex') } : { path: 'C:\\tools\\node.exe', sha256: 'a'.repeat(64) };

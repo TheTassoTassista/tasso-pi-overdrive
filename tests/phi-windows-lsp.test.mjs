@@ -91,6 +91,11 @@ test('native LSP timeout, real target crash and broker death retain failure and 
     const request=brokerRequest({'config.json':'{}'},mode==='timeout'?{timeoutMs:30}:{});
     const abort=new AbortController();
     const result=await runWindowsSecureBroker(request,{signal:abort.signal,onTargetStarted:row=>{target=row;if(mode==='crash'){process.kill(row.childPid,'SIGKILL');crashIssued=true;}if(mode==='broker')abort.abort();}});
+    // Never print server stdout/stderr, paths or draft contents. Preserve only
+    // the native owner's fixed failure code/phase so 70 cannot masquerade as
+    // timeout proof or discard the reason when the same control fails in-suite.
+    const nativeFailure=result.nativeFailure??null;
+    console.log(JSON.stringify({control:'LSP_FAILURE',mode,code:result.code,receipt:result.receipt,jobEmptyVerified:result.jobEmptyVerified,targetObserved:Boolean(target),crashIssued,nativeFailure}));
     assert.notEqual(result.code,0);assert.equal(result.receipt.cleanup,'PASS');assert.equal(result.lspResult??null,null);
     if(mode==='timeout')assert.equal(result.code,124);
     if(mode==='broker')assert.equal(result.code,125);
