@@ -175,9 +175,9 @@ namespace Phi.Native {
     }
     internal static int AtomicCreateSelfTest(string name) {
       string[] phases = { "before-temp", "temp", "write", "flush", "validation", "precommit", "rename", "postverify" };
-      string[] controls = { "create", "existing", "case-alias", "concurrent-create", "junction", "protected", "ads", "root-identity" };
+      string[] controls = { "create", "existing", "case-alias", "concurrent-create", "junction", "protected", "ads", "root-identity", "foreign-handle", "parent-pinned" };
       if (!phases.Contains(name) && !controls.Contains(name)) return 70;
-      ScopeRecovery scope = null; bool passed = false, clean = true, committed = false, denied = false, injected = false;
+      ScopeRecovery scope = null; bool passed = false, clean = true, committed = false, denied = false, injected = false, parentSwapDenied = false;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root), directory = Path.Combine(scope.Root, "src");
@@ -187,25 +187,35 @@ namespace Phi.Native {
         if (name == "existing" || name == "case-alias") File.WriteAllText(target, "synthetic-user");
         if (name == "junction") { Directory.Move(directory, directory + "-old"); AppContainerScope.CreateOwnedJunction(directory, unrelated); }
         try {
+          if (name == "foreign-handle") {
+            using (RecoveryFilesystem parent = new RecoveryFilesystem(directory))
+            using (AnchoredFile foreign = new AnchoredFile(scope.Root, rootId, "unrelated/sentinel.txt")) parent.RenameNewFile(foreign.handle, "fixture.txt");
+            throw new InvalidOperationException();
+          }
           string relative = name == "case-alias" ? "src/FIXTURE.TXT" : name == "protected" ? ".env" : name == "ads" ? "src/fixture.txt:stream" : "src/fixture.txt";
           CreateNoReplace(scope.Root, name == "root-identity" ? new String('a', 16) + ":" + new String('b', 32) : rootId, relative, Encoding.UTF8.GetBytes("synthetic-complete-new"), delegate(string phase) {
             if (phase == "precommit" && name == "concurrent-create") File.WriteAllText(target, "synthetic-user");
+            if (phase == "precommit" && name == "parent-pinned") {
+              try { Directory.Move(directory, directory + "-moved"); }
+              catch (IOException error) { int nativeError = error.HResult & 0xffff; if (nativeError != 32 && nativeError != 33) throw; parentSwapDenied = true; }
+              if (!parentSwapDenied) throw new InvalidOperationException();
+            }
             if (phase == "rename") committed = true;
             if (phase == name) { injected = true; throw new IOException("PHI_INJECTED_ATOMIC_CREATE_FAILURE"); }
           });
-        } catch (InvalidDataException) { if (name != "junction" && name != "protected" && name != "ads" && name != "root-identity") throw; denied = true; }
+        } catch (InvalidDataException) { if (name != "junction" && name != "protected" && name != "ads" && name != "root-identity" && name != "foreign-handle") throw; denied = true; }
           catch (Win32Exception error) { if ((name != "existing" && name != "case-alias" && name != "concurrent-create") || (error.NativeErrorCode != 80 && error.NativeErrorCode != 183)) throw; denied = true; }
           catch (IOException) { if (!injected) throw; denied = true; }
         bool user = name == "existing" || name == "case-alias" || name == "concurrent-create";
-        bool expectedDenied = name != "create";
-        if (denied != expectedDenied || injected != phases.Contains(name) || File.ReadAllText(Path.Combine(unrelated, "sentinel.txt")) != "synthetic-unrelated") throw new InvalidDataException();
+        bool expectedDenied = name != "create" && name != "parent-pinned";
+        if (denied != expectedDenied || injected != phases.Contains(name) || parentSwapDenied != (name == "parent-pinned") || File.ReadAllText(Path.Combine(unrelated, "sentinel.txt")) != "synthetic-unrelated") throw new InvalidDataException();
         if (user) { if (File.ReadAllText(target) != "synthetic-user") throw new InvalidDataException(); }
         else if (committed || name == "create") { if (File.ReadAllText(target) != "synthetic-complete-new") throw new InvalidDataException(); }
         else if (File.Exists(target)) throw new InvalidDataException();
         passed = true;
       } catch (Exception error) { RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_ATOMIC_CREATE_SELFTEST_FAILED"); }
       finally { try { if (scope != null) { scope.CleanupFiles(); scope.Complete(true); } } catch { clean = false; if (scope != null) scope.Dispose(); Console.Error.WriteLine("PHI_ATOMIC_CREATE_CLEANUP_FAILED"); } }
-      Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, committed, denied, injected, fixtureCleanup = clean, scope = "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION" }));
+      Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, committed, denied, injected, parentSwapDenied, fixtureCleanup = clean, scope = "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION" }));
       return passed && clean ? 0 : 70;
     }
   }

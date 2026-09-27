@@ -212,7 +212,7 @@ test('native concurrent user edit and identical-text delete/recreate both CONFLI
 });
 
 const atomicCases = ['create', 'existing', 'case-alias', 'concurrent-create', 'junction', 'protected', 'ads', 'root-identity',
-  'before-temp', 'temp', 'write', 'flush', 'validation', 'precommit', 'rename', 'postverify'];
+  'foreign-handle', 'parent-pinned', 'before-temp', 'temp', 'write', 'flush', 'validation', 'precommit', 'rename', 'postverify'];
 for (const name of atomicCases) test('native no-clobber atomic CREATE primitive: ' + name, native, () => {
   const result = spawnSync(ownedWindowsHelper(), ['--atomic-create-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
   assert.equal(result.status, 0, result.stderr); const receipt = JSON.parse(result.stdout);

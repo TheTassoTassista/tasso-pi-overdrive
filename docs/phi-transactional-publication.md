@@ -75,8 +75,10 @@ The separate `CreateNoReplace` primitive pins root and every parent, checks the
 original root ID and protected segments, creates an exclusive random temp via
 handle-relative NtCreateFile/FILE_CREATE on that same filesystem, writes complete
 bytes, flushes, validates native ID/single-link/content hash, then performs
-NtSetInformationFile/FileRenameInformation with a held parent directory handle,
-one destination leaf and ReplaceIfExists=false. It post-verifies the same held
+NtSetInformationFile/FileRenameInformation with RootDirectory=NULL and one leaf:
+the documented same-directory rename relative to the exclusively held source
+file object. Only a handle created by that exact parent instance, with matching
+native ID, may be renamed. Parents remain pinned and ReplaceIfExists=false. It post-verifies the same held
 file before closing. Kernel no-clobber is the destination concurrency check:
 existing/case-alias/newly-created user targets are never overwritten. No delete
 of a target or path reopen for a write is permitted. New files inherit parent
@@ -87,6 +89,8 @@ ScopeRecovery fixtures and is **not** exposed as a model-facing publication
 endpoint. Exception-injection tests cover before-temp/temp/write/flush/validation/
 precommit/rename/postverify and check absent-or-complete-new target, unchanged user
 target, unchanged unrelated sentinel, explicit injected phase and fixture cleanup.
+Additional controls reject a foreign source handle and prove the parent cannot
+be renamed while the valid same-directory CREATE proceeds.
 Unexpected native/IO failures cannot masquerade as successful injection. These
 are exception/namespace primitive controls, not process-termination recovery or
 power-loss durability proof. A pre-commit failure may leave an owned temp until
@@ -103,6 +107,19 @@ is not evidence that replacement can commit. Neither a repeated path check nor
 an unconditional POSIX rename closes that gap. A replacement design must prove
 anchoring, destination identity at commit and old-complete/new-complete under
 actual native process death. No unsafe substitute is enabled to make D green.
+
+Initial native candidate7bc020b/CI36337120221 proved preflight/CONFLICT and all
+pre-rename injection/alias-denial controls, but six rename-dependent CREATE
+controls failed with RENAME_NEW/c0000043/32. That version explicitly supplied the
+same pinned parent as RootDirectory. Microsoft's API defines NULL/one leaf for
+same-directory rename; explicitly supplying RootDirectory involves a new target
+directory open. The next candidate uses that documented NULL/leaf operation and
+binds its source handle to the exact exclusive-create parent/ID. No directory or
+file sharing/access rights are increased, no pin is released, no collision is
+accepted as success and no assertion is relaxed. Native confirmation is required.
+The same failed aggregate also cancelled one existing Worker least-privilege
+control at its unchanged30000ms test budget; underlying phase/cause UNKNOWN.
+Its dedicated step passed. No timeout extension or retrospective fix claim.
 
 ## Operation policy and remaining D work
 

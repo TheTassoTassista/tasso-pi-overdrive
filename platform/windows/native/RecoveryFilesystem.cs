@@ -34,6 +34,7 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetFileInformationByHandle(IntPtr file, int type, ref Disposition info, uint size);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
+    readonly Dictionary<IntPtr, string> publicationFiles = new Dictionary<IntPtr, string>();
     readonly string directoryPath;
     internal static volatile int TransientDeleteRetries;
     internal static volatile int TransientOpenRetries;
@@ -136,24 +137,34 @@ namespace Phi.Native {
     internal IntPtr CreateExclusiveFile(string leaf, out Info info) {
       // FILE_CREATE, never OPEN_IF/OVERWRITE. Parent and temp handles remain
       // pinned, no sharing, no reparse traversal, DELETE only for handle rename.
-      return OpenRelative(parents[parents.Count - 1], leaf, 0x13019f, 0, 2, 0x40, IntPtr.Zero, out info);
+      IntPtr file = OpenRelative(parents[parents.Count - 1], leaf, 0x13019f, 0, 2, 0x40, IntPtr.Zero, out info);
+      try { publicationFiles.Add(file, HandleIdentity(file)); return file; }
+      catch { CloseHandle(file); throw; }
     }
     internal void RenameNewFile(IntPtr file, string destination) {
       Leaf(destination);
       IntPtr parent = parents[parents.Count - 1]; Info info;
+      string sourceIdentity;
+      if (!publicationFiles.TryGetValue(file, out sourceIdentity) || HandleIdentity(file) != sourceIdentity) throw new InvalidDataException();
       if (!GetFileInformationByHandle(parent, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || IntPtr.Size != 8) throw new InvalidDataException();
-      // Native FILE_RENAME_INFORMATION, x64 layout: BOOLEAN at 0, held root
-      // directory at 8, byte length at 16, UTF16 leaf at 20. ReplaceIfExists=0:
-      // the kernel refuses an existing destination, including a case alias.
+      // This exact source was exclusively created under this held parent.
+      // RootDirectory=NULL plus one leaf is Windows' SAME-DIRECTORY rename,
+      // relative to the source file object, not a reopened DOS pathname. Giving
+      // the same parent as RootDirectory asks IopOpenLinkOrRenameTarget for a
+      // new FILE_WRITE_DATA directory open and conflicts with our pinned share
+      // modes (native c0000043/32). Do not broaden sharing or release pins.
+      // x64 layout: BOOLEAN=0, RootDirectory=8, byte length=16, UTF16 leaf=20.
+      // ReplaceIfExists=0; existing destinations, including case aliases, deny.
       byte[] name = Encoding.Unicode.GetBytes(destination);
       int length = checked(24 + name.Length); IntPtr buffer = Marshal.AllocHGlobal(length);
       try {
         Marshal.Copy(new byte[length], 0, buffer, length);
-        Marshal.WriteIntPtr(buffer, 8, parent); Marshal.WriteInt32(buffer, 16, name.Length);
+        Marshal.WriteInt32(buffer, 16, name.Length);
         Marshal.Copy(name, 0, IntPtr.Add(buffer, 20), name.Length);
         IoStatus status; int result = NtSetInformationFile(file, out status, buffer, (uint)length, 10);
         if (result != 0) { int error = (int)RtlNtStatusToDosError(result); Failure("RENAME_NEW", parent, destination, 0, 0, 0, result, error); throw new Win32Exception(error); }
+        publicationFiles.Remove(file);
       } finally { Marshal.FreeHGlobal(buffer); }
     }
     // Read-only controller extraction. Every component is opened from a held

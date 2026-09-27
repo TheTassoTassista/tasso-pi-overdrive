@@ -34,6 +34,9 @@ jobs:
       - name: Native Linux foundation bootstrap
         if: runner.os == 'Linux'
         run: sh bootstrap/linux.sh
+      - name: Native Windows no-clobber CREATE primitive (not project publication)
+        if: runner.os == 'Windows'
+        run: node --test --test-name-pattern="native no-clobber" tests/phi-publication.test.mjs
       - name: Native Windows clean-clone primary/cleanup and ownership controls (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-clone-cleanup.test.mjs
