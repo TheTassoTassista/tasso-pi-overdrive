@@ -265,7 +265,7 @@ test('native partial failed command and subsequent revocation preserve prior dra
 test('native unsafe draft readback cannot silently omit protected files or accept alias output', native, async () => {
   const item = fixture({ ...persistentFiles(),
     'protected.cjs': "require('node:fs').writeFileSync('.env','not-a-credential');",
-    'alias.cjs': "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'edited');try{f.linkSync('input.txt','alias.txt');}catch(e){a.equal(f.statSync('input.txt').nlink,1);a.equal(f.existsSync('alias.txt'),false);const expected=['EPERM','EACCES','UNKNOWN'].includes(e.code);console.error('PHI_DRAFT_ALIAS_'+(expected?e.code:'UNEXPECTED'));process.exit(expected?1:91);}",
+    'alias.cjs': "const f=require('node:fs'),p=require('node:path'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'edited');try{f.linkSync(p.join(process.cwd(),'input.txt'),p.join(process.cwd(),'alias.txt'));}catch(e){a.equal(f.statSync('input.txt').nlink,1);a.equal(f.existsSync('alias.txt'),false);console.error('PHI_DRAFT_ALIAS_DIAGNOSTIC:'+JSON.stringify({code:typeof e.code==='string'&&/^[A-Z_]{1,30}$/.test(e.code)?e.code:'INVALID',errno:Number.isInteger(e.errno)?e.errno:null}));process.exit(['EPERM','EACCES'].includes(e.code)?1:91);}",
     'binary.cjs': "require('node:fs').writeFileSync('invalid.txt',Buffer.from([255]));",
   });
   // Real ordinary-host positive control, not a mock denial. Restore single-link
@@ -280,19 +280,22 @@ test('native unsafe draft readback cannot silently omit protected files or accep
     const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx);
     for (const script of ['protected.cjs', 'alias.cjs', 'binary.cjs']) {
       await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: [script] }, attempt.ctx), error => {
-        // LPAC may deny or not support hardlink creation before readback.
-        // UNKNOWN is NOT a permission-denial proof. Arbitrary failure fails.
+        const marker = /PHI_DRAFT_ALIAS_DIAGNOSTIC:(\{[^\r\n]*\})/u.exec(error.message);
+        const diagnostic = marker ? JSON.parse(marker[1]) : null;
+        console.log(JSON.stringify({ control: script === 'alias.cjs' ? 'ALIAS_OUTPUT' : script === 'protected.cjs' ? 'PROTECTED_OUTPUT' : 'NON_UTF8_OUTPUT',
+          diagnostic, receipt: error.receipt })); // before asserting: no lost failure code
+        // Only exact permission errors prove a kernel denial. Unsupported or
+        // other errors remain FAIL with their bounded diagnostic preserved.
         const aliasUnavailable = script === 'alias.cjs' && error.receipt.exitCode === 1;
-        const unsupportedAlias = aliasUnavailable && /PHI_DRAFT_ALIAS_UNKNOWN\b/u.test(error.message);
         if (aliasUnavailable) {
-          assert.match(error.message, /PHI_DRAFT_ALIAS_(?:EPERM|EACCES|UNKNOWN)\b/u);
+          assert.ok(['EPERM', 'EACCES'].includes(diagnostic?.code));
           assert.equal(error.receipt.securityFailure, null);
         } else { assert.equal(error.receipt.exitCode, 70); assert.equal(error.receipt.securityFailure, 'DRAFT'); }
         assert.equal(error.receipt.tokenVerified, true); assert.equal(error.receipt.targetStarted, true);
         assert.equal(error.receipt.jobEmptyVerified, true); assert.equal(error.receipt.cleanup, 'PASS');
         assert.deepEqual(error.receipt.draft, edit.details.receipt.draft);
         console.log(JSON.stringify({ control: script === 'alias.cjs' ? 'ALIAS_OUTPUT' : script === 'protected.cjs' ? 'PROTECTED_OUTPUT' : 'NON_UTF8_OUTPUT',
-          rejection: unsupportedAlias ? 'LPAC_ALIAS_UNSUPPORTED_NOT_PERMISSION_PROOF' : aliasUnavailable ? 'ACTUAL_KERNEL_DENIAL' : 'ANCHORED_READBACK_DENIAL',
+          rejection: aliasUnavailable ? 'ACTUAL_KERNEL_DENIAL' : 'ANCHORED_READBACK_DENIAL',
           ordinaryHostLinkSucceeded: true, receipt: error.receipt })); return true;
       });
     }
