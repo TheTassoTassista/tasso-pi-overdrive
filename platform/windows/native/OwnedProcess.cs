@@ -108,17 +108,40 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--recovery-selftest") return ScopeRecovery.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
+      if (args.Length == 1 && args[0] == "--lpac-broker" && IntPtr.Size == 8) return ExecutionBroker.Run(Console.OpenStandardInput());
       // API capability checks below fail closed on pre-Windows-10 systems.
       // Unmanifested .NET Framework OSVersion can report a legacy version.
       if (args.Length != 0 || IntPtr.Size != 8) return 70;
       return Execute(Console.OpenStandardInput(), null);
     }
-    // Only the fixed native probe can supply confinement. No model/tool input
-    // can request a full-trust fallback from this entry point.
-    internal static int Execute(Stream input, AppContainerScope scope) {
+    // Fixed probes and the structured broker supply confinement. Neither can
+    // request a full-trust fallback; bare ownership remains a separate API.
+    internal sealed class Capture {
+      internal readonly MemoryStream Output = new MemoryStream(), Error = new MemoryStream();
+      internal readonly EventWaitHandle Overflow = new EventWaitHandle(false, EventResetMode.ManualReset);
+      internal bool JobAttested, Started, Drained;
+      int bytes;
+      internal Thread Drain(IntPtr handle, MemoryStream destination) {
+        Thread thread = new Thread(delegate() {
+          try {
+            using (FileStream pipe = new FileStream(new SafeFileHandle(handle, true), FileAccess.Read)) {
+              byte[] block = new byte[8192]; int count;
+              while ((count = pipe.Read(block, 0, block.Length)) != 0) {
+                if (Interlocked.Add(ref bytes, count) > 2 * 1024 * 1024) { Overflow.Set(); break; }
+                destination.Write(block, 0, count);
+              }
+            }
+          } catch { Overflow.Set(); }
+        });
+        thread.IsBackground = true; thread.Start(); return thread;
+      }
+    }
+    internal static int Execute(Stream input, AppContainerScope scope, Capture capture = null) {
       IntPtr job = IntPtr.Zero, list = IntPtr.Zero, jobs = IntPtr.Zero, handles = IntPtr.Zero, environment = IntPtr.Zero;
       IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, output = IntPtr.Zero, error = IntPtr.Zero;
       IntPtr guardian = IntPtr.Zero;
+      IntPtr outputRead = IntPtr.Zero, errorRead = IntPtr.Zero;
+      Thread outputThread = null, errorThread = null;
       ProcessInfo child = new ProcessInfo(); bool listReady = false;
       string phase = "REQUEST";
       try {
@@ -165,8 +188,17 @@ namespace Phi.Native {
         Check(CreatePipe(out inputRead, out inputWrite, ref security, 0));
         Check(SetHandleInformation(inputWrite, 1, 0));
         IntPtr self = GetCurrentProcess();
-        Check(DuplicateHandle(self, GetStdHandle(-11), self, out output, 0, true, 2));
-        Check(DuplicateHandle(self, GetStdHandle(-12), self, out error, 0, true, 2));
+        if (capture == null) {
+          Check(DuplicateHandle(self, GetStdHandle(-11), self, out output, 0, true, 2));
+          Check(DuplicateHandle(self, GetStdHandle(-12), self, out error, 0, true, 2));
+        } else {
+          Check(CreatePipe(out outputRead, out output, ref security, 0));
+          Check(SetHandleInformation(outputRead, 1, 0));
+          Check(CreatePipe(out errorRead, out error, ref security, 0));
+          Check(SetHandleInformation(errorRead, 1, 0));
+          outputThread = capture.Drain(outputRead, capture.Output); outputRead = IntPtr.Zero;
+          errorThread = capture.Drain(errorRead, capture.Error); errorRead = IntPtr.Zero;
+        }
         phase = "ATTRIBUTES";
         IntPtr size = IntPtr.Zero;
         int attributeCount = scope == null ? 2 : scope.AttributeCount;
@@ -187,6 +219,7 @@ namespace Phi.Native {
         phase = "ATTEST";
         bool inside; Check(IsProcessInJob(child.Process, job, out inside)); if (!inside) throw new InvalidDataException();
         if (scope != null) scope.VerifyToken(child.Process);
+        if (capture != null) capture.JobAttested = true;
         Close(ref inputRead); Close(ref output); Close(ref error);
         SafeFileHandle writeHandle = new SafeFileHandle(inputWrite, true); inputWrite = IntPtr.Zero;
         Thread copy = new Thread(delegate() {
@@ -196,7 +229,10 @@ namespace Phi.Native {
         }); copy.IsBackground = true; copy.Start();
         phase = "RESUME";
         if (ResumeThread(child.Thread) == UInt32.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
-        uint waited = WaitForMultipleObjects(2, new IntPtr[] { child.Process, guardian }, false, (uint)timeout);
+        if (capture != null) capture.Started = true;
+        IntPtr[] waitHandles = capture == null ? new IntPtr[] { child.Process, guardian } : new IntPtr[] { child.Process, guardian, capture.Overflow.SafeWaitHandle.DangerousGetHandle() };
+        uint waited = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, (uint)timeout);
+        if (capture != null && waited == 2) throw new InvalidDataException();
         if (waited != 0 && waited != 1 && waited != 258) throw new Win32Exception(Marshal.GetLastWin32Error());
         uint code = waited == 1 ? 125U : 124U;
         if (waited == 0) Check(GetExitCodeProcess(child.Process, out code));
@@ -206,6 +242,10 @@ namespace Phi.Native {
         Stopwatch deadline = Stopwatch.StartNew();
         while (!EmptyJob(job)) { if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException(); Thread.Sleep(10); }
         writeHandle.Dispose();
+        if (capture != null) {
+          if (!outputThread.Join(5000) || !errorThread.Join(5000) || capture.Overflow.WaitOne(0)) throw new InvalidDataException();
+          capture.Drained = true;
+        }
         return code <= 255 ? (int)code : 1;
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
         catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:" + phase); return 70; }
@@ -221,6 +261,10 @@ namespace Phi.Native {
         // Closing the non-inherited last Job handle kills owned children even on exception.
         Close(ref job); Close(ref child.Thread); Close(ref child.Process); Close(ref guardian);
         Close(ref inputRead); Close(ref inputWrite); Close(ref output); Close(ref error);
+        Close(ref outputRead); Close(ref errorRead);
+        if (capture != null && !capture.Drained) {
+          capture.Drained = (outputThread == null || outputThread.Join(5000)) && (errorThread == null || errorThread.Join(5000));
+        }
         if (listReady) DeleteProcThreadAttributeList(list);
         foreach (IntPtr pointer in new IntPtr[] { list, jobs, handles, environment }) if (pointer != IntPtr.Zero) Marshal.FreeHGlobal(pointer);
       }

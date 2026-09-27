@@ -159,6 +159,7 @@ namespace Phi.Native {
     }
     internal void CleanupFiles() { using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) pins.DeleteOwnedTree(Root, (string)record["rootIdentity"]); }
     internal void RegistryCreated() { record["registry"] = true; Save(); }
+    internal void RegistryRemoved() { record["registry"] = false; Save(); }
     internal void Ready() { record["ready"] = true; Save(); }
     internal void Complete(bool clean) {
       if (clean) using (RegistryKey root = OpenBase()) { root.DeleteSubKeyTree(Id); if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException(); }

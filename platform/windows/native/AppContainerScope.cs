@@ -1,5 +1,5 @@
-// Experimental confinement primitive. NOT registered as an agent tool/backend.
-// The sole callable operation is a fixed synthetic probe on owned fresh data.
+// Shared LPAC scope for fixed probes and structured broker execution.
+// This does not enable the Windows autonomous engine.
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -56,7 +56,46 @@ namespace Phi.Native {
     internal bool TokenVerified { get; private set; }
     string privateRegistry;
     string protectedDirectory, readOnlyAsset;
+    string lpacCanary;
+    bool broker;
+    bool brokerRegistryOwned;
     uint guardianPid;
+    internal string Root { get { return recovery.Root; } }
+    internal string Id { get { return recovery.Id; } }
+    internal void CreateBrokerRoot() { broker = true; recovery.CreateRoot(); }
+    internal void PrepareBrokerAttestation(int guardian, string runtime) {
+      guardianPid = (uint)guardian;
+      protectedDirectory = Path.Combine(Root, "private"); Directory.CreateDirectory(protectedDirectory);
+      SetDirectoryAuthority(protectedDirectory, false, false);
+      File.WriteAllText(Path.Combine(protectedDirectory, "control.txt"), "private-broker-control");
+      readOnlyAsset = Path.Combine(runtime, "read-only.txt"); File.WriteAllText(readOnlyAsset, "private-broker-control");
+      lpacCanary = Path.Combine(runtime, "all-packages.txt"); File.WriteAllText(lpacCanary, "private-broker-control");
+      FileSecurity acl = new FileSecurity(); acl.SetAccessRuleProtection(true, false);
+      acl.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User, FileSystemRights.FullControl, AccessControlType.Allow));
+      acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-15-2-1"), FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+      acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, AccessControlType.Allow));
+      File.SetAccessControl(lpacCanary, acl);
+      RegistrySecurity registryAcl = new RegistrySecurity(); registryAcl.SetAccessRuleProtection(true, false);
+      registryAcl.SetOwner(WindowsIdentity.GetCurrent().User);
+      registryAcl.AddAccessRule(new RegistryAccessRule(WindowsIdentity.GetCurrent().User, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
+      using (RegistryKey key = Registry.CurrentUser.CreateSubKey(recovery.FixtureRegistry, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, registryAcl)) key.SetValue("Control", 1);
+      recovery.RegistryCreated(); brokerRegistryOwned = true; privateRegistry = WindowsIdentity.GetCurrent().User.Value + "\\" + recovery.FixtureRegistry;
+      recovery.Ready();
+    }
+    internal bool FinishBroker() {
+      bool clean = true;
+      try { Dispose(); } catch { clean = false; }
+      try { recovery.CleanupFiles(); } catch (Exception error) { RecoveryFilesystem.LogFailure(error); clean = false; }
+      try {
+        if (brokerRegistryOwned) {
+          using (RegistryKey key = Registry.CurrentUser.OpenSubKey(recovery.FixtureRegistry))
+            if (key != null && !WindowsIdentity.GetCurrent().User.Equals(key.GetAccessControl().GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
+          Registry.CurrentUser.DeleteSubKeyTree(recovery.FixtureRegistry, false); recovery.RegistryRemoved();
+        }
+      } catch { clean = false; }
+      try { recovery.Complete(clean); } catch { clean = false; }
+      return clean;
+    }
     internal AppContainerScope() {
       recovery = ScopeRecovery.Begin();
       profile = recovery.Profile;
@@ -137,6 +176,14 @@ namespace Phi.Native {
         bool registryRead = publicResult == 0, privateDenied = privateResult == 5, hostHandleDenied = hostProcess == IntPtr.Zero && processError == 5;
         bool protectedDaclDenied = WriteDaclDenied(protectedDirectory, true), runtimeDaclDenied = WriteDaclDenied(readOnlyAsset, false);
         if (!registryRead || !privateDenied || journalResult != 5 || !hostHandleDenied || !protectedDaclDenied || !runtimeDaclDenied) throw new InvalidDataException();
+        if (broker) {
+          // Test the actual child's token against an AAP-only canary before
+          // resume; no ordinary-AppContainer execution path for broker code.
+          IntPtr canary = CreateFileW(lpacCanary, 0x80000000, 1, IntPtr.Zero, 3, 0x200000, IntPtr.Zero);
+          int denied = Marshal.GetLastWin32Error();
+          if (canary != new IntPtr(-1)) { CloseHandle(canary); throw new InvalidDataException(); }
+          if (denied != 5) throw new InvalidDataException();
+        }
       } finally {
         if (publicKey != IntPtr.Zero) RegCloseKey(publicKey);
         if (privateKey != IntPtr.Zero) RegCloseKey(privateKey);
@@ -145,7 +192,7 @@ namespace Phi.Native {
         if (impersonating && !RevertToSelf()) Environment.FailFast("PHI_APPCONTAINER_REVERT_FAILED");
         if (duplicate != IntPtr.Zero) CloseHandle(duplicate);
       }
-      Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"journalRegistryDenied\":true,\"hostHandleDuplicationDenied\":true,\"protectedDaclChangeDenied\":true,\"runtimeDaclChangeDenied\":true}");
+      if (!broker) Console.WriteLine("{\"registryReadAvailable\":true,\"privateRegistryDenied\":true,\"journalRegistryDenied\":true,\"hostHandleDuplicationDenied\":true,\"protectedDaclChangeDenied\":true,\"runtimeDaclChangeDenied\":true}");
     }
     static bool WriteDaclDenied(string file, bool directory) {
       // Opening WRITE_DAC is enough to test the owner-rights escape without

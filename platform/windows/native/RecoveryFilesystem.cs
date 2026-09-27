@@ -126,6 +126,10 @@ namespace Phi.Native {
     internal IntPtr OpenFile(string leaf, out Info info) {
       return OpenRelative(parents[parents.Count - 1], leaf, 0x12019f, 0, 1, 0x40, IntPtr.Zero, out info);
     }
+    internal IntPtr OpenReadFile(string leaf, out Info info) {
+      // Broker runtime snapshot: read only, no write/delete sharing, no reparse.
+      return OpenRelative(parents[parents.Count - 1], leaf, 0x81, 1, 1, 0x40, IntPtr.Zero, out info);
+    }
     internal static string HandleIdentity(IntPtr handle) {
       Identity identity;
       if (!GetFileInformationByHandleEx(handle, 18, out identity, (uint)Marshal.SizeOf(typeof(Identity)))) throw new Win32Exception(Marshal.GetLastWin32Error());

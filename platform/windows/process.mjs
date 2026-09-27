@@ -22,6 +22,7 @@ export function ownedWindowsHelper() {
     if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 1024 * 1024) throw new Error('PHI_NATIVE_PROCESS_BUILD_REQUIRED');
   }
   const record = JSON.parse(fs.readFileSync(manifest, 'utf8').replace(/^\uFEFF/u, ''));
+  if (record.brokerSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'ExecutionBroker.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.anchoredFileSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'AnchoredFile.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.recoverySourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'ScopeRecovery.cs')) || record.recoveryFilesystemSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'RecoveryFilesystem.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'OwnedProcess.cs')) || record.confinementSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'AppContainerScope.cs')) || record.binarySha256 !== digest(binary)) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');

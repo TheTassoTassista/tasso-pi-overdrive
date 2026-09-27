@@ -2,6 +2,16 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## Checkpoint 12 candidate — generic non-interactive LPAC broker
+
+Resumed exact 7b9126bb740b0673919c29238233d453b34a59b2. Only protected pre-existing user edit dirty; hashes/auth unchanged. No completed recovery work redone. Execution surface mapped in phi-windows-broker.md, including shared dispatch and independent Git/browser/editor/controller paths.
+
+Structured generic broker implemented using existing LPAC/Job/recovery, independent native schema validation, role-bound READ_ONLY/EDIT/TEST profiles, explicit bounded snapshots (no host ACL grants), handle-pinned/hash-checked executable snapshot, scrubbed environment, pre-resume token/denial checks, output/control separation and metadata-only receipts. Cancellation/crash reuses the same owned-scope recovery; unknown proofs remain null. No Windows readiness switch, direct Pi/tool fallback or Linux backend change.
+
+Candidate complete Linux gate: **680 total / 601 PASS / 0 FAIL / 79 Windows-only skips**; syntax, installed-Pi TypeScript, package/pinned-policy/secret validation PASS. Initial local fixture ID/drive-path validation defects were corrected and gate rerun; no claims based on the failed run. New native tests are mandatory on real Windows, not counted from these skips. **Native broker validation PENDING** until matching hosted run and independent clone pass. Existing127 Windows cases retained, not skipped/removed.
+
+Exact next step: inspect native compilation/broker tests and fix only observed deterministic defects; finish boundary A before integrating safe_exec/verification transport (B), real streaming LSP (C) and transactions (D). This candidate has no host edit publication/streaming/generic Node fork pipe certificate. WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN PROGRESS. Zero provider/model calls, protected document never staged.
+
 Latest verified native recovery/filesystem checkpoint: `94c6b4d3e36c3ac2ad4ba800e42d359f82815acb`, native CI 36279000733 SUCCESS; full Linux 597 PASS / 0 FAIL / 70 native-Windows skips; native Windows 127 PASS / 0 FAIL / 7 Linux-only skips. See checkpoint 11 at the end for the authoritative continuation point. Older pending/next entries below are historical, not instructions to redo completed work.
 
 Current continuation: functional `94c6b4d`, checkpoint 11 below; Linux **597 PASS / 0 FAIL / 70 skips**, real native CI **36279000733 SUCCESS (127 Windows PASS / 0 FAIL / 7 skips)**, both independent source clones PASS_FOUNDATION_ONLY. Recovery lifetime regression fixed with real native controls; Windows autonomy still BLOCKED. Checkpoint 10 failures remain historical evidence, not the current result.
