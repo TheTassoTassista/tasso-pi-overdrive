@@ -66,7 +66,13 @@ function diagnostic(result) {
   const known = ['EPERM', 'EACCES', 'ENOENT', 'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ERR_ACCESS_DENIED', 'ERR_UNKNOWN_BUILTIN_MODULE', 'ERR_INVALID_ARG_VALUE'];
   const codes = known.filter((code) => new RegExp('\\b' + code + '\\b', 'u').test(result.stderr ?? ''));
   const operations = ['lstat', 'realpath', 'open', 'read'].filter((op) => new RegExp('\\b' + op + '\\b', 'u').test(result.stderr ?? ''));
-  return JSON.stringify({ receipt: result.receipt, codes, operations });
+  let task = null;
+  try {
+    const match = /PHI_BROKER_TASK_DIAGNOSTIC:(\{[^\r\n]+\})/u.exec(result.stderr ?? '');
+    const value = match ? JSON.parse(match[1]) : null;
+    if (value && Object.keys(value).length === 4 && ['INPUT', 'STDIN', 'DENIALS', 'SCRATCH', 'NETWORK', 'MARKER'].includes(value.phase) && [null, 'ENOENT', 'EPERM', 'EACCES'].includes(value.errorCode) && typeof value.tempMatches === 'boolean' && typeof value.cwdMatches === 'boolean') task = value;
+  } catch {}
+  return JSON.stringify({ receipt: result.receipt, codes, operations, task });
 }
 test('native broker independently rejects invalid requests before any target starts', native, () => {
   for (const patch of [{ profile: 'EDIT' }, { environment: { NODE_OPTIONS: 'NEVER_EMIT_PRIVATE_SENTINEL' } }, { cwd: '../escape' }, { profile: 'NEVER_EMIT_PRIVATE_SENTINEL' }, { context: { role: 'NEVER_EMIT_PRIVATE_SENTINEL', sessionId, operation: 'safe-exec' } }]) {
@@ -109,7 +115,9 @@ for (const role of ['reviewer', 'worker', 'tester']) {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     const args = ['', 'Φ 日本語', 'quote"slash\\', '%PATH% & | > ;'];
     const script = `const fs=require('node:fs'),path=require('node:path'),net=require('node:net');
-const checks={read:fs.readFileSync('input.txt','utf8')==='input',args:process.argv.slice(2),input:fs.readFileSync(0,'utf8')==='',cleanEnv:!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|NODE_OPTIONS/i.test(k))};
+let phase='INPUT';process.on('uncaughtException',e=>{console.error('PHI_BROKER_TASK_DIAGNOSTIC:'+JSON.stringify({phase,errorCode:['ENOENT','EPERM','EACCES'].includes(e.code)?e.code:null,tempMatches:process.env.TEMP===path.join(path.dirname(path.dirname(process.execPath)),'scratch'),cwdMatches:path.basename(process.cwd())==='workspace'}));process.exit(1);});
+const checks={read:fs.readFileSync('input.txt','utf8')==='input',args:process.argv.slice(2),cleanEnv:!Object.keys(process.env).some(k=>/TOKEN|SECRET|AUTH|API_KEY|NODE_OPTIONS/i.test(k))};
+phase='STDIN';checks.input=fs.readFileSync(0,'utf8')==='';phase='DENIALS';
 function deny(k,fn){try{fn();checks[k]=false;}catch(e){checks[k]=['EACCES','EPERM'].includes(e.code);}}
 const root=path.dirname(process.cwd());
 deny('privateRead',()=>fs.readFileSync(path.join(root,'private','control.txt')));
@@ -118,7 +126,7 @@ deny('runtimeWrite',()=>fs.writeFileSync(process.execPath,'x'));
 deny('aapRead',()=>fs.readFileSync(path.join(root,'runtime','all-packages.txt')));
 deny('extendedRead',()=>fs.readFileSync(path.toNamespacedPath(path.join(root,'private','control.txt'))));
 try{fs.writeFileSync('edit.txt','changed');checks.write=true;}catch(e){checks.write=false;checks.writeDenied=['EACCES','EPERM'].includes(e.code);}
-fs.writeFileSync(path.join(process.env.TEMP,'temp.txt'),'allowed');checks.tempWrite=true;
+phase='SCRATCH';fs.writeFileSync(path.join(process.env.TEMP,'temp.txt'),'allowed');checks.tempWrite=true;phase='NETWORK';
 console.error('ERROR required diagnostic');const socket=net.connect({host:'127.0.0.1',port:${server.address().port}});socket.setTimeout(1500);
 let done=false;function finish(denied){if(done)return;done=true;checks.networkDenied=denied;socket.destroy();console.log(JSON.stringify(checks));process.exit(0);}
 socket.on('connect',()=>finish(false));socket.on('error',e=>finish(['EACCES','EPERM'].includes(e.code)));socket.on('timeout',()=>finish(false));`;
@@ -163,7 +171,7 @@ function alive(pid) { try { process.kill(pid, 0); return true; } catch (error) {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function gone(pids) { const end = Date.now() + 5000; while (pids.some(alive) && Date.now() < end) await delay(20); assert.deepEqual(pids.filter(alive), []); }
 function treeScript(exit) {
-  return `const fs=require('node:fs'),{spawn}=require('node:child_process');const child=spawn(process.execPath,['--no-addons','-e','setInterval(()=>{},1000)'],{stdio:'inherit',detached:true});child.on('error',()=>process.exit(91));const pids=[process.pid,child.pid];fs.writeFileSync(process.env.TEMP+'/pids.json',JSON.stringify(pids));console.log(JSON.stringify(pids));${exit ? 'setTimeout(()=>process.exit(7),200);' : 'setInterval(()=>{},1000);'}`;
+  return `const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');process.on('uncaughtException',e=>{console.error('PHI_BROKER_TASK_DIAGNOSTIC:'+JSON.stringify({phase:'MARKER',errorCode:['ENOENT','EPERM','EACCES'].includes(e.code)?e.code:null,tempMatches:process.env.TEMP===path.join(path.dirname(path.dirname(process.execPath)),'scratch'),cwdMatches:path.basename(process.cwd())==='workspace'}));process.exit(1);});const child=spawn(process.execPath,['--no-addons','-e','setInterval(()=>{},1000)'],{stdio:'inherit',detached:true});child.on('error',()=>process.exit(91));const pids=[process.pid,child.pid];fs.writeFileSync(process.env.TEMP+'/pids.json',JSON.stringify(pids));console.log(JSON.stringify(pids));${exit ? 'setTimeout(()=>process.exit(7),200);' : 'setInterval(()=>{},1000);'}`;
 }
 test('native generic broker normal completion and timeout kill inherited-token descendants', native, async () => {
   for (const exit of [true, false]) {
