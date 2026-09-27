@@ -14,6 +14,8 @@ import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { reserveWindowsWorker, registerWindowsWorkerBoundary, windowsWorkerAuthority } from '../lib/phi-worker-authority.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+if (process.argv.slice(2).some(argument => argument !== '--revocation')) throw new Error('PHI_WORKER_TEST_USAGE');
+const revokedControl = process.argv.includes('--revocation');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
 const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.homedir(), '.pi', 'agent', 'npm', 'node_modules', 'pi-subagents');
 if (!runtimeRoot) throw new Error('PHI_WORKER_TEST_PI_REQUIRED');
@@ -78,14 +80,18 @@ try {
       apiKey: 'offline-fixture-not-a-credential', models: [{ id: 'worker', name: 'Offline Worker fixture', reasoning: false,
         input: ['text'], contextWindow: 32768, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
       streamSimple: (model, context) => {
-        assert.ok(windowsWorkerAuthority(sessionId)); turns++;
+        if (!revokedControl) assert.ok(windowsWorkerAuthority(sessionId));
+        else if (turns === 0) reservation.revoke();
+        turns++;
         const stream = ai.createAssistantMessageEventStream();
         const result = context.messages.find(message => message.role === 'toolResult');
-        const nativeTool = process.platform === 'win32' && !result;
-        const message = { role: 'assistant', content: nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool', name: 'safe_exec', arguments: { program: 'node', args: ['run.cjs'] } }]
+        const nativeTool = process.platform === 'win32' && !result && !revokedControl;
+        const revokedWrite = revokedControl && !result;
+        const message = { role: 'assistant', content: revokedWrite ? [{ type: 'toolCall', id: 'revoked-host-write', name: 'write', arguments: { path: 'input.txt', content: 'unauthorized-host-edit' } }]
+          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool', name: 'safe_exec', arguments: { program: 'node', args: ['run.cjs'] } }]
           : [{ type: 'text', text: 'SNAPSHOT_ONLY_NO_PROJECT_PUBLICATION' }], api: model.api, provider: model.provider, model: model.id,
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-          stopReason: nativeTool ? 'toolUse' : 'stop', timestamp: Date.now() };
+          stopReason: nativeTool || revokedWrite ? 'toolUse' : 'stop', timestamp: Date.now() };
         queueMicrotask(() => { stream.push({ type: 'start', partial: message }); stream.push({ type: 'done', reason: message.stopReason, message }); stream.end(); });
         return stream;
       },
@@ -95,7 +101,7 @@ try {
   // depth/tool-budget hooks and session. Only model output is deterministic.
   const worker = { name: 'worker', description: 'Bounded Worker transport', source: 'runtime', filePath: path.join(root, 'agents/worker.md'),
     acceptanceRole: 'writer', completionGuard: true, systemPromptMode: 'replace', inheritGlobalContext: false,
-    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: process.platform === 'win32' ? ['safe_exec'] : [],
+    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: revokedControl ? ['write'] : process.platform === 'win32' ? ['safe_exec'] : [],
     model: 'phi-worker-local/worker', thinking: 'off', systemPrompt: 'Deterministic Worker transport validation. Snapshot only.',
     subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts')] : [],
   };
@@ -114,9 +120,14 @@ try {
   assert.ok(sessionId); assert.notEqual(sessionId, parentSessionId);
   assert.equal(foregroundResult.exitCode, 0, foregroundResult.error);
   assert.deepEqual(errors, []); assert.equal(boundEvents, 1);
-  assert.equal(turns, process.platform === 'win32' ? 2 : 1);
+  assert.equal(turns, revokedControl || process.platform === 'win32' ? 2 : 1);
   assert.equal(child.messages.at(-1).stopReason, 'stop');
-  if (process.platform === 'win32') {
+  if (revokedControl) {
+    const result = child.messages.find(message => message.role === 'toolResult');
+    assert.equal(result.isError, true, 'revoked Worker must not run a host write even when its tool is present');
+    assert.match(result.content[0].text, /PHI_WORKER_TOOL_DENIED|PHI_WORKER_AUTHORITY_UNAVAILABLE/u);
+    assert.deepEqual(receipts, []);
+  } else if (process.platform === 'win32') {
     assert.equal(receipts.length, 1);
     const receipt = receipts[0], result = child.messages.find(message => message.role === 'toolResult');
     assert.equal(result.isError, false);
@@ -132,7 +143,7 @@ try {
   assert.throws(() => windowsWorkerAuthority(sessionId), /AUTHORITY_UNAVAILABLE/u);
   assert.equal(externalRequests, 0);
   report = { status: 'PASS', platform: process.platform, piVersion: '0.87.1', subagentsVersion: '0.66.0',
-    proof: process.platform === 'win32' ? 'REAL_FOREGROUND_WORKER_PI_FACTORY_TO_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
+    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? 'REAL_FOREGROUND_WORKER_PI_FACTORY_TO_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
     foregroundExitCode: foregroundResult.exitCode,
     boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts };
 } catch (error) {

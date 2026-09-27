@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "status": "VERIFIED_BOUNDED_TRANSPORT_ONLY",
+  "functionalCommit": "d14200e1292fa31861551bbe280d8779157508b7",
+  "nativeRun": {
+    "id": 36314964435,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36314964435",
+    "conclusion": "SUCCESS",
+    "windows": { "tests": 190, "pass": 181, "fail": 0, "linuxOnlySkipped": 9 },
+    "ubuntu": { "tests": 190, "pass": 90, "fail": 0, "windowsOnlySkipped": 100 },
+    "focusedNativeWorker": { "tests": 12, "pass": 12, "fail": 0, "skipped": 0 },
+    "independentClones": {
+      "windows": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS", "attempts": 1, "elapsedMs": 260, "ownedResidualProcesses": 0 },
+      "ubuntu": { "primary": "PASS_FOUNDATION_ONLY", "cleanup": "PASS" }
+    }
+  },
+  "realPiForegroundProof": {
+    "platform": "win32",
+    "piVersion": "0.87.1",
+    "subagentsVersion": "0.66.0",
+    "proof": "REAL_FOREGROUND_WORKER_PI_FACTORY_TO_LPAC_JOB",
+    "foregroundExitCode": 0,
+    "boundEvents": 1,
+    "localDeterministicTurns": 2,
+    "externalProviderCalls": 0,
+    "sourceUnchanged": true,
+    "backend": "windows-lpac-broker",
+    "profile": "EDIT",
+    "role": "worker",
+    "operation": "safe-exec",
+    "tokenVerified": true,
+    "jobAttested": true,
+    "targetStarted": true,
+    "exitCode": 0,
+    "cleanup": "PASS",
+    "projectPublished": false,
+    "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+    "depth": 1,
+    "toolCallNumber": 1,
+    "toolCallLimit": 40,
+    "actualSnapshotWriteReadback": true,
+    "actualPrivateReadDenied": true,
+    "observedToolPidGone": true,
+    "temporaryRemoved": true,
+    "authorityRevoked": true
+  },
+  "localLinux": { "tests": 723, "pass": 623, "fail": 0, "nativeWindowsSkipped": 100, "syntax": "PASS", "installedPiTypeScript": "PASS", "packageValidation": "PASS" },
+  "limits": [
+    "Deterministic local model output, no live GPT/provider call or billing",
+    "Supported offline Node transport only; narrowed tool surface, no whole workflow certificate",
+    "Snapshot edits remain ephemeral and are not published to the host project",
+    "Durable draft continuity and attempt-aware verification are still unfinished",
+    "Revoked-host-write real-Pi native control is pending a later candidate",
+    "No global host process census; process evidence is scoped to owned executions",
+    "Windows autonomy remains BLOCKED; C and D are NOT_STARTED"
+  ]
+}

@@ -58,14 +58,22 @@ Native cases must prove snapshot write/readback, actual forbidden read/mutation,
 LPAC/Job/start/cleanup metadata, exited PID, nonzero73/FATAL/timeout124, authority
 forgery rejection and unchanged source. Linux skips are NOT Windows PASS.
 
-This candidate is NOT a fresh native Pi session/full Worker workflow proof.
+Native Pi session/foreground transport is proven; full Worker workflow is NOT.
 Handler/broker controls have native proof on dc12d5d / CI36314208555:
 Windows Worker12/12PASS; full190/181PASS/0FAIL/9Linux-only skips and both
 source clones green. Subsequent scripts/phi-worker-pi-smoke.mjs uses actual
 pi-subagents runSync/default child factory and real Pi SDK with a deterministic
 local-only provider, isolated empty auth/catalog, denied fetch and narrowed
 safe_exec-only tool surface. It already proves binding/revocation locally;
-Windows mandatory execution must still prove the real session -> broker path.
+Mandatory Windows execution now proves the real session -> broker path on
+d14200e / CI36314964435 SUCCESS: actual foreground runSync/default Pi factory,
+two deterministic turns, WorkerEDIT/LPAC/Job/start/cleanup, real private denial,
+snapshot readback, observed tool PID gone and source unchanged. Metadata receipt:
+phi-worker-transport-evidence.json. No full coding/draft/publication certificate.
+The same actual foreground fixture with --revocation proves that a present
+built-in write tool cannot mutate the host fixture after controller revocation.
+Pi's real AUTHORITY_UNAVAILABLE tool error is a fail-closed result, not a bypass.
+Local denial/source preservation/cleanup PASS; mandatory native case pending.
 This bounded transport task intentionally does not request host publication,
 does not disable completion guards and is not the full autonomy coding E2E.
 Whole workflow still blocked. Mutable snapshot is currently ephemeral per

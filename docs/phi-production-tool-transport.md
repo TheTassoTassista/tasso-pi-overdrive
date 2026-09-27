@@ -5,7 +5,11 @@ Windows178/169PASS/0FAIL/9skips, separate primary/cleanupPASS. Historical f006
 pre-receipt failure did not reproduce, cause UNKNOWN; fixed-code diagnostics
 now preserve future controller failures. Prior fbb proof remains exact-run only.
 Separate primary/cleanup proof and exact budget contract: phi-clean-clone-cleanup.md.
-A remains COMPLETE. B2 controller/Worker candidate IN_PROGRESS, native unverified;
+A remains COMPLETE. B2 governed handler/broker controls verified on dc12d5d,
+CI36314208555 SUCCESS (native Worker12/12; full Windows190/181PASS/0FAIL/9skips,
+both clones green). Exact foreground envelope fix/real-Pi session candidate
+d14200e/CI36314964435 SUCCESS, actual foreground Pi -> Worker -> broker proven;
+B2 overall remains IN_PROGRESS (draft/verification integration unfinished);
 see phi-worker-tool-transport.md. C LSP/D publication NOT_STARTED; autonomy BLOCKED.
 
 Historical report-only tested HEAD51460dbb11f5c6503c680fd5811dec79d5f4afc5:
