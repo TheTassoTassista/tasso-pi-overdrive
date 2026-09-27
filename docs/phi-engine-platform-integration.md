@@ -1,5 +1,12 @@
 # Real engine platform integration — first production checkpoint
 
+Historical checkpoint10 trace below. Current B1 production safe_exec/verification
+now use the bounded registered LPAC transport; full workflow, Worker identity,
+LSP/transactional mutation and Windows autonomy are still blocked.
+See phi-production-tool-transport.md and current phi-progress.md for the actual
+call graph and native evidence; the old all-verification-denied treatment below
+must not be interpreted as current B1 behavior.
+
 Status: **PARTIAL; Windows autonomous coding remains BLOCKED**. This is production boundary wiring, not proof that native Windows coding works. No new provider/model call is needed for this stage.
 
 ## Actual path audited

@@ -2,7 +2,17 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Checkpoint B1 — production safe_exec / verification candidate
+## Current checkpoint B1 — COMPLETE bounded production transport
+
+Functional9be8ac0f6e41e831bdec0302ae0fef606063792e, real [CI36301697234](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36301697234) SUCCESS. Windows163total/154PASS/0FAIL/9Linux-only skips, all previous144 passes retained. Focused B1 11/10PASS/0FAIL/1Linux-only skip. Ubuntu focused163/74PASS/0FAIL/89Windows-only skips. Post-native complete Linux696/607PASS/0FAIL/89skips, syntax/installed-Pi TypeScript/package/pinned-policy validation PASS. Both independent source-with-spaces clones rebuild all six native sources and repeat counts: PASS_FOUNDATION_ONLY, cleanupPASS, no auth/ignored runtime copy. Existing13 recovery controls pass individually and sequentially. No required Windows case skipped; extra skip is new Linux-only transport rejection.
+
+safe_exec broker COMPLETE for registered read-only Node subset; verification broker COMPLETE for registered offline single-Node-file package checks; Worker workflow BLOCKED/B2 NOT_STARTED; bypass audit COMPLETE within these coding paths. Actual native shared production handler and direct verifier CLI prove backend/profile/token/Job/session/start/result/cleanup, source/temp reads/writes, real kernel workspace/private denial, no publication, source alias rejection, actual Node unit test/syntax/nonzero73/FATAL/124timeout/abort, strict caller authority and helper-absent failure with no weaker fallback. No fresh native Pi/model/Worker E2E claim. Snapshot state VERIFIED or ROLLED_BACK/FAILED; projectPublished alwaysfalse; EDIT_APPLIED/READY_TO_PUBLISH/PUBLISHED BLOCKED pending B2/D.
+
+Functional source index593blobs/0FAIL/13classifiedWARN; bookkeeping index594/0FAIL/13WARN; functional ancestry1639blobs/0FAIL/126WARN. Heuristic scope excludes unstaged user content/other branches/commit messages, not absolute secret proof. Pi/auth/routing/Council/Judge/Second Brain/Linux backend/governors/caps unchanged;0new model/provider calls. Protected SHA256 f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba unchanged/never staged. Only pre-existing protected edit remains outside task commits.
+
+This closes B1 only, not B overall. **Exact next step B2:** trusted actual Worker/session/task/tool-authority binding into the registered production handler and controller-owned edit draft lifecycle, keep snapshot-vs-project publication distinct and Windows autonomy blocked. Existing worktree/process identity and native transaction integration remain necessary; do not mint role authority from model fields or environment flags. Test deterministic Worker requests through actual dispatch/broker and bypass/readonly/governor rejection. Only AFTER B2 and full Windows/Linux gates green begin C real LSP, then D crash-atomic publication. No speculative host copy or readiness switch. Report: phi-production-tool-transport.md; receipt: phi-native-tool-transport-evidence.json. Final bookkeeping HEAD comes from Git.
+
+## Historical B1 candidate — superseded by native proof above
 
 Resumed exact520347612f842a4e3eb1b29b121442e5a9bb4ad3, same branch, only protected pre-existing user edit. A COMPLETE; B1 IN_PROGRESS (native validation pending); B2 Worker NOT_STARTED; C LSP NOT_STARTED; D transactional publication NOT_STARTED. WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS.
 

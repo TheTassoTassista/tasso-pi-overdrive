@@ -1,15 +1,24 @@
-# Production Windows tool transport — B1 candidate
+# Production Windows tool transport — B1 verified bounded subset
 
-State: IN_PROGRESS, native evidence pending. A remains COMPLETE. B2 Worker,
+State: B1 COMPLETE for the registered read-only Node subset. A remains COMPLETE. B2 Worker,
 C LSP and D transactional publication are NOT_STARTED. Windows autonomy BLOCKED.
+
+Functional9be8ac0f6e41e831bdec0302ae0fef606063792e, real
+[CI36301697234](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36301697234)
+SUCCESS, both native OSes and independent source-with-spaces clones.
+Windows163/154PASS/0FAIL/9Linux-only skips; focused B1 11/10PASS/0FAIL/1Linux-only skip.
+Ubuntu focused163/74PASS/0FAIL/89Windows-only skips; complete Linux696/607PASS/0FAIL/89skips.
+Syntax/installed-Pi TypeScript/package validation PASS. Every previous144 native
+passing case retained; extra skip is the new explicitly Linux-only host-rejection
+test, not a required Windows test disabled. Exact receipt: phi-native-tool-transport-evidence.json.
 
 ## Actual call graph / spawn classification
 
 | Production surface | Windows route | Classification |
 |---|---|---|
-| registered safe_exec | extensions/safe-exec.ts -> shared/safe-exec-handler.mjs -> shared executeCodingTool -> windows/coding-tools.mjs -> runWindowsSecureBroker -> native ExecutionBroker -> OwnedProcess | BROKERED candidate; registered Node file commands only |
-| verification_gate | extension -> shared verifyCodingProject -> native anchored snapshot -> registered checks -> shared executeCodingTool -> same LPAC broker | BROKERED candidate; no pi.exec on Windows |
-| verification CLI | scripts/verify-project.mjs Windows branch -> same shared verifier | BROKERED candidate; exits before Linux discovery/spawn |
+| registered safe_exec | extensions/safe-exec.ts -> shared/safe-exec-handler.mjs -> shared executeCodingTool -> windows/coding-tools.mjs -> runWindowsSecureBroker -> native ExecutionBroker -> OwnedProcess | BROKERED verified bounded subset; registered Node file commands only |
+| verification_gate | extension -> shared verifyCodingProject -> verifyWindowsProject -> native anchored snapshot -> registered checks -> executeWindowsCodingTool -> same LPAC broker | BROKERED verified bounded subset; no pi.exec on Windows |
+| verification CLI | scripts/verify-project.mjs Windows branch -> same shared verifier | BROKERED verified bounded subset; exits before Linux discovery/spawn |
 | workflow / Worker delegation | secure-workflow -> requireCodingBackend(workflow) | BLOCKED, B2 integration/role identity pending |
 | safe_remove / EditEngine | requireCodingBackend -> native filesystem integration missing | BLOCKED |
 | LSP / DAP / Persistent Eval | shared sandboxInvocation/admission | BLOCKED, no Job-only fallback |
@@ -89,9 +98,20 @@ journal identity, never guess ownership or overwrite user changes.
 
 ## Evidence / limits
 
-Local regression/gate counts are recorded in phi-progress.md. Native B1 tests
-are mandatory on a real Windows runner; Linux skips cannot certify them.
-Candidate push for that CI was explicitly authorized after Linux gate green.
+Local regression/gate counts are recorded in phi-progress.md. Mandatory actual
+Windows tests now prove the registered production safe_exec handler (not a
+substitute fixture executor), actual shared-dispatch verification and its CLI:
+real Git fixture/source/local CJS imports/node:test unit execution, syntax,
+READ_ONLY/TEST token/Job/start/session/backend attestation, scratch writes,
+actual protected/workspace write denial with unchanged source, source extraction
+hardlink/junction positive controls followed by rejection, nonzero73/FATAL,
+timeout124, actual abort, unavailable-helper no-fallback and cleanup.
+Both source clones rebuild all six sources and repeat their corresponding
+counts/cleanupPASS without auth or ignored runtime copy. Native read-only recovery
+Doctor row PASS; whole clone Doctor still FAIL/full engine BLOCKED_NOT_INSTALLED.
+This is not full product acceptance. Runtime payload evidence is CJS; js/mjs
+entry grammar is accepted but not independently certified by these B1 cases.
+Candidate push for CI was explicitly authorized after Linux gate green.
 
 Remaining: actual Worker binding/edit drafts (B2), real Pi Windows startup,
 additional runtimes/dependencies, directory cwd, Unicode/binary snapshots,
