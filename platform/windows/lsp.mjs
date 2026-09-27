@@ -25,6 +25,7 @@ export async function executeWindowsLsp(cwd, parameters, context) {
     if (snapshot && draftContentDigest(snapshot.files) !== worker.binding.digest) fail('DRAFT_IDENTITY_INVALID');
     const settled = worker.finish(snapshot, result.code === 0);
     const success = result.code === 0 && !settled.cancelled;
+    if(!settled.cancelled)worker.recordLsp(parameters.path,result.lspResult?.diagnostics,success);
     const receipt = Object.freeze({...result.receipt,productionPath:'semantic_nav',workerAuthority:worker.metadata,draftBefore:worker.before,draft:settled.draft,
       jobEmptyVerified:result.jobEmptyVerified??null,projectPublished:false,runtimeDigest:runtime.digest,runtimeFiles:runtime.fileCount,
       initialized:result.lspResult?.initialized??false,shutdown:result.lspResult?.shutdown??false,onWrite:context.onWrite===true});
@@ -33,5 +34,6 @@ export async function executeWindowsLsp(cwd, parameters, context) {
       start:{line:(d.range?.start?.line??0)+1,character:(d.range?.start?.character??0)+1},end:{line:(d.range?.end?.line??0)+1,character:(d.range?.end?.character??0)+1}})) : [];
     return {status:success?'PASS':'FAIL',error:success?undefined:settled.cancelled?'PHI_LSP_CANCELLED':'PHI_LSP_EXECUTION_FAILED',operation:'diagnostics',language:'json',
       backend:'vscode-langservers-extracted@4.10.0',sandbox:'windows-lpac-job-read-only-no-network',count:entries.length,entries,receipt};
-  } finally { worker.release(); }
+  } catch(error) { worker.recordLspFailure(parameters?.path);throw error; }
+  finally { worker.release(); }
 }

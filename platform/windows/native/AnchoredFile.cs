@@ -23,6 +23,7 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string target, IntPtr attributes);
     readonly RecoveryFilesystem rootPins, parentPins;
     IntPtr handle;
+    AnchoredFile(IntPtr ownedHandle) { handle = ownedHandle; }
     internal string Identity { get { return RecoveryFilesystem.HandleIdentity(handle); } }
     static void Check(bool ok) { if (!ok) throw new Win32Exception(Marshal.GetLastWin32Error()); }
     static string[] Segments(string relative) {
@@ -72,6 +73,33 @@ namespace Phi.Native {
       if (written != value.Length) throw new InvalidDataException();
       Check(SetEndOfFile(handle)); Check(FlushFileBuffers(handle));
       if (Identity != expectedIdentity || Digest != Hash(value)) throw new InvalidDataException();
+    }
+    // Bounded CREATE primitive only, NOT production publication or a replace
+    // implementation. No existing destination is opened, deleted or replaced.
+    internal static void CreateNoReplace(string root, string rootIdentity, string relative, byte[] value, Action<string> checkpoint) {
+      string[] segments = Segments(relative);
+      if (value == null || value.Length > MaxBytes) throw new InvalidDataException();
+      using (RecoveryFilesystem rootPins = new RecoveryFilesystem(root)) {
+        if (RecoveryFilesystem.DirectoryIdentity(root) != rootIdentity) throw new InvalidDataException();
+        string target = segments.Aggregate(root, (current, part) => Path.Combine(current, part));
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(target))) {
+          checkpoint("before-temp"); RecoveryFilesystem.Info info;
+          IntPtr owned = parent.CreateExclusiveFile("phi-publish-" + Guid.NewGuid().ToString("N") + ".tmp", out info);
+          using (AnchoredFile temp = new AnchoredFile(owned)) {
+            Validate(info); string id = temp.Identity; checkpoint("temp");
+            uint written; temp.Rewind();
+            Check(WriteFile(owned, value, (uint)value.Length, out written, IntPtr.Zero));
+            if (written != value.Length) throw new InvalidDataException();
+            Check(SetEndOfFile(owned)); checkpoint("write");
+            Check(FlushFileBuffers(owned)); checkpoint("flush");
+            if (temp.Identity != id || temp.Digest != Hash(value)) throw new InvalidDataException();
+            checkpoint("validation"); checkpoint("precommit");
+            parent.RenameNewFile(owned, segments[segments.Length - 1]); checkpoint("rename");
+            if (temp.Identity != id || temp.Digest != Hash(value)) throw new InvalidDataException();
+            checkpoint("postverify");
+          }
+        }
+      }
     }
     public void Dispose() {
       if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); handle = IntPtr.Zero;
@@ -143,6 +171,41 @@ namespace Phi.Native {
       } catch (Exception error) { RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_ANCHORED_FILE_SELFTEST_FAILED"); }
       finally { try { if (scope != null) { scope.CleanupFiles(); scope.Complete(true); } } catch { clean = false; if (scope != null) scope.Dispose(); Console.Error.WriteLine("PHI_ANCHORED_FILE_CLEANUP_FAILED"); } }
       Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, scope = "HANDLE_MUTATION_PRIMITIVE_NOT_TRANSACTIONAL_ENGINE" }));
+      return passed && clean ? 0 : 70;
+    }
+    internal static int AtomicCreateSelfTest(string name) {
+      string[] phases = { "before-temp", "temp", "write", "flush", "validation", "precommit", "rename", "postverify" };
+      string[] controls = { "create", "existing", "case-alias", "concurrent-create", "junction", "protected", "ads", "root-identity" };
+      if (!phases.Contains(name) && !controls.Contains(name)) return 70;
+      ScopeRecovery scope = null; bool passed = false, clean = true, committed = false, denied = false, injected = false;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root), directory = Path.Combine(scope.Root, "src");
+        Directory.CreateDirectory(directory);
+        string target = Path.Combine(directory, "fixture.txt"), unrelated = Path.Combine(scope.Root, "unrelated");
+        Directory.CreateDirectory(unrelated); File.WriteAllText(Path.Combine(unrelated, "sentinel.txt"), "synthetic-unrelated");
+        if (name == "existing" || name == "case-alias") File.WriteAllText(target, "synthetic-user");
+        if (name == "junction") { Directory.Move(directory, directory + "-old"); AppContainerScope.CreateOwnedJunction(directory, unrelated); }
+        try {
+          string relative = name == "case-alias" ? "src/FIXTURE.TXT" : name == "protected" ? ".env" : name == "ads" ? "src/fixture.txt:stream" : "src/fixture.txt";
+          CreateNoReplace(scope.Root, name == "root-identity" ? new String('a', 16) + ":" + new String('b', 32) : rootId, relative, Encoding.UTF8.GetBytes("synthetic-complete-new"), delegate(string phase) {
+            if (phase == "precommit" && name == "concurrent-create") File.WriteAllText(target, "synthetic-user");
+            if (phase == "rename") committed = true;
+            if (phase == name) { injected = true; throw new IOException("PHI_INJECTED_ATOMIC_CREATE_FAILURE"); }
+          });
+        } catch (InvalidDataException) { if (name != "junction" && name != "protected" && name != "ads" && name != "root-identity") throw; denied = true; }
+          catch (Win32Exception error) { if ((name != "existing" && name != "case-alias" && name != "concurrent-create") || (error.NativeErrorCode != 80 && error.NativeErrorCode != 183)) throw; denied = true; }
+          catch (IOException) { if (!injected) throw; denied = true; }
+        bool user = name == "existing" || name == "case-alias" || name == "concurrent-create";
+        bool expectedDenied = name != "create";
+        if (denied != expectedDenied || injected != phases.Contains(name) || File.ReadAllText(Path.Combine(unrelated, "sentinel.txt")) != "synthetic-unrelated") throw new InvalidDataException();
+        if (user) { if (File.ReadAllText(target) != "synthetic-user") throw new InvalidDataException(); }
+        else if (committed || name == "create") { if (File.ReadAllText(target) != "synthetic-complete-new") throw new InvalidDataException(); }
+        else if (File.Exists(target)) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { RecoveryFilesystem.LogFailure(error); Console.Error.WriteLine("PHI_ATOMIC_CREATE_SELFTEST_FAILED"); }
+      finally { try { if (scope != null) { scope.CleanupFiles(); scope.Complete(true); } } catch { clean = false; if (scope != null) scope.Dispose(); Console.Error.WriteLine("PHI_ATOMIC_CREATE_CLEANUP_FAILED"); } }
+      Console.WriteLine(new JavaScriptSerializer().Serialize(new { caseName = name, passed, committed, denied, injected, fixtureCleanup = clean, scope = "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION" }));
       return passed && clean ? 0 : 70;
     }
   }

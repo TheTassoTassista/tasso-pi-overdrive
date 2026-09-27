@@ -2,6 +2,14 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current D subsystem candidate — native proof pending
+
+Exact starting checkpoint d713d24 and C native CI36333889772 confirmed; B1/B2/C retained. D now has immutable original per-file native-ID/hash baseline, exact verification/content binding, applicable real clean LSP proofs, controller-only explicit host mutation approval and opaque attempt/transaction-bound preflight grant. User changes or identical-text native replacement return CONFLICT without overwriting user files or erasing draft. Re-edit/re-analysis/failure/revocation invalidate prior approvals. No publication backend exists: valid grants fail BACKEND_UNAVAILABLE, projectPublished=false, PUBLISHING/PUBLISHED/ROLLED_BACK unreachable. Existing whole Windows workflow gate remains closed.
+
+Separate native CREATE/no-clobber primitive with pinned parents/exclusive same-filesystem temp/write/flush/hash/relative native rename/postverify and16 fixed primitive controls added. Those controls do not prove durable project journal, existing-file replacement, real process-death recovery, power-loss durability or production publication. [Actual path, API rationale, operation policy and remaining D](phi-transactional-publication.md). D IN_PROGRESS, not COMPLETE; Windows autonomy BLOCKED; full engine E1/E2/E3/Doctor/backup/reconstruction pending.
+
+Full Linux candidate776total/649PASS/0FAIL/127native skips plus syntax/installed-Pi TypeScript/package/pinned-policy/secret validation PASS. Native candidate Windows/Ubuntu, retained C/actual-Pi controls and both independent clones are pending exact CI. No native test credit from Linux.0external provider/model calls, no new dependencies/Pi/auth/routing/governor changes; protected user document remains byte-identical and excluded. Historical timeout70/124 cause UNKNOWN, no assertion or timeout relaxation. Exact verified delivery hashes/counts/CI will be appended after the native candidate gate, not invented here.
+
 ## Verified checkpoint — C COMPLETE (governed JSON LSP only)
 
 Functional **216113d3893e1dc52b0e5beee9b71947bc570c8d**, [CI36333889772](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36333889772) SUCCESS Windows/Ubuntu. Windows212/202PASS/0FAIL/10Linux-only skips, Ubuntu212/104PASS/0FAIL/108native skips; dedicated real LSP8/7PASS/0FAIL/1Linux-only skip. Full Linux745/637PASS/0FAIL/108native skips, syntax/installed-Pi TypeScript/package-pinned-policy-secret validation PASS. Both independent clones PASS_FOUNDATION_ONLY/cleanupPASS; Windows10 owned validation Jobs empty/drained, residual0, one15581ms removal; Ubuntu17ms, native process count unavailable. Whole clone DoctorFAIL/fullEngineBLOCKED_NOT_INSTALLED; no full fresh-machine acceptance claim.

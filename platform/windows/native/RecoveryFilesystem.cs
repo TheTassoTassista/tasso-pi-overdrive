@@ -26,6 +26,7 @@ namespace Phi.Native {
     [StructLayout(LayoutKind.Sequential)] struct IoStatus { public IntPtr Status; public UIntPtr Information; }
     [DllImport("ntdll.dll")] static extern int NtCreateFile(out IntPtr file, uint access, ref ObjectAttributes attributes, out IoStatus status, IntPtr allocation, uint fileAttributes, uint share, uint disposition, uint options, IntPtr ea, uint eaLength);
     [DllImport("ntdll.dll")] static extern uint RtlNtStatusToDosError(int status);
+    [DllImport("ntdll.dll")] static extern int NtSetInformationFile(IntPtr file, out IoStatus status, IntPtr information, uint length, int type);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandle(IntPtr file, out Info info);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandleEx(IntPtr file, int type, out Identity info, uint size);
@@ -131,6 +132,29 @@ namespace Phi.Native {
     internal IntPtr OpenReadFile(string leaf, out Info info) {
       // Broker runtime snapshot: read only, no write/delete sharing, no reparse.
       return OpenRelative(parents[parents.Count - 1], leaf, 0x81, 1, 1, 0x40, IntPtr.Zero, out info);
+    }
+    internal IntPtr CreateExclusiveFile(string leaf, out Info info) {
+      // FILE_CREATE, never OPEN_IF/OVERWRITE. Parent and temp handles remain
+      // pinned, no sharing, no reparse traversal, DELETE only for handle rename.
+      return OpenRelative(parents[parents.Count - 1], leaf, 0x13019f, 0, 2, 0x40, IntPtr.Zero, out info);
+    }
+    internal void RenameNewFile(IntPtr file, string destination) {
+      Leaf(destination);
+      IntPtr parent = parents[parents.Count - 1]; Info info;
+      if (!GetFileInformationByHandle(parent, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || IntPtr.Size != 8) throw new InvalidDataException();
+      // Native FILE_RENAME_INFORMATION, x64 layout: BOOLEAN at 0, held root
+      // directory at 8, byte length at 16, UTF16 leaf at 20. ReplaceIfExists=0:
+      // the kernel refuses an existing destination, including a case alias.
+      byte[] name = Encoding.Unicode.GetBytes(destination);
+      int length = checked(24 + name.Length); IntPtr buffer = Marshal.AllocHGlobal(length);
+      try {
+        Marshal.Copy(new byte[length], 0, buffer, length);
+        Marshal.WriteIntPtr(buffer, 8, parent); Marshal.WriteInt32(buffer, 16, name.Length);
+        Marshal.Copy(name, 0, IntPtr.Add(buffer, 20), name.Length);
+        IoStatus status; int result = NtSetInformationFile(file, out status, buffer, (uint)length, 10);
+        if (result != 0) { int error = (int)RtlNtStatusToDosError(result); Failure("RENAME_NEW", parent, destination, 0, 0, 0, result, error); throw new Win32Exception(error); }
+      } finally { Marshal.FreeHGlobal(buffer); }
     }
     // Read-only controller extraction. Every component is opened from a held
     // directory; all source handles remain pinned until the snapshot completes.

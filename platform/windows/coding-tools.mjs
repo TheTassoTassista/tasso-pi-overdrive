@@ -175,5 +175,6 @@ async function verifyWorkerDraft({ cwd, mode, listOnly, signal, timeoutMs, worke
     if (last) results.at(-1).receipt = finishDraftResult(last, worker, finished).metadata;
     return { status, platform: 'win32', backend: 'windows-lpac-broker', sandboxed: results.length > 0, projectPublished: false,
       draft: finished.draft, results };
-  } finally { worker.release(); }
+  } catch(error) { worker.verificationFailed();throw error; }
+  finally { worker.release(); }
 }
