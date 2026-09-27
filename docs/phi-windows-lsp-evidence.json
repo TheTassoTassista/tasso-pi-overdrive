@@ -1,0 +1,619 @@
+{
+  "version": 1,
+  "status": "PASS_BOUNDED_WINDOWS_JSON_LSP",
+  "checkpoint": "C_COMPLETE",
+  "functionalHead": "216113d3893e1dc52b0e5beee9b71947bc570c8d",
+  "branch": "feature/routing-presets-quality",
+  "ci": {
+    "runId": 36333889772,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36333889772",
+    "conclusion": "success",
+    "windows": "success",
+    "ubuntu": "success"
+  },
+  "externalModelProviderCalls": 0,
+  "linuxFullGate": {
+    "tests": 745,
+    "pass": 637,
+    "fail": 0,
+    "skipped": 108,
+    "syntax": "PASS",
+    "installedPiTypescript": "PASS",
+    "packagePinnedPolicySecretValidation": "PASS"
+  },
+  "nativeWindows": {
+    "tests": 212,
+    "pass": 202,
+    "fail": 0,
+    "skipped": 10
+  },
+  "nativeUbuntu": {
+    "tests": 212,
+    "pass": 104,
+    "fail": 0,
+    "skipped": 108
+  },
+  "nativeFocusedLsp": {
+    "tests": 8,
+    "pass": 7,
+    "fail": 0,
+    "skipped": 1
+  },
+  "nativeFailureControls": [
+    {
+      "control": "LSP_FAILURE",
+      "mode": "timeout",
+      "code": 124,
+      "receipt": {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "role": "worker",
+        "operation": "lsp",
+        "sessionId": "6e1acb889237496789daa1cc033b7bda",
+        "scopeId": "53db72e4fa4f4b0abe7893e3b085f77f",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 124,
+        "timedOut": true,
+        "cleanup": "PASS",
+        "securityFailure": null
+      },
+      "jobEmptyVerified": true,
+      "targetObserved": true,
+      "crashIssued": false,
+      "nativeFailure": null
+    },
+    {
+      "control": "LSP_FAILURE",
+      "mode": "crash",
+      "code": 1,
+      "receipt": {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "role": "worker",
+        "operation": "lsp",
+        "sessionId": "dd17cb96ecb94848babee82a247ea662",
+        "scopeId": "ae377a93c7ed4da383a6aca94ced5ee3",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 1,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null
+      },
+      "jobEmptyVerified": true,
+      "targetObserved": true,
+      "crashIssued": true,
+      "nativeFailure": null
+    },
+    {
+      "control": "LSP_FAILURE",
+      "mode": "broker",
+      "code": 125,
+      "receipt": {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "sessionId": "b42af7a92d5c4a09bf5cb4a93b6878d7",
+        "operation": "lsp",
+        "role": "worker",
+        "scopeId": "f5db6907607142cc9bd08de543523333",
+        "tokenVerified": null,
+        "jobAttested": null,
+        "targetStarted": null,
+        "exitCode": 125,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": "CANCELLED"
+      },
+      "targetObserved": true,
+      "crashIssued": false,
+      "nativeFailure": null
+    }
+  ],
+  "independentClones": {
+    "windows": {
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "head": "216113d3893e1dc52b0e5beee9b71947bc570c8d",
+        "platform": "win32",
+        "tests": {
+          "total": 212,
+          "passed": 202,
+          "failed": 0,
+          "skipped": 10
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "fixedScopeRecovery": "PASS",
+        "recoveryAfterTests": {
+          "status": "PASS",
+          "active": 0,
+          "stale": 0,
+          "quarantined": 0,
+          "processKills": 0,
+          "cleanupPerformed": false
+        },
+        "ownedCommands": 10,
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false
+      },
+      "ownedCommands": [
+        {
+          "stage": "git-source",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 3736,
+            "childGeneration": "134350011802833126"
+          }
+        },
+        {
+          "stage": "git-source",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 5268,
+            "childGeneration": "134350011804712173"
+          }
+        },
+        {
+          "stage": "git-source",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 1820,
+            "childGeneration": "134350011819448706"
+          }
+        },
+        {
+          "stage": "git-source",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 1788,
+            "childGeneration": "134350011823367533"
+          }
+        },
+        {
+          "stage": "source-dependencies",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 7640,
+            "childGeneration": "134350011825450816"
+          }
+        },
+        {
+          "stage": "pinned-lsp-runtime",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 4788,
+            "childGeneration": "134350011833851391"
+          }
+        },
+        {
+          "stage": "windows-process-build",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 1444,
+            "childGeneration": "134350012845360792"
+          }
+        },
+        {
+          "stage": "foundation-tests",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 5252,
+            "childGeneration": "134350012857566185"
+          }
+        },
+        {
+          "stage": "post-test-recovery",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 6344,
+            "childGeneration": "134350015234039944"
+          }
+        },
+        {
+          "stage": "brand-smoke",
+          "receipt": {
+            "version": 1,
+            "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+            "resultExitCode": 0,
+            "primaryExitCode": 0,
+            "timedOut": false,
+            "jobAttested": true,
+            "targetStarted": true,
+            "jobEmptyVerified": true,
+            "pipesDrained": true,
+            "residualOwnedProcesses": 0,
+            "childPid": 2088,
+            "childGeneration": "134350015237779300"
+          }
+        }
+      ],
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 15581,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": false,
+        "inheritedHandleAfter": false,
+        "residualOwnedProcesses": 0,
+        "processOwnership": "NATIVE_JOB_HANDLES",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      }
+    },
+    "ubuntu": {
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "head": "216113d3893e1dc52b0e5beee9b71947bc570c8d",
+        "platform": "linux",
+        "tests": {
+          "total": 212,
+          "passed": 104,
+          "failed": 0,
+          "skipped": 108
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "fixedScopeRecovery": "NOT_NATIVE_WINDOWS",
+        "recoveryAfterTests": "NOT_NATIVE_WINDOWS",
+        "ownedCommands": 0,
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false
+      },
+      "ownedCommands": [],
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 17,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": "UNKNOWN",
+        "inheritedHandleAfter": "UNKNOWN",
+        "residualOwnedProcesses": null,
+        "processOwnership": "NOT_NATIVE_WINDOWS",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      }
+    }
+  },
+  "realPiLsp": {
+    "status": "PASS",
+    "platform": "win32",
+    "piVersion": "0.87.1",
+    "subagentsVersion": "0.66.0",
+    "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB",
+    "foregroundExitCode": 0,
+    "boundEvents": 1,
+    "localDeterministicTurns": 3,
+    "externalProviderCalls": 0,
+    "sourceUnchanged": true,
+    "receipts": [
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "sessionId": "01a0e3c95263728a99298a3103f491c9",
+        "scopeId": "0316d74a2b9048ebb43d7aaf577149cf",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "safe_exec",
+        "snapshotDigest": "d4c8b39b5280e911d84d2974198a56d8342ca836318363ff911c4e4945e15736",
+        "publicationState": "EDITED",
+        "projectPublished": false,
+        "failureReason": null,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "c4919aa2-eebe-4683-98d5-7c164dcf1762",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+          "toolCallNumber": 1,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 0,
+          "contentDigest": "5a28acae2c12e7605d705676804b12270b3a1a504f4d0b8e46804684411f85e3",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "state": "DRAFT_CREATED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 1,
+          "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000a0000000496390000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true
+      },
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "role": "worker",
+        "operation": "lsp",
+        "sessionId": "01a0e3c95263728a99298a3103f491c9",
+        "scopeId": "e0ce6069ef284b61a5adbcd0d8805128",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "semantic_nav",
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "c4919aa2-eebe-4683-98d5-7c164dcf1762",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+          "toolCallNumber": 2,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 1,
+          "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000a0000000496390000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 1,
+          "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000b0000000496390000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true,
+        "projectPublished": false,
+        "runtimeDigest": "40bfd6d46ca654a4b7abd5fb989382285be0d80e59b0ea91c0429a0cec2cf71d",
+        "runtimeFiles": 315,
+        "initialized": true,
+        "shutdown": true,
+        "onWrite": true
+      },
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "role": "worker",
+        "operation": "lsp",
+        "sessionId": "01a0e3c95263728a99298a3103f491c9",
+        "scopeId": "cc87d9e433fd4c9a9e19456e6ac5541a",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "semantic_nav",
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "c4919aa2-eebe-4683-98d5-7c164dcf1762",
+          "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+          "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+          "toolCallNumber": 3,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 1,
+          "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000b0000000496390000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "4a92f081b3ad42afb194f5c005927aa0",
+          "revision": 1,
+          "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+          "baseRootIdentity": "f42c40802c403fba:000a0000000479640000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:000c0000000496390000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true,
+        "projectPublished": false,
+        "runtimeDigest": "40bfd6d46ca654a4b7abd5fb989382285be0d80e59b0ea91c0429a0cec2cf71d",
+        "runtimeFiles": 315,
+        "initialized": true,
+        "shutdown": true,
+        "onWrite": false
+      }
+    ],
+    "cleanup": {
+      "temporaryRemoved": true,
+      "authorityRevoked": true,
+      "draftPayloadCleared": true
+    },
+    "externalRequests": 0
+  },
+  "retainedRealPiControls": [
+    {
+      "status": "PASS",
+      "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB",
+      "localDeterministicTurns": 6,
+      "brokerCalls": 5,
+      "externalRequests": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      }
+    },
+    {
+      "status": "PASS",
+      "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
+      "localDeterministicTurns": 3,
+      "brokerCalls": 1,
+      "externalRequests": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      }
+    }
+  ],
+  "audit": {
+    "index": {
+      "blobs": 612,
+      "fail": 0,
+      "warn": 13
+    },
+    "headAncestry": {
+      "blobs": 1767,
+      "fail": 0,
+      "warn": 126
+    },
+    "scope": "HEURISTIC_NOT_EXHAUSTIVE_EXCLUDES_OTHER_BRANCHES_COMMIT_MESSAGES_UNSTAGED_USER_CONTENT"
+  },
+  "knownPriorFailure": {
+    "head": "e6d94194583af6b534e4c4a118ef979e805c20cd",
+    "ciRunId": 36332841220,
+    "observed": "timeout control returned70 not124; cleanupPASS; native reason not captured",
+    "cause": "UNKNOWN_NOT_RETROSPECTIVELY_FIXED",
+    "currentChange": "fixed-field trusted-channel diagnostics only; assertions/timeouts/permissions unchanged"
+  },
+  "limits": [
+    "JSON diagnostics only; no ordinary unbound Windows LSP",
+    "Finite fresh server on same controller-memory logical draft; no restart durability",
+    "Host project unchanged; D publication NOT_STARTED",
+    "Native Job/PID cleanup proof is scoped, not a global host census",
+    "Private runtime/controller/build/cache remains TCB; no signed publisher attestation",
+    "Windows lsp-status inventory remains Linux-oriented, not a Windows readiness certificate",
+    "Both clones foundation-only; DoctorFAIL/fullEngineBLOCKED_NOT_INSTALLED",
+    "Windows autonomy BLOCKED; full coding/security/crash/Doctor/backup/reconstruction pending"
+  ]
+}

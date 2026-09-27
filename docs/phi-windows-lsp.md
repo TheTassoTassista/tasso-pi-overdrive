@@ -1,4 +1,13 @@
-# C — production Windows LSP candidate (NOT native certified yet)
+# C — production Windows JSON LSP (COMPLETE bounded subsystem)
+
+Exact functional216113d3893e1dc52b0e5beee9b71947bc570c8d / native
+[CI36333889772](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36333889772)
+SUCCESS proves dedicated/aggregate/independent-clone controls and actual Pi
+foreground edit -> on-write -> semantic_nav. Windows202PASS/0FAIL, Ubuntu104PASS/
+0FAIL, complete Linux637PASS/0FAIL; OS-only skips classified in the
+[metadata receipt](phi-windows-lsp-evidence.json). Both clones cleanupPASS.
+Actual Pi3 deterministic turns/3 broker calls,0 external requests, same draft/
+version/digest, both real Error diagnostics, init/shutdown/LPAC/Job/cleanup.
 
 Production path: actual `semantic_nav` / Windows `safe_exec` tool-result on-write
 hook -> `lib/lsp-manager.mjs` -> shared platform dispatch ->
@@ -50,6 +59,14 @@ registered edit -> on-write -> semantic_nav, not just direct module calls. Both
 are mandatory in native Windows CI; source-only clone installs the existing lock
 instead of copying ignored development runtimes. Linux skips are not native proof.
 
-C remains IN_PROGRESS until those exact native gates, Linux and both clones are
-green. D NOT_STARTED. Windows autonomy BLOCKED; whole-product coding/security/
-crash E2Es and final reconstruction/Doctor/backup certification remain pending.
+C is COMPLETE only for those exact bounded JSON/native gates, Linux and both
+clones. Ordinary unbound Windows LSP/other languages/navigation remain denied;
+the current lsp-status inventory is Linux-oriented, not Windows readiness proof.
+Prior e6d aggregate timeout70 cause remains UNKNOWN; current dedicated/aggregate/
+clone gates pass without assertion, timeout, retry or permission relaxation.
+Fixed-field trusted helper diagnostics are retained for any recurrence; no raw
+helper/server output is added to traces/receipts. D NOT_STARTED. Windows autonomy
+BLOCKED; whole-product coding/security/crash E2Es and final reconstruction/Doctor/
+backup certification remain pending. Next D must retain original base per-file
+identity/hash and use native anchored transactional replace, never in-place write
+or recursive host copy masquerading as atomic publication.

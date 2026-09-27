@@ -34,7 +34,10 @@ turns/1 broker call PASS, zero external requests. Current metadata receipt:
 phi-worker-transport-evidence.json. Complete Linux631PASS/0FAIL; platform-only
 skips are explicitly classified, not security proof. B2 COMPLETE for this Node
 subsystem, no host publication/restart durability/full workflow certificate.
-Next C real LSP, then D crash-atomic publication. Autonomy BLOCKED.
+Subsequent C216113d / CI36333889772 also COMPLETE for bounded Worker JSON
+diagnostics/on-write; actual Pi3 deterministic turns/3 broker calls, same draft/
+version/digest, real LPAC/Job LSP and cleanup. See phi-windows-lsp-evidence.json.
+Next D crash-atomic publication. Autonomy BLOCKED.
 
 ## Production path and authority
 
@@ -79,7 +82,8 @@ extensions/controller code are part of the TCB, not protected from themselves.
 | secure workflow controller pi.exec verification | unreachable on Windows while whole-workflow gate remains false; Linux-only today |
 | native snapshot/build/recovery / validation Jobs | INTERNAL_TRUSTED fixed endpoints, not Worker command transport |
 | Git allocator/orchestration/Pi SDK | trusted controller, native workflow integration remains incomplete |
-| LSP/DAP/EditEngine/persistent eval | platform gate still denies Windows, no legacy fallback |
+| Worker semantic_nav / JSON safe_exec on-write | C opaque governor LSP authority, same draft, fixed read-only LPAC/Job/no-network real server; JSON diagnostics only |
+| unbound/unsupported LSP, DAP/EditEngine/persistent eval | platform gate still denies Windows, no legacy fallback |
 | Linux tools/Worker | existing Linux Bubblewrap path unchanged; new boundary is inert |
 
 No new worker tool calls a shell/exec/spawn. Broker spawns only the verified native
