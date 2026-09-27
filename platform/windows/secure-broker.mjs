@@ -35,9 +35,13 @@ export function windowsNodeToolArguments(script, args = []) {
   return Object.freeze(['--no-addons', '--no-global-search-paths', '--preserve-symlinks-main', '--preserve-symlinks', script, ...args]);
 }
 export function validateWindowsBrokerRequest(request) {
-  object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context']);
+  object(request, ['version', 'executable', 'argv', 'cwd', 'environment', 'profile', 'grants', 'network', 'timeoutMs', 'guardianPid', 'context', ...(Object.hasOwn(request ?? {}, 'draft') ? ['draft'] : [])]);
   object(request.executable, ['path', 'sha256']); object(request.context, ['sessionId', 'operation', 'role']); object(request.grants, ['workspace', 'assets']);
   if (request.version !== 1 || !id(request.context.sessionId) || !['safe-exec', 'verification'].includes(request.context.operation) || !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, request.profile) || !profileAllowed(request.context.role, request.profile) || request.context.operation === 'verification' && request.context.role !== 'tester' || request.network !== 'DENY') fail('POLICY_INVALID');
+  if (Object.hasOwn(request, 'draft')) {
+    object(request.draft, ['id', 'revision', 'digest']);
+    if (!id(request.draft.id) || !Number.isSafeInteger(request.draft.revision) || request.draft.revision < 0 || request.draft.revision > 40 || !/^[0-9a-f]{64}$/u.test(request.draft.digest) || !['worker', 'tester'].includes(request.context.role)) fail('DRAFT_INVALID');
+  }
   const executable = request.executable.path;
   if (!string(executable) || !/^[A-Za-z]:[\\/]/u.test(executable) || executable.slice(2).includes(':') || !executable.toLowerCase().endsWith('.exe') || /^(?:cmd|powershell|pwsh|wscript|cscript|mshta|rundll32|regsvr32)\.exe$/iu.test(path.win32.basename(executable)) || !/^[0-9a-f]{64}$/u.test(request.executable.sha256)) fail('EXECUTABLE_INVALID');
   if (!Array.isArray(request.argv) || request.argv.length > 128 || request.argv.some((arg) => !string(arg) || arg.length > 4096)) fail('ARGUMENT_INVALID');
@@ -60,7 +64,7 @@ export function validateWindowsBrokerRequest(request) {
 export function validateWindowsBrokerReceipt(value) {
   object(value, ['version', 'platform', 'backend', 'profile', 'role', 'operation', 'sessionId', 'scopeId', 'tokenVerified', 'jobAttested', 'targetStarted', 'exitCode', 'timedOut', 'cleanup', 'securityFailure']);
   const interrupted = ['CANCELLED', 'SUPERVISOR'].includes(value.securityFailure);
-  if (value.version !== 1 || value.platform !== 'win32' || value.backend !== 'windows-lpac-broker' || ![null, 'REQUEST', 'SCOPE', 'RUNTIME', 'GRANTS', 'LAUNCH', 'EXECUTION', 'CLEANUP', 'CANCELLED', 'SUPERVISOR'].includes(value.securityFailure) || !['PASS', 'FAIL'].includes(value.cleanup) || !Number.isInteger(value.exitCode) || value.exitCode < 0 || value.exitCode > 255 || typeof value.timedOut !== 'boolean' || ['tokenVerified', 'jobAttested', 'targetStarted'].some((key) => typeof value[key] !== 'boolean' && !(interrupted && value[key] === null))) fail('RECEIPT_INVALID');
+  if (value.version !== 1 || value.platform !== 'win32' || value.backend !== 'windows-lpac-broker' || ![null, 'REQUEST', 'SCOPE', 'RUNTIME', 'GRANTS', 'LAUNCH', 'EXECUTION', 'DRAFT', 'CLEANUP', 'CANCELLED', 'SUPERVISOR'].includes(value.securityFailure) || !['PASS', 'FAIL'].includes(value.cleanup) || !Number.isInteger(value.exitCode) || value.exitCode < 0 || value.exitCode > 255 || typeof value.timedOut !== 'boolean' || ['tokenVerified', 'jobAttested', 'targetStarted'].some((key) => typeof value[key] !== 'boolean' && !(interrupted && value[key] === null))) fail('RECEIPT_INVALID');
   if (value.scopeId !== null && !id(value.scopeId) || value.sessionId !== null && !id(value.sessionId) || value.profile !== null && !Object.hasOwn(WINDOWS_CAPABILITY_PROFILES, value.profile) || value.role !== null && !Object.hasOwn({ worker: 1, tester: 1, scout: 1, reviewer: 1 }, value.role) || value.operation !== null && !['safe-exec', 'verification'].includes(value.operation)) fail('RECEIPT_INVALID');
   if (value.securityFailure === null && (!value.tokenVerified || !value.jobAttested || !value.targetStarted || value.cleanup !== 'PASS' || value.scopeId === null || !profileAllowed(value.role, value.profile)) || value.exitCode === 0 && value.securityFailure !== null || value.timedOut !== (value.exitCode === 124)) fail('RECEIPT_INVALID');
   return Object.freeze({ ...value });
@@ -111,7 +115,7 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}
   try {
     const records = stdout.trim().split(/\r?\n/u).map((line) => JSON.parse(line));
     if (records.length !== (admission ? 2 : 1)) fail('PROTOCOL_INVALID');
-    const result = records.at(-1); object(result, ['kind', 'stdoutBase64', 'stderrBase64', 'receipt']);
+    const result = records.at(-1); object(result, ['kind', 'stdoutBase64', 'stderrBase64', 'receipt', ...(request.draft ? ['draft'] : [])]);
     if (result.kind !== 'result') fail('PROTOCOL_INVALID');
     const receipt = validateWindowsBrokerReceipt(result.receipt);
     if (status !== receipt.exitCode || receipt.scopeId !== (admission?.scopeId ?? null) || ['profile', 'role', 'operation', 'sessionId'].some((key) => receipt[key] !== (key === 'profile' ? request.profile : request.context[key]))) fail('PROTOCOL_INVALID');
@@ -121,6 +125,11 @@ export async function runWindowsSecureBroker(input, { signal, onAdmission } = {}
     };
     const output = decode(result.stdoutBase64), error = decode(result.stderrBase64);
     if (output.length + error.length > WINDOWS_PROCESS_LIMITS.outputBytes) fail('OUTPUT_LIMIT');
-    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt };
+    if (request.draft) {
+      object(result.draft, ['id', 'revision', 'digest', 'snapshot', 'jobEmptyVerified']);
+      if (['id', 'revision', 'digest'].some(key => result.draft[key] !== request.draft[key]) || receipt.exitCode === 0 && result.draft.snapshot === null || receipt.exitCode !== 0 && result.draft.snapshot !== null) fail('DRAFT_INVALID');
+      if (typeof result.draft.jobEmptyVerified !== 'boolean' || receipt.exitCode === 0 && !result.draft.jobEmptyVerified) fail('DRAFT_INVALID');
+    }
+    return { code: receipt.exitCode, stdout: output.toString('utf8'), stderr: error.toString('utf8'), receipt, ...(request.draft ? { draftSnapshot: result.draft.snapshot, jobEmptyVerified: result.draft.jobEmptyVerified } : {}) };
   } catch { recovery(); fail('PROTOCOL_INVALID'); }
 }

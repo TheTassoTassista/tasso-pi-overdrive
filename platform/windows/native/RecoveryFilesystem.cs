@@ -135,7 +135,7 @@ namespace Phi.Native {
     // Read-only controller extraction. Every component is opened from a held
     // directory; all source handles remain pinned until the snapshot completes.
     // No host grants, pathname reads, recursive copies or publication authority.
-    internal object ReadProjectSnapshot() {
+    internal object ReadProjectSnapshot(bool strictDraft = false) {
       var handles = new List<IntPtr>();
       var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
       var identities = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -146,13 +146,13 @@ namespace Phi.Native {
         IntPtr root = OpenRelative(parents[parents.Count - 2], Path.GetFileName(directoryPath), 0x81, 1, 1, 1, IntPtr.Zero, out info);
         handles.Add(root);
         if (HandleIdentity(root) != HandleIdentity(parents[parents.Count - 1])) throw new InvalidDataException();
-        SnapshotDirectory(root, "", 0, handles, files, identities, ref remaining, ref bytes, deadline);
+        SnapshotDirectory(root, "", 0, handles, files, identities, ref remaining, ref bytes, deadline, strictDraft);
         return new { version = 1, rootIdentity = HandleIdentity(root), files, identities };
       } finally { for (int i = handles.Count - 1; i >= 0; i--) CloseHandle(handles[i]); }
     }
     static void SnapshotDirectory(IntPtr directory, string prefix, int depth, List<IntPtr> handles,
         SortedDictionary<string, string> files, SortedDictionary<string, string> identities,
-        ref int remaining, ref int totalBytes, Stopwatch deadline) {
+        ref int remaining, ref int totalBytes, Stopwatch deadline, bool strictDraft) {
       if (depth > 12 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
       const int Size = 32768;
       IntPtr buffer = Marshal.AllocHGlobal(Size);
@@ -179,6 +179,7 @@ namespace Phi.Native {
               if (--remaining < 0 || !names.Add(name)) throw new InvalidDataException();
               // Names only: protected entries are never opened/read.
               bool protectedName = Regex.IsMatch(name, "\\A(?:\\.git|node_modules|\\.phi-cache|\\.env(?:\\..*)?|\\.ssh|\\.aws|\\.gnupg|\\.password-store|browser-data|keyrings|auth\\.json|credentials(?:\\.json)?|id_(?:rsa|dsa|ecdsa|ed25519)|known_hosts|netrc)\\z|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase);
+              if (protectedName && strictDraft) throw new InvalidDataException();
               if (!protectedName) {
                 if (!Regex.IsMatch(name, "\\A[A-Za-z0-9_.-]+\\z") || name.EndsWith(".") ||
                     Regex.IsMatch(name, "\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)", RegexOptions.IgnoreCase)) throw new InvalidDataException();
@@ -191,7 +192,7 @@ namespace Phi.Native {
                 if ((info.Attributes & 0x400) != 0) throw new InvalidDataException();
                 if (isDirectory) {
                   if ((info.Attributes & 0x10) == 0) throw new InvalidDataException();
-                  SnapshotDirectory(child, relative + "/", depth + 1, handles, files, identities, ref remaining, ref totalBytes, deadline);
+                  SnapshotDirectory(child, relative + "/", depth + 1, handles, files, identities, ref remaining, ref totalBytes, deadline, strictDraft);
                 } else {
                   if ((info.Attributes & 0x10) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 512 * 1024 || files.Count >= 256) throw new InvalidDataException();
                   byte[] value;

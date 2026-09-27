@@ -89,6 +89,7 @@ namespace Phi.Native {
     }
     internal static int Run(Stream input) {
       AppContainerScope scope = null; OwnedProcess.Capture capture = new OwnedProcess.Capture();
+      RecoveryFilesystem draftPins = null; Dictionary<string, object> draft = null; object draftSnapshot = null;
       string profile = null, role = null, operation = null, session = null, failure = "REQUEST";
       int code = 70; bool cleanup = true;
       JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = 4 * MaxRequest;
@@ -100,7 +101,11 @@ namespace Phi.Native {
           }
           bytes = buffer.ToArray();
         }
-        Dictionary<string, object> request = Object(serializer.DeserializeObject(new UTF8Encoding(false, true).GetString(bytes)), "version", "executable", "argv", "cwd", "environment", "profile", "grants", "network", "timeoutMs", "guardianPid", "context");
+        object parsed = serializer.DeserializeObject(new UTF8Encoding(false, true).GetString(bytes));
+        var raw = parsed as Dictionary<string, object>;
+        bool hasDraft = raw != null && raw.ContainsKey("draft");
+        string[] keys = new string[] { "version", "executable", "argv", "cwd", "environment", "profile", "grants", "network", "timeoutMs", "guardianPid", "context" };
+        Dictionary<string, object> request = Object(parsed, hasDraft ? keys.Concat(new string[] { "draft" }).ToArray() : keys);
         if (!(request["version"] is int) || (int)request["version"] != 1 || Text(request["network"]) != "DENY") throw new InvalidDataException();
         Dictionary<string, object> context = Object(request["context"], "sessionId", "operation", "role");
         session = Text(context["sessionId"]); operation = Text(context["operation"]); role = Text(context["role"]); profile = Text(request["profile"]);
@@ -108,6 +113,10 @@ namespace Phi.Native {
         string intended = role == "worker" ? "EDIT" : role == "tester" ? "TEST" : role == "reviewer" || role == "scout" ? "READ_ONLY" : null;
         bool profileAllowed = role == "worker" ? new string[] { "EDIT", "TEST", "READ_ONLY" }.Contains(profile) : profile == intended;
         if (!profileAllowed || intended == null || (operation != "safe-exec" && operation != "verification") || (operation == "verification" && role != "tester")) throw new InvalidDataException();
+        if (hasDraft) {
+          draft = Object(request["draft"], "id", "revision", "digest");
+          if (!Regex.IsMatch(Text(draft["id"]), "\\A[0-9a-f]{32}\\z") || !(draft["revision"] is int) || (int)draft["revision"] < 0 || (int)draft["revision"] > 40 || !Regex.IsMatch(Text(draft["digest"]), "\\A[0-9a-f]{64}\\z") || (role != "worker" && role != "tester")) throw new InvalidDataException();
+        }
         IList argv = request["argv"] as IList;
         if (argv == null || argv.Count > 128 || argv.Cast<object>().Any(v => Text(v).Length > 4096)) throw new InvalidDataException();
         string cwd = Relative(Text(request["cwd"]), true);
@@ -154,23 +163,38 @@ namespace Phi.Native {
         foreach (var pair in environment) env.Add(pair.Key, Text(pair.Value));
         var launch = new { command, args = argv, cwd = working, env, timeoutMs = request["timeoutMs"], guardianPid = request["guardianPid"] };
         failure = "LAUNCH";
+        // Pin the actual workspace and all ancestors BEFORE the untrusted
+        // target starts; readback cannot be redirected to a replacement path.
+        if (draft != null) draftPins = new RecoveryFilesystem(workspace);
         using (MemoryStream pipe = new MemoryStream(Encoding.UTF8.GetBytes(serializer.Serialize(launch) + "\n"))) code = OwnedProcess.Execute(pipe, scope, capture);
         if (!scope.TokenVerified || !capture.JobAttested || !capture.Started || !capture.Drained) code = 70;
         failure = code == 70 ? "EXECUTION" : null;
+        if (draft != null && code == 0) {
+          failure = "DRAFT";
+          if (!capture.JobEmptyVerified) throw new InvalidDataException();
+          // Reject protected names, aliases, non-UTF8 and overflow. Never
+          // silently omit an unsafe output and call the remaining draft valid.
+          draftSnapshot = draftPins.ReadProjectSnapshot(true);
+          failure = null;
+        }
       } catch {
         code = 70;
         if (failure == "REQUEST") { profile = null; role = null; operation = null; session = null; }
       }
       finally {
+        if (draftPins != null) draftPins.Dispose();
         if (scope != null) cleanup = scope.FinishBroker();
         if (!cleanup) { code = 70; failure = "CLEANUP"; }
+        if (code != 0) draftSnapshot = null;
       }
       // Child stdout/stderr never share the control channel: no forged receipt.
       // Tool output is an artifact, explicitly separate from metadata receipt.
-      Console.WriteLine(serializer.Serialize(new {
-        kind = "result", stdoutBase64 = Convert.ToBase64String(capture.Drained ? capture.Output.ToArray() : new byte[0]), stderrBase64 = Convert.ToBase64String(capture.Drained ? capture.Error.ToArray() : new byte[0]),
-        receipt = new { version = 1, platform = "win32", backend = "windows-lpac-broker", profile, role, operation, sessionId = session, scopeId = scope == null ? null : scope.Id, tokenVerified = scope != null && scope.TokenVerified, jobAttested = capture.JobAttested, targetStarted = capture.Started, exitCode = code, timedOut = code == 124, cleanup = cleanup ? "PASS" : "FAIL", securityFailure = failure }
-      }));
+      var result = new Dictionary<string, object> {
+        { "kind", "result" }, { "stdoutBase64", Convert.ToBase64String(capture.Drained ? capture.Output.ToArray() : new byte[0]) }, { "stderrBase64", Convert.ToBase64String(capture.Drained ? capture.Error.ToArray() : new byte[0]) },
+        { "receipt", new { version = 1, platform = "win32", backend = "windows-lpac-broker", profile, role, operation, sessionId = session, scopeId = scope == null ? null : scope.Id, tokenVerified = scope != null && scope.TokenVerified, jobAttested = capture.JobAttested, targetStarted = capture.Started, exitCode = code, timedOut = code == 124, cleanup = cleanup ? "PASS" : "FAIL", securityFailure = failure } }
+      };
+      if (draft != null) result.Add("draft", new { id = draft["id"], revision = draft["revision"], digest = draft["digest"], snapshot = draftSnapshot, jobEmptyVerified = capture.JobEmptyVerified });
+      Console.WriteLine(serializer.Serialize(result));
       capture.Overflow.Dispose(); return code;
     }
   }

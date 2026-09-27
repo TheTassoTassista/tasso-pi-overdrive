@@ -1,5 +1,36 @@
 # B2 governed Worker transport — IN_PROGRESS, not Windows-ready
 
+## Persistent draft candidate (native proof pending)
+
+The controller seeds lib/phi-worker-draft.mjs once from the approved native
+source snapshot. The immutable bounded payload persists in controller memory
+for the bound session, not in the original project or a caller-selected path.
+Every command rehydrates that same payload into a fresh LPAC workspace; logical
+draft ID/revision/content digest and original native base ID remain continuous.
+Actual execution-copy IDs are recorded separately and may change. No restart
+durability or physical-file-ID persistence across copies is claimed.
+
+Native workspace/ancestors are pinned before target launch. Readback uses held
+handles after owned Job emptiness and drained output, before scope cleanup;
+protected entries, reparse/hardlink/non-UTF8/overflow are rejected, not omitted.
+Only exit0 + validated readback + cleanupPASS commits. Partial failed copies are
+discarded. Revocation aborts tools and clears payload, leaving metadata/digest
+evidence, never restoring interactive authority. No raw files in traces.
+
+verification_gate now obtains the real bound Worker authority and holds one
+exclusive lease for all TEST checks against the immutable draft revision.
+Each command consumes the fixed40-call budget. TEST denial plus content-digest
+comparison precede PASS; no-check/list/error/revocation is never verification
+PASS. The host snapshot is checked for native base identity, never substituted
+as verification input. Source changes are not overwritten; publication is
+separate and still blocked. Stale/replayed leases and copied tokens fail closed.
+
+Mandatory native tests and actual Pi factory fixtures cover command persistence,
+same-draft verification, nonzero partial-copy preservation, post-edit revoke and
+owned cleanup. Linux units/binding pass but native proof is pending the new CI.
+Historical receipt below only proves preceding transport. Once accepted, start
+C streaming LSP, then D crash-atomic publication preparation. Autonomy BLOCKED.
+
 ## Production path and authority
 
 secure-workflow.ts reserves authority only for a controller-selected Worker
@@ -39,7 +70,7 @@ extensions/controller code are part of the TCB, not protected from themselves.
 | Worker safe_exec | shared brokered handler; opaque authority required for Worker privileges |
 | Worker bash/PowerShell/subagent/eval/debug/AST rewrite/write/edit/remove | actual Worker hook denies, even if upstream list exposes them |
 | Worker read/grep/find/ls | existing governed host read tools, not an LPAC process; existing path safety still applies |
-| verification_gate | B1 read-only TEST broker; currently denied in Worker boundary pending attempt-aware integration |
+| verification_gate | B1 read-only TEST broker; Worker uses opaque attempt authority and same immutable draft under a batch lease |
 | secure workflow controller pi.exec verification | unreachable on Windows while whole-workflow gate remains false; Linux-only today |
 | native snapshot/build/recovery / validation Jobs | INTERNAL_TRUSTED fixed endpoints, not Worker command transport |
 | Git allocator/orchestration/Pi SDK | trusted controller, native workflow integration remains incomplete |
@@ -82,7 +113,7 @@ skips and both independent clones PASS; Windows clone cleanup387ms/owned residua
 This closes those controls only; draft continuity/verification remain unfinished.
 This bounded transport task intentionally does not request host publication,
 does not disable completion guards and is not the full autonomy coding E2E.
-Whole workflow still blocked. Mutable snapshot is currently ephemeral per
+Whole workflow still blocked. At that preceding checkpoint the mutable snapshot was ephemeral per
 command: no durable draft, cross-command edits or host publication. VERIFIED
 only means command exit0 and owned cleanup, not PUBLISHED_TO_PROJECT. Required
 next B2 work is actual Pi child binding and controller-owned draft continuity

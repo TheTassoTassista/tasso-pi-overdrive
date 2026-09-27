@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current checkpoint — B1 COMPLETE on latest native run; B2 IN_PROGRESS
+## Current candidate — B2 draft continuity implemented, native certification pending
+
+B1 COMPLETE. Controller-owned, immutable session draft plus version-bound TEST verification implemented; successful native readback requires anchored workspace, empty owned Job and PASS cleanup. Failure discards partial execution copy; revocation clears draft payload while retaining metadata. Execution copies have new native IDs but one logical draft ID/content lineage; this is session persistence, NOT disk/restart durability. No host publication or PUBLISHED state. Required real Windows edit/read/failure/verify and post-edit revocation fixtures added; candidate validation pending next CI. Linux native skips are not Windows proof. C/D NOT_STARTED; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS. Exact next action in phi-progress.md. Active Pi/auth/routes and protected document unchanged;0external provider/model calls.
+
+## Previous verified checkpoint — B1 COMPLETE; initial B2 transport
 
 Final verified functional **1a74cab9aceadb6b04535cf27b5f674928030c10**, [CI36315617834](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36315617834) SUCCESS on Windows/Ubuntu and both independent clones. Windows190/181PASS/0FAIL/9Linux-only skips; Ubuntu190/90PASS/0FAIL/100Windows-only skips. Clone primary/cleanupPASS, Windows387ms/owned residual0. BOTH mandatory real-Pi controls PASS: actual foreground Worker/LPAC/Job/private denial/snapshot edit/receipt/cleanup and revoked built-in host-write denial/source preservation. Two deterministic turns each; zero external AI/provider requests. Complete local Linux723/623PASS/0FAIL/100native skips, syntax/installed-Pi TypeScript/package validation PASS. [Exact bounded proof](phi-worker-transport-evidence.json).
 

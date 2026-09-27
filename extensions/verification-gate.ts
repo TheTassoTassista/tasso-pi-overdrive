@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { requireCodingBackend, verifyCodingProject } from "../platform/shared/coding-execution.mjs";
+import { windowsWorkerAuthority } from "../lib/phi-worker-authority.mjs";
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/verify-project.mjs");
 const Params = Type.Object({
@@ -18,7 +19,10 @@ export default function (pi: ExtensionAPI) {
     parameters: Params,
     async execute(_id, params, signal, _update, ctx) {
       if (process.platform === "win32") {
-        const summary = await verifyCodingProject({ cwd: ctx.cwd, mode: params.mode ?? "quick", listOnly: params.listOnly ?? false, signal });
+        const sessionId = ctx.sessionManager.getSessionId();
+        const workerAuthority = windowsWorkerAuthority(sessionId);
+        const summary = await verifyCodingProject({ cwd: ctx.cwd, mode: params.mode ?? "quick", listOnly: params.listOnly ?? false, signal,
+          ...(workerAuthority ? { workerAuthority, sessionId } : {}) });
         for (const result of summary.results ?? []) pi.events.emit("pi-overdrive:execution-metadata", result.receipt);
         if (!["PASS", "LIST_ONLY"].includes(summary.status)) throw new Error(JSON.stringify(summary));
         return { content: [{ type: "text", text: JSON.stringify(summary) }], details: { status: summary.status } };

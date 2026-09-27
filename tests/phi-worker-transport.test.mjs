@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { reserveWindowsWorker, bindWindowsWorker, windowsWorkerAuthority, admitWindowsWorkerTool, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
 import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
-import { executeCodingTool, requireCodingBackend } from '../platform/shared/coding-execution.mjs';
+import { executeCodingTool, requireCodingBackend, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { windowsRecoveryStatus } from '../platform/windows/process.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 30000 };
@@ -102,6 +102,18 @@ test('revocation aborts admitted tools and root replacement invalidates the sess
     } finally { next.close(); }
   } finally { attempt.close(); item.cleanup(); }
 });
+test('stale tool lease cannot unlock or settle a later command in the same draft/session', () => {
+  const item = fixture(), attempt = controller(item);
+  try {
+    const old = admitWindowsWorkerTool(attempt.token, { cwd: item.project, sessionId: attempt.sessionId, syntax: true });
+    old.release();
+    const current = admitWindowsWorkerTool(attempt.token, { cwd: item.project, sessionId: attempt.sessionId, syntax: true });
+    old.release();
+    assert.throws(() => old.finish(null, false), /DRAFT_IDENTITY_INVALID/u);
+    assert.throws(() => admitWindowsWorkerTool(attempt.token, { cwd: item.project, sessionId: attempt.sessionId, syntax: true }), /ALREADY_RUNNING/u);
+    current.release();
+  } finally { attempt.close(); item.cleanup(); }
+});
 test('revoked Worker session cannot downgrade to the interactive B1 execution principal', async () => {
   const item = fixture({ 'run.cjs': 'process.exit(99)' }), attempt = controller(item);
   try {
@@ -182,15 +194,90 @@ test('native Worker cannot select capability/role/platform or submit a forged co
   } finally { attempt.close(); item.cleanup(); }
 });
 test('native Worker nonzero/timeout propagate with owned cleanup and no publication', native, async () => {
-  const item = fixture({ 'run.cjs': "console.error('FATAL worker failure');process.exit(73)" }), attempt = controller(item);
+  const item = fixture({ 'run.cjs': "console.error('FATAL worker failure');process.exit(73)", 'timeout.cjs': 'setInterval(()=>{},1000)' }), attempt = controller(item);
   try {
     await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['run.cjs'] }, attempt.ctx), error => {
       assert.equal(error.receipt.exitCode, 73); assert.equal(error.receipt.cleanup, 'PASS'); assert.match(error.message, /FATAL worker failure/u); return true;
     });
-    fs.writeFileSync(path.join(item.project, 'run.cjs'), 'setInterval(()=>{},1000)');
-    await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['run.cjs'], timeoutMs: 250 }, attempt.ctx), error => {
+    await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['timeout.cjs'], timeoutMs: 250 }, attempt.ctx), error => {
       assert.equal(error.receipt.exitCode, 124); assert.equal(error.receipt.timedOut, true); assert.equal(error.receipt.cleanup, 'PASS'); return true;
     });
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+  } finally { attempt.close(); item.cleanup(); }
+});
+
+const persistentFiles = () => ({
+  'input.txt': 'source', 'package.json': JSON.stringify({ scripts: { lint: 'node --check test.cjs', test: 'node test.cjs' } }),
+  'edit.cjs': "require('node:fs').writeFileSync('input.txt','edited');console.log(JSON.stringify({pid:process.pid}));",
+  'test.cjs': "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'edited');a.throws(()=>f.writeFileSync('input.txt','forbidden'),e=>['EPERM','EACCES'].includes(e.code));console.log(JSON.stringify({persisted:true,pid:process.pid}));",
+  'read.cjs': "require('node:assert/strict').equal(require('node:fs').readFileSync('input.txt','utf8'),'edited');console.log(JSON.stringify({persisted:true,pid:process.pid}));",
+  'fail.cjs': "require('node:fs').writeFileSync('input.txt','corrupt');console.error('FATAL partial copy discarded');process.exit(73);",
+});
+test('native same Worker draft persists and TEST verifies modified draft, never fresh host or concurrent user edit', native, async () => {
+  const item = fixture(persistentFiles()), attempt = controller(item), events = [];
+  try {
+    const original = await verifyCodingProject({ cwd: item.project });
+    assert.equal(original.status, 'FAIL'); // canonical false-positive control
+    const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx, undefined, row => events.push(row));
+    const edited = edit.details.receipt.draft;
+    assert.equal(edited.revision, 1); assert.equal(edited.state, 'EDITED');
+    fs.writeFileSync(path.join(item.project, 'input.txt'), 'concurrent-user-change');
+    const read = await executeBrokeredSafeExec({ program: 'node', args: ['read.cjs'] }, attempt.ctx, undefined, row => events.push(row));
+    assert.equal(JSON.parse(read.content[0].text).persisted, true);
+    const summary = await verifyCodingProject({ cwd: item.project, workerAuthority: attempt.token, sessionId: attempt.sessionId });
+    assert.equal(summary.status, 'PASS'); assert.equal(summary.results.length, 2);
+    assert.equal(summary.draft.state, 'VERIFIED'); assert.equal(summary.draft.revision, 1);
+    for (const receipt of [read.details.receipt, ...summary.results.map(row => row.receipt)]) {
+      assert.equal(receipt.draft.draftId, edited.draftId); assert.equal(receipt.draft.contentDigest, edited.contentDigest);
+      assert.equal(receipt.draft.baseRootIdentity, edited.baseRootIdentity); assert.equal(receipt.sessionId, attempt.sessionId.replaceAll('-', ''));
+      assert.equal(receipt.cleanup, 'PASS'); assert.equal(receipt.jobEmptyVerified, true); assert.equal(receipt.projectPublished, false);
+    }
+    assert.deepEqual(summary.results.map(row => row.receipt.workerAuthority.toolCallNumber), [3, 4]);
+    assert.ok(summary.results.every(row => row.receipt.role === 'tester' && row.receipt.profile === 'TEST'));
+    for (const result of [edit, read]) assert.throws(() => process.kill(JSON.parse(result.content[0].text).pid, 0), error => error.code === 'ESRCH');
+    assert.equal(fs.readFileSync(path.join(item.project, 'input.txt'), 'utf8'), 'concurrent-user-change');
+    assert.doesNotMatch(JSON.stringify(events), /input\.txt|edited|concurrent-user-change|files|stdout/u);
+    console.log(JSON.stringify({ control: 'SAME_DRAFT_VERIFICATION', receipts: [edit.details.receipt, read.details.receipt, ...summary.results.map(row => row.receipt)], hostUnchangedByWorker: true }));
+  } finally { attempt.close(); assert.equal(attempt.reservation.status().draft.payloadCleared, true); item.cleanup(); }
+});
+test('native partial failed command and subsequent revocation preserve prior draft digest without publication', native, async () => {
+  const item = fixture(persistentFiles()), attempt = controller(item);
+  try {
+    const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx);
+    const prior = edit.details.receipt.draft;
+    await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['fail.cjs'] }, attempt.ctx), error => {
+      assert.equal(error.receipt.exitCode, 73); assert.equal(error.receipt.publicationState, 'ROLLED_BACK');
+      assert.deepEqual(error.receipt.draft, prior); assert.match(error.message, /FATAL partial copy discarded/u); return true;
+    });
+    const read = await executeBrokeredSafeExec({ program: 'node', args: ['read.cjs'] }, attempt.ctx);
+    assert.equal(JSON.parse(read.content[0].text).persisted, true);
+    const beforeRevoke = attempt.reservation.status().draft;
+    attempt.reservation.revoke();
+    await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx), /AUTHORITY_UNAVAILABLE/u);
+    await assert.rejects(verifyCodingProject({ cwd: item.project, workerAuthority: attempt.token, sessionId: attempt.sessionId }), /AUTHORITY_UNAVAILABLE/u);
+    assert.equal(attempt.reservation.status().draft.contentDigest, beforeRevoke.contentDigest);
+    assert.equal(attempt.reservation.status().draft.revision, beforeRevoke.revision);
+    assert.equal(attempt.reservation.status().draft.payloadCleared, true);
+    assert.equal(fs.readFileSync(path.join(item.project, 'input.txt'), 'utf8'), 'source');
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+  } finally { attempt.close(); item.cleanup(); }
+});
+test('native unsafe draft readback cannot silently omit protected files or accept alias output', native, async () => {
+  const item = fixture({ ...persistentFiles(),
+    'protected.cjs': "require('node:fs').writeFileSync('.env','not-a-credential');",
+    'alias.cjs': "require('node:fs').linkSync('input.txt','alias.txt');",
+    'binary.cjs': "require('node:fs').writeFileSync('invalid.txt',Buffer.from([255]));",
+  }), attempt = controller(item);
+  try {
+    const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'] }, attempt.ctx);
+    for (const script of ['protected.cjs', 'alias.cjs', 'binary.cjs']) {
+      await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: [script] }, attempt.ctx), error => {
+        assert.equal(error.receipt.exitCode, 70); assert.equal(error.receipt.securityFailure, 'DRAFT');
+        assert.equal(error.receipt.cleanup, 'PASS'); assert.deepEqual(error.receipt.draft, edit.details.receipt.draft); return true;
+      });
+    }
+    const read = await executeBrokeredSafeExec({ program: 'node', args: ['read.cjs'] }, attempt.ctx);
+    assert.equal(JSON.parse(read.content[0].text).persisted, true);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
   } finally { attempt.close(); item.cleanup(); }
 });

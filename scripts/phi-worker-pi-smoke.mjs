@@ -25,12 +25,17 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-worker-real-pi-'));
 const project = path.join(temporary, 'project'), agentDir = path.join(temporary, 'agent');
 const savedAgentDir = process.env.PI_CODING_AGENT_DIR, savedFetch = globalThis.fetch;
 let externalRequests = 0, factory, child, reservation, sessionId;
+let revocationBefore;
 let report = { status: 'FAIL', platform: process.platform, externalProviderCalls: 0 };
 try {
   fs.mkdirSync(project); fs.mkdirSync(agentDir, { mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, 'settings.json'), '{}');
   fs.writeFileSync(path.join(project, 'input.txt'), 'source');
   fs.writeFileSync(path.join(project, 'run.cjs'), "const f=require('node:fs'),p=require('node:path'),a=require('node:assert/strict');f.writeFileSync('input.txt','snapshot-edit');a.equal(f.readFileSync('input.txt','utf8'),'snapshot-edit');a.throws(()=>f.readFileSync(p.join(p.dirname(process.cwd()),'private','control.txt')),e=>['EACCES','EPERM'].includes(e.code));console.log(JSON.stringify({edited:true,denied:true,pid:process.pid}));");
+  fs.writeFileSync(path.join(project, 'read.cjs'), "require('node:assert/strict').equal(require('node:fs').readFileSync('input.txt','utf8'),'snapshot-edit');console.log(JSON.stringify({persisted:true,pid:process.pid}));");
+  fs.writeFileSync(path.join(project, 'fail.cjs'), "require('node:fs').writeFileSync('input.txt','corrupt');console.error('FATAL discard partial draft');process.exit(73);");
+  fs.writeFileSync(path.join(project, 'test.cjs'), "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'snapshot-edit');a.throws(()=>f.writeFileSync('input.txt','attack'),e=>['EPERM','EACCES'].includes(e.code));console.log(JSON.stringify({verified:true,pid:process.pid}));");
+  fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ scripts: { test: 'node test.cjs' } }));
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   process.env.PI_CODING_AGENT_DIR = agentDir;
   globalThis.fetch = async () => { externalRequests++; throw new Error('PHI_WORKER_TEST_EXTERNAL_REQUEST_DENIED'); };
@@ -80,15 +85,19 @@ try {
       apiKey: 'offline-fixture-not-a-credential', models: [{ id: 'worker', name: 'Offline Worker fixture', reasoning: false,
         input: ['text'], contextWindow: 32768, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
       streamSimple: (model, context) => {
-        if (!revokedControl) assert.ok(windowsWorkerAuthority(sessionId));
-        else if (turns === 0) reservation.revoke();
+        const results = context.messages.filter(message => message.role === 'toolResult');
+        const plan = process.platform === 'win32' ? revokedControl ? ['run.cjs', 'REVOKED_WRITE'] : ['run.cjs', 'read.cjs', 'fail.cjs', 'read.cjs', 'VERIFY']
+          : revokedControl ? ['REVOKED_WRITE'] : [];
+        const step = plan[results.length];
+        if (step === 'REVOKED_WRITE') { revocationBefore = reservation.status(); reservation.revoke(); }
+        else if (!revokedControl || !results.length) assert.ok(windowsWorkerAuthority(sessionId));
         turns++;
         const stream = ai.createAssistantMessageEventStream();
-        const result = context.messages.find(message => message.role === 'toolResult');
-        const nativeTool = process.platform === 'win32' && !result && !revokedControl;
-        const revokedWrite = revokedControl && !result;
+        const nativeTool = step && step !== 'REVOKED_WRITE';
+        const revokedWrite = step === 'REVOKED_WRITE';
         const message = { role: 'assistant', content: revokedWrite ? [{ type: 'toolCall', id: 'revoked-host-write', name: 'write', arguments: { path: 'input.txt', content: 'unauthorized-host-edit' } }]
-          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool', name: 'safe_exec', arguments: { program: 'node', args: ['run.cjs'] } }]
+          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool-' + results.length, name: step === 'VERIFY' ? 'verification_gate' : 'safe_exec',
+            arguments: step === 'VERIFY' ? { mode: 'quick' } : { program: 'node', args: [step] } }]
           : [{ type: 'text', text: 'SNAPSHOT_ONLY_NO_PROJECT_PUBLICATION' }], api: model.api, provider: model.provider, model: model.id,
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
           stopReason: nativeTool || revokedWrite ? 'toolUse' : 'stop', timestamp: Date.now() };
@@ -101,9 +110,9 @@ try {
   // depth/tool-budget hooks and session. Only model output is deterministic.
   const worker = { name: 'worker', description: 'Bounded Worker transport', source: 'runtime', filePath: path.join(root, 'agents/worker.md'),
     acceptanceRole: 'writer', completionGuard: true, systemPromptMode: 'replace', inheritGlobalContext: false,
-    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: revokedControl ? ['write'] : process.platform === 'win32' ? ['safe_exec'] : [],
+    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: process.platform === 'win32' ? revokedControl ? ['safe_exec', 'write'] : ['safe_exec', 'verification_gate'] : revokedControl ? ['write'] : [],
     model: 'phi-worker-local/worker', thinking: 'off', systemPrompt: 'Deterministic Worker transport validation. Snapshot only.',
-    subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts')] : [],
+    subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts'), path.join(root, 'extensions/verification-gate.ts')] : [],
   };
   const deterministicFactory = { create: async launch => {
     assert.equal(launch.ambientExtensions, false);
@@ -115,20 +124,26 @@ try {
   }, dispose: () => factory.dispose() };
   const foregroundResult = await runSync(project, [worker], 'worker', task, { runId: executionId, parentSessionId,
     childSessionFactory: deterministicFactory, cwd: project, context: 'fresh', maxSubagentDepth: 1,
-    timeoutMs: 30000, toolBudget: { soft: 2, hard: 3, block: ['bash', 'subagent'] }, artifactConfig: { enabled: false },
+    timeoutMs: 30000, toolBudget: { soft: 6, hard: 7, block: ['bash', 'subagent'] }, artifactConfig: { enabled: false },
     share: false, modelOverride: worker.model, thinkingOverride: 'off' });
   assert.ok(sessionId); assert.notEqual(sessionId, parentSessionId);
   assert.equal(foregroundResult.exitCode, 0, foregroundResult.error);
   assert.deepEqual(errors, []); assert.equal(boundEvents, 1);
-  assert.equal(turns, revokedControl || process.platform === 'win32' ? 2 : 1);
+  assert.equal(turns, process.platform === 'win32' ? revokedControl ? 3 : 6 : revokedControl ? 2 : 1);
   assert.equal(child.messages.at(-1).stopReason, 'stop');
   if (revokedControl) {
-    const result = child.messages.find(message => message.role === 'toolResult');
+    const result = child.messages.filter(message => message.role === 'toolResult').at(-1);
     assert.equal(result.isError, true, 'revoked Worker must not run a host write even when its tool is present');
     assert.match(result.content[0].text, /PHI_WORKER_TOOL_DENIED|PHI_WORKER_AUTHORITY_UNAVAILABLE/u);
-    assert.deepEqual(receipts, []);
+    assert.equal(receipts.length, process.platform === 'win32' ? 1 : 0);
+    if (process.platform === 'win32') {
+      const before = revocationBefore.draft, after = reservation.status().draft;
+      assert.equal(before.state, 'EDITED'); assert.equal(before.revision, 1);
+      assert.equal(after.draftId, before.draftId); assert.equal(after.contentDigest, before.contentDigest);
+      assert.equal(after.revision, before.revision); assert.equal(after.payloadCleared, true);
+    }
   } else if (process.platform === 'win32') {
-    assert.equal(receipts.length, 1);
+    assert.equal(receipts.length, 5);
     const receipt = receipts[0], result = child.messages.find(message => message.role === 'toolResult');
     assert.equal(result.isError, false);
     assert.equal(receipt.role, 'worker'); assert.equal(receipt.profile, 'EDIT');
@@ -137,15 +152,31 @@ try {
     assert.equal(receipt.workerAuthority.executionId, executionId);
     const output = JSON.parse(result.content[0].text); assert.equal(output.edited, true); assert.equal(output.denied, true);
     assert.throws(() => process.kill(output.pid, 0), error => error.code === 'ESRCH');
+    const results = child.messages.filter(message => message.role === 'toolResult');
+    assert.deepEqual(results.map(result => result.isError), [false, false, true, false, false]);
+    assert.equal(receipts[2].exitCode, 73); assert.equal(receipts[2].publicationState, 'ROLLED_BACK');
+    assert.equal(receipts[2].draft.contentDigest, receipt.draft.contentDigest);
+    assert.equal(receipts.at(-1).role, 'tester'); assert.equal(receipts.at(-1).profile, 'TEST');
+    assert.equal(JSON.parse(results.at(-1).content[0].text).status, 'PASS');
+    assert.equal(receipts.at(-1).draft.state, 'VERIFIED');
+    for (const row of receipts) {
+      assert.equal(row.draft.draftId, receipt.draft.draftId); assert.equal(row.draft.revision, 1);
+      assert.equal(row.draft.contentDigest, receipt.draft.contentDigest); assert.equal(row.sessionId, sessionId.replaceAll('-', ''));
+      assert.equal(row.cleanup, 'PASS'); assert.equal(row.jobEmptyVerified, true); assert.equal(row.projectPublished, false);
+    }
+    for (const index of [1, 3]) assert.throws(() => process.kill(JSON.parse(results[index].content[0].text).pid, 0), error => error.code === 'ESRCH');
+    const verifiedOutput = JSON.parse(JSON.parse(results.at(-1).content[0].text).results[0].output);
+    assert.throws(() => process.kill(verifiedOutput.pid, 0), error => error.code === 'ESRCH');
   }
   assert.equal(fs.readFileSync(path.join(project, 'input.txt'), 'utf8'), 'source');
   await child.dispose(); child = undefined; await factory.dispose(); factory = undefined;
   assert.throws(() => windowsWorkerAuthority(sessionId), /AUTHORITY_UNAVAILABLE/u);
   assert.equal(externalRequests, 0);
   report = { status: 'PASS', platform: process.platform, piVersion: '0.87.1', subagentsVersion: '0.66.0',
-    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? 'REAL_FOREGROUND_WORKER_PI_FACTORY_TO_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
+    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
     foregroundExitCode: foregroundResult.exitCode,
-    boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts };
+    boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts,
+    ...(revokedControl ? { revocationBefore, revocationAfter: reservation.status() } : {}) };
 } catch (error) {
   report.failure = error instanceof Error ? error.message : 'UNKNOWN';
 } finally {
@@ -153,7 +184,8 @@ try {
   reservation?.revoke(); globalThis.fetch = savedFetch;
   if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
   fs.rmSync(temporary, { recursive: true, force: true });
-  report.cleanup = { temporaryRemoved: !fs.existsSync(temporary), authorityRevoked: sessionId ? (() => { try { windowsWorkerAuthority(sessionId); return false; } catch { return true; } })() : null };
+  report.cleanup = { temporaryRemoved: !fs.existsSync(temporary), authorityRevoked: sessionId ? (() => { try { windowsWorkerAuthority(sessionId); return false; } catch { return true; } })() : null,
+    draftPayloadCleared: reservation?.status().draft?.payloadCleared ?? null };
   report.externalRequests = externalRequests;
   if (!report.cleanup.temporaryRemoved || externalRequests) report.status = 'FAIL';
 }

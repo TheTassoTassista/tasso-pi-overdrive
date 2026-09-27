@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper } from './process.mjs';
 import { runWindowsSecureBroker, windowsNodeToolArguments, validateWindowsBrokerRequest } from './secure-broker.mjs';
 import { admitWindowsWorkerTool } from '../../lib/phi-worker-authority.mjs';
+import { draftContentDigest } from '../../lib/phi-worker-draft.mjs';
 
 const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -32,15 +33,22 @@ export function readWindowsProjectSnapshot(root) {
   });
   let value;
   try { value = JSON.parse(run.stdout); } catch { fail('PHI_PROJECT_SNAPSHOT_REJECTED'); }
+  if (run.status !== 0 || run.error) fail('PHI_PROJECT_SNAPSHOT_REJECTED');
+  return validateWindowsSnapshot(value);
+}
+
+export function validateWindowsSnapshot(value) {
   const identity = (id) => typeof id === 'string' && /^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(id);
-  if (run.status !== 0 || run.error || !shape(value, ['version', 'rootIdentity', 'files', 'identities']) || value.version !== 1 || !identity(value.rootIdentity) ||
+  if (!shape(value, ['version', 'rootIdentity', 'files', 'identities']) || value.version !== 1 || !identity(value.rootIdentity) ||
       !value.files || !value.identities || Array.isArray(value.files) || Array.isArray(value.identities) ||
       Object.keys(value.files).length !== Object.keys(value.identities).length ||
-      Object.keys(value.files).some((file) => typeof value.files[file] !== 'string' || !identity(value.identities[file]))) fail('PHI_PROJECT_SNAPSHOT_REJECTED');
-  validateWindowsBrokerRequest({ version: 1, executable: { path: process.execPath, sha256: 'a'.repeat(64) }, argv: [], cwd: '.', environment: {},
+      Object.keys(value.files).some((file) => typeof value.files[file] !== 'string' || !Object.hasOwn(value.identities, file) || !identity(value.identities[file])) ||
+      new Set(Object.values(value.identities)).size !== Object.keys(value.files).length) fail('PHI_PROJECT_SNAPSHOT_REJECTED');
+  // Validate payload policy without executing anything, including on Linux.
+  validateWindowsBrokerRequest({ version: 1, executable: { path: 'C:/Phi/snapshot-validation.exe', sha256: 'a'.repeat(64) }, argv: [], cwd: '.', environment: {},
     profile: 'TEST', grants: { workspace: value.files, assets: {} }, network: 'DENY', timeoutMs: 1, guardianPid: process.pid,
     context: { sessionId: 'a'.repeat(32), operation: 'verification', role: 'tester' } });
-  return Object.freeze({ files: Object.freeze(value.files), rootIdentity: value.rootIdentity, identities: Object.freeze(value.identities),
+  return Object.freeze({ files: Object.freeze({ ...value.files }), rootIdentity: value.rootIdentity, identities: Object.freeze({ ...value.identities }),
     digest: hash(JSON.stringify({ root: value.rootIdentity, identities: value.identities, files: value.files })) });
 }
 
@@ -61,25 +69,43 @@ export async function executeWindowsCodingTool(input, context) {
   const sessionId = context.sessionId?.replaceAll('-', '');
   if (!/^[0-9a-f]{32}$/u.test(sessionId ?? '')) fail('PHI_TOOL_SESSION_INVALID');
   if (context.signal?.aborted) fail('PHI_TOOL_CANCELLED');
-  if (Object.hasOwn(context, 'workerAuthority') && (context.operation !== 'safe-exec' || context.snapshot)) fail('PHI_TOOL_REQUEST_INVALID');
+  if (Object.hasOwn(context, 'workerAuthority') && context.snapshot) fail('PHI_TOOL_REQUEST_INVALID');
   const worker = Object.hasOwn(context, 'workerAuthority') ? admitWindowsWorkerTool(context.workerAuthority, {
-    cwd: input.cwd, sessionId: context.sessionId, syntax: input.args[0] === '--check', signal: context.signal,
+    cwd: input.cwd, sessionId: context.sessionId, syntax: input.args[0] === '--check', signal: context.signal, operation: context.operation,
   }) : null;
   try {
   // Controller-only reuse: tools cannot submit grants/base data.
-  const snapshot = context.snapshot ?? readWindowsProjectSnapshot(input.cwd);
-  if (worker && snapshot.rootIdentity !== worker.expectedRootIdentity) fail('PHI_WORKER_WORKSPACE_CHANGED');
+  const source = context.snapshot ?? readWindowsProjectSnapshot(input.cwd);
+  if (worker && source.rootIdentity !== worker.expectedRootIdentity) fail('PHI_WORKER_WORKSPACE_CHANGED');
+  const snapshot = worker ? worker.snapshot : source;
+  if (worker && !snapshot) fail('PHI_WORKER_DRAFT_IDENTITY_INVALID');
+  const result = await runSnapshot(input, context, intent, snapshot, worker);
+  if (!worker) return result;
+  const finished = worker.finish(result.draftSnapshot, result.code === 0);
+  return finishDraftResult(result, worker, finished);
+  } finally { worker?.release(); }
+}
+
+async function runSnapshot(input, context, intent, snapshot, worker) {
   if (!Object.hasOwn(snapshot.files, intent.script)) fail('PHI_TOOL_ENTRY_MISSING');
   const request = { version: 1, executable: { path: process.execPath, sha256: hash(fs.readFileSync(process.execPath)) },
     argv: [...intent.argv], cwd: '.', environment: { CI: '1', NO_COLOR: '1' }, profile: worker?.profile ?? intent.profile,
     grants: { workspace: snapshot.files, assets: {} }, network: 'DENY', timeoutMs: worker ? Math.min(input.timeoutMs, worker.remainingMs) : input.timeoutMs, guardianPid: process.pid,
-    context: { sessionId, operation: context.operation, role: worker?.role ?? intent.role } };
+    context: { sessionId: context.sessionId.replaceAll('-', ''), operation: context.operation, role: worker?.role ?? intent.role },
+    ...(worker ? { draft: worker.binding } : {}) };
   const result = await runWindowsSecureBroker(request, { signal: worker?.signal ?? context.signal });
   const failureReason = codingFailureReason(result.receipt);
-  return { ...result, metadata: Object.freeze({ ...result.receipt, productionPath: context.operation === 'safe-exec' ? 'safe_exec' : 'verification',
+  const draftSnapshot = worker && result.code === 0 ? validateWindowsSnapshot(result.draftSnapshot) : null;
+  return { ...result, draftSnapshot, metadata: Object.freeze({ ...result.receipt, productionPath: context.operation === 'safe-exec' ? 'safe_exec' : 'verification',
     snapshotDigest: snapshot.digest, publicationState: failureReason === null ? 'VERIFIED' : result.receipt.cleanup === 'PASS' ? 'ROLLED_BACK' : 'FAILED', projectPublished: false,
     failureReason, ...(worker ? { workerAuthority: worker.metadata } : {}) }) };
-  } finally { worker?.release(); }
+}
+
+function finishDraftResult(result, worker, finished) {
+  return { ...result, code: finished.cancelled ? 125 : result.code, metadata: Object.freeze({ ...result.metadata,
+    ...(finished.cancelled ? { nativeExitCode: result.code, exitCode: 125, failureReason: 'CANCELLED', publicationState: 'ROLLED_BACK' } : {}),
+    draftBefore: worker.before, draft: finished.draft, jobEmptyVerified: result.jobEmptyVerified ?? null,
+    publicationState: finished.cancelled || result.code !== 0 ? 'ROLLED_BACK' : finished.draft.state }) };
 }
 
 // No shell parser: only explicit registered single Node command forms.
@@ -102,7 +128,12 @@ export function windowsVerificationCommands(snapshot, mode = 'quick') {
   return Object.freeze(checks);
 }
 
-export async function verifyWindowsProject({ cwd, mode = 'quick', listOnly = false, signal, timeoutMs = 120000 }) {
+export async function verifyWindowsProject(input) {
+  if (!input || Object.keys(input).some(key => !['cwd', 'mode', 'listOnly', 'signal', 'timeoutMs', 'workerAuthority', 'sessionId'].includes(key))) fail('PHI_TOOL_REQUEST_INVALID');
+  const { cwd, mode = 'quick', listOnly = false, signal, timeoutMs = 120000, workerAuthority, sessionId: workerSessionId } = input;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000 || typeof listOnly !== 'boolean') fail('PHI_TOOL_REQUEST_INVALID');
+  if (Object.hasOwn(input, 'workerAuthority')) return verifyWorkerDraft({ cwd, mode, listOnly, signal, timeoutMs, workerAuthority, sessionId: workerSessionId });
+  if (workerSessionId !== undefined) fail('PHI_TOOL_SESSION_INVALID');
   const snapshot = readWindowsProjectSnapshot(cwd);
   const checks = windowsVerificationCommands(snapshot, mode);
   const sessionId = randomUUID();
@@ -117,4 +148,31 @@ export async function verifyWindowsProject({ cwd, mode = 'quick', listOnly = fal
   }
   return { status: results.length === 0 ? 'NO_CHECKS' : results.length === checks.length && results.every((row) => row.status === 'PASS') ? 'PASS' : 'FAIL',
     platform: 'win32', backend: 'windows-lpac-broker', sandboxed: results.length > 0, projectPublished: false, results };
+}
+
+async function verifyWorkerDraft({ cwd, mode, listOnly, signal, timeoutMs, workerAuthority, sessionId }) {
+  const worker = admitWindowsWorkerTool(workerAuthority, { cwd, sessionId, signal, operation: 'verification' });
+  try {
+    if (!worker.snapshot || readWindowsProjectSnapshot(cwd).rootIdentity !== worker.expectedRootIdentity) fail('PHI_WORKER_WORKSPACE_CHANGED');
+    const snapshot = worker.snapshot, checks = windowsVerificationCommands(snapshot, mode), results = [];
+    if (listOnly) return { status: 'LIST_ONLY', checks, sandboxed: false, executionPerformed: false, projectPublished: false, draft: worker.before };
+    let last;
+    for (const check of checks) {
+      if (results.length) worker.nextCall();
+      const run = await runSnapshot({ program: check.program, args: check.args, cwd, timeoutMs }, { operation: 'verification', sessionId, signal },
+        windowsCodingIntent(check.program, check.args, 'verification'), snapshot, worker);
+      // The TEST kernel denies writes; compare content anyway before any PASS.
+      if (run.code === 0 && draftContentDigest(run.draftSnapshot.files) !== worker.binding.digest) fail('PHI_WORKER_DRAFT_IDENTITY_INVALID');
+      last = run;
+      results.push({ name: check.name, status: run.code === 0 ? 'PASS' : 'FAIL', exitCode: run.code, sandboxed: true,
+        output: run.stdout + run.stderr, receipt: finishDraftResult(run, worker, { cancelled: false, draft: worker.before }).metadata });
+      if (run.code !== 0) break;
+    }
+    let status = results.length === 0 ? 'NO_CHECKS' : results.length === checks.length && results.every(row => row.status === 'PASS') ? 'PASS' : 'FAIL';
+    const finished = worker.finish(last?.draftSnapshot, status === 'PASS', status === 'PASS');
+    if (finished.cancelled) status = 'FAIL';
+    if (last) results.at(-1).receipt = finishDraftResult(last, worker, finished).metadata;
+    return { status, platform: 'win32', backend: 'windows-lpac-broker', sandboxed: results.length > 0, projectPublished: false,
+      draft: finished.draft, results };
+  } finally { worker.release(); }
 }
