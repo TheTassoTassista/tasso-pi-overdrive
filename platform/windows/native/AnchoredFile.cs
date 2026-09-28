@@ -26,7 +26,7 @@ namespace Phi.Native {
     AnchoredFile(IntPtr ownedHandle) { handle = ownedHandle; }
     internal string Identity { get { return RecoveryFilesystem.HandleIdentity(handle); } }
     static void Check(bool ok) { if (!ok) throw new Win32Exception(Marshal.GetLastWin32Error()); }
-    static string[] Segments(string relative) {
+    internal static string[] Segments(string relative) {
       if (String.IsNullOrEmpty(relative) || relative.Length > 1024 || relative.IndexOfAny(new char[] { '\\', ':', '\0', '<', '>', '"', '|', '?', '*' }) >= 0) throw new InvalidDataException();
       string[] parts = relative.Split('/');
       string[] blocked = { ".git", "node_modules", ".aws", ".gnupg", ".password-store", ".ssh", "browser-data", "keyrings", ".env", "auth.json", "credentials", "credentials.json", "id_dsa", "id_ed25519", "id_ecdsa", "id_rsa", "known_hosts", "netrc" };

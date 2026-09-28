@@ -1,9 +1,75 @@
 # D — transactional project publication (IN PROGRESS)
 
-This checkpoint implements immutable baseline/preflight/authority and a separate
-native no-clobber CREATE primitive. It does **not** implement production project
-publication, a durable project transaction journal, replacement, rollback or
-restart recovery. Windows autonomy remains BLOCKED. B1/B2/C are retained, not
+## Durable journal continuation (native candidate, not publication)
+
+`platform/windows/native/PublicationJournal.cs` is now the trusted native journal
+subsystem. Its class is not a model tool, publication endpoint or project writer.
+`executePreparedWindowsPublication` remains BACKEND_UNAVAILABLE. Private registry
+`HKCU/Software/Phi/PublicationJournalV1` reuses validated user/SYSTEM-only ACLs;
+each new transaction binds an exclusive private named lease, creator PID **and
+generation**, project root native ID, original target IDs/digests, draft ID/version,
+verified/base digests and explicit CREATE/REPLACE/DELETE metadata. No project
+absolute path, source contents, environment or credential payload is stored.
+Metadata is deep-copied; protected paths/case aliases/duplicate IDs/extra fields
+are rejected. Ceilings:64 transactions,512 events,64KiB/event,64 operations.
+
+The journal is append-only `E00000000` onward: bounded binary format/version/length,
+SHA256 envelope integrity plus previous-event hash and strict sequence/state graph.
+Each event is synchronously flushed and read back; the first event also flushes
+the parent key. A failed persistence poisons the writer; an empty/unknown/torn/
+gapped/corrupt/unsafe-ACL journal is retained, not silently successful or deleted.
+[RegFlushKey](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regflushkey)
+documents persistence of the containing hive on return; it is expensive and has
+no hard syscall-latency guarantee. This is not a power-loss hardware certificate.
+Private same-user controller/runtime remains TCB; checksum is integrity detection,
+not a signature against malicious code with the user's own authority. Removing a
+valid tail can yield an older valid prefix; restart still requires recovery and
+never treats even a clean prefix as publication success.
+
+Explicit phases include PREPARED/TEMP_WRITTEN/TEMP_FLUSHED/READY_TO_COMMIT/
+COMMIT_STARTED/COMMITTED/VERIFIED/CLEANED plus CONFLICT/ROLLBACK_REQUIRED/
+ROLLED_BACK/RECOVERY_REQUIRED/FAILED. Skipped phases/terminal resurrection deny.
+Actual COMMITTED/VERIFIED/CLEANED writes/read certificates are denied until real
+native commit/cleanup observations exist. The class currently tracks precommit
+metadata only; it does not implement partial multi-file progress or rollback.
+
+`Inspect` re-opens and validates the whole bounded chain and project root/base
+manifest. A busy lease or live matching generation is ACTIVE; a dead producer
+with matching base is RECOVERY_REQUIRED; concurrent target content/native-ID
+changes are CONFLICT. Wrong project ID, unknown schema/ACL/integrity deny. It
+never changes project/temp files or journal keys, kills processes, infers a
+commit from a temp file, or performs rollback. Unknown resources remain untouched.
+Full unchanged-manifest preflight remains the controller's separate responsibility;
+this journal check is per planned target, not a replacement for that preflight.
+
+Required native fixed fixtures include persistence/phase/duplicate/live-lease,
+corrupt/gap/size/unknown-schema/ACL, wrong-root, user-change/same-content-ID change,
+protected path and five real writer terminations/restart inspections. The fixed
+child can borrow only a validated live ScopeRecovery root (private record, lease,
+generation, native ID), not an arbitrary pathname. No model calls. Deliberate
+fixture corruption is removed only by that original test owner, not recovery.
+TEMP_* fixture phase events simulate **journal progression only**, not physical
+temp operations. These receipts always projectPublished=false, committed=[] and
+cleanup=NOT_PERFORMED (journal inspection); owned test-fixture cleanup is separate.
+They are NOT actual publication-crash, restart rollback or D completion proof.
+
+Safe replacement remains unresolved. Microsoft's
+[FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
+allows POSIX replacement with open target handles, but documents no expected-target
+identity compare-and-swap. It must not be used as an unvalidated replacement.
+[Oplock types](https://learn.microsoft.com/en-us/windows/win32/fileio/types-of-opportunistic-locks)
+retain sharing violations when incompatible handles are not closed; introducing an
+oplock alone is not proof that safe replacement can proceed without releasing the
+protected destination. Narrow native experiments/actual identity and crash proof
+must precede any production replacement adapter. No new rights/sharing/driver,
+filesystem transaction dependency or silent compatibility fallback was introduced.
+
+## Retained preflight/CREATE checkpoint (39daeba)
+
+The preceding checkpoint implements immutable baseline/preflight/authority and a
+separate native no-clobber CREATE primitive. It did **not** implement a journal;
+the journal continuation above does not yet implement production project
+publication, replacement, rollback or publication restart recovery. Windows autonomy remains BLOCKED. B1/B2/C are retained, not
 re-certified as a complete Windows engine.
 
 ## Actual lifecycle and receipt meaning

@@ -64,14 +64,14 @@ namespace Phi.Native {
     internal static string RootBase { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Phi", "NativeScopesV1"); } }
     static string RootFor(string id) { if (!IdPattern.IsMatch(id)) throw new InvalidDataException(); return Path.Combine(RootBase, id); }
     static SecurityIdentifier User { get { return WindowsIdentity.GetCurrent().User; } }
-    static RegistrySecurity PrivateRegistryAcl() {
+    internal static RegistrySecurity PrivateRegistryAcl() {
       RegistrySecurity acl = new RegistrySecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(User);
       foreach (SecurityIdentifier sid in new SecurityIdentifier[] { User, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
         acl.AddAccessRule(new RegistryAccessRule(sid, RegistryRights.FullControl, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
       acl.AddAccessRule(new RegistryAccessRule(new SecurityIdentifier("S-1-3-4"), RegistryRights.ReadPermissions, InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
       return acl;
     }
-    static void ValidateRegistry(RegistryKey key) {
+    internal static void ValidateRegistry(RegistryKey key) {
       RegistrySecurity acl = key.GetAccessControl();
       if (!acl.AreAccessRulesProtected || !User.Equals(acl.GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
       foreach (RegistryAccessRule rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier))) {
@@ -113,7 +113,7 @@ namespace Phi.Native {
       bool created; return new Mutex(false, "Local\\Phi.Scope." + User.Value + "." + id, out created, acl);
     }
     static bool Acquire(Mutex mutex) { try { return mutex.WaitOne(0); } catch (AbandonedMutexException) { return true; } }
-    static string ProcessCreation(int pid, out bool alive) {
+    internal static string ProcessCreation(int pid, out bool alive) {
       IntPtr process = OpenProcess(0x1000 | 0x100000, false, (uint)pid);
       if (process == IntPtr.Zero) { int error = Marshal.GetLastWin32Error(); if (error == 87) { alive = false; return null; } throw new Win32Exception(error); }
       try {
@@ -175,6 +175,20 @@ namespace Phi.Native {
       string[] keys = { "v", "id", "pid", "created", "profile", "registry", "rootIdentity", "ready" };
       if (value == null || value.Count != keys.Length || keys.Any(k => !value.ContainsKey(k)) || !(value["v"] is int) || (int)value["v"] != 1 || (string)value["id"] != id || !(value["pid"] is int) || (int)value["pid"] < 1 || !(value["created"] is string) || !Regex.IsMatch((string)value["created"], "\\A[0-9a-f]{16}\\z") || !(value["profile"] is bool) || !(value["registry"] is bool) || !(value["ready"] is bool) || !(value["rootIdentity"] is string) || (!IdentityPattern.IsMatch((string)value["rootIdentity"]) && (string)value["rootIdentity"] != "")) throw new InvalidDataException();
       return value;
+    }
+    // Fixed journal fixtures borrow a real live scope, never PID/path alone.
+    // Does not grant cleanup authority or change the ownership record.
+    internal static void ValidateLiveRoot(string id, string expectedIdentity) {
+      if (!IdPattern.IsMatch(id) || !IdentityPattern.IsMatch(expectedIdentity)) throw new InvalidDataException();
+      using (RegistryKey root = OpenBase()) using (RegistryKey key = root.OpenSubKey(id)) {
+        if (key == null) throw new InvalidDataException();
+        Dictionary<string, object> value = Read(key, id);
+        bool alive; string generation = ProcessCreation((int)value["pid"], out alive);
+        if (!alive || generation != (string)value["created"] || !(bool)value["ready"] || (string)value["rootIdentity"] != expectedIdentity) throw new InvalidDataException();
+        using (Mutex mutex = ScopeMutex(id)) {
+          if (Acquire(mutex)) { mutex.ReleaseMutex(); throw new InvalidDataException(); }
+        }
+      }
     }
     internal static int Recover(bool emit, string only) {
       int scanned = 0, active = 0, recovered = 0, quarantined = 0;

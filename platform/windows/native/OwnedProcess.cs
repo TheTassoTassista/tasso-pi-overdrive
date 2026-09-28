@@ -108,6 +108,9 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--recovery-selftest") return ScopeRecovery.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--atomic-create-selftest") return AnchoredFile.AtomicCreateSelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--publication-journal-selftest") return PublicationJournal.SelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--publication-journal-fixture-child") return PublicationJournal.FixtureChild(args[1]);
+      if (args.Length == 1 && args[0] == "--publication-journal-fixture-inspect") return PublicationJournal.FixtureInspect();
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
       if (args.Length == 1 && args[0] == "--lpac-broker" && IntPtr.Size == 8) return ExecutionBroker.Run(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--project-snapshot" && IntPtr.Size == 8) return ExecutionBroker.Snapshot(Console.OpenStandardInput());

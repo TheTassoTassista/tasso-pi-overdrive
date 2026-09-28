@@ -22,6 +22,7 @@ export function ownedWindowsHelper() {
     if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 1024 * 1024) throw new Error('PHI_NATIVE_PROCESS_BUILD_REQUIRED');
   }
   const record = JSON.parse(fs.readFileSync(manifest, 'utf8').replace(/^\uFEFF/u, ''));
+  if (record.publicationJournalSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'PublicationJournal.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.brokerSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'ExecutionBroker.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.anchoredFileSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'AnchoredFile.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');
   if (record.recoverySourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'ScopeRecovery.cs')) || record.recoveryFilesystemSourceSha256 !== digest(path.join(root, 'platform', 'windows', 'native', 'RecoveryFilesystem.cs'))) throw new Error('PHI_NATIVE_PROCESS_BUILD_INVALID');

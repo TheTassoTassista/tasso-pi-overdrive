@@ -2,6 +2,12 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current D journal candidate — native proof pending
+
+Interrupted document/evidence checkpoint finished as local/remote b509b8a, reusing exact functional39da/nativeCI36338087065 green proof below. New native durable publication journal/source attestation and18required native controls implemented; full Linux797/650PASS/0FAIL/147native skips plus syntax/installed-Pi TypeScript/package validation PASS. Exact native build/controls/full/retained Pi/clones/cleanup not yet credited. Private ACL/generation/lease/native-root/target manifest binding, strict bounded metadata, immutable sequence/hash/checksum envelopes and synchronous registry flush/readback; failed or uncertain state retained and fail-closed. No raw contents/environment/credentials/project path. Read-only restarted inspector never mutates a project/temp/key or kills processes; no published success certificate is available.
+
+Five new actual process-termination/restarted-inspector controls exercise journal phases, NOT physical write/flush/replace or complete transaction recovery. D1 native candidate; D2 partial; D3-D14 actual publication unfinished; no Windows readiness switch.0external model/provider calls, protected/auth/stable installation/routing/Second Brain/security/governors unchanged. **B1/B2/C retained COMPLETE; D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.** Next exact native candidate proof, then expected-ID crash-atomic replacement/actual publication recovery, never unconditional path overwrite, releasing a held expected destination, in-place/copy fallback or success inferred from temp presence.
+
 ## Verified D subsystem — NOT production publication
 
 Functional **39daebadb8ee3c069597591c39b3b16a91ae291d**, [CI36338087065](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36338087065) SUCCESS Windows/Ubuntu. Windows245/235PASS/0FAIL/0cancelled/10Linux-only skips; Ubuntu245/116PASS/0FAIL/129native skips. Dedicated CREATE18/18PASS/0FAIL/0skip; LSP8/7PASS/0FAIL/1skip,13 recovery controls retained. Full Linux778/649PASS/0FAIL/129native skips; syntax/installed-Pi TypeScript/package-pinned-policy-secret validation PASS.
