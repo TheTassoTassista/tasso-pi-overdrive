@@ -1,5 +1,37 @@
 # D — transactional project publication (IN PROGRESS)
 
+## D3 journal-MODIFY integration candidate (native proof pending)
+
+The existing PublicationJournal now has a strict V2 single-REPLACE graph. Its
+private observation writer is driven by the actual AtomicModify implementation:
+PREPARED -> TEMP_CREATED -> TEMP_WRITTEN -> TEMP_FLUSHED -> READY_TO_COMMIT ->
+COMMIT_STARTED -> COMMITTED -> POST_COMMIT_VERIFIED -> CLEANED. Generic Advance
+cannot forge V2 phases; V1 remains precommit-only. All-ID admission is serialized
+with the same private mutex ACL validation and a bounded1s wait; the64-record
+limit cannot race across different transaction IDs. No reclamation policy yet.
+
+The complete, flushed and hashed source is private to the SAME NTFS transaction
+and volume. Actual locked expected target ID/hash precedes any staged target
+write; synchronous KTM commit alone exposes NEW. The final source name is checked
+absent through the held parent before CLEANED. Unknown existence/sharing/error
+never becomes absence or permits deleting a newly found user object.
+
+On actual producer death the restarted inspector pins actual root/parents and
+destination while checking ID/hash and appending recovery metadata. OLD without
+a recorded commit permits ROLLED_BACK; matching NEW with a commit-possible prefix
+permits COMMITTED content observation, but retains RECOVERY_REQUIRED unless the
+live writer already recorded CLEANED. Neither result mutates project files or
+claims full verified-draft/ACL/creation-time continuity on restart. Different ID,
+neither digest, NEW before commit intent, or OLD after a recorded commit is a
+CONFLICT. No blind overwrite, retry/publication or arbitrary cleanup occurs.
+
+27controls include11exceptions and13actual publisher deaths/new recovery processes
+(10mutation-phase kills plus3post-death user content/ID/deletion conflicts). These are native journal
+and physical mutation controls, not a real verified Worker/Git-diff E2E. Aggregate
+fixture draft/base digests remain schema-only. The production opaque READY grant
+still denies BACKEND_UNAVAILABLE. Next bind the real controller grant and validate
+full digest continuity before PUBLISHED. D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## D3 native mechanism under evaluation — NOT production publication
 
 `AtomicModify.cs` extends the trusted native primitive layer for the existing

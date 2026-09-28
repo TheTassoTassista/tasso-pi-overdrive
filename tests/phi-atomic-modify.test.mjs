@@ -18,7 +18,8 @@ test('atomic MODIFY uses native transaction-bound handles only; no ordinary targ
   for (const name of ['build-process.mjs', 'process.mjs']) assert.match(fs.readFileSync(new URL('../platform/windows/' + name, import.meta.url), 'utf8'), /atomicModifySourceSha256/u);
   assert.equal(fs.readFileSync(new URL('../platform/windows/index.mjs', import.meta.url), 'utf8').includes('autonomousReady: true'), false);
 });
-for (const name of ['commit', 'old-visible-before-commit', 'locked-after-handles-close', 'changed-content', 'same-content-recreated', 'write', 'flush', 'before-commit', 'committed']) {
+for (const name of ['commit', 'old-visible-before-commit', 'locked-after-handles-close', 'changed-content', 'same-content-recreated', 'write', 'flush', 'before-commit', 'committed',
+  'junction', 'hardlink', 'ads', 'protected', 'root-identity', 'parent-swap', 'case-alias', 'rename-after-close', 'delete-after-close']) {
   test('native atomic MODIFY primitive: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--atomic-modify-selftest', name], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 20000, maxBuffer: 8192 });
     assert.equal(run.status, 0, run.stderr);
@@ -26,6 +27,8 @@ for (const name of ['commit', 'old-visible-before-commit', 'locked-after-handles
     assert.equal(receipt.passed, true); assert.equal(receipt.fixtureCleanup, true); assert.equal(receipt.externalRequests, 0);
     assert.equal(receipt.scope, 'NATIVE_TRANSACTION_PRIMITIVE_NOT_PRODUCTION_PUBLICATION'); assert.equal(receipt.projectPublished, false);
     if (name === 'locked-after-handles-close') { assert.equal(receipt.lockedAfterHandlesClose, true); assert.equal(receipt.outsideWritePositive, true); assert.equal(receipt.oldVisibleBeforeCommit, true); }
+    if (['parent-swap', 'rename-after-close', 'delete-after-close'].includes(name)) { assert.equal(receipt.competingDenied, true); assert.equal(receipt.afterClosePositive, true); }
+    if (name === 'commit' || name === 'case-alias') assert.equal(receipt.evidence.tempAbsent, true);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'NATIVE_ATOMIC_MODIFY_PRIMITIVE_ONLY', ...receipt }));
   });

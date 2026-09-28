@@ -1,5 +1,6 @@
-// Trusted publication metadata journal. No project writer or model endpoint.
-// Append-only, flushed binary envelopes; uncertain state is never success.
+// Trusted durable publication journal, never a model endpoint. V1 metadata
+// only; V2 single-file MODIFY uses the internal native transaction primitive.
+// Append-only flushed envelopes; uncertain/restarted state is never PUBLISHED.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,7 +21,7 @@ namespace Phi.Native {
   internal sealed class PublicationJournal : IDisposable {
     internal const string RegistryBase = "Software\\Phi\\PublicationJournalV1";
     const int MaxTransactions = 64, MaxEvents = 512, MaxBytes = 65536;
-    internal static readonly string[] Phases = { "PREPARED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "VERIFIED", "CLEANED", "CONFLICT", "ROLLBACK_REQUIRED", "ROLLED_BACK", "RECOVERY_REQUIRED", "FAILED" };
+    internal static readonly string[] Phases = { "PREPARED", "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "CLEANED", "CONFLICT", "ROLLBACK_REQUIRED", "ROLLED_BACK", "RECOVERY_REQUIRED", "FAILED" };
     static readonly Regex Id = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Identity = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Digest = new Regex("\\A[0-9a-f]{64}\\z", RegexOptions.CultureInvariant);
@@ -49,12 +50,12 @@ namespace Phi.Native {
       if (key == null) throw new InvalidDataException();
       try { ScopeRecovery.ValidateRegistry(key); return key; } catch { key.Dispose(); throw; }
     }
-    static Mutex Lease(string transactionId) {
+    static Mutex Lease(string transactionId, bool admission = false) {
       if (!Id.IsMatch(transactionId)) throw new InvalidDataException();
       SecurityIdentifier user = WindowsIdentity.GetCurrent().User;
       MutexSecurity acl = new MutexSecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(user);
       foreach (SecurityIdentifier sid in new SecurityIdentifier[] { user, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) }) acl.AddAccessRule(new MutexAccessRule(sid, MutexRights.FullControl, AccessControlType.Allow));
-      bool created; Mutex result = new Mutex(false, "Local\\Phi.Publication." + user.Value + "." + transactionId, out created, acl);
+      bool created; Mutex result = new Mutex(false, "Local\\Phi.Publication." + user.Value + "." + (admission ? "Admission" : transactionId), out created, acl);
       try {
         MutexSecurity actual = result.GetAccessControl();
         if (!actual.AreAccessRulesProtected || !user.Equals(actual.GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
@@ -63,7 +64,7 @@ namespace Phi.Native {
         return result;
       } catch { result.Dispose(); throw; }
     }
-    static bool Acquire(Mutex mutex) { try { return mutex.WaitOne(0); } catch (AbandonedMutexException) { return true; } }
+    static bool Acquire(Mutex mutex, int waitMs = 0) { try { return mutex.WaitOne(waitMs); } catch (AbandonedMutexException) { return true; } }
     static byte[] Envelope(Dictionary<string, object> body) {
       byte[] bytes = new UTF8Encoding(false, true).GetBytes(Serializer().Serialize(body));
       if (bytes.Length > MaxBytes - 40) throw new InvalidDataException();
@@ -90,7 +91,7 @@ namespace Phi.Native {
     }
     static void ValidateHeader(Dictionary<string, object> value, string transactionId) {
       Keys(value, "version", "transactionId", "projectIdentity", "draftId", "draftVersion", "verifiedDigest", "baseDigest", "creatorPid", "creatorGeneration", "operations");
-      Number(value, "version", 1, 1); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
+      int version = Number(value, "version", 1, 2); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
       StringField(value, "projectIdentity", Identity); StringField(value, "draftId", Id); Number(value, "draftVersion", 0, Int32.MaxValue);
       StringField(value, "verifiedDigest", Digest); StringField(value, "baseDigest", Digest); Number(value, "creatorPid", 1, Int32.MaxValue);
       StringField(value, "creatorGeneration", new Regex("\\A[0-9a-f]{16}\\z"));
@@ -105,16 +106,18 @@ namespace Phi.Native {
         else { if (!ids.Add(StringField(op, "baseIdentity", Identity))) throw new InvalidDataException(); StringField(op, "baseDigest", Digest); }
         if (kind == "DELETE") { if (op["newDigest"] != null || op["newBytes"] != null) throw new InvalidDataException(); }
         else { StringField(op, "newDigest", Digest); Number(op, "newBytes", 0, 1024 * 1024); }
+        if (version == 2 && (Operations(value).Count != 1 || kind != "REPLACE" || Object.Equals(op["baseDigest"], op["newDigest"]))) throw new InvalidDataException();
       }
     }
-    static bool Transition(string from, string to, int previousOp, int nextOp, int count) {
+    static bool Transition(string from, string to, int previousOp, int nextOp, int count, int version) {
       if (!Phases.Contains(to) || from == "CLEANED" || from == "ROLLED_BACK" || from == "FAILED" || from == "CONFLICT") return false;
       if (to == "CONFLICT" || to == "FAILED" || to == "RECOVERY_REQUIRED" || to == "ROLLBACK_REQUIRED") return previousOp == nextOp;
       if (from == "ROLLBACK_REQUIRED") return to == "ROLLED_BACK" && previousOp == nextOp;
       if (from == "RECOVERY_REQUIRED") return false; // needs a separately proven recovery adapter, not a guessed phase
       if (from == "VERIFIED" && to == "TEMP_WRITTEN") return nextOp == previousOp + 1 && nextOp < count;
       if (previousOp != nextOp) return false;
-      string[] normal = { "PREPARED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "VERIFIED", "CLEANED" };
+      string[] normal = version == 2 ? new string[] { "PREPARED", "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }
+        : new string[] { "PREPARED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "VERIFIED", "CLEANED" };
       int index = Array.IndexOf(normal, from);
       return index >= 0 && index < normal.Length - 1 && normal[index + 1] == to && (to != "CLEANED" || nextOp == count - 1);
     }
@@ -152,26 +155,30 @@ namespace Phi.Native {
       PublicationJournal result = new PublicationJournal(transactionId, project);
       try {
         if (!MatchesBase(project, value)) throw new InvalidDataException();
-        using (RegistryKey root = OpenBase(true)) {
+        using (Mutex admission = Lease(transactionId, true)) {
+          if (!Acquire(admission, 1000)) throw new InvalidDataException();
+          try { using (RegistryKey root = OpenBase(true)) {
           if (root.GetSubKeyNames().Length >= MaxTransactions) throw new InvalidDataException();
           using (RegistryKey existing = root.OpenSubKey(transactionId)) if (existing != null) throw new InvalidDataException();
           using (RegistryKey key = root.CreateSubKey(transactionId, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, ScopeRecovery.PrivateRegistryAcl())) {
             result.header = value; result.Append(key, "PREPARED", 0, null, null);
           }
+          } } finally { admission.ReleaseMutex(); }
         }
         return result;
       } catch { result.Dispose(); throw; } // incomplete/unknown key retained, never guessed away
     }
-    void Append(RegistryKey key, string phase, int operationIndex, string tempIdentity, string committedIdentity) {
+    void Append(RegistryKey key, string phase, int operationIndex, string tempIdentity, string committedIdentity, bool nativeObservation = false) {
       if (poisoned || disposed || !acquired) throw new InvalidDataException();
       int sequence = last == null ? 0 : (int)last["sequence"] + 1;
       if (sequence >= MaxEvents || !Phases.Contains(phase) || operationIndex < 0 || operationIndex >= Operations(header).Count ||
           (tempIdentity != null && !Identity.IsMatch(tempIdentity)) || (committedIdentity != null && !Identity.IsMatch(committedIdentity))) throw new InvalidDataException();
-      if (last != null && !Transition((string)last["phase"], phase, (int)last["operationIndex"], operationIndex, Operations(header).Count)) throw new InvalidDataException();
+      if (last != null && !Transition((string)last["phase"], phase, (int)last["operationIndex"], operationIndex, Operations(header).Count, (int)header["version"])) throw new InvalidDataException();
       if (last != null && last["tempIdentity"] != null && (int)last["operationIndex"] == operationIndex && !Object.Equals(last["tempIdentity"], tempIdentity)) throw new InvalidDataException();
-      if (phase == "COMMITTED" || phase == "VERIFIED" || phase == "CLEANED") throw new InvalidOperationException("PHI_PUBLICATION_COMMIT_PROOF_NOT_IMPLEMENTED");
-      // Recording post-commit success is unavailable until native commit proof
-      // exists. Even a trusted caller cannot fabricate PUBLISHED via a journal.
+      if (((int)header["version"] == 2 && phase != "PREPARED" && !nativeObservation) ||
+          ((int)header["version"] == 1 && new string[] { "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains(phase))) throw new InvalidOperationException("PHI_PUBLICATION_COMMIT_PROOF_NOT_IMPLEMENTED");
+      // V1 remains precommit-only. V2 phases can only be written from this
+      // class's actual native mutation/inspection observations, never Advance.
       Dictionary<string, object> body = new Dictionary<string, object> {
         { "sequence", sequence }, { "previousDigest", lastDigest ?? new string('0', 64) }, { "phase", phase }, { "operationIndex", operationIndex },
         { "tempIdentity", tempIdentity }, { "committedIdentity", committedIdentity }, { "header", sequence == 0 ? header : null }
@@ -188,6 +195,7 @@ namespace Phi.Native {
       last = body; lastDigest = Hash(bytes);
     }
     internal void Advance(string phase, string tempIdentity) {
+      if ((int)header["version"] == 2) throw new InvalidOperationException("PHI_PUBLICATION_NATIVE_OBSERVATION_REQUIRED");
       using (RegistryKey root = OpenBase(true)) using (RegistryKey key = root.OpenSubKey(id, true)) {
         if (key == null) throw new InvalidDataException();
         ReadChain(key); // detect unexpected append/corruption before another write
@@ -198,6 +206,89 @@ namespace Phi.Native {
         Append(key, phase, (int)last["operationIndex"], tempIdentity, null);
       }
     }
+    void Observe(string phase, string tempIdentity, string committedIdentity) {
+      if ((int)header["version"] != 2) throw new InvalidDataException();
+      using (RegistryKey root = OpenBase(true)) using (RegistryKey key = root.OpenSubKey(id, true)) {
+        if (key == null) throw new InvalidDataException(); ReadChain(key);
+        // READY is recorded only after the actual temp flush/hash. The actual
+        // native writer subsequently re-checks the target under its KTM lock.
+        if (phase == "READY_TO_COMMIT" && !MatchesBase(project, header)) {
+          Append(key, "CONFLICT", 0, tempIdentity, null, true); throw new InvalidOperationException("PHI_PUBLICATION_CONFLICT");
+        }
+        Append(key, phase, 0, tempIdentity, committedIdentity, true);
+      }
+    }
+    internal object PublishSingleModify(byte[] bytes, Action<string> checkpoint) {
+      if ((int)header["version"] != 2 || (string)last["phase"] != "PREPARED") throw new InvalidDataException();
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      if (bytes == null || bytes.Length != (int)op["newBytes"] || Hash(bytes) != (string)op["newDigest"]) throw new InvalidDataException();
+      object proof = AtomicModify.ReplaceDefaultStream(project, (string)header["projectIdentity"], (string)op["path"], (string)op["baseIdentity"], (string)op["baseDigest"], bytes, delegate(string phase, string temp) {
+        if (phase == "temp") Observe("TEMP_CREATED", temp, null);
+        else if (phase == "write") Observe("TEMP_WRITTEN", temp, null);
+        else if (phase == "flush") Observe("TEMP_FLUSHED", temp, null);
+        else if (phase == "validation") Observe("READY_TO_COMMIT", temp, null);
+        else if (phase == "locked") Observe("COMMIT_STARTED", temp, null);
+        else if (phase == "committed") {
+          // A real kill here leaves a durable COMMIT_STARTED prefix and NEW
+          // complete bytes. Recovery must inspect the file, not guess OLD.
+          checkpoint("before-journal-committed");
+          Observe("COMMITTED", temp, (string)op["baseIdentity"]);
+        }
+        else if (phase == "postverify") Observe("POST_COMMIT_VERIFIED", temp, (string)op["baseIdentity"]);
+        else if (phase == "cleanup") Observe("CLEANED", temp, (string)op["baseIdentity"]);
+        checkpoint(phase);
+      });
+      if ((string)last["phase"] != "CLEANED") throw new InvalidDataException();
+      return new { journal = Metadata("NOT_REQUIRED"), nativeProof = proof };
+    }
+    object InspectSingleModify(bool recover) {
+      if ((int)header["version"] != 2) throw new InvalidDataException();
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      string[] parts = AnchoredFile.Segments((string)op["path"]);
+      string destination = parts.Aggregate(project, (current, part) => Path.Combine(current, part));
+      using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(destination))) {
+        RecoveryFilesystem.Info info; IntPtr file;
+        try { file = parent.OpenPublicationReadFile(parts[parts.Length - 1], out info); }
+        catch (System.ComponentModel.Win32Exception error) {
+          if (error.NativeErrorCode != 2) throw;
+          return new { status = "CONFLICT", metadata = Metadata("CONFLICT"), observedIdentity = (string)null, observedDigest = (string)null,
+            ownerGenerationAlive = false, baseMatches = false, newMatches = false, journalMutations = 0, projectMutations = 0, processKills = 0,
+            projectPublished = false, destinationMissing = true, recoveryScope = "SINGLE_FILE_CONTENT_OBSERVATION_NOT_CONTROLLER_VERIFICATION" };
+        }
+        try {
+          if ((info.Attributes & (0x10 | 0x400)) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 1024 * 1024) throw new InvalidDataException();
+          byte[] bytes;
+          using (FileStream input = new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle(file, false), FileAccess.Read))
+          using (MemoryStream data = new MemoryStream()) {
+            byte[] block = new byte[4096]; int count;
+            while ((count = input.Read(block, 0, block.Length)) != 0) { if (data.Length + count > 1024 * 1024) throw new InvalidDataException(); data.Write(block, 0, count); }
+            bytes = data.ToArray();
+          }
+          string actualId = RecoveryFilesystem.HandleIdentity(file), actualDigest = Hash(bytes), phase = (string)last["phase"];
+          bool old = actualId == (string)op["baseIdentity"] && actualDigest == (string)op["baseDigest"];
+          bool next = actualId == (string)op["baseIdentity"] && actualDigest == (string)op["newDigest"] && bytes.Length == (int)op["newBytes"];
+          bool commitRecorded = last["committedIdentity"] != null || new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains(phase);
+          bool commitPossible = commitRecorded || phase == "COMMIT_STARTED" || phase == "RECOVERY_REQUIRED";
+          string status = old && !commitRecorded ? "OLD_COMPLETE_OBSERVED" : next && commitPossible ? "NEW_COMPLETE_OBSERVED" : "CONFLICT";
+          int previousSequence = (int)last["sequence"];
+          if (recover && status == "OLD_COMPLETE_OBSERVED" && phase != "ROLLED_BACK") {
+            Observe("ROLLBACK_REQUIRED", last["tempIdentity"] as string, null);
+            Observe("ROLLED_BACK", last["tempIdentity"] as string, null);
+          } else if (recover && status == "NEW_COMPLETE_OBSERVED" && phase != "CLEANED" && phase != "RECOVERY_REQUIRED") {
+            if (phase == "COMMIT_STARTED") Observe("COMMITTED", last["tempIdentity"] as string, actualId);
+            // Content/ID observation cannot restore the original live publisher's
+            // ACL/creation-time proof or the controller's verified draft. Keep
+            // RECOVERY_REQUIRED, never mint PUBLISHED/CLEANED on restart alone.
+            Observe("RECOVERY_REQUIRED", last["tempIdentity"] as string, actualId);
+          }
+          return new { status, metadata = Metadata(status), observedIdentity = actualId, observedDigest = actualDigest,
+            ownerGenerationAlive = false, baseMatches = old, newMatches = next, journalMutations = (int)last["sequence"] - previousSequence,
+            projectMutations = 0, processKills = 0, projectPublished = false, recoveryScope = "SINGLE_FILE_CONTENT_OBSERVATION_NOT_CONTROLLER_VERIFICATION" };
+        } finally { CloseNative(file); }
+      }
+    }
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+    static void CloseNative(IntPtr handle) { if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); }
     void ReadChain(RegistryKey key) {
       ScopeRecovery.ValidateRegistry(key);
       if (key.GetSubKeyNames().Length != 0) throw new InvalidDataException();
@@ -210,24 +301,36 @@ namespace Phi.Native {
         Keys(body, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header");
         if (Number(body, "sequence", 0, MaxEvents - 1) != i || StringField(body, "previousDigest", Digest) != previous || !(body["phase"] is string) || !Phases.Contains((string)body["phase"])) throw new InvalidDataException();
         if (i == 0) { original = body["header"] as Dictionary<string, object>; ValidateHeader(original, id); if ((string)body["phase"] != "PREPARED" || Number(body, "operationIndex", 0, 0) != 0) throw new InvalidDataException(); }
-        else if (body["header"] != null || !Transition((string)prior["phase"], (string)body["phase"], (int)prior["operationIndex"], Number(body, "operationIndex", 0, Operations(original).Count - 1), Operations(original).Count)) throw new InvalidDataException();
+        else if (body["header"] != null || !Transition((string)prior["phase"], (string)body["phase"], (int)prior["operationIndex"], Number(body, "operationIndex", 0, Operations(original).Count - 1), Operations(original).Count, (int)original["version"])) throw new InvalidDataException();
         foreach (string field in new string[] { "tempIdentity", "committedIdentity" }) if (body[field] != null) StringField(body, field, Identity);
         if (prior != null && prior["tempIdentity"] != null && (int)prior["operationIndex"] == (int)body["operationIndex"] && !Object.Equals(prior["tempIdentity"], body["tempIdentity"])) throw new InvalidDataException();
-        // No post-commit journal certificate exists in this version.
-        if ((string)body["phase"] == "COMMITTED" || (string)body["phase"] == "VERIFIED" || (string)body["phase"] == "CLEANED") throw new InvalidDataException();
+        if ((int)original["version"] == 1 && new string[] { "TEMP_CREATED", "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains((string)body["phase"])) throw new InvalidDataException();
+        if ((int)original["version"] == 2) {
+          string phase = (string)body["phase"], committed = body["committedIdentity"] as string;
+          string expected = (string)((Dictionary<string, object>)Operations(original)[0])["baseIdentity"];
+          if (new string[] { "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains(phase) && body["tempIdentity"] == null) throw new InvalidDataException();
+          if (new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains(phase) ? committed != expected : committed != null && committed != expected) throw new InvalidDataException();
+          if (phase == "PREPARED" && (body["tempIdentity"] != null || committed != null)) throw new InvalidDataException();
+        }
         previous = Hash(bytes); prior = body;
       }
       if (lastDigest != null && previous != lastDigest) throw new InvalidDataException();
       header = original; last = prior; lastDigest = previous;
     }
     internal object Metadata(string recovery) {
+      if ((int)header["version"] == 2) return new { version = 2, scope = "SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION", transactionId = id,
+        projectIdentity = header["projectIdentity"], draftId = header["draftId"], draftVersion = header["draftVersion"], verifiedDigest = header["verifiedDigest"], baseDigest = header["baseDigest"],
+        phase = last["phase"], sequence = last["sequence"], operationIndex = last["operationIndex"], operations = header["operations"], tempIdentity = last["tempIdentity"], committedIdentity = last["committedIdentity"],
+        filesCommitted = last["committedIdentity"] == null ? new string[0] : new string[] { (string)((Dictionary<string, object>)Operations(header)[0])["path"] },
+        pendingOperations = last["committedIdentity"] == null ? 1 : 0, recoveryState = recovery, cleanup = (string)last["phase"] == "CLEANED" ? "PASS" : "NOT_PROVEN", projectPublished = false };
       return new { version = 1, scope = "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION", transactionId = id, projectIdentity = header["projectIdentity"], draftId = header["draftId"], draftVersion = header["draftVersion"], verifiedDigest = header["verifiedDigest"], baseDigest = header["baseDigest"],
         phase = last["phase"], sequence = last["sequence"], operationIndex = last["operationIndex"], operations = header["operations"], tempIdentity = last["tempIdentity"], committedIdentity = last["committedIdentity"],
         filesCommitted = new string[0], pendingOperations = Operations(header).Count, recoveryState = recovery, cleanup = "NOT_PERFORMED", projectPublished = false };
     }
-    internal static object Inspect(string transactionId, string project, string expectedProjectIdentity) {
-      // Read-only restart inspection. Does NOT delete project/temp files or keys,
-      // kill a PID, guess ownership, or infer commit from a temporary file.
+    internal static object Inspect(string transactionId, string project, string expectedProjectIdentity, bool recover = false) {
+      // Read-only unless explicit V2 metadata recovery is requested. Never
+      // modifies/removes project/temp files or keys, kills a PID, guesses
+      // ownership or infers commit from a temporary file.
       if (!Id.IsMatch(transactionId) || !Identity.IsMatch(expectedProjectIdentity)) throw new InvalidDataException();
       using (Mutex mutex = Lease(transactionId)) {
         if (!Acquire(mutex)) return new { status = "ACTIVE", projectMutations = 0, journalMutations = 0, processKills = 0, projectPublished = false };
@@ -237,9 +340,11 @@ namespace Phi.Native {
             // This object borrows the already-held lease only for parsing.
             using (PublicationJournal parsed = new PublicationJournal(transactionId, project)) {
               parsed.ReadChain(key);
-              if ((string)parsed.header["projectIdentity"] != expectedProjectIdentity) throw new InvalidDataException();
+              if ((string)parsed.header["projectIdentity"] != expectedProjectIdentity || RecoveryFilesystem.HandleIdentity(parsed.pins.DirectoryHandle) != expectedProjectIdentity) throw new InvalidDataException();
               bool alive; string generation = ScopeRecovery.ProcessCreation((int)parsed.header["creatorPid"], out alive);
               if (alive && generation == (string)parsed.header["creatorGeneration"]) return new { status = "ACTIVE", projectMutations = 0, journalMutations = 0, processKills = 0, projectPublished = false };
+              if ((int)parsed.header["version"] == 2) return parsed.InspectSingleModify(recover);
+              if (recover) throw new InvalidDataException();
               bool unchanged = MatchesBase(project, parsed.header);
               return new { status = unchanged ? "RECOVERY_REQUIRED" : "CONFLICT", metadata = parsed.Metadata(unchanged ? "RECOVERY_REQUIRED" : "CONFLICT"), ownerGenerationAlive = false, baseMatches = unchanged,
                 projectMutations = 0, journalMutations = 0, processKills = 0, projectPublished = false };
@@ -303,6 +408,107 @@ namespace Phi.Native {
         Dictionary<string, object> request = FixtureRequest();
         Console.WriteLine(Serializer().Serialize(Inspect((string)request["transactionId"], Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), (string)request["rootIdentity"]))); return 0;
       } catch { Console.Error.WriteLine("PHI_JOURNAL_FIXTURE_INSPECT_FAILED"); return 70; }
+    }
+    static readonly string[] ModifyCheckpoints = { "before-transaction", "temp", "write", "flush", "validation", "staged", "before-commit", "before-journal-committed", "committed", "postverify", "cleanup" };
+    internal static int ModifyFixtureChild(string phase) {
+      if (!ModifyCheckpoints.Contains(phase) || phase == "before-transaction") return 70;
+      try {
+        Dictionary<string, object> request = FixtureRequest();
+        string root = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]);
+        Dictionary<string, object> header = FixtureHeader(root, (string)request["transactionId"]); header["version"] = 2;
+        using (PublicationJournal journal = Begin(root, header)) {
+          journal.PublishSingleModify(Encoding.UTF8.GetBytes("new-complete"), delegate(string observed) {
+            if (observed != phase) return;
+            Console.WriteLine(Serializer().Serialize(new { ready = true, checkpoint = observed, phase = journal.last["phase"], transactionId = request["transactionId"], tempIdentity = journal.last["tempIdentity"] }));
+            Console.Out.Flush(); Thread.Sleep(12000); throw new IOException("PHI_MODIFY_KILL_FIXTURE_NOT_TERMINATED");
+          });
+        }
+      } catch { Console.Error.WriteLine("PHI_MODIFY_FIXTURE_CHILD_FAILED"); }
+      return 70;
+    }
+    internal static int ModifyFixtureRecover() {
+      try {
+        Dictionary<string, object> request = FixtureRequest();
+        Console.WriteLine(Serializer().Serialize(Inspect((string)request["transactionId"], Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), (string)request["rootIdentity"], true))); return 0;
+      } catch { Console.Error.WriteLine("PHI_MODIFY_FIXTURE_RECOVERY_FAILED"); return 70; }
+    }
+    internal static int ModifySelfTest(string name) {
+      bool crash = name.StartsWith("crash-", StringComparison.Ordinal), userConflict = name == "user-content-after-crash" || name == "same-content-recreated-after-crash" || name == "user-delete-after-crash";
+      string point = crash ? name.Substring(6) : userConflict ? "before-journal-committed" : name;
+      if (name != "commit" && name != "unobserved-advance" && !userConflict && !ModifyCheckpoints.Contains(point)) return 70;
+      if (crash && point == "before-transaction") return 70;
+      ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null;
+      string tx = Guid.NewGuid().ToString("N"), rootId = null, stage = "BEGIN";
+      bool passed = false, clean = false, created = false, injected = false, killed = false, childGone = false, restarted = false, tempAbsent = false;
+      object evidence = null; string journalPhase = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready(); rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string target = Path.Combine(scope.Root, "input.txt"), unrelated = Path.Combine(scope.Root, "sentinel.txt");
+        File.WriteAllText(target, "old-complete", new UTF8Encoding(false)); File.WriteAllText(unrelated, "unrelated-user", new UTF8Encoding(false));
+        if (crash || userConflict) {
+          stage = "CHILD_START";
+          child = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-modify-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+          child.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); child.StandardInput.Close();
+          string ready = null; Thread reader = new Thread(delegate() { try { ready = child.StandardOutput.ReadLine(); } catch { } }); reader.IsBackground = true; reader.Start();
+          if (!reader.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+          Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+          if (!(bool)announcement["ready"] || (string)announcement["checkpoint"] != point || (string)announcement["transactionId"] != tx || announcement["tempIdentity"] == null) throw new InvalidDataException();
+          journalPhase = (string)announcement["phase"]; created = true; stage = "KILL";
+          child.Kill(); killed = true; if (!child.WaitForExit(3000) || !child.HasExited || child.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+          bool expectedNew = new string[] { "before-journal-committed", "committed", "postverify", "cleanup" }.Contains(point);
+          if (File.ReadAllText(target) != (expectedNew ? "new-complete" : "old-complete")) throw new InvalidDataException();
+          if (name == "user-content-after-crash") File.WriteAllText(target, "user-complete", new UTF8Encoding(false));
+          if (name == "same-content-recreated-after-crash") { File.Move(target, target + ".old"); File.WriteAllText(target, "new-complete", new UTF8Encoding(false)); }
+          if (name == "user-delete-after-crash") File.Delete(target);
+          stage = "RESTART_RECOVERY";
+          using (Process recovery = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-modify-fixture-recover", UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+            try {
+              recovery.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); recovery.StandardInput.Close();
+              if (!recovery.WaitForExit(5000) || recovery.ExitCode != 0) throw new InvalidDataException();
+              string output = recovery.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+              Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = result; restarted = true;
+              if ((string)result["status"] != (userConflict ? "CONFLICT" : expectedNew ? "NEW_COMPLETE_OBSERVED" : "OLD_COMPLETE_OBSERVED") ||
+                  (bool)result["ownerGenerationAlive"] || (bool)result["projectPublished"] || (int)result["projectMutations"] != 0 || (int)result["processKills"] != 0) throw new InvalidDataException();
+              Dictionary<string, object> metadata = (Dictionary<string, object>)result["metadata"];
+              if (!userConflict && (string)metadata["phase"] != (expectedNew ? point == "cleanup" ? "CLEANED" : "RECOVERY_REQUIRED" : "ROLLED_BACK")) throw new InvalidDataException();
+              if (userConflict && ((int)result["journalMutations"] != 0 || (string)metadata["phase"] != journalPhase)) throw new InvalidDataException();
+            } finally { if (!recovery.HasExited) { recovery.Kill(); recovery.WaitForExit(3000); } }
+          }
+          string after = name == "user-content-after-crash" ? "user-complete" : expectedNew ? "new-complete" : "old-complete";
+          if (name == "user-delete-after-crash" ? File.Exists(target) : File.ReadAllText(target) != after) throw new InvalidDataException();
+        } else {
+          Dictionary<string, object> header = FixtureHeader(scope.Root, tx); header["version"] = 2;
+          journal = Begin(scope.Root, header); created = true;
+          if (name == "unobserved-advance") {
+            bool denied = false; try { journal.Advance("TEMP_CREATED", rootId); } catch (InvalidOperationException) { denied = true; }
+            if (!denied || (string)journal.last["phase"] != "PREPARED" || File.ReadAllText(target) != "old-complete") throw new InvalidDataException();
+          } else {
+            try { evidence = journal.PublishSingleModify(Encoding.UTF8.GetBytes("new-complete"), delegate(string observed) { if (observed == name) { injected = true; throw new IOException("PHI_MODIFY_JOURNAL_INJECTED"); } }); }
+            catch (IOException) { if (!injected) throw; }
+            bool expectedNew = name == "commit" || new string[] { "before-journal-committed", "committed", "postverify", "cleanup" }.Contains(name);
+            if (injected != (name != "commit") || File.ReadAllText(target) != (expectedNew ? "new-complete" : "old-complete")) throw new InvalidDataException();
+            if (name == "commit" && (string)journal.last["phase"] != "CLEANED") throw new InvalidDataException();
+          }
+          journalPhase = (string)journal.last["phase"]; if (evidence == null) evidence = journal.Metadata("RETAINED");
+        }
+        tempAbsent = Directory.GetFiles(scope.Root, "phi-publish-*.tmp", SearchOption.AllDirectories).Length == 0;
+        if (!tempAbsent || File.ReadAllText(unrelated) != "unrelated-user") throw new InvalidDataException(); passed = true;
+      } catch (Exception error) {
+        Console.Error.WriteLine("PHI_MODIFY_JOURNAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"));
+        if (child != null && child.HasExited) { string detail = child.StandardError.ReadToEnd(); if (detail.Length <= 8192) Console.Error.Write(detail); }
+      } finally {
+        if (journal != null) journal.Dispose();
+        if (child != null) { try { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } } finally { child.Dispose(); } }
+        try {
+          // Only the original fixed fixture owner removes its own exact key.
+          // Production recovery never deletes any journal/project/temp object.
+          if (created) using (RegistryKey root = OpenBase(true)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, injected, actualProcessKilled = killed, childGone, restartedRecovery = restarted,
+        tempAbsent, journalPhaseAtInterruption = journalPhase, unrelatedPreserved = passed, evidence, scope = "NATIVE_JOURNAL_MODIFY_NOT_VERIFIED_WORKER_PUBLICATION", projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
     }
     internal static int SelfTest(string name) {
       string[] cases = { "metadata", "transition", "duplicate", "active", "corrupt", "gap", "oversized", "unknown-owner", "unsafe-acl", "project-replaced", "user-change", "same-content-replaced", "protected", "crash-prepared", "crash-written", "crash-flushed", "crash-ready", "crash-commit-started" };

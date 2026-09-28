@@ -31,6 +31,7 @@ namespace Phi.Native {
     [DllImport("advapi32.dll")] static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
     [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateHardLinkW(string link, string existing, IntPtr security);
     const int MaxBytes = 1024 * 1024;
     static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
     static JavaScriptSerializer Json() { return new JavaScriptSerializer { MaxJsonLength = 65536, RecursionLimit = 16 }; }
@@ -72,7 +73,7 @@ namespace Phi.Native {
       if (bytes == null || bytes.Length > MaxBytes || Utf8.GetString(bytes).IndexOf('\0') >= 0) throw new InvalidDataException();
       string expectedNew = Hash(bytes); if (expectedNew == expectedDigest) throw new InvalidDataException();
       IntPtr transaction = IntPtr.Zero, temp = IntPtr.Zero, target = IntPtr.Zero;
-      bool committed = false; string tempId = null, security = null, stage = "ADMISSION";
+      bool committed = false; string tempId = null, tempLeaf = "phi-publish-" + Guid.NewGuid().ToString("N") + ".tmp", security = null, stage = "ADMISSION";
       try {
         using (RecoveryFilesystem rootPins = new RecoveryFilesystem(root)) {
           if (RecoveryFilesystem.DirectoryIdentity(root) != rootId) throw new InvalidDataException();
@@ -90,7 +91,7 @@ namespace Phi.Native {
             transaction = CreateTransaction(IntPtr.Zero, IntPtr.Zero, 1, 0, 0, 30000, "Phi single-file publication");
             if (transaction == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error());
             stage = "TEMP_CREATE";
-            temp = OpenTransacted(Path.Combine(Path.GetDirectoryName(targetPath), "phi-publish-" + Guid.NewGuid().ToString("N") + ".tmp"), transaction, true);
+            temp = OpenTransacted(Path.Combine(Path.GetDirectoryName(targetPath), tempLeaf), transaction, true);
             tempId = RecoveryFilesystem.HandleIdentity(temp); checkpoint("temp", tempId);
             stage = "TEMP_WRITE"; WriteComplete(temp, bytes); checkpoint("write", tempId);
             stage = "TEMP_FLUSH"; Check(FlushFileBuffers(temp)); checkpoint("flush", tempId);
@@ -107,6 +108,7 @@ namespace Phi.Native {
             // fallback. Only synchronous KTM commit exposes the whole version.
             stage = "STAGED_WRITE"; WriteComplete(target, Read(temp)); Check(FlushFileBuffers(target));
             if (RecoveryFilesystem.HandleIdentity(target) != expectedId || Hash(Read(target)) != expectedNew || SecurityDigest(target) != security) throw new InvalidDataException();
+            checkpoint("staged", tempId);
             Disposition remove = new Disposition { Delete = 1 };
             Check(SetFileInformationByHandle(temp, 4, ref remove, (uint)Marshal.SizeOf(typeof(Disposition))));
             Close(ref temp); Close(ref target);
@@ -119,9 +121,18 @@ namespace Phi.Native {
             if (RecoveryFilesystem.HandleIdentity(target) != expectedId || Hash(Read(target)) != expectedNew || SecurityDigest(target) != security ||
                 final.Attributes != original.Attributes || final.Created.Low != original.Created.Low || final.Created.High != original.Created.High) throw new InvalidDataException();
             checkpoint("postverify", tempId);
+            // A successful disposition/commit is not by itself cleanup proof.
+            // Re-open only this random private source name under the held parent;
+            // never delete an object now found there or claim a missing path on
+            // permission/sharing/unknown errors.
+            bool absent = false; IntPtr remaining = IntPtr.Zero;
+            try { RecoveryFilesystem.Info ignored; remaining = parent.OpenPublicationReadFile(tempLeaf, out ignored); }
+            catch (Win32Exception error) { if (error.NativeErrorCode != 2) throw; absent = true; }
+            finally { Close(ref remaining); }
+            if (!absent) throw new InvalidDataException(); checkpoint("cleanup", tempId);
             return new { backend = "NTFS_KTM_TRANSACTIONAL_DEFAULT_STREAM", committed = true, rootIdentity = rootId, destinationIdentity = expectedId,
               oldDigest = expectedDigest, tempIdentity = tempId, tempDigest = expectedNew, finalDigest = expectedNew,
-              sameVolume = true, securityPreserved = true, creationTimePreserved = true, temporaryObjectInPrivateTransaction = true };
+              sameVolume = true, securityPreserved = true, creationTimePreserved = true, temporaryObjectInPrivateTransaction = true, tempAbsent = true };
           }
         }
       } catch (Exception error) {
@@ -140,6 +151,7 @@ namespace Phi.Native {
       }
     }
     internal static int SelfTest(string name) {
+      if (new string[] { "junction", "hardlink", "ads", "protected", "root-identity", "parent-swap", "case-alias", "rename-after-close", "delete-after-close" }.Contains(name)) return NamespaceSelfTest(name);
       string[] cases = { "commit", "old-visible-before-commit", "locked-after-handles-close", "changed-content", "same-content-recreated", "write", "flush", "before-commit", "committed" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; bool passed = false, cleanup = false, injected = false, committed = false, locked = false, oldVisible = false, outsideWritePositive = false; object evidence = null;
@@ -192,6 +204,47 @@ namespace Phi.Native {
       // anchored postverify and KTM writer lock are unchanged.
       using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
       using (StreamReader reader = new StreamReader(stream, Utf8, false)) return reader.ReadToEnd();
+    }
+    static int NamespaceSelfTest(string name) {
+      ScopeRecovery scope = null; bool passed = false, cleanup = false, denied = false, competingDenied = false, afterClosePositive = false;
+      object proof = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string source = Path.Combine(scope.Root, "src"), outside = Path.Combine(scope.Root, "unrelated"); Directory.CreateDirectory(source); Directory.CreateDirectory(outside);
+        string target = Path.Combine(source, "input.txt"), sentinel = Path.Combine(outside, "input.txt");
+        File.WriteAllText(target, "old-complete", Utf8); File.WriteAllText(sentinel, "unrelated-user", Utf8);
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root), id, digest;
+        using (AnchoredFile baseline = new AnchoredFile(scope.Root, rootId, "src/input.txt")) { id = baseline.Identity; digest = baseline.Digest; }
+        if (name == "junction") { Directory.Move(source, source + "-old"); AppContainerScope.CreateOwnedJunction(source, outside); }
+        if (name == "hardlink") { File.Delete(target); Check(CreateHardLinkW(target, sentinel, IntPtr.Zero)); }
+        try {
+          proof = ReplaceDefaultStream(scope.Root, name == "root-identity" ? new string('a', 16) + ":" + new string('b', 32) : rootId,
+            name == "ads" ? "src/input.txt:stream" : name == "protected" ? ".env" : name == "case-alias" ? "SRC/INPUT.TXT" : "src/input.txt", id, digest, Utf8.GetBytes("new-complete"), delegate(string phase, string temp) {
+              if (phase != "before-commit") return;
+              if (name == "parent-swap" || name == "rename-after-close" || name == "delete-after-close") {
+                try {
+                  if (name == "parent-swap") Directory.Move(source, source + "-moved");
+                  else if (name == "rename-after-close") File.Move(target, target + ".moved");
+                  else File.Delete(target);
+                } catch (IOException error) { int code = error.HResult & 0xffff; if (code != 32 && code != 33 && code != 6800) throw; competingDenied = true; }
+                if (!competingDenied) throw new InvalidDataException();
+              }
+            });
+        } catch (InvalidDataException) { denied = true; }
+        bool expectedDenial = new string[] { "junction", "hardlink", "ads", "protected", "root-identity" }.Contains(name);
+        if (denied != expectedDenial || File.ReadAllText(sentinel) != "unrelated-user") throw new InvalidDataException();
+        string actual = name == "junction" ? Path.Combine(source + "-old", "input.txt") : target;
+        if (File.ReadAllText(actual) != (name == "hardlink" ? "unrelated-user" : expectedDenial ? "old-complete" : "new-complete")) throw new InvalidDataException();
+        if (name == "parent-swap") { Directory.Move(source, source + "-moved"); afterClosePositive = Directory.Exists(source + "-moved"); }
+        if (name == "rename-after-close") { File.Move(target, target + ".moved"); afterClosePositive = File.Exists(target + ".moved"); }
+        if (name == "delete-after-close") { File.Delete(target); afterClosePositive = !File.Exists(target); }
+        if (new string[] { "parent-swap", "rename-after-close", "delete-after-close" }.Contains(name) && (!competingDenied || !afterClosePositive)) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_ATOMIC_MODIFY_NAMESPACE_SELFTEST_FAILED:" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally { if (scope != null) { try { scope.CleanupFiles(); cleanup = !Directory.Exists(scope.Root); } catch { passed = false; } scope.Complete(cleanup); } }
+      Console.WriteLine(Json().Serialize(new { caseName = name, passed, fixtureCleanup = cleanup, denied, competingDenied, afterClosePositive, evidence = proof,
+        scope = "NATIVE_TRANSACTION_PRIMITIVE_NOT_PRODUCTION_PUBLICATION", projectPublished = false, externalRequests = 0 }));
+      return passed && cleanup ? 0 : 70;
     }
   }
 }
