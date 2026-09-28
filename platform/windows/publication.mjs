@@ -11,6 +11,38 @@ const freeze = value => { if (value && typeof value === 'object') { Object.value
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && same(Object.keys(value).sort(), [...keys].sort());
+const journalKeys = ['version', 'scope', 'transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'phase',
+  'sequence', 'operationIndex', 'operations', 'tempIdentity', 'committedIdentity', 'filesCommitted', 'pendingOperations', 'recoveryState', 'cleanup', 'projectPublished'];
+const admissionKeys = ['version', 'scope', 'phase', 'transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'operations',
+  'journalCreated', 'mutationStarted', 'filesCommitted', 'pendingOperations', 'commitState', 'recoveryState', 'cleanup', 'projectPublished'];
+
+// Pure bounded failure decoder, not an execution endpoint or publication proof.
+// Production calls it ONLY with the result of the fixed attested native spawn.
+// Tests may decode metadata, but no Error/JSON can mint the private certificate.
+export function windowsPublicationFailure(run, value, header) {
+  const error = new Error('PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); error.code = error.message;
+  if (run.error || run.status !== 70 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1 || value?.version !== 1 ||
+      value.status !== 'FAIL_NATIVE_SINGLE_MODIFY' || value.projectPublished !== false || value.externalRequests !== 0) return error;
+  const bound = item => Object.keys(header).every(key => same(item?.[key], header[key]));
+  const phase = /^[a-zA-Z-]{1,40}$/u.test(value.phase ?? '') ? value.phase : 'UNKNOWN';
+  const nativeCode = /^[0-9a-f]{8}$/u.test(value.nativeCode ?? '') ? value.nativeCode : null;
+  const j = value.journal, a = value.admission;
+  if (exactKeys(j, journalKeys) && j.version === 2 && j.scope === 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION' &&
+      j.projectPublished === false && bound(j)) {
+    error.publicationEvidence = freeze({ phase, nativeCode, journal: j });
+    if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && j.pendingOperations === 1 && same(j.filesCommitted, [])) {
+      error.code = 'PHI_PUBLICATION_CONFLICT'; error.message = error.code;
+    }
+  } else if (value.reason === 'CONFLICT' && value.phase === 'ADMISSION' && nativeCode !== null && j === null && exactKeys(a, admissionKeys) &&
+      a.version === 1 && a.scope === 'VALIDATED_BASE_CONFLICT_BEFORE_JOURNAL' && a.phase === 'ADMISSION_CONFLICT' && bound(a) &&
+      a.journalCreated === false && a.mutationStarted === false && a.projectPublished === false && a.pendingOperations === 1 && same(a.filesCommitted, []) &&
+      a.commitState === 'NOT_STARTED' && a.recoveryState === 'NOT_STARTED' && a.cleanup === 'NOT_STARTED') {
+    error.code = 'PHI_PUBLICATION_CONFLICT'; error.message = error.code;
+    error.publicationEvidence = freeze({ phase, nativeCode, journal: null, admission: a });
+  }
+  return error;
+}
 
 export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metadata, remainingMs }) {
   if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
@@ -28,20 +60,7 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
     timeout: timeoutMs + 1000, maxBuffer: 32768 });
   let value; try { value = JSON.parse(run.stdout); } catch { fail('NATIVE_RECEIPT_INVALID'); }
   if (run.error || run.status !== 0 || !run.pid) {
-    const error = new Error('PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); error.code = error.message;
-    // Only selected, bounded fixed metadata from this actual attested native
-    // execution is retained. Never propagate raw stdout/stderr/exception text.
-    const j = value?.journal;
-    if (value?.version === 1 && value.status === 'FAIL_NATIVE_SINGLE_MODIFY' && value.projectPublished === false && value.externalRequests === 0 &&
-        j?.transactionId === header.transactionId && j.projectIdentity === header.projectIdentity && j.draftId === header.draftId &&
-        j.draftVersion === header.draftVersion && j.verifiedDigest === header.verifiedDigest && j.baseDigest === header.baseDigest && same(j.operations, operations)) {
-      error.publicationEvidence = freeze({ phase: /^[a-zA-Z-]{1,40}$/u.test(value.phase ?? '') ? value.phase : 'UNKNOWN',
-        nativeCode: /^[0-9a-f]{8}$/u.test(value.nativeCode ?? '') ? value.nativeCode : null, journal: j });
-      if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && j.pendingOperations === 1) {
-        error.code = 'PHI_PUBLICATION_CONFLICT'; error.message = error.code;
-      }
-    }
-    throw error;
+    throw windowsPublicationFailure(run, value, header);
   }
   const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
   if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_MODIFY' || value.projectPublished !== false || value.externalRequests !== 0 ||

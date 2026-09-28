@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current continuation — earlier native admission controls, pending proof
+## Current continuation — admission classification correction candidate
+
+Actual Windows dedicated characterization step of ff1944b / CI36470773129 SUCCESS confirms the earlier generic rejection in six strict production endpoint controls; complete run/clone/Pi acceptance is still pending at this entry. Targeted correction emits request-bound CONFLICT only for a proved ordinary destination mismatch after secure expected-root snapshot. Invalid root/schema/sharing/unknown errors remain UNCONFIRMED; V1 journal semantics unchanged. Rejection metadata explicitly records no journal creation/no mutation/NOT_STARTED, never fabricates PREPARED or PUBLISHED. Production decoder requires actual completed exit70, exact binding and no extra/raw fields. Three portable regressions and six strengthened native controls retain user/draft data, private certificate boundaries and cleanup. Focused111/19PASS/0FAIL/92native skips; final authoritative local856/656PASS/0FAIL/200native skips plus syntax/installed-Pi TypeScript/package validation PASS. Patched native acceptance pending, not inferred from skips. No retry/permission/governor/model/Pi/provider changes or external calls. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.
+
+## Historical continuation — earlier native admission controls, pending proof
 
 Actual resumed HEAD db39006 already contains the accepted single-MODIFY checkpoint below. Six new fixed controls reproduce the production pre-journal boundary using a real child endpoint and real user changes/negative controls, without adding production failpoints or write authority. They characterize the current generic UNCONFIRMED/no-journal outcome before correcting it. Local authoritative853/653PASS/0FAIL/200native skips plus syntax/TypeScript/package validation PASS; focused70/14PASS/0FAIL/56skips. Native proof is pending exact private Windows CI, not inferred from Linux. The next correction must separate proved base mismatches from invalid root/schema/sharing/unknown failures and never invent a prepared journal. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls; protected/auth/Pi/routing/security/budgets unchanged.
 

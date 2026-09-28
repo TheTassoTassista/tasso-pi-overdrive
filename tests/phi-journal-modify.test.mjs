@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
+import { windowsPublicationFailure } from '../platform/windows/publication.mjs';
 
 test('single-file MODIFY extends the existing journal; native observations alone advance V2', () => {
   const source = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
@@ -36,14 +37,28 @@ for (const name of cases) test('native journal-bound MODIFY: ' + name, { skip: p
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_MODIFY_ONLY', ...receipt }));
 });
 for (const name of ['admission-content-change', 'admission-recreated', 'admission-missing', 'admission-root-mismatch', 'admission-invalid-header', 'admission-sharing']) {
-  test('native production pre-journal admission characterization: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+  test('native production pre-journal admission: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--publication-modify-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 22000, maxBuffer: 16384 });
     assert.equal(result.status, 0, result.stderr);
     const receipt = JSON.parse(result.stdout);
     for (const key of ['passed', 'fixtureCleanup', 'childGone', 'journalAbsent', 'tempAbsent', 'userStatePreserved']) assert.equal(receipt[key], true, key);
-    assert.equal(receipt.scope, 'NATIVE_PREJOURNAL_ADMISSION_CHARACTERIZATION');
-    assert.equal(receipt.evidence.status, 'FAIL_NATIVE_SINGLE_MODIFY'); assert.equal(receipt.evidence.reason, 'UNCONFIRMED');
+    assert.equal(receipt.scope, 'NATIVE_PREJOURNAL_ADMISSION');
+    const conflict = ['admission-content-change', 'admission-recreated', 'admission-missing'].includes(name);
+    assert.equal(receipt.evidence.status, 'FAIL_NATIVE_SINGLE_MODIFY'); assert.equal(receipt.evidence.reason, conflict ? 'CONFLICT' : 'UNCONFIRMED');
     assert.equal(receipt.evidence.journal, null); assert.equal(receipt.evidence.projectPublished, false); assert.equal(receipt.evidence.externalRequests, 0);
+    assert.equal(receipt.publisherExitCode, 70); assert.ok(Number.isSafeInteger(receipt.publisherPid) && receipt.publisherPid > 0);
+    if (conflict) {
+      const admission = receipt.evidence.admission;
+      assert.equal(receipt.evidence.phase, 'ADMISSION'); assert.equal(admission.phase, 'ADMISSION_CONFLICT');
+      assert.equal(admission.journalCreated, false); assert.equal(admission.mutationStarted, false);
+      assert.equal(admission.commitState, 'NOT_STARTED'); assert.deepEqual(admission.filesCommitted, []);
+      // Native fixture already asserts every request-binding field. Exercise the
+      // production decoder on the actual child failure, not synthetic metadata.
+      const header = Object.fromEntries(['transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'operations'].map(key => [key, admission[key]]));
+      const error = windowsPublicationFailure({ pid: receipt.publisherPid, status: receipt.publisherExitCode, signal: null }, receipt.evidence, header);
+      assert.equal(error.code, 'PHI_PUBLICATION_CONFLICT'); assert.equal(error.publicationEvidence.journal, null);
+      assert.deepEqual(error.publicationEvidence.admission, admission);
+    } else assert.equal(receipt.evidence.admission, null);
     assert.doesNotMatch(JSON.stringify(receipt), /old-complete|new-complete|user-complete|unrelated-user|FORBIDDEN_RAW_SENTINEL/u);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'NATIVE_PREJOURNAL_ADMISSION', ...receipt }));

@@ -70,14 +70,24 @@ this adapter. Original metadata/verified-controller reconstruction after a dead
 controller, automatic trusted-root journal discovery and retention remain partial;
 the record64 capacity still fails closed. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.
 
-Admission classification limit (source-inspected, not a newly runtime-certified
-race): Begin still rejects a changed base before creating PREPARED with a generic
-validation error. A change in the narrow interval after controller readback but
-before native Begin can therefore produce FAILED/UNKNOWN instead of CONFLICT,
-without writing the project. The tested final native writer-lock conflict and
-ordinary post-READY controller conflict are distinct, both evidenced controls.
-Do not advertise uniform classification of every earlier admission race; add
-its deterministic native regression before a targeted later correction.
+Earlier admission was independently reproduced in six fixed native production
+endpoint controls (ff1944b / CI36470773129 dedicated step SUCCESS): known content,
+identity and absence changes previously returned generic UNCONFIRMED before any
+journal or project mutation. The subsequent correction is pending its own exact
+patched Windows gate. A private typed conflict is emitted only after validated
+request/creator and a completed anchored snapshot with the expected root ID.
+Wrong root/schema/sharing/unknown errors are NOT relabelled. V1 is unchanged.
+
+This rejection carries immutable matching transaction/root/draft/version/digest/
+operation metadata, explicitly journalCreated=false, mutationStarted=false,
+commitState=NOT_STARTED. It is not a durable journal and never claims PREPARED,
+temp/commit proof or PUBLISHED. The controller accepts it only from its actual
+attested completed exit70 with exact metadata/binding. Extra/raw fields, changed
+binding, timeout/signal/unknown execution cannot certify CONFLICT. The live draft
+remains preserved; the opaque grant remains consumed once. There is no retry or
+weaker filesystem path. This native boundary control plus the production failure
+decoder is distinct from forcing the live controller race end-to-end; no such
+scheduling-dependent E2E or universal root/IO classification claim is made.
 
 ## D3 same-journal MODIFY implementation and recovery decision table
 

@@ -33,6 +33,18 @@ namespace Phi.Native {
     Dictionary<string, object> header, last;
     string lastDigest;
     bool acquired, poisoned, disposed;
+    sealed class AdmissionConflict : InvalidOperationException {
+      internal readonly object Evidence;
+      internal AdmissionConflict(Dictionary<string, object> value) : base("PHI_PUBLICATION_CONFLICT") {
+        // Validated immutable request + a completed anchored snapshot with the
+        // expected root ID. This is rejection evidence, NOT a durable journal.
+        Evidence = new { version = 1, scope = "VALIDATED_BASE_CONFLICT_BEFORE_JOURNAL", phase = "ADMISSION_CONFLICT",
+          transactionId = value["transactionId"], projectIdentity = value["projectIdentity"], draftId = value["draftId"], draftVersion = value["draftVersion"],
+          verifiedDigest = value["verifiedDigest"], baseDigest = value["baseDigest"], operations = value["operations"], journalCreated = false,
+          mutationStarted = false, filesCommitted = new string[0], pendingOperations = 1, commitState = "NOT_STARTED",
+          recoveryState = "NOT_STARTED", cleanup = "NOT_STARTED", projectPublished = false };
+      }
+    }
     static JavaScriptSerializer Serializer() { return new JavaScriptSerializer { MaxJsonLength = MaxBytes, RecursionLimit = 16 }; }
     static string Hash(byte[] bytes) { using (SHA256 hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant(); }
     static void Keys(Dictionary<string, object> value, params string[] keys) {
@@ -154,7 +166,13 @@ namespace Phi.Native {
       if ((int)value["creatorPid"] != pid || ScopeRecovery.ProcessCreation(pid, out alive) != (string)value["creatorGeneration"] || !alive) throw new InvalidDataException();
       PublicationJournal result = new PublicationJournal(transactionId, project);
       try {
-        if (!MatchesBase(project, value)) throw new InvalidDataException();
+        if (!MatchesBase(project, value)) {
+          // Keep V1 semantics and unknown/root/schema/sharing exceptions intact.
+          // Only known V2 destination absence/identity/content mismatch reaches
+          // this branch. No journal key or native transaction exists yet.
+          if ((int)value["version"] == 2) throw new AdmissionConflict(value);
+          throw new InvalidDataException();
+        }
         using (Mutex admission = Lease(transactionId, true)) {
           if (!Acquire(admission, 1000)) throw new InvalidDataException();
           try { using (RegistryKey root = OpenBase(true)) {
@@ -317,15 +335,16 @@ namespace Phi.Native {
         Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
         if (value.Length != (int)op["newBytes"] || Hash(value) != (string)op["newDigest"]) throw new InvalidDataException();
         OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 30000), delegate(Action live) {
-          phase = "PREPARED"; journal = Begin(project, header);
+          phase = "ADMISSION"; journal = Begin(project, header); phase = "PREPARED";
           result = journal.PublishSingleModify(value, delegate(string observed) { phase = observed; live(); });
         });
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_MODIFY", receipt = result, projectPublished = false, externalRequests = 0 })); return 0;
       } catch (Exception error) {
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_NATIVE_SINGLE_MODIFY", phase,
-          reason = error is InvalidOperationException && error.Message == "PHI_PUBLICATION_CONFLICT" ? "CONFLICT" : "UNCONFIRMED",
+          reason = error is AdmissionConflict || error is InvalidOperationException && error.Message == "PHI_PUBLICATION_CONFLICT" ? "CONFLICT" : "UNCONFIRMED",
           nativeCode = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"),
-          journal = journal == null ? null : journal.Metadata("INSPECTION_REQUIRED"), projectPublished = false, externalRequests = 0 })); return 70;
+          journal = journal == null ? null : journal.Metadata("INSPECTION_REQUIRED"), admission = error is AdmissionConflict ? ((AdmissionConflict)error).Evidence : null,
+          projectPublished = false, externalRequests = 0 })); return 70;
       } finally { if (journal != null) journal.Dispose(); }
     }
     void ReadChain(RegistryKey key) {
@@ -477,6 +496,7 @@ namespace Phi.Native {
       // not an injected exception or a configurable production checkpoint.
       ScopeRecovery scope = null; FileStream held = null; Process child = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; object evidence = null;
+      int? publisherPid = null, publisherExitCode = null;
       bool passed = false, clean = false, childGone = false, journalAbsent = false, tempAbsent = false, ownedKey = false;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
@@ -493,14 +513,21 @@ namespace Phi.Native {
         else if (name == "admission-sharing") held = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.None);
         stage = "PRODUCTION_ENDPOINT";
         child = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-modify", UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisherPid = child.Id;
         child.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root, header, content = "new-complete", guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 })); child.StandardInput.Close();
-        if (!child.WaitForExit(5000) || child.ExitCode != 70) throw new InvalidDataException(); childGone = child.HasExited;
+        if (!child.WaitForExit(5000) || child.ExitCode != 70) throw new InvalidDataException(); childGone = child.HasExited; publisherExitCode = child.ExitCode;
         string output = child.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
         Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = result;
-        // Characterization of the pre-fix failure. The native regression will
-        // change to require evidenced CONFLICT once this boundary is corrected.
-        if ((string)result["status"] != "FAIL_NATIVE_SINGLE_MODIFY" || (string)result["reason"] != "UNCONFIRMED" || result["journal"] != null ||
+        bool conflict = name == "admission-content-change" || name == "admission-recreated" || name == "admission-missing";
+        if ((string)result["status"] != "FAIL_NATIVE_SINGLE_MODIFY" || (string)result["reason"] != (conflict ? "CONFLICT" : "UNCONFIRMED") || result["journal"] != null ||
             (bool)result["projectPublished"] || (int)result["externalRequests"] != 0) throw new InvalidDataException();
+        if (conflict) {
+          Dictionary<string, object> admission = result["admission"] as Dictionary<string, object>;
+          if (admission == null || (string)result["phase"] != "ADMISSION" || (string)admission["scope"] != "VALIDATED_BASE_CONFLICT_BEFORE_JOURNAL" ||
+              (string)admission["phase"] != "ADMISSION_CONFLICT" || (bool)admission["journalCreated"] || (bool)admission["mutationStarted"] ||
+              (bool)admission["projectPublished"] || (string)admission["commitState"] != "NOT_STARTED" || (int)admission["pendingOperations"] != 1 ||
+              ((IList)admission["filesCommitted"]).Count != 0 || header.Any(pair => Serializer().Serialize(pair.Value) != Serializer().Serialize(admission[pair.Key]))) throw new InvalidDataException();
+        } else if (result["admission"] != null) throw new InvalidDataException();
         if (held != null) { held.Dispose(); held = null; }
         using (RegistryKey root = Registry.CurrentUser.OpenSubKey(RegistryBase, false)) {
           if (root == null) journalAbsent = true;
@@ -519,8 +546,8 @@ namespace Phi.Native {
           if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
-      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, childGone, journalAbsent, tempAbsent,
-        userStatePreserved = passed, evidence, scope = "NATIVE_PREJOURNAL_ADMISSION_CHARACTERIZATION", projectPublished = false, externalRequests = 0 }));
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, childGone, publisherPid, publisherExitCode, journalAbsent, tempAbsent,
+        userStatePreserved = passed, evidence, scope = "NATIVE_PREJOURNAL_ADMISSION", projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
     internal static int ModifySelfTest(string name) {

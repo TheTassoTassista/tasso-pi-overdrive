@@ -11,7 +11,7 @@ import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublicat
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { consumeWindowsPublicationProof } from '../platform/windows/publication.mjs';
+import { consumeWindowsPublicationProof, windowsPublicationFailure } from '../platform/windows/publication.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 60000 };
 const rootIdentity = 'a'.repeat(16) + ':' + '1'.repeat(32);
@@ -136,6 +136,60 @@ test('forged native JSON cannot mint PUBLISHED or a reusable publication certifi
     assert.equal(draft.publicationMetadata.state, 'PUBLISHING'); assert.equal(draft.publicationMetadata.projectPublished, false);
   }
   draft.failPublication(false); assert.equal(draft.publicationMetadata.state, 'FAILED'); assert.equal(draft.publicationMetadata.cleanup, 'NOT_PROVEN');
+});
+
+function admissionFixture() {
+  const { base, draft } = edited(); verify(draft);
+  const ready = draft.preparePublication(base), header = { transactionId: ready.transactionId, projectIdentity: base.rootIdentity,
+    draftId: draft.binding.id, draftVersion: draft.binding.revision, verifiedDigest: draft.binding.digest, baseDigest: ready.baseDigest, operations: ready.operations };
+  const admission = { version: 1, scope: 'VALIDATED_BASE_CONFLICT_BEFORE_JOURNAL', phase: 'ADMISSION_CONFLICT', ...header,
+    journalCreated: false, mutationStarted: false, filesCommitted: [], pendingOperations: 1, commitState: 'NOT_STARTED',
+    recoveryState: 'NOT_STARTED', cleanup: 'NOT_STARTED', projectPublished: false };
+  const value = { version: 1, status: 'FAIL_NATIVE_SINGLE_MODIFY', phase: 'ADMISSION', reason: 'CONFLICT', nativeCode: '80131509',
+    journal: null, admission, projectPublished: false, externalRequests: 0 };
+  return { draft, ready, header, value, run: { pid: 1234, status: 70, signal: null } };
+}
+test('failure decoder retains bound admission CONFLICT without inventing PREPARED, journal or publication', () => {
+  const { draft, ready, header, value, run } = admissionFixture();
+  const error = windowsPublicationFailure(run, value, header);
+  assert.equal(error.code, 'PHI_PUBLICATION_CONFLICT'); assert.equal(error.publicationEvidence.journal, null);
+  assert.equal(error.publicationEvidence.admission.journalCreated, false); assert.equal(Object.isFrozen(error.publicationEvidence.admission), true);
+  draft.beginPublication(draft.binding, ready.transactionId); draft.failPublication(true, error.publicationEvidence);
+  assert.equal(draft.publicationMetadata.state, 'CONFLICT'); assert.equal(draft.publicationMetadata.commitState, 'NOT_STARTED');
+  assert.equal(draft.publicationMetadata.projectPublished, false); assert.deepEqual(draft.publicationMetadata.filesCommitted, []);
+  assert.equal(draft.snapshot.files['input.txt'], 'verified-change');
+  for (const fake of [error, error.publicationEvidence, error.publicationEvidence.admission]) assert.throws(() => consumeWindowsPublicationProof(fake, {}), /NATIVE_PROOF_DENIED/u);
+});
+test('admission decoder rejects mismatched binding, extra/raw fields, ambiguous execution and unsupported failure classes', () => {
+  const mutations = [
+    x => { x.value.reason = 'UNCONFIRMED'; }, x => { x.value.phase = 'PREPARED'; }, x => { x.value.nativeCode = 'raw-secret'; },
+    x => { x.value.journal = {}; }, x => { x.value.projectPublished = true; }, x => { x.value.externalRequests = 1; },
+    ...['transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'operations'].map(key => x => { x.value.admission[key] = null; }),
+    ...['journalCreated', 'mutationStarted', 'projectPublished'].map(key => x => { x.value.admission[key] = true; }),
+    ...['commitState', 'recoveryState', 'cleanup'].map(key => x => { x.value.admission[key] = 'PASS'; }),
+    x => { x.value.admission.version = 2; }, x => { x.value.admission.scope = 'JOURNAL'; }, x => { x.value.admission.phase = 'COMMITTED'; },
+    x => { x.value.admission.filesCommitted = ['input.txt']; }, x => { x.value.admission.pendingOperations = 0; },
+    x => { x.value.admission.stdout = 'RAW_FILE_SENTINEL'; }, x => { delete x.value.admission.cleanup; },
+    x => { x.run.error = new Error('RAW_ERROR_SENTINEL'); }, x => { x.run.status = 0; }, x => { x.run.status = null; },
+    x => { x.run.signal = 'SIGTERM'; }, x => { x.run.pid = null; },
+  ];
+  for (const mutate of mutations) {
+    const item = admissionFixture(); mutate(item);
+    const error = windowsPublicationFailure(item.run, item.value, item.header);
+    assert.equal(error.code, 'PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); assert.equal(error.publicationEvidence, undefined);
+    assert.doesNotMatch(JSON.stringify(error), /RAW_|raw-secret/u);
+  }
+});
+test('failure decoder preserves actual bound post-journal conflicts, without propagating raw extra fields', () => {
+  const { run, value, header } = admissionFixture();
+  value.admission = null; value.phase = 'validation';
+  value.journal = { version: 2, scope: 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION', ...header,
+    phase: 'CONFLICT', sequence: 5, operationIndex: 0, tempIdentity: fileIdentity(9), committedIdentity: null, filesCommitted: [], pendingOperations: 1,
+    recoveryState: 'INSPECTION_REQUIRED', cleanup: 'NOT_PROVEN', projectPublished: false };
+  const error = windowsPublicationFailure(run, value, header);
+  assert.equal(error.code, 'PHI_PUBLICATION_CONFLICT'); assert.equal(error.publicationEvidence.journal.phase, 'CONFLICT');
+  const bad = structuredClone(value); bad.journal.prompt = 'RAW_PROMPT_SENTINEL';
+  assert.equal(windowsPublicationFailure(run, bad, header).publicationEvidence, undefined);
 });
 
 function nativeFixture(task = 'Fix JSON configuration code and test diagnostics') {
