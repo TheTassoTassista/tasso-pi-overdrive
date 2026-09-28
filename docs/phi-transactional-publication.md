@@ -2,6 +2,29 @@
 
 ## Current proved scope — single MODIFY, explicit trusted-controller approval
 
+Latest exact tested functional **0d673ceb18e35f678d23ea17933168bda2c23612** /
+[CI36474391450](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36474391450)
+SUCCESS Windows/Ubuntu: Windows325/315PASS/0FAIL/10Linux-only skips,
+Ubuntu325/125PASS/0FAIL/200native skips; both independent foundation clones,
+cleanup and all three retained actual-Pi local controls PASS. Authoritative local
+Linux858/658PASS/0FAIL/200native skips, syntax/TypeScript/package validation PASS.
+Six actual pre-journal admission controls and retained journal-MODIFY34/34,
+atomic/namespace19/19, CREATE18/18, D1journal19/19,13distinct real publisher-death/
+fresh recovery scenarios and actual controller publication/conflict2/2 PASS.
+[Current and failed-predecessor metadata-only evidence](phi-admission-conflict-evidence.json).
+Known validated base mismatch is now CONFLICT; invalid root/schema/sharing remains
+UNCONFIRMED. This closes the earlier bounded classification gap, not full D or
+restored controller continuity. Native boundary plus production decoder proof is
+not a forced live controller scheduling-race E2E. Windows autonomy remains BLOCKED.
+
+The two preceding full gates remain FAILURE at the unchanged120s Windows clone
+pinned-LSP install deadline, not retrospectively accepted. Current same online
+install succeeds with96observed cache-hit records; its redacted fixed-stage
+diagnostics do not establish the previous timeout cause or prove it fixed.
+No offline/runtime-copy workaround, security waiver, budget or retry change.
+
+Preceding retained single-MODIFY/final-lock evidence:
+
 Exact functional1b0da2848b8487d6a8bd50d2833271c21568a050 /
 [CI36464401667](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36464401667)
 SUCCESS Windows/Ubuntu: Windows314/304PASS/0FAIL/10Linux-only skips,
@@ -73,8 +96,9 @@ the record64 capacity still fails closed. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKE
 Earlier admission was independently reproduced in six fixed native production
 endpoint controls (ff1944b / CI36470773129 dedicated step SUCCESS): known content,
 identity and absence changes previously returned generic UNCONFIRMED before any
-journal or project mutation. The subsequent correction is pending its own exact
-patched Windows gate. A private typed conflict is emitted only after validated
+journal or project mutation. The corrected outcomes and production failure decoder
+are accepted by the exact current complete native gate above. A private typed
+conflict is emitted only after validated
 request/creator and a completed anchored snapshot with the expected root ID.
 Wrong root/schema/sharing/unknown errors are NOT relabelled. V1 is unchanged.
 
