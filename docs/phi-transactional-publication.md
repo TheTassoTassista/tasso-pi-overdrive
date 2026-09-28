@@ -1,6 +1,20 @@
 # D — transactional project publication (IN PROGRESS)
 
-## Current proof scopes and final-lock candidate
+## Current proved scope — single MODIFY, explicit trusted-controller approval
+
+Exact functional1b0da2848b8487d6a8bd50d2833271c21568a050 /
+[CI36464401667](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36464401667)
+SUCCESS Windows/Ubuntu: Windows314/304PASS/0FAIL/10Linux-only skips,
+Ubuntu314/120PASS/0FAIL/194native skips, both independent clones/cleanup and
+all three retained actual-Pi local controls PASS. Atomic/namespace19/19,
+journal-MODIFY28/28 and real controller production-API publication/conflict2/2
+PASS. Full localLinux847/653PASS/0FAIL/194native skips, syntax/TypeScript/package
+validation PASS. [Metadata-only proof and limitations](phi-single-modify-evidence.json).
+This confirms the final-lock regression, verified-draft continuity and actual
+PUBLISHED/Git-diff flow, not whole D, restored controller state or ordinary
+Windows autonomous E1/E2/E3. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.
+
+## Historical candidate sequence — no waiver from earlier passes
 
 Native journal integration1029475 / CI36459467660 is SUCCESS Windows/Ubuntu,
 including19atomic/namespace controls,27journal-MODIFY controls and13distinct real
@@ -47,15 +61,25 @@ autonomy enablement or broad host role privilege. Successful attempt tool execut
 is frozen, replay denied, revocation clears payload and retains historical receipt.
 Mandatory native production-API Git fixture exercises real governed Worker edit,
 same-draft JSON LSP, non-mutating Tester verification, native journal/MODIFY,
-PUBLISHED, intended-only diff and cleanup. Until its matching Windows CI succeeds,
-no production-publication PASS is claimed. Full ordinary-Pi E1/E2/E3 is later.
+PUBLISHED, intended-only diff and cleanup. It passed the matching complete native
+CI above. This is explicit-controller production-API proof; full ordinary-Pi
+E1/E2/E3 certification remains later and Windows autonomy is still blocked.
 
 Single MODIFY only. CREATE/DELETE/RENAME/multifile publication is not enabled by
 this adapter. Original metadata/verified-controller reconstruction after a dead
 controller, automatic trusted-root journal discovery and retention remain partial;
 the record64 capacity still fails closed. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.
 
-## D3 journal-MODIFY integration candidate (native proof pending)
+Admission classification limit (source-inspected, not a newly runtime-certified
+race): Begin still rejects a changed base before creating PREPARED with a generic
+validation error. A change in the narrow interval after controller readback but
+before native Begin can therefore produce FAILED/UNKNOWN instead of CONFLICT,
+without writing the project. The tested final native writer-lock conflict and
+ordinary post-READY controller conflict are distinct, both evidenced controls.
+Do not advertise uniform classification of every earlier admission race; add
+its deterministic native regression before a targeted later correction.
+
+## D3 same-journal MODIFY implementation and recovery decision table
 
 The existing PublicationJournal now has a strict V2 single-REPLACE graph. Its
 private observation writer is driven by the actual AtomicModify implementation:
@@ -80,14 +104,37 @@ claims full verified-draft/ACL/creation-time continuity on restart. Different ID
 neither digest, NEW before commit intent, or OLD after a recorded commit is a
 CONFLICT. No blind overwrite, retry/publication or arbitrary cleanup occurs.
 
-27controls include11exceptions and13actual publisher deaths/new recovery processes
-(10mutation-phase kills plus3post-death user content/ID/deletion conflicts). These are native journal
-and physical mutation controls, not a real verified Worker/Git-diff E2E. Aggregate
-fixture draft/base digests remain schema-only. The production opaque READY grant
-still denies BACKEND_UNAVAILABLE. Next bind the real controller grant and validate
-full digest continuity before PUBLISHED. D IN_PROGRESS; Windows autonomy BLOCKED.
+The original27controls include11exceptions and13distinct actual publisher-death/
+fresh recovery scenarios (10mutation-phase kills plus3post-death user content/ID/
+deletion conflicts). The final-lock candidate adds one post-READY concurrent
+change case. These are actual same-journal/native mutation controls, not by
+themselves a verified Worker/Git-diff E2E. Their aggregate fixture draft/base
+digests remain schema-only; the separate controller fixture above derives actual
+same-draft verification digests through real tools. No fixture digest mints a
+production proof. D IN_PROGRESS; Windows autonomy BLOCKED.
 
-## D3 native mechanism under evaluation — NOT production publication
+`InspectSingleModify` uses the actual pinned destination, native identity, SHA256,
+byte length, validated journal chain/ACL/root and dead creator generation:
+
+| Filesystem evidence | Journal evidence | Decision / explicit recovery action |
+| --- | --- | --- |
+| Expected original ID + OLD hash | No committed ID/record | OLD_COMPLETE_OBSERVED; metadata-only ROLLBACK_REQUIRED -> ROLLED_BACK |
+| Expected original ID + NEW hash/length | COMMIT_STARTED, no COMMITTED record | NEW_COMPLETE_OBSERVED; append observed COMMITTED -> RECOVERY_REQUIRED |
+| Expected original ID + NEW hash/length | COMMITTED or POST_COMMIT_VERIFIED | NEW_COMPLETE_OBSERVED; retain RECOVERY_REQUIRED |
+| Expected original ID + NEW hash/length | Already CLEANED | NEW_COMPLETE_OBSERVED; leave CLEANED unchanged |
+| Different ID, neither hash, known missing leaf; or OLD after recorded commit / NEW before commit intent | Any valid prefix | CONFLICT; preserve current user state and existing journal |
+| Unknown ownership/schema/root/ACL/link/sharing/IO, or creator still live | Any | Fail closed / owner-active; no recovery mutation or success certificate |
+
+These actions change journal metadata only, never project files or process state.
+The kernel transaction owns precommit rollback/temp reclamation. Restart NEW
+observation does not reconstruct the verified controller draft or the original
+live metadata proof, so it never creates controller PUBLISHED. A supplied trusted
+fixture root/transaction locator is used in the restarted controls; automatic
+production project discovery and retained-record reclamation are still missing.
+Forced process death is proved at adjacent commit checkpoints, not instruction-
+exact termination inside CommitTransaction or hardware/power-loss durability.
+
+## D3 native mechanism — only the controller can certify publication
 
 `AtomicModify.cs` extends the trusted native primitive layer for the existing
 publication adapter; it does not mint controller authority or journal success.
@@ -109,9 +156,9 @@ identical ordinary write must succeed before the transaction with parents pinned
 Successful commit must expose only NEW. Content/new-ID conflicts preserve the
 user object. Exact source-write/flush/precommit/postcommit exception controls
 must retain complete old/new versions and reclaim only the owned test scope.
-These controls are not yet real publisher-death/recovery or production E2E proof.
-Current controller still denies BACKEND_UNAVAILABLE; D1 postcommit certificates
-remain denied, and Windows autonomy remains BLOCKED.
+These primitive controls alone are not publisher-death/recovery or production
+E2E proof; those are separately exercised by the journal and controller controls.
+V1 D1 postcommit certificates remain denied. Windows autonomy remains BLOCKED.
 
 Primary API rationale:
 
@@ -120,13 +167,15 @@ Primary API rationale:
 - [TxF handle lifecycle](https://learn.microsoft.com/en-us/windows/win32/fileio/how-to-use-transactional-ntfs): close transacted file handles before commit; commit invalidates them, so final verification uses a new anchored read-only handle.
 - [Microsoft's TxF warning](https://learn.microsoft.com/en-us/windows/win32/fileio/deprecation-of-txf): legacy API, future availability not guaranteed, alternatives recommended. The candidate cannot claim general Windows/filesystem portability or power-loss hardware guarantees.
 
-The mechanism is UNPROVEN until actual candidate Windows compilation/API tests.
-Unsupported volume/API/locking/flush behavior fails closed, never substitutes
-unvalidated rename, plain write/copy or increased rights. Only after the native
-primitive is proven bind the already-existing journal and real verified opaque
-grant, then real mutation/process-death/recovery and production Git publication.
+Native primitive/API support is proved only on the exact Windows CI NTFS runner,
+not inferred for all Windows installations. Unsupported volume/API/locking/flush
+behavior fails closed, never substitutes unvalidated rename, ordinary write/copy
+or increased rights. The original journal and verified opaque grant are now bound
+to this same primitive; full candidate acceptance still requires its complete
+matching native/clone/Pi gate. The kernel stages the existing default stream
+transactionally; this is not an ordinary non-atomic in-place write fallback.
 
-## Durable journal continuation (native verified subsystem, not publication)
+## Historical D1 durable journal checkpoint (d817f09, precommit only)
 
 Exact functional **d817f0962f1875d01407ba08ffebb00a7334fd84** /
 [CI36448649855](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36448649855)
@@ -206,7 +255,7 @@ same text as a new native object and requires CONFLICT from the new inspector.
 Thus a blocked live namespace operation is not mistaken for successful concurrent
 replacement, nor worked around by widening production sharing or releasing pins.
 
-Safe replacement remains unresolved. Microsoft's
+At that preceding D1 checkpoint safe replacement remained unresolved. Microsoft's
 [FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
 allows POSIX replacement with open target handles, but documents no expected-target
 identity compare-and-swap. It must not be used as an unvalidated replacement.
@@ -225,7 +274,7 @@ the journal continuation above does not yet implement production project
 publication, replacement, rollback or publication restart recovery. Windows autonomy remains BLOCKED. B1/B2/C are retained, not
 re-certified as a complete Windows engine.
 
-## Actual lifecycle and receipt meaning
+## Actual current lifecycle and receipt meaning
 
 The controller in `extensions/secure-workflow.ts` reserves a governed Worker via
 `lib/phi-worker-authority.mjs` before delegation. On Windows that reservation
@@ -270,20 +319,25 @@ Only after VERIFIED and applicable clean LSP and unchanged base does the
 controller receive READY_TO_PUBLISH plus a separate opaque WeakMap grant. Grants
 are bound to record/lifetime/exact draft/transaction ID; copies, Worker tokens,
 stale preparations, revocation and in-flight tools cannot use them.
-`executePreparedWindowsPublication` always denies with BACKEND_UNAVAILABLE for
-an otherwise valid grant. No runner injection, recursive copy or host write
-fallback exists. The full workflow platform gate remains closed and does not
-invoke preflight yet; this is an implemented subsystem, not a publication E2E.
+`executePreparedWindowsPublication` consumes an original opaque live grant once
+and invokes the fixed single-MODIFY adapter. On unsupported platforms/operations
+it fails closed; no runner injection, recursive copy or ordinary host-write
+fallback exists. The full ordinary Windows workflow platform gate remains closed
+and does not automatically call this explicit-controller publication API.
 
 All lifecycle names are explicit: DRAFT_CREATED, EDITED, VERIFIED,
 READY_TO_PUBLISH, PUBLISHING, PUBLISHED, CONFLICT, ROLLED_BACK, FAILED. In this
-partial implementation PUBLISHING/PUBLISHED/ROLLED_BACK are **unreachable**;
-terminal mutation transitions require the missing native transaction adapter.
-Revoked publication preflight is FAILED (Worker metadata separately REVOKED).
-Receipts report draft ID/version/source digest, verified/base digests, operations,
-semantic proof metadata, conflicts and projectPublished=false. Attempted/committed
-file lists are empty; transaction recovery/cleanup are NOT_STARTED, not PASS.
-Existing execution receipts are not project publication certificates.
+implementation PUBLISHING/PUBLISHED are reachable only through the original
+controller grant and actual native/private proof plus whole-project readback.
+Controller ROLLED_BACK is still not minted from a restarted hash observation;
+the native journal has its separately evidenced metadata rollback state.
+Revocation clears payload; a historical PUBLISHED receipt remains PUBLISHED,
+while an unpublished revoked preflight is FAILED (Worker metadata REVOKED).
+Receipts report draft ID/version/source digest, verified/base/temp/final digests,
+operations, actual native identities, semantic proof metadata and confirmed
+commit/cleanup evidence. Uncertain attempts are FAILED/UNKNOWN with retained
+journal metadata, not a fabricated rollback/PASS; conflict is never publication.
+Existing sandbox execution receipts alone remain distinct from publication proof.
 `publishHub` in secure-workflow publishes metadata/evidence, **not project files**.
 
 ## Native CREATE primitive and API choice
@@ -320,7 +374,7 @@ API rationale uses primary Microsoft documentation:
 - [FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information): same-volume rename, relative parent handle/leaf, DELETE source right and no-clobber semantics. POSIX replacement flags are not proof of expected-destination-ID compare-and-swap.
 - [ReplaceFileW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew): path-based opens, preservation rules and documented nontrivial failure states; WRITE_THROUGH is unsupported. This is not sufficient evidence of safe anchored expected-ID replacement or crash recovery.
 
-**Unresolved replacement constraint:** releasing an exclusive expected target
+**Rejected unsafe replacement shortcut:** releasing an exclusive expected target
 handle before a pathname replace reintroduces the race; keeping no-delete-sharing
 is not evidence that replacement can commit. Neither a repeated path check nor
 an unconditional POSIX rename closes that gap. A replacement design must prove
@@ -345,7 +399,7 @@ Its dedicated step passed. No timeout extension or retrospective fix claim.
 | Operation | This checkpoint | Required before production |
 | --- | --- | --- |
 | CREATE | Metadata plan; separate fixed no-clobber native primitive | Durable ownership journal, adapter, recovery/crash proof |
-| REPLACE | Metadata plan only; backend denied | Expected-ID atomic native replacement, ACL/stream policy, recovery |
+| REPLACE | Implemented single-file V2 journal/KTM + approved verified-controller adapter; exact final native gate required above | Restart original metadata/controller continuity, discovery/retention and full E1/E2/E3 certification |
 | DELETE | Metadata plan only; backend denied | Recoverable staged deletion; no irreversible early removal |
 | RENAME | Explicit DELETE+CREATE plan, never guessed | Destination conflict + recoverable paired operation semantics |
 
@@ -355,11 +409,12 @@ operations; partial multi-file publication must be detectable and recovered only
 when ownership/base/current IDs match. Unknown identity or concurrent user changes
 must retain evidence/FAIL safe, never repair arbitrary files.
 
-Next subsystem: expected-ID safe native replacement design and proof, then bind
-the now-proven precommit journal to physical temp/commit observations and recover
-at each actual mutation phase including real process kill. Only after those proofs integrate controller publication into the
-real disposable Git fixture pipeline, require exact verified/LSP/published digest,
-host tests/intended Git diff/receipts/cleanup and all D acceptance controls. Then
+Next after exact single-MODIFY acceptance: safe DELETE and conflict-safe RENAME
+semantics/native controls, then per-operation multi-file journal/recovery without
+claiming global atomicity. Original metadata/controller restart continuity,
+trusted project discovery and terminal-record reclamation also remain open.
+Do not expand the backend to other operations without their own native death/
+conflict/cleanup proof or promote metadata-only recovery to PUBLISHED. Then
 E1/E2/E3 full engine certification, Doctor/backup/reconstruction. Current D is
 IN_PROGRESS, not COMPLETE; autonomy and full portability remain blocked/pending.
 

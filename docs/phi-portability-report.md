@@ -2,7 +2,23 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## D3 final-lock conflict candidate — native acceptance pending
+## Current D3 bounded acceptance — not full Windows readiness
+
+Exact functional **1b0da2848b8487d6a8bd50d2833271c21568a050** / [CI36464401667](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36464401667) SUCCESS Windows/Ubuntu, same private branch. Windows314/304PASS/0FAIL/10Linux-only skips, Ubuntu314/120PASS/0FAIL/194native skips; full authoritative Linux847/653PASS/0FAIL/194Windows-only skips plus syntax/installed-Pi TypeScript/package-pinned-policy validation PASS. CREATE18/18, D1journal19/19, atomic/namespace19/19, journal-MODIFY28/28 and real production-API publication/conflict2/2 PASS. Required native cases are not made optional. [Exact metadata receipts](phi-single-modify-evidence.json).
+
+The production internal controller path uses actual governed LPAC EDIT, same-draft real JSON LSP, non-mutating TEST, opaque explicit approved READY, same durable journal/native NTFS atomic default-stream replacement, postverify/full manifest readback, private proof and PUBLISHED with intended-only Git diff. Source/temp/final file digests and source/verified/final aggregate digests agree in their distinct encodings; original ID/security/creation-time preserved. Final writer-lock conflict and normal post-READY controller conflict preserve user state; no JSON replay or ordinary overwrite fallback.13distinct real publisher kills/fresh recoveries prove OLD/NEW/conflict and owned temp cleanup; recovery never overwrites project data, kills processes or reconstructs controller PUBLISHED.
+
+Both independent source clones PASS_FOUNDATION_ONLY/cleanupPASS, matching OS counts and no copied auth/ignored runtime. Windows10attested/empty/drained owned validation Jobs/residual owned0, one8838ms removal; Ubuntu15ms removal with native process census null/UNKNOWN. Whole DoctorFAIL/fullEngineBLOCKED_NOT_INSTALLED remains intentionally partial, not full machine reconstruction. Actual Pi0.87.1/subagents0.66.0 local normal/revoked/same-draft LSP smokes PASS with cleared/revoked/removed cleanup and0external provider calls. Receipt/digest/role/cleanup cross-validation PASS; cancelled historical CI is correctly rejected, not counted as full acceptance.
+
+**D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS.** Legacy NTFS TxF support only; unsupported behavior fails closed, no power-loss/hardware or general Windows guarantee. Restart original metadata/verified-controller continuity, automatic trusted discovery, retained-record reclamation (64-record ceiling), safe DELETE/RENAME/multifile, E1/E2/E3, full Doctor/backup/restore/reconstruction remain open. Earlier native pre-PREPARED changed-base rejection is source-inspected generic FAILED/UNKNOWN, without project writes; its deterministic native race regression/correction is still pending. Do not claim all concurrent changes are classified uniformly.
+
+Functional indexed audit624/0blockingFAIL/13classifiedWARN, tested ancestry1861/0blockingFAIL/126classifiedWARN: heuristic limited scopes, not exhaustive secret absence. Protected document byte-for-byte unchanged/never staged, auth fingerprint unchanged, no active Pi/provider/routes/presets/Council/Judge/Second Brain/security/governor/model retry/spawn limit changes or external model calls. Pre-existing protected user edit is outside task commits. Delivery is documentation/evidence only; tested source above is separate from final delivery HEAD.
+
+Next: deterministic earlier admission classification regression, safe DELETE/RENAME through the same journal and per-operation multi-file recovery; original metadata/controller recovery/discovery/retention must also close before D certification. Windows autonomy remains blocked even after D until E1/E2/E3 PASS. This is the nearest coherent proved single-MODIFY checkpoint, not a whole-project completion declaration.
+
+Delivery JSON/metadata consistency, package-pinned-policy validation and staged whitespace PASS; indexed625blobs/0blockingFAIL/13classifiedWARN. Documentation/evidence only; protected user edit excluded, functional native proof not rerun for bookkeeping.
+
+## Historical final-lock candidate — subsequently accepted
 
 Local final-lock candidate gate847/653PASS/0FAIL/194Windows-only skips; syntax/installed-Pi TypeScript/package-pinned-policy validation PASS, focused102/16PASS/0FAIL/86native skips. Added a mandatory actual native post-READY/pre-lock concurrent change case and propagation of its persisted CONFLICT through the fixed native endpoint/controller adapter. User bytes and journal remain preserved, transaction aborts, no retry or rights/policy widening. Its matching native proof is not yet claimed.
 
