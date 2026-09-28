@@ -33,6 +33,12 @@ for (const name of cases) test('native durable publication journal: ' + name, { 
     assert.equal(receipt.evidence.metadata.projectPublished, false); assert.deepEqual(receipt.evidence.metadata.filesCommitted, []);
     assert.equal(receipt.evidence.metadata.cleanup, 'NOT_PERFORMED');
   }
+  if (name === 'same-content-replaced') {
+    assert.equal(receipt.actualProcessKilled, true); assert.equal(receipt.childGone, true); assert.equal(receipt.restartedInspector, true);
+    assert.equal(receipt.pinnedRenameDenied, true); assert.equal(receipt.evidence.status, 'CONFLICT'); assert.equal(receipt.evidence.baseMatches, false);
+    assert.equal(receipt.evidence.projectMutations, 0); assert.equal(receipt.evidence.journalMutations, 0); assert.equal(receipt.evidence.processKills, 0);
+    assert.deepEqual(receipt.evidence.metadata.filesCommitted, []); assert.equal(receipt.evidence.metadata.phase, 'PREPARED');
+  }
   assert.doesNotMatch(JSON.stringify(receipt), /old-complete|new-complete|FORBIDDEN_RAW_SENTINEL/u);
   assert.equal(windowsRecoveryStatus().status, 'PASS');
   console.log(JSON.stringify({ control: 'PUBLICATION_DURABLE_JOURNAL_ONLY', ...receipt }));

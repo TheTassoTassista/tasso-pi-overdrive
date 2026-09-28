@@ -307,15 +307,15 @@ namespace Phi.Native {
     internal static int SelfTest(string name) {
       string[] cases = { "metadata", "transition", "duplicate", "active", "corrupt", "gap", "oversized", "unknown-owner", "unsafe-acl", "project-replaced", "user-change", "same-content-replaced", "protected", "crash-prepared", "crash-written", "crash-flushed", "crash-ready", "crash-commit-started" };
       if (!cases.Contains(name)) return 70;
-      ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool created = false, passed = false, killed = false, childGone = false, restarted = false, clean = false; object evidence = null;
+      ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool created = false, passed = false, killed = false, childGone = false, restarted = false, pinnedRenameDenied = false, clean = false; object evidence = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "old-complete", new UTF8Encoding(false));
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
         Dictionary<string, object> header = FixtureHeader(scope.Root, tx);
-        if (name.StartsWith("crash-", StringComparison.Ordinal)) {
+        if (name.StartsWith("crash-", StringComparison.Ordinal) || name == "same-content-replaced") {
           stage = "CHILD_START";
-          string phase = name == "crash-prepared" ? "PREPARED" : name == "crash-written" ? "TEMP_WRITTEN" : name == "crash-flushed" ? "TEMP_FLUSHED" : name == "crash-ready" ? "READY_TO_COMMIT" : "COMMIT_STARTED";
+          string phase = name == "crash-prepared" || name == "same-content-replaced" ? "PREPARED" : name == "crash-written" ? "TEMP_WRITTEN" : name == "crash-flushed" ? "TEMP_FLUSHED" : name == "crash-ready" ? "READY_TO_COMMIT" : "COMMIT_STARTED";
           child = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-journal-fixture-child " + phase, UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
           child.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); child.StandardInput.Close();
           string ready = null; Thread reader = new Thread(delegate() { try { ready = child.StandardOutput.ReadLine(); } catch { } }); reader.IsBackground = true; reader.Start();
@@ -323,8 +323,20 @@ namespace Phi.Native {
           Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
           if (!(bool)announcement["ready"] || (string)announcement["phase"] != phase || (string)announcement["transactionId"] != tx) throw new InvalidDataException();
           created = true;
+          if (name == "same-content-replaced") {
+            stage = "PINNED_USER_RENAME";
+            try { File.Move(Path.Combine(scope.Root, "input.txt"), Path.Combine(scope.Root, "previous.txt")); }
+            catch (IOException error) { if (unchecked((uint)Marshal.GetHRForException(error)) != 0x80070020U) throw; pinnedRenameDenied = true; }
+            if (!pinnedRenameDenied || File.ReadAllText(Path.Combine(scope.Root, "input.txt")) != "old-complete") throw new InvalidDataException();
+          }
           stage = "KILL";
           child.Kill(); killed = true; if (!child.WaitForExit(3000) || !child.HasExited || child.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+          if (name == "same-content-replaced") {
+            // The producer is actually dead. Its kernel pins are gone, not
+            // deliberately weakened/released by a live publication backend.
+            stage = "USER_RENAME_AFTER_CRASH"; File.Move(Path.Combine(scope.Root, "input.txt"), Path.Combine(scope.Root, "previous.txt"));
+            stage = "USER_RECREATE_AFTER_CRASH"; File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "old-complete", new UTF8Encoding(false));
+          }
           // Restart in a fresh native process after real TerminateProcess.
           stage = "RESTART_INSPECTION";
           using (Process inspector = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-journal-fixture-inspect", UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
@@ -337,7 +349,8 @@ namespace Phi.Native {
           }
           Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(evidence));
           Dictionary<string, object> metadata = (Dictionary<string, object>)result["metadata"];
-          if ((string)result["status"] != "RECOVERY_REQUIRED" || (string)metadata["phase"] != phase || (bool)result["projectPublished"] || (int)result["projectMutations"] != 0) throw new InvalidDataException();
+          if ((string)result["status"] != (name == "same-content-replaced" ? "CONFLICT" : "RECOVERY_REQUIRED") || (bool)result["baseMatches"] != (name != "same-content-replaced") ||
+              (string)metadata["phase"] != phase || (bool)result["projectPublished"] || (int)result["projectMutations"] != 0) throw new InvalidDataException();
         } else if (name == "protected") {
           ((Dictionary<string, object>)((object[])header["operations"])[0])["path"] = ".env";
           bool denied = false; try { journal = Begin(scope.Root, header); } catch (InvalidDataException) { denied = true; }
@@ -378,9 +391,8 @@ namespace Phi.Native {
           } else if (name == "project-replaced") {
             bool denied = false; try { Inspect(tx, scope.Root, new string('a', 16) + ":" + new string('b', 32)); } catch (InvalidDataException) { denied = true; }
             if (!denied) throw new InvalidDataException(); evidence = new { status = "PROJECT_IDENTITY_REJECTED", projectMutations = 0 };
-          } else if (name == "user-change" || name == "same-content-replaced") {
-            if (name == "user-change") File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "user-complete", new UTF8Encoding(false));
-            else { stage = "USER_RENAME"; File.Move(Path.Combine(scope.Root, "input.txt"), Path.Combine(scope.Root, "previous.txt")); stage = "USER_RECREATE"; File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "old-complete", new UTF8Encoding(false)); }
+          } else if (name == "user-change") {
+            File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "user-complete", new UTF8Encoding(false));
             stage = "USER_BASE_CHECK";
             if (MatchesBase(scope.Root, journal.header)) throw new InvalidDataException();
             journal.Advance("TEMP_WRITTEN", null); journal.Advance("TEMP_FLUSHED", null);
@@ -403,7 +415,7 @@ namespace Phi.Native {
         if (created) try { using (RegistryKey root = OpenBase(true)) { root.DeleteSubKeyTree(tx, false); if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException(); } } catch { passed = false; }
         if (scope != null) { try { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); } catch { passed = false; } scope.Complete(clean); }
       }
-      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, scope = "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY", evidence, actualProcessKilled = killed, childGone, restartedInspector = restarted, fixtureCleanup = clean, externalRequests = 0, projectPublished = false }));
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, scope = "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY", evidence, actualProcessKilled = killed, childGone, restartedInspector = restarted, pinnedRenameDenied, fixtureCleanup = clean, externalRequests = 0, projectPublished = false }));
       return passed && clean ? 0 : 70;
     }
   }
