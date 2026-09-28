@@ -11,7 +11,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20 # bounded aggregate validation, not a product/agent lifetime
+    # CI36461530347 passed both suites/clones but hit 20m during the last Pi
+    # smoke after adding actual publication controls. Validation allowance only;
+    # all production/agent/individual-command budgets remain unchanged.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
         with:

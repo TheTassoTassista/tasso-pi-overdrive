@@ -6,8 +6,10 @@ Native journal integration1029475 / CI36459467660 is SUCCESS Windows/Ubuntu,
 including19atomic/namespace controls,27journal-MODIFY controls and13distinct real
 publisher-death/fresh recovery scenarios. Both independent source clones/cleanup
 and retained actual-Pi deterministic controls pass. Controllerf50a021 /
-CI36461530347 has passed the actual Worker/LSP/Tester/MODIFY/PUBLISHED/Git-diff
-and post-READY CONFLICT steps; complete acceptance is still pending here.
+CI36461530347 passed actual Worker/LSP/Tester/MODIFY/PUBLISHED/Git-diff2/2,
+both suites and independent clones/cleanup, but is CANCELLED at the evidenced
+GitHub20m job timeout during the last actual-Pi LSP smoke. Not full acceptance.
+The CI allowance alone is bounded25m; no product/governor/command limit changes.
 
 New mandatory final-lock native control changes user content after actual temp
 flush/hash/READY and before the transactional writer locks the expected target.
