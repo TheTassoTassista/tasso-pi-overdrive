@@ -144,7 +144,16 @@ host tests/intended Git diff/receipts/cleanup and all D acceptance controls. The
 E1/E2/E3 full engine certification, Doctor/backup/reconstruction. Current D is
 IN_PROGRESS, not COMPLETE; autonomy and full portability remain blocked/pending.
 
-Candidate verification is recorded in `phi-progress.md` and
-`phi-portability-report.md`. Required native cases are mandatory on Windows and
+Accepted functional39daebadb8ee3c069597591c39b3b16a91ae291d /
+[CI36338087065](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36338087065)
+SUCCESS: native245/235PASS/0FAIL/10Linux-only skips, dedicated CREATE18/18 and
+retained real LSP/actual Pi/both source clones green; full Linux778/649PASS/
+0FAIL/129native skips plus syntax/TypeScript/package validation PASS.
+[Exact metadata-only receipts](phi-publication-evidence.json) retain readiness,
+conflicts, native primitive, owned clone cleanup and actual-Pi regression proof.
+This confirms the no-sharing-change same-directory fix; it does not retrospectively
+explain the separate prior Worker timeout, nor complete D. Additional verification
+details are recorded in `phi-progress.md` and `phi-portability-report.md`.
+Required native cases are mandatory on Windows and
 skipped (not credited) on Linux. All controls use deterministic local programs,
 with zero external model/provider calls and no Pi/auth/routing changes.

@@ -1,0 +1,1462 @@
+{
+  "version": 1,
+  "status": "PASS_SUBSYSTEM_ONLY",
+  "scope": "D_PREFLIGHT_AND_NATIVE_CREATE_NOT_PROJECT_PUBLICATION",
+  "functionalHead": "39daebadb8ee3c069597591c39b3b16a91ae291d",
+  "ci": {
+    "runId": 36338087065,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36338087065",
+    "status": "SUCCESS_WINDOWS_AND_UBUNTU"
+  },
+  "phaseD": "IN_PROGRESS",
+  "windowsAutonomy": "BLOCKED",
+  "externalProviderCalls": 0,
+  "counts": {
+    "fullLocalLinux": {
+      "total": 778,
+      "passed": 649,
+      "failed": 0,
+      "skipped": 129
+    },
+    "nativeWindows": {
+      "total": 245,
+      "passed": 235,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 10
+    },
+    "ubuntu": {
+      "total": 245,
+      "passed": 116,
+      "failed": 0,
+      "skipped": 129
+    },
+    "dedicatedNativeCreate": {
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    "dedicatedNativeLsp": {
+      "total": 8,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 1
+    }
+  },
+  "preflight": {
+    "control": "PUBLICATION_PREFLIGHT_ONLY",
+    "receipts": [
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "EDIT",
+        "role": "worker",
+        "operation": "safe-exec",
+        "sessionId": "14a590dc7a9e42c38aa736fc97106f08",
+        "scopeId": "0541e4235ca447c89a66680848a0ab68",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "safe_exec",
+        "snapshotDigest": "438b1232ef3bd5f3ec131934b5bf2657cde6fceaa5e78c23b7442a8e20e784e2",
+        "publicationState": "EDITED",
+        "projectPublished": false,
+        "failureReason": null,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "6ac17077-6bad-48b2-a996-14f407111661",
+          "taskPolicyDigest": "8d2a2bda40d67afbf26ced1d1c4d6dc48e731179312815b1361861bc16ff9ce4",
+          "toolPolicyDigest": "2865fc17e68d095e466e6ed53e4e69db2dfdd2fc87a5f425c4f9823f36974189",
+          "toolCallNumber": 1,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 0,
+          "contentDigest": "25520f81633499cfbe2fac4379c7cc7c8639e5e6b68fdd67daea505b72f9472c",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "state": "DRAFT_CREATED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002a0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true
+      },
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "LSP_READ_ONLY",
+        "role": "worker",
+        "operation": "lsp",
+        "sessionId": "14a590dc7a9e42c38aa736fc97106f08",
+        "scopeId": "5f08458673b54d65bdd778c5c768345c",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "semantic_nav",
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "6ac17077-6bad-48b2-a996-14f407111661",
+          "taskPolicyDigest": "8d2a2bda40d67afbf26ced1d1c4d6dc48e731179312815b1361861bc16ff9ce4",
+          "toolPolicyDigest": "2865fc17e68d095e466e6ed53e4e69db2dfdd2fc87a5f425c4f9823f36974189",
+          "toolCallNumber": 2,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002a0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002b0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true,
+        "projectPublished": false,
+        "runtimeDigest": "40bfd6d46ca654a4b7abd5fb989382285be0d80e59b0ea91c0429a0cec2cf71d",
+        "runtimeFiles": 315,
+        "initialized": true,
+        "shutdown": true,
+        "onWrite": false
+      },
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "TEST",
+        "role": "tester",
+        "operation": "verification",
+        "sessionId": "14a590dc7a9e42c38aa736fc97106f08",
+        "scopeId": "c3ea8ccdfdba4686af269ba0c8681fd1",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "verification",
+        "snapshotDigest": "18aef0b068828c21931b7b2f4ee28eae74a23318c2b4b05bc1aec31355823f34",
+        "publicationState": "EDITED",
+        "projectPublished": false,
+        "failureReason": null,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "6ac17077-6bad-48b2-a996-14f407111661",
+          "taskPolicyDigest": "8d2a2bda40d67afbf26ced1d1c4d6dc48e731179312815b1361861bc16ff9ce4",
+          "toolPolicyDigest": "2865fc17e68d095e466e6ed53e4e69db2dfdd2fc87a5f425c4f9823f36974189",
+          "toolCallNumber": 3,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002b0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002b0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true
+      },
+      {
+        "version": 1,
+        "platform": "win32",
+        "backend": "windows-lpac-broker",
+        "profile": "TEST",
+        "role": "tester",
+        "operation": "verification",
+        "sessionId": "14a590dc7a9e42c38aa736fc97106f08",
+        "scopeId": "f4d4ecece419485c9abfa9701ddc4d64",
+        "tokenVerified": true,
+        "jobAttested": true,
+        "targetStarted": true,
+        "exitCode": 0,
+        "timedOut": false,
+        "cleanup": "PASS",
+        "securityFailure": null,
+        "productionPath": "verification",
+        "snapshotDigest": "18aef0b068828c21931b7b2f4ee28eae74a23318c2b4b05bc1aec31355823f34",
+        "publicationState": "VERIFIED",
+        "projectPublished": false,
+        "failureReason": null,
+        "workerAuthority": {
+          "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+          "executionId": "6ac17077-6bad-48b2-a996-14f407111661",
+          "taskPolicyDigest": "8d2a2bda40d67afbf26ced1d1c4d6dc48e731179312815b1361861bc16ff9ce4",
+          "toolPolicyDigest": "2865fc17e68d095e466e6ed53e4e69db2dfdd2fc87a5f425c4f9823f36974189",
+          "toolCallNumber": 4,
+          "depth": 1,
+          "toolCallLimit": 40
+        },
+        "draftBefore": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:002b0000000471cd0000000000000000",
+          "state": "EDITED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "draft": {
+          "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+          "revision": 1,
+          "contentDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "baseRootIdentity": "f42c40802c403fba:001600000002acd40000000000000000",
+          "nativeSnapshotIdentity": "f42c40802c403fba:00290000000471cc0000000000000000",
+          "state": "VERIFIED",
+          "payloadCleared": false,
+          "projectPublished": false
+        },
+        "jobEmptyVerified": true
+      }
+    ],
+    "publication": {
+      "state": "READY_TO_PUBLISH",
+      "transactionId": "a86df46e6d9e4846859d1c1e453ab3b7",
+      "baseDigest": "596c902c981e0adcd3fb376a802d008e852b18502799cc85ffa9c37ffcb633e6",
+      "verifiedDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+      "operations": [
+        {
+          "path": "config.json",
+          "kind": "REPLACE",
+          "baseIdentity": "f42c40802c403fba:001000000002afc40000000000000000",
+          "baseDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "newDigest": "1bff1ce9494f80e149182ba3b174ede892b39b886812687bf4b5b98a801532db",
+          "newBytes": 16
+        }
+      ],
+      "conflicts": [],
+      "semanticProofs": {
+        "config.json": {
+          "digest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+          "revision": 1,
+          "clean": true
+        }
+      },
+      "filesAttempted": [],
+      "filesCommitted": [],
+      "recovery": "NOT_STARTED",
+      "cleanup": "NOT_STARTED",
+      "projectPublished": false,
+      "backend": "BLOCKED_NOT_IMPLEMENTED",
+      "draftId": "47f981e98ede4388a8a66a12fbb025a2",
+      "draftVersion": 1,
+      "sourceDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf"
+    },
+    "hostUnchanged": true,
+    "externalRequests": 0
+  },
+  "conflicts": [
+    {
+      "control": "PUBLICATION_CONFLICT",
+      "mode": "content",
+      "publication": {
+        "state": "CONFLICT",
+        "transactionId": null,
+        "baseDigest": "d3f9682ab0fb4099785a6e7e31b5a13c4c43990a3a0d9176e3324ccf95c2ea15",
+        "verifiedDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+        "operations": [
+          {
+            "path": "config.json",
+            "kind": "REPLACE",
+            "baseIdentity": "f42c40802c403fba:001800000002acd40000000000000000",
+            "baseDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "newDigest": "1bff1ce9494f80e149182ba3b174ede892b39b886812687bf4b5b98a801532db",
+            "newBytes": 16
+          }
+        ],
+        "conflicts": [
+          {
+            "path": "config.json",
+            "reason": "FILE_CONTENT"
+          }
+        ],
+        "semanticProofs": {
+          "config.json": {
+            "digest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+            "revision": 1,
+            "clean": true
+          }
+        },
+        "filesAttempted": [],
+        "filesCommitted": [],
+        "recovery": "NOT_STARTED",
+        "cleanup": "NOT_STARTED",
+        "projectPublished": false,
+        "backend": "BLOCKED_NOT_IMPLEMENTED",
+        "draftId": "756cb59f91f74891b96ff3fde03118b2",
+        "draftVersion": 1,
+        "sourceDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf"
+      },
+      "draftPreserved": true,
+      "userPreserved": true,
+      "externalRequests": 0
+    },
+    {
+      "control": "PUBLICATION_CONFLICT",
+      "mode": "identity",
+      "publication": {
+        "state": "CONFLICT",
+        "transactionId": null,
+        "baseDigest": "b634d809060e7ffe56a33d15bfc57cbd7873226eb934480f0a027b1dd672c9bc",
+        "verifiedDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+        "operations": [
+          {
+            "path": "config.json",
+            "kind": "REPLACE",
+            "baseIdentity": "f42c40802c403fba:001900000002acd40000000000000000",
+            "baseDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "newDigest": "1bff1ce9494f80e149182ba3b174ede892b39b886812687bf4b5b98a801532db",
+            "newBytes": 16
+          }
+        ],
+        "conflicts": [
+          {
+            "path": "config.json",
+            "reason": "FILE_IDENTITY"
+          },
+          {
+            "path": "previous.txt",
+            "reason": "USER_CREATED"
+          }
+        ],
+        "semanticProofs": {
+          "config.json": {
+            "digest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf",
+            "revision": 1,
+            "clean": true
+          }
+        },
+        "filesAttempted": [],
+        "filesCommitted": [],
+        "recovery": "NOT_STARTED",
+        "cleanup": "NOT_STARTED",
+        "projectPublished": false,
+        "backend": "BLOCKED_NOT_IMPLEMENTED",
+        "draftId": "be67b99be40f4690ba4272fc9f3fa361",
+        "draftVersion": 1,
+        "sourceDigest": "e037ee9d67c7e8002810b2c6f27d8195994615378323b3d603c7eb2eca3cadcf"
+      },
+      "draftPreserved": true,
+      "userPreserved": true,
+      "externalRequests": 0
+    }
+  ],
+  "nativeCreate": [
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "create",
+      "passed": true,
+      "committed": true,
+      "denied": false,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "existing",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "case-alias",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "concurrent-create",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "junction",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "protected",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "ads",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "root-identity",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "foreign-handle",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": false,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "parent-pinned",
+      "passed": true,
+      "committed": true,
+      "denied": false,
+      "injected": false,
+      "parentSwapDenied": true,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "before-temp",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "temp",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "write",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "flush",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "validation",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "precommit",
+      "passed": true,
+      "committed": false,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "rename",
+      "passed": true,
+      "committed": true,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    },
+    {
+      "control": "NATIVE_ATOMIC_CREATE_ONLY",
+      "caseName": "postverify",
+      "passed": true,
+      "committed": true,
+      "denied": true,
+      "injected": true,
+      "parentSwapDenied": false,
+      "fixtureCleanup": true,
+      "scope": "NATIVE_CREATE_PRIMITIVE_NOT_PROJECT_TRANSACTION"
+    }
+  ],
+  "clones": {
+    "windows": {
+      "version": 2,
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "version": 1,
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "39daebadb8ee3c069597591c39b3b16a91ae291d",
+        "platform": "win32",
+        "tests": {
+          "total": 245,
+          "passed": 235,
+          "failed": 0,
+          "skipped": 10
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fixedScopeRecovery": "PASS",
+        "recoveryAfterTests": {
+          "status": "PASS",
+          "active": 0,
+          "stale": 0,
+          "quarantined": 0,
+          "processKills": 0,
+          "cleanupPerformed": false
+        },
+        "ownedCommands": 10,
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "limitation": "Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending",
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4292,
+              "childGeneration": "134350053337505944"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 1652,
+              "childGeneration": "134350053339726972"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3464,
+              "childGeneration": "134350053354786209"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 7172,
+              "childGeneration": "134350053357325057"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 7304,
+              "childGeneration": "134350053359292817"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "pinned-lsp-runtime",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3972,
+              "childGeneration": "134350053368226662"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "windows-process-build",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3224,
+              "childGeneration": "134350054452971447"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 8068,
+              "childGeneration": "134350054469983736"
+            },
+            "diagnosticCodes": [
+              "PHI_FILESYSTEM_FAILURE"
+            ],
+            "filesystemFailures": [
+              {
+                "operation": "NT_OPEN",
+                "access": "00110080",
+                "share": 1,
+                "options": "00200060",
+                "nativeStatus": "c0000043",
+                "nativeError": 32,
+                "objectIdentity": "f42c40802c403fba:00320000000095010000000000000000",
+                "leafDigest": "532cba7264d001a2769afb27486e714dfc176eafb26dac6a089ea7974cf4dea5"
+              },
+              {
+                "operation": "NT_OPEN",
+                "access": "00110080",
+                "share": 1,
+                "options": "00200060",
+                "nativeStatus": "c0000043",
+                "nativeError": 32,
+                "objectIdentity": "f42c40802c403fba:00320000000095010000000000000000",
+                "leafDigest": "532cba7264d001a2769afb27486e714dfc176eafb26dac6a089ea7974cf4dea5"
+              },
+              {
+                "operation": "NT_OPEN",
+                "access": "00110081",
+                "share": 1,
+                "options": "00200021",
+                "nativeStatus": "c0000056",
+                "nativeError": 5,
+                "objectIdentity": "f42c40802c403fba:0007000000046f6c0000000000000000",
+                "leafDigest": "483a5d3fd7e9247558ebbd7ac591d444d1ca8d615e5270f36054ef242bb656b5"
+              },
+              {
+                "operation": "NT_OPEN",
+                "access": "00110081",
+                "share": 1,
+                "options": "00200021",
+                "nativeStatus": "c0000056",
+                "nativeError": 5,
+                "objectIdentity": "f42c40802c403fba:0007000000046f6c0000000000000000",
+                "leafDigest": "483a5d3fd7e9247558ebbd7ac591d444d1ca8d615e5270f36054ef242bb656b5"
+              }
+            ]
+          },
+          {
+            "stage": "post-test-recovery",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 5604,
+              "childGeneration": "134350057388216167"
+            },
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 1424,
+              "childGeneration": "134350057390684191"
+            },
+            "diagnosticCodes": []
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 16753,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": false,
+        "inheritedHandleAfter": false,
+        "residualOwnedProcesses": 0,
+        "processOwnership": "NATIVE_JOB_HANDLES",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    },
+    "linux": {
+      "version": 2,
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "version": 1,
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "39daebadb8ee3c069597591c39b3b16a91ae291d",
+        "platform": "linux",
+        "tests": {
+          "total": 245,
+          "passed": 116,
+          "failed": 0,
+          "skipped": 129
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fixedScopeRecovery": "NOT_NATIVE_WINDOWS",
+        "recoveryAfterTests": "NOT_NATIVE_WINDOWS",
+        "ownedCommands": 0,
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "limitation": "Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending",
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "diagnosticCodes": []
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "diagnosticCodes": []
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 29,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": "UNKNOWN",
+        "inheritedHandleAfter": "UNKNOWN",
+        "residualOwnedProcesses": null,
+        "processOwnership": "NOT_NATIVE_WINDOWS",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    }
+  },
+  "piRegression": [
+    {
+      "status": "PASS",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 6,
+      "externalProviderCalls": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      },
+      "externalRequests": 0,
+      "brokerCalls": 5,
+      "receipts": [
+        {
+          "scopeId": "d2dfdaa73e7d4d23b0b6bd4512d98280",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 0,
+            "contentDigest": "645f14fa5ac480c33362ea60f41031170431848b791b288c2249d8127d4fb4fa",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "state": "DRAFT_CREATED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0007000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "2b138e4b-468b-482a-9b09-be7b84af922f",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 1,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        },
+        {
+          "scopeId": "307d77197e7a4698a87ecc852714d03c",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0007000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0008000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "2b138e4b-468b-482a-9b09-be7b84af922f",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 2,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        },
+        {
+          "scopeId": "d824d21099f644db93995e5737565fc2",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 73,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0008000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0008000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "2b138e4b-468b-482a-9b09-be7b84af922f",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 3,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        },
+        {
+          "scopeId": "7cb910656b9e4b1f9a9c79c49eb2c859",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:0008000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000a000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "2b138e4b-468b-482a-9b09-be7b84af922f",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 4,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        },
+        {
+          "scopeId": "8cfc62f980604190b4076f23837d82ab",
+          "role": "tester",
+          "profile": "TEST",
+          "operation": "verification",
+          "productionPath": "verification",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000a000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "76c24a2b393048a195faf56a2a69784b",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:000a0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000b000000049e2c0000000000000000",
+            "state": "VERIFIED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "2b138e4b-468b-482a-9b09-be7b84af922f",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 5,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        }
+      ]
+    },
+    {
+      "status": "PASS",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 3,
+      "externalProviderCalls": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      },
+      "externalRequests": 0,
+      "brokerCalls": 1,
+      "receipts": [
+        {
+          "scopeId": "016521621b204bd2a9e657c705080023",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "3412368445e04d8189add28e94d127ea",
+            "revision": 0,
+            "contentDigest": "645f14fa5ac480c33362ea60f41031170431848b791b288c2249d8127d4fb4fa",
+            "baseRootIdentity": "f42c40802c403fba:00080000000479680000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:00080000000479680000000000000000",
+            "state": "DRAFT_CREATED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "3412368445e04d8189add28e94d127ea",
+            "revision": 1,
+            "contentDigest": "68ae33c387d204e3e69eb8403012946fcbbcf8ab2f0ec1c9c5f5be4128e89c96",
+            "baseRootIdentity": "f42c40802c403fba:00080000000479680000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000c000000049e2c0000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "5b45c083-79e2-4757-9ad8-cd15bfa82111",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 1,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        }
+      ]
+    },
+    {
+      "status": "PASS",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 3,
+      "externalProviderCalls": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      },
+      "externalRequests": 0,
+      "brokerCalls": 3,
+      "receipts": [
+        {
+          "scopeId": "65c60f5fa76141fd9fa747822b38fa7a",
+          "role": "worker",
+          "profile": "EDIT",
+          "operation": "safe-exec",
+          "productionPath": "safe_exec",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 0,
+            "contentDigest": "5a28acae2c12e7605d705676804b12270b3a1a504f4d0b8e46804684411f85e3",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "state": "DRAFT_CREATED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 1,
+            "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000b000000049e310000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "7edb849f-9c08-4195-944d-d43d5963b7e2",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 1,
+            "depth": 1,
+            "toolCallLimit": 40
+          }
+        },
+        {
+          "scopeId": "051927d10d784055adaef90126e927e4",
+          "role": "worker",
+          "profile": "LSP_READ_ONLY",
+          "operation": "lsp",
+          "productionPath": "semantic_nav",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 1,
+            "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000b000000049e310000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 1,
+            "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000c000000049e300000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "7edb849f-9c08-4195-944d-d43d5963b7e2",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 2,
+            "depth": 1,
+            "toolCallLimit": 40
+          },
+          "initialized": true,
+          "shutdown": true,
+          "onWrite": true
+        },
+        {
+          "scopeId": "28d7bad908424f41baa3d84d20b588cc",
+          "role": "worker",
+          "profile": "LSP_READ_ONLY",
+          "operation": "lsp",
+          "productionPath": "semantic_nav",
+          "tokenVerified": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "exitCode": 0,
+          "timedOut": false,
+          "cleanup": "PASS",
+          "jobEmptyVerified": true,
+          "projectPublished": false,
+          "draftBefore": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 1,
+            "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000c000000049e300000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "draft": {
+            "draftId": "09bf4804db164fe4af8af3a73051a6da",
+            "revision": 1,
+            "contentDigest": "92ef69b920c539eb13494021f5ecda81611dabd827468d2a9dd8d474dee2dad2",
+            "baseRootIdentity": "f42c40802c403fba:000c0000000000ff0000000000000000",
+            "nativeSnapshotIdentity": "f42c40802c403fba:000d000000049e300000000000000000",
+            "state": "EDITED",
+            "payloadCleared": false,
+            "projectPublished": false
+          },
+          "workerAuthority": {
+            "authority": "CONTROLLER_TASK_TOOL_GOVERNORS",
+            "executionId": "7edb849f-9c08-4195-944d-d43d5963b7e2",
+            "taskPolicyDigest": "eda69c8dd369056c6a910192cbebfaf1e020158947b56f6ab96cf226cfcd248a",
+            "toolPolicyDigest": "fa610c26b663fcf5b535a10aaf55615ced0877d069b0acaed74221edb9497556",
+            "toolCallNumber": 3,
+            "depth": 1,
+            "toolCallLimit": 40
+          },
+          "initialized": true,
+          "shutdown": true,
+          "onWrite": false
+        }
+      ]
+    }
+  ],
+  "priorFailure": {
+    "functionalHead": "7bc020bd6b34429c053bb73083e52f9c01cffb41",
+    "runId": 36337120221,
+    "status": "FAIL",
+    "windows": {
+      "total": 243,
+      "passed": 226,
+      "failed": 6,
+      "cancelled": 1,
+      "skipped": 10
+    },
+    "rename": {
+      "failedControls": 6,
+      "operation": "RENAME_NEW",
+      "nativeStatus": "c0000043",
+      "nativeError": 32,
+      "fix": "DOCUMENTED_SAME_DIRECTORY_NULL_ROOT_SOURCE_HANDLE_RENAME_NO_SHARING_CHANGE"
+    },
+    "workerTimeout": {
+      "testBudgetMs": 30000,
+      "cause": "UNKNOWN",
+      "assertionUnchanged": true,
+      "notClaimedFixed": true
+    }
+  },
+  "limitations": [
+    "No production project publication/backend: valid grants deny BACKEND_UNAVAILABLE",
+    "READY receipt is a preflight event before later negative assertions, not the final workflow state or published host",
+    "No durable transaction journal, REPLACE/DELETE/RENAME adapter, rollback, restart recovery or process-kill publication proof",
+    "Native CREATE controls inject exceptions, not actual process termination/power loss",
+    "Whole clone Doctor FAIL/full engine BLOCKED_NOT_INSTALLED; foundation reconstruction only",
+    "Residual process proof is scoped to attested owned Jobs/observed test PIDs, not all host processes",
+    "Historical LSP70/124 and initial Worker30000ms timeout causes remain UNKNOWN",
+    "Protected/auth files were fingerprinted only, never copied into evidence"
+  ]
+}
