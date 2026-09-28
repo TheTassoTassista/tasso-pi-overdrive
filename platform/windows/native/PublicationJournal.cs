@@ -289,6 +289,38 @@ namespace Phi.Native {
     }
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     static void CloseNative(IntPtr handle) { if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); }
+    internal static int RunSingleModify(Stream input) {
+      PublicationJournal journal = null; object result = null; string phase = "REQUEST";
+      try {
+        byte[] bytes;
+        using (MemoryStream line = new MemoryStream()) {
+          bool complete = false;
+          for (int i = 0; i < 1024 * 1024; i++) { int next = input.ReadByte(); if (next < 0) throw new InvalidDataException(); if (next == 10) { complete = true; break; } line.WriteByte((byte)next); }
+          if (!complete) throw new InvalidDataException(); bytes = line.ToArray();
+        }
+        JavaScriptSerializer reader = new JavaScriptSerializer { MaxJsonLength = 1024 * 1024, RecursionLimit = 16 };
+        Dictionary<string, object> request = reader.Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(bytes));
+        Keys(request, "version", "root", "header", "content", "guardianPid", "timeoutMs"); Number(request, "version", 1, 1);
+        string project = request["root"] as string, content = request["content"] as string;
+        if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project) || content == null || content.IndexOf('\0') >= 0) throw new InvalidDataException();
+        byte[] value = new UTF8Encoding(false, true).GetBytes(content);
+        Dictionary<string, object> header = request["header"] as Dictionary<string, object>;
+        Keys(header, "transactionId", "projectIdentity", "draftId", "draftVersion", "verifiedDigest", "baseDigest", "operations");
+        bool alive; int pid = Process.GetCurrentProcess().Id;
+        header.Add("version", 2); header.Add("creatorPid", pid); header.Add("creatorGeneration", ScopeRecovery.ProcessCreation(pid, out alive));
+        if (!alive) throw new InvalidDataException(); ValidateHeader(header, header["transactionId"] as string);
+        Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+        if (value.Length != (int)op["newBytes"] || Hash(value) != (string)op["newDigest"]) throw new InvalidDataException();
+        OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 30000), delegate(Action live) {
+          phase = "PREPARED"; journal = Begin(project, header);
+          result = journal.PublishSingleModify(value, delegate(string observed) { phase = observed; live(); });
+        });
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_MODIFY", receipt = result, projectPublished = false, externalRequests = 0 })); return 0;
+      } catch (Exception error) {
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_NATIVE_SINGLE_MODIFY", phase, nativeCode = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"),
+          journal = journal == null ? null : journal.Metadata("INSPECTION_REQUIRED"), projectPublished = false, externalRequests = 0 })); return 70;
+      } finally { if (journal != null) journal.Dispose(); }
+    }
     void ReadChain(RegistryKey key) {
       ScopeRecovery.ValidateRegistry(key);
       if (key.GetSubKeyNames().Length != 0) throw new InvalidDataException();

@@ -2,6 +2,12 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## D3 production controller candidate — NOT native accepted yet
+
+Original opaque approved READY grant now drives the existing single-file V2 journal/native NTFS transaction, with one-use authority, fixed source-attested helper, bounded pipe-only payload, generation-bound native guardian/30s maximum and no runner/profile/shell override or automatic retry. Actual CLEANED/commit/ID/temp/security evidence plus full anchored project readback must match the exact verified controller draft aggregate before a private certificate permits PUBLISHED. JSON/public receipts cannot mint/replay that certificate; uncertain native failures retain commitState UNKNOWN and journal evidence. Current normal Windows autonomy remains BLOCKED; this is internal explicit-controller publication, not E1/E2/E3 certification.
+
+Required production-API fixtures exercise actual LPAC Worker EDIT/real JSON LSP/non-mutating TEST/READY/journal/MODIFY/PUBLISHED/exact Git diff/cleanup and a user change after READY. Native proof pending. Full local846/653PASS/0FAIL/193native-only skips, syntax/installed-Pi TypeScript/package validation PASS; focused52/22PASS/0FAIL/30skips. Native1029475/CI36459467660 dedicated mutation/namespace/13death-recovery steps PASS, its complete acceptance pending at this entry. Original metadata/restart verified draft, journal discovery/retention, DELETE/RENAME/multifile/full coding E2Es remain unfinished. D IN_PROGRESS.0new model/provider calls; protected/auth/Pi/provider/routing/Second Brain/security/governor caps unchanged.
+
 ## D3 continuation candidate — native atomic MODIFY prerequisite, not accepted yet
 
 Initial202e670 / CI36456091523 FAILED two outside-read fixtures with real sharing32; source/native commit/metadata/conflicts and seven native cases passed. Fixed observer27cb3244fee5ab0a3eff9ee00b34e54012630eec / CI36456773708 SUCCESS Windows/Ubuntu: all9native atomic controls+guard, Windows aggregate274/264PASS/0FAIL/10skips, CREATE18/18/D1journal19/19, both independent clones/retained real-Pi smoke steps PASS. Publisher share0/permissions unchanged, no weakening of expected OLD content or denied outside writer assertions. The observer alone is read-only and does not exclude transactional writer access.

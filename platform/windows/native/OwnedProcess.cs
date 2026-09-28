@@ -115,6 +115,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--publication-modify-selftest") return PublicationJournal.ModifySelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-modify-fixture-child") return PublicationJournal.ModifyFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-modify-fixture-recover") return PublicationJournal.ModifyFixtureRecover();
+      if (args.Length == 1 && args[0] == "--publication-modify" && IntPtr.Size == 8) return PublicationJournal.RunSingleModify(Console.OpenStandardInput());
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);
       if (args.Length == 1 && args[0] == "--lpac-broker" && IntPtr.Size == 8) return ExecutionBroker.Run(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--project-snapshot" && IntPtr.Size == 8) return ExecutionBroker.Snapshot(Console.OpenStandardInput());
@@ -137,6 +138,27 @@ namespace Phi.Native {
       // Unmanifested .NET Framework OSVersion can report a legacy version.
       if (args.Length != 0 || IntPtr.Size != 8) return 70;
       return Execute(Console.OpenStandardInput(), null);
+    }
+    internal static void WithPublicationGuardian(int pid, int timeout, Action<Action> action) {
+      // Trusted native publisher only, not a model execution/sandbox endpoint.
+      // Same generation-bound guardian semantics as owned execution, but this
+      // process never spawns a workload. Its own death aborts an uncommitted KTM.
+      if (pid < 1 || timeout < 1 || timeout > 30000) throw new InvalidDataException();
+      IntPtr guardian = OpenProcess(0x00100000 | 0x1000, false, (uint)pid); Check(guardian != IntPtr.Zero);
+      try {
+        FileTime parentCreated, selfCreated, unused1, unused2, unused3;
+        Check(GetProcessTimes(guardian, out parentCreated, out unused1, out unused2, out unused3));
+        Check(GetProcessTimes(GetCurrentProcess(), out selfCreated, out unused1, out unused2, out unused3));
+        if (parentCreated.Value >= selfCreated.Value || WaitForSingleObject(guardian, 0) != 258) throw new InvalidDataException();
+        Stopwatch lifetime = Stopwatch.StartNew();
+        using (ManualResetEvent stop = new ManualResetEvent(false)) {
+          Action live = delegate() { if (lifetime.ElapsedMilliseconds >= timeout || WaitForSingleObject(guardian, 0) != 258) throw new InvalidOperationException("PHI_PUBLICATION_GUARDIAN_UNAVAILABLE"); };
+          Thread watch = new Thread(delegate() { while (!stop.WaitOne(20)) { if (lifetime.ElapsedMilliseconds >= timeout || WaitForSingleObject(guardian, 0) != 258) { Process.GetCurrentProcess().Kill(); return; } } });
+          watch.IsBackground = true; watch.Start();
+          try { live(); action(live); live(); }
+          finally { stop.Set(); if (!watch.Join(1000)) throw new InvalidDataException(); }
+        }
+      } finally { Close(ref guardian); }
     }
     // Fixed probes and the structured broker supply confinement. Neither can
     // request a full-trust fallback; bare ownership remains a separate API.

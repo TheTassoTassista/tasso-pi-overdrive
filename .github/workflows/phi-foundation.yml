@@ -55,6 +55,9 @@ jobs:
       - name: Real Windows LSP via governed draft and LPAC broker (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-windows-lsp.test.mjs
+      - name: Real verified Worker single-file publication and final concurrency (no model calls, autonomy blocked)
+        if: runner.os == 'Windows'
+        run: node --test --test-name-pattern="native production Worker|native user change after READY" tests/phi-publication.test.mjs
       - name: Native Windows structured broker fixtures (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-windows-broker.test.mjs

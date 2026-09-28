@@ -1,5 +1,37 @@
 # D — transactional project publication (IN PROGRESS)
 
+## Live verified-controller single-file MODIFY adapter (native acceptance pending)
+
+`executePreparedWindowsPublication` consumes the ORIGINAL controller-only opaque
+READY grant once and calls `platform/windows/publication.mjs`. Actual fixed native
+helper receives bounded pipe-only metadata/content, never model-selected runner,
+binary, profile, environment or shell. A generation-bound guardian/deadline watcher
+owns only the publisher itself; death closes uncommitted KTM handles. No retries.
+
+The same PublicationJournal/AtomicModify implementation is used, with actual
+PREPARED/physical-temp/flush/hash/locked-target/commit/postverify/absence phases.
+After successful native exit, controller readWindowsProjectSnapshot revalidates the
+whole eligible manifest and all original file IDs; the full aggregate digest must
+equal the actual same-draft verification digest. Source file digest==temp file
+digest==final file digest; source aggregate==verified aggregate==final project
+aggregate. A private one-use WeakMap proof, not JSON or public receipt metadata,
+alone can transition PUBLISHING->PUBLISHED. Unknown failures are not reported as
+rollback: commitState UNKNOWN/recovery INSPECTION_REQUIRED. Actual native metadata
+is retained without raw input/stdout/stderr. Post-READY user changes are CONFLICT.
+
+Internal explicit-controller authorization only; no publication tool/normal Windows
+autonomy enablement or broad host role privilege. Successful attempt tool execution
+is frozen, replay denied, revocation clears payload and retains historical receipt.
+Mandatory native production-API Git fixture exercises real governed Worker edit,
+same-draft JSON LSP, non-mutating Tester verification, native journal/MODIFY,
+PUBLISHED, intended-only diff and cleanup. Until its matching Windows CI succeeds,
+no production-publication PASS is claimed. Full ordinary-Pi E1/E2/E3 is later.
+
+Single MODIFY only. CREATE/DELETE/RENAME/multifile publication is not enabled by
+this adapter. Original metadata/verified-controller reconstruction after a dead
+controller, automatic trusted-root journal discovery and retention remain partial;
+the record64 capacity still fails closed. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.
+
 ## D3 journal-MODIFY integration candidate (native proof pending)
 
 The existing PublicationJournal now has a strict V2 single-REPLACE graph. Its

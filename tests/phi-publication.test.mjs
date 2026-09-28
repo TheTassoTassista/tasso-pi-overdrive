@@ -11,6 +11,7 @@ import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublicat
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
+import { consumeWindowsPublicationProof } from '../platform/windows/publication.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 60000 };
 const rootIdentity = 'a'.repeat(16) + ':' + '1'.repeat(32);
@@ -126,6 +127,16 @@ test('no-op verification cannot authorize a host transaction', () => {
   const base = snapshot(), draft = new WorkerDraft(base); verify(draft);
   assert.throws(() => draft.preparePublication(base), /NO_CHANGES/u);
 });
+test('forged native JSON cannot mint PUBLISHED or a reusable publication certificate', () => {
+  const { base, draft } = edited(); verify(draft); const ready = draft.preparePublication(base), binding = draft.binding;
+  draft.beginPublication(binding, ready.transactionId);
+  for (const fake of [undefined, null, {}, { committed: true, cleanup: 'PASS', finalDigest: binding.digest }, { state: 'PUBLISHED', projectPublished: true }]) {
+    assert.throws(() => consumeWindowsPublicationProof(fake, {}), /NATIVE_PROOF_DENIED/u);
+    assert.throws(() => draft.completePublication(binding, fake), /NATIVE_PROOF_DENIED/u);
+    assert.equal(draft.publicationMetadata.state, 'PUBLISHING'); assert.equal(draft.publicationMetadata.projectPublished, false);
+  }
+  draft.failPublication(false); assert.equal(draft.publicationMetadata.state, 'FAILED'); assert.equal(draft.publicationMetadata.cleanup, 'NOT_PROVEN');
+});
 
 function nativeFixture(task = 'Fix JSON configuration code and test diagnostics') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
@@ -157,7 +168,7 @@ async function nativeVerified(item) {
   }
   return { edit: edit.metadata, lsp: lsp.receipt, verification: verified };
 }
-test('native real draft EDIT/LSP/TEST reaches controller-only READY, but missing transactional backend cannot publish', native, async () => {
+test('native real draft EDIT/LSP/TEST reaches controller-only READY, stale/forged/re-analysis grants cannot publish', native, async () => {
   const item = nativeFixture();
   try {
     assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /UNVERIFIED_DRAFT/u);
@@ -168,7 +179,6 @@ test('native real draft EDIT/LSP/TEST reaches controller-only READY, but missing
     assert.deepEqual(ready.receipt.operations.map(o => [o.path, o.kind]), [['config.json', 'REPLACE']]);
     assert.throws(() => executePreparedWindowsPublication(item.token), /PUBLISH_AUTHORITY_DENIED/u);
     assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
-    assert.throws(() => executePreparedWindowsPublication(ready.authority), /BACKEND_UNAVAILABLE/u);
     const second = item.reservation.preparePublication({ approveProjectMutation: true });
     assert.notEqual(second.receipt.transactionId, ready.receipt.transactionId);
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
@@ -186,6 +196,56 @@ test('native real draft EDIT/LSP/TEST reaches controller-only READY, but missing
     console.log(JSON.stringify({ control: 'PUBLICATION_PREFLIGHT_ONLY', receipts: [evidence.edit, evidence.lsp, ...evidence.verification.results.map(x => x.receipt)], publication: second.receipt, hostUnchanged: true, externalRequests: 0 }));
     item.reservation.revoke(); assert.throws(() => executePreparedWindowsPublication(second.authority), /PUBLISH_AUTHORITY_DENIED/u);
     assert.equal(item.reservation.status().draft.payloadCleared, true);
+  } finally { item.close(); }
+});
+test('native production Worker EDIT/LSP/TEST/READY/journal/MODIFY reaches PUBLISHED with exact verified Git diff and cleanup', native, async () => {
+  const item = nativeFixture(); let publication;
+  try {
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', 'config.json', 'package.json', 'edit.cjs', 'test.cjs'], { shell: false }).status, 0);
+    assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Fixture baseline'], { shell: false }).status, 0);
+    const evidence = await nativeVerified(item), before = item.reservation.status().draft;
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{}');
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    publication = executePreparedWindowsPublication(ready.authority);
+    assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
+    assert.deepEqual(publication.filesCommitted, ['config.json']);
+    const proof = publication.publicationProof;
+    assert.equal(proof.scope, 'VERIFIED_WORKER_SINGLE_MODIFY'); assert.equal(proof.operation, 'MODIFY');
+    assert.equal(proof.verifiedDigest, before.contentDigest); assert.equal(proof.finalDigest, before.contentDigest); assert.equal(publication.sourceDigest, before.contentDigest);
+    assert.equal(proof.native.tempDigest, publication.operations[0].newDigest); assert.equal(proof.native.finalDigest, proof.native.tempDigest);
+    assert.equal(proof.native.destinationIdentity, publication.operations[0].baseIdentity);
+    assert.equal(proof.journal.phase, 'CLEANED'); assert.equal(proof.journal.cleanup, 'PASS');
+    assert.equal(proof.publisherExited, true); assert.equal(proof.publisherExitCode, 0);
+    assert.throws(() => process.kill(proof.publisherPid, 0), e => e.code === 'ESRCH');
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"changed":true}');
+    const diff = spawnSync('git', ['-C', item.project, 'diff', '--name-only', '--no-renames'], { shell: false, encoding: 'utf8' });
+    assert.equal(diff.status, 0); assert.equal(diff.stdout.trim(), 'config.json');
+    assert.equal(spawnSync('git', ['-C', item.project, 'diff', '--check'], { shell: false }).status, 0);
+    assert.equal(fs.readdirSync(item.project).some(name => name.startsWith('phi-publish-')), false);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => consumeWindowsPublicationProof(proof, {}), /NATIVE_PROOF_DENIED/u); // Public metadata is not the private certificate.
+    await assert.rejects(executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 },
+      { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token }), /ATTEMPT_ALREADY_PUBLISHED/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"changed":true}');
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    item.reservation.revoke(); assert.equal(item.reservation.status().draft.payloadCleared, true);
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_MODIFY', receipts: [evidence.edit, evidence.lsp, ...evidence.verification.results.map(x => x.receipt)], publication,
+      gitDiffOnlyIntendedChange: true, sourceWasUnchangedUntilCommit: true, publisherGone: true, authorityRevoked: true, payloadCleared: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native user change after READY is CONFLICT, preserving real user bytes and verified draft without replay', native, async () => {
+  const item = nativeFixture();
+  try {
+    await nativeVerified(item); const ready = item.reservation.preparePublication({ approveProjectMutation: true }), before = item.reservation.status().draft;
+    fs.writeFileSync(path.join(item.project, 'config.json'), '{"user":true}');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(item.reservation.publicationStatus().state, 'CONFLICT'); assert.equal(item.reservation.publicationStatus().projectPublished, false);
+    assert.equal(item.reservation.status().draft.contentDigest, before.contentDigest);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"user":true}');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_MODIFY_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
 });
 test('native controller approval cannot override read-only Task/Tool Governor policy', native, () => {
