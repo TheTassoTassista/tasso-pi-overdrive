@@ -35,3 +35,17 @@ for (const name of cases) test('native journal-bound MODIFY: ' + name, { skip: p
   assert.equal(windowsRecoveryStatus().status, 'PASS');
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_MODIFY_ONLY', ...receipt }));
 });
+for (const name of ['admission-content-change', 'admission-recreated', 'admission-missing', 'admission-root-mismatch', 'admission-invalid-header', 'admission-sharing']) {
+  test('native production pre-journal admission characterization: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const result = spawnSync(ownedWindowsHelper(), ['--publication-modify-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 22000, maxBuffer: 16384 });
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    for (const key of ['passed', 'fixtureCleanup', 'childGone', 'journalAbsent', 'tempAbsent', 'userStatePreserved']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.scope, 'NATIVE_PREJOURNAL_ADMISSION_CHARACTERIZATION');
+    assert.equal(receipt.evidence.status, 'FAIL_NATIVE_SINGLE_MODIFY'); assert.equal(receipt.evidence.reason, 'UNCONFIRMED');
+    assert.equal(receipt.evidence.journal, null); assert.equal(receipt.evidence.projectPublished, false); assert.equal(receipt.evidence.externalRequests, 0);
+    assert.doesNotMatch(JSON.stringify(receipt), /old-complete|new-complete|user-complete|unrelated-user|FORBIDDEN_RAW_SENTINEL/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'NATIVE_PREJOURNAL_ADMISSION', ...receipt }));
+  });
+}

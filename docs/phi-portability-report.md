@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current continuation — earlier native admission controls, pending proof
+
+Actual resumed HEAD db39006 already contains the accepted single-MODIFY checkpoint below. Six new fixed controls reproduce the production pre-journal boundary using a real child endpoint and real user changes/negative controls, without adding production failpoints or write authority. They characterize the current generic UNCONFIRMED/no-journal outcome before correcting it. Local authoritative853/653PASS/0FAIL/200native skips plus syntax/TypeScript/package validation PASS; focused70/14PASS/0FAIL/56skips. Native proof is pending exact private Windows CI, not inferred from Linux. The next correction must separate proved base mismatches from invalid root/schema/sharing/unknown failures and never invent a prepared journal. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls; protected/auth/Pi/routing/security/budgets unchanged.
+
 ## Current D3 bounded acceptance — not full Windows readiness
 
 Exact functional **1b0da2848b8487d6a8bd50d2833271c21568a050** / [CI36464401667](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36464401667) SUCCESS Windows/Ubuntu, same private branch. Windows314/304PASS/0FAIL/10Linux-only skips, Ubuntu314/120PASS/0FAIL/194native skips; full authoritative Linux847/653PASS/0FAIL/194Windows-only skips plus syntax/installed-Pi TypeScript/package-pinned-policy validation PASS. CREATE18/18, D1journal19/19, atomic/namespace19/19, journal-MODIFY28/28 and real production-API publication/conflict2/2 PASS. Required native cases are not made optional. [Exact metadata receipts](phi-single-modify-evidence.json).

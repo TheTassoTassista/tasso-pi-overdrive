@@ -471,7 +471,60 @@ namespace Phi.Native {
         Console.WriteLine(Serializer().Serialize(Inspect((string)request["transactionId"], Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), (string)request["rootIdentity"], true))); return 0;
       } catch { Console.Error.WriteLine("PHI_MODIFY_FIXTURE_RECOVERY_FAILED"); return 70; }
     }
+    static readonly string[] AdmissionCases = { "admission-content-change", "admission-recreated", "admission-missing", "admission-root-mismatch", "admission-invalid-header", "admission-sharing" };
+    static int AdmissionSelfTest(string name) {
+      // Reproduce the exact pre-Begin boundary through the production endpoint,
+      // not an injected exception or a configurable production checkpoint.
+      ScopeRecovery scope = null; FileStream held = null; Process child = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; object evidence = null;
+      bool passed = false, clean = false, childGone = false, journalAbsent = false, tempAbsent = false, ownedKey = false;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string target = Path.Combine(scope.Root, "input.txt"), unrelated = Path.Combine(scope.Root, "sentinel.txt");
+        File.WriteAllText(target, "old-complete", new UTF8Encoding(false)); File.WriteAllText(unrelated, "unrelated-user", new UTF8Encoding(false));
+        Dictionary<string, object> header = FixtureHeader(scope.Root, tx);
+        foreach (string key in new string[] { "version", "creatorPid", "creatorGeneration" }) header.Remove(key);
+        // The original snapshot/request exists before this real user mutation.
+        if (name == "admission-content-change") File.WriteAllText(target, "user-complete", new UTF8Encoding(false));
+        else if (name == "admission-recreated") { File.Move(target, target + ".old"); File.WriteAllText(target, "old-complete", new UTF8Encoding(false)); }
+        else if (name == "admission-missing") File.Delete(target);
+        else if (name == "admission-root-mismatch") header["projectIdentity"] = new string('a', 16) + ":" + new string('b', 32);
+        else if (name == "admission-invalid-header") header["unexpected"] = "FORBIDDEN_RAW_SENTINEL";
+        else if (name == "admission-sharing") held = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.None);
+        stage = "PRODUCTION_ENDPOINT";
+        child = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-modify", UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        child.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root, header, content = "new-complete", guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 })); child.StandardInput.Close();
+        if (!child.WaitForExit(5000) || child.ExitCode != 70) throw new InvalidDataException(); childGone = child.HasExited;
+        string output = child.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+        Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = result;
+        // Characterization of the pre-fix failure. The native regression will
+        // change to require evidenced CONFLICT once this boundary is corrected.
+        if ((string)result["status"] != "FAIL_NATIVE_SINGLE_MODIFY" || (string)result["reason"] != "UNCONFIRMED" || result["journal"] != null ||
+            (bool)result["projectPublished"] || (int)result["externalRequests"] != 0) throw new InvalidDataException();
+        if (held != null) { held.Dispose(); held = null; }
+        using (RegistryKey root = Registry.CurrentUser.OpenSubKey(RegistryBase, false)) {
+          if (root == null) journalAbsent = true;
+          else { ScopeRecovery.ValidateRegistry(root); using (RegistryKey key = root.OpenSubKey(tx, false)) { journalAbsent = key == null; ownedKey = key != null; } }
+        }
+        tempAbsent = Directory.GetFiles(scope.Root, "phi-publish-*.tmp", SearchOption.AllDirectories).Length == 0;
+        if (!journalAbsent || !tempAbsent || File.ReadAllText(unrelated) != "unrelated-user" ||
+            (name == "admission-missing" ? File.Exists(target) : File.ReadAllText(target) != (name == "admission-content-change" ? "user-complete" : "old-complete"))) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_ADMISSION_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally {
+        if (held != null) held.Dispose();
+        if (child != null) { try { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } childGone = child.HasExited; } catch { passed = false; } child.Dispose(); }
+        try {
+          if (ownedKey) using (RegistryKey root = OpenBase(true)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, childGone, journalAbsent, tempAbsent,
+        userStatePreserved = passed, evidence, scope = "NATIVE_PREJOURNAL_ADMISSION_CHARACTERIZATION", projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
+    }
     internal static int ModifySelfTest(string name) {
+      if (AdmissionCases.Contains(name)) return AdmissionSelfTest(name);
       bool crash = name.StartsWith("crash-", StringComparison.Ordinal), userConflict = name == "user-content-after-crash" || name == "same-content-recreated-after-crash" || name == "user-delete-after-crash";
       string point = crash ? name.Substring(6) : userConflict ? "before-journal-committed" : name;
       if (name != "commit" && name != "unobserved-advance" && name != "concurrent-change-at-ready" && !userConflict && !ModifyCheckpoints.Contains(point)) return 70;
