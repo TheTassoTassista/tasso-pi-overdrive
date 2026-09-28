@@ -1,0 +1,1378 @@
+{
+  "version": 1,
+  "scope": "NATIVE_PRECOMMIT_JOURNAL_SUBSYSTEM_ONLY_NOT_PROJECT_PUBLICATION",
+  "verifiedFunctionalHead": "d817f0962f1875d01407ba08ffebb00a7334fd84",
+  "branch": "feature/routing-presets-quality",
+  "nativeCI": {
+    "runId": 36448649855,
+    "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36448649855",
+    "head": "d817f0962f1875d01407ba08ffebb00a7334fd84",
+    "status": "completed",
+    "conclusion": "success",
+    "runners": [
+      "native-foundation (windows-latest)",
+      "native-foundation (ubuntu-latest)"
+    ]
+  },
+  "readiness": {
+    "B1": "COMPLETE_BOUNDED",
+    "B2": "COMPLETE_BOUNDED",
+    "C": "COMPLETE_BOUNDED_JSON_LSP",
+    "D": "IN_PROGRESS",
+    "D1": "NATIVE_PRECOMMIT_JOURNAL_PROVEN",
+    "D2": "PARTIAL_POSTCOMMIT_CERTIFICATES_DENIED",
+    "D3": "SAFE_REPLACEMENT_NOT_IMPLEMENTED",
+    "D10": "PROJECT_PUBLICATION_CRASH_RECOVERY_NOT_IMPLEMENTED",
+    "windowsAutonomy": "BLOCKED",
+    "projectPublished": false
+  },
+  "commands": {
+    "localFullGate": "PI_OVERDRIVE_LSP_RUNTIME=\"$PWD/runtime/lsp\" npm run check",
+    "focusedJournal": "node --test tests/phi-publication-journal.test.mjs",
+    "nativeAggregate": "npm run check:phi",
+    "currentIndexAudit": "node scripts/phi-repository-audit.mjs",
+    "ancestryAudit": "node scripts/phi-repository-audit.mjs --history"
+  },
+  "localLinux": {
+    "tests": 797,
+    "passed": 650,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 147,
+    "skipScope": "NATIVE_WINDOWS_NOT_CREDITED",
+    "syntax": "PASS",
+    "typecheckAgainstInstalledPi": "PASS",
+    "packagePinnedPolicySecretValidation": "PASS",
+    "focused": {
+      "tests": 52,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 39
+    }
+  },
+  "nativeTestSteps": [
+    {
+      "step": "native-foundation (ubuntu-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+      "tests": 264,
+      "pass": 117,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 147
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows no-clobber CREATE primitive (not project publication)",
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows durable publication journal and real writer death (not project publication)",
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows clean-clone primary/cleanup and ownership controls (no model calls)",
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Real Windows LSP via governed draft and LPAC broker (no model calls)",
+      "tests": 8,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows structured broker fixtures (no model calls)",
+      "tests": 19,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows production safe_exec and verification (no model calls)",
+      "tests": 11,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows governed Worker transport (no model calls, autonomy blocked)",
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+      "tests": 264,
+      "pass": 254,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 10
+    }
+  ],
+  "journal": {
+    "nativeControlCount": 18,
+    "portableSourceGuardCount": 1,
+    "dedicatedSuite": {
+      "tests": 19,
+      "passed": 19,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "actualProducerTerminations": 6,
+    "restartedInspectors": 6,
+    "fixtureCleanupPassed": 18,
+    "physicalTempWriteFlushReplacement": false,
+    "projectPublicationCrashRecovery": false,
+    "aggregateDraftVerification": "FIXED_SCHEMA_ONLY_METADATA_NOT_REAL_WORKER_VERIFICATION",
+    "perTargetNativeIdentityAndDigest": "ACTUAL_NATIVE_OBJECTS",
+    "inspectionProjectMutations": 0,
+    "inspectionJournalMutations": 0,
+    "inspectionProcessKills": 0,
+    "productionInspectionCleanup": "NOT_PERFORMED",
+    "receipts": [
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "metadata",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "version": 1,
+          "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+          "transactionId": "d0f93b4554074088bf6399ab458eeb51",
+          "projectIdentity": "f42c40802c403fba:000a00000000a1d80000000000000000",
+          "draftId": "eb0fba189f5d4ca2bb57e01e3e2fbfc1",
+          "draftVersion": 1,
+          "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+          "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+          "phase": "PREPARED",
+          "sequence": 0,
+          "operationIndex": 0,
+          "operations": [
+            {
+              "path": "input.txt",
+              "kind": "REPLACE",
+              "baseIdentity": "f42c40802c403fba:0018000000046f740000000000000000",
+              "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+              "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+              "newBytes": 12
+            }
+          ],
+          "tempIdentity": null,
+          "committedIdentity": null,
+          "filesCommitted": [],
+          "pendingOperations": 1,
+          "recoveryState": "NOT_STARTED",
+          "cleanup": "NOT_PERFORMED",
+          "projectPublished": false
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "transition",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "version": 1,
+          "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+          "transactionId": "d16342b203bb496db472af5c3dbd7dce",
+          "projectIdentity": "f42c40802c403fba:000b00000000a1d80000000000000000",
+          "draftId": "588f79ad36934e9e873f327397b27d02",
+          "draftVersion": 1,
+          "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+          "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+          "phase": "RECOVERY_REQUIRED",
+          "sequence": 5,
+          "operationIndex": 0,
+          "operations": [
+            {
+              "path": "input.txt",
+              "kind": "REPLACE",
+              "baseIdentity": "f42c40802c403fba:000700000000a1db0000000000000000",
+              "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+              "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+              "newBytes": 12
+            }
+          ],
+          "tempIdentity": null,
+          "committedIdentity": null,
+          "filesCommitted": [],
+          "pendingOperations": 1,
+          "recoveryState": "NOT_STARTED",
+          "cleanup": "NOT_PERFORMED",
+          "projectPublished": false
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "duplicate",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "version": 1,
+          "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+          "transactionId": "14af7ec60ecf4feb9deb12d5b5d6e17a",
+          "projectIdentity": "f42c40802c403fba:000c00000000a1d80000000000000000",
+          "draftId": "e3aeb77acc994b32b1e7e453c907f95b",
+          "draftVersion": 1,
+          "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+          "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+          "phase": "PREPARED",
+          "sequence": 0,
+          "operationIndex": 0,
+          "operations": [
+            {
+              "path": "input.txt",
+              "kind": "REPLACE",
+              "baseIdentity": "f42c40802c403fba:000800000000a1db0000000000000000",
+              "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+              "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+              "newBytes": 12
+            }
+          ],
+          "tempIdentity": null,
+          "committedIdentity": null,
+          "filesCommitted": [],
+          "pendingOperations": 1,
+          "recoveryState": "NOT_STARTED",
+          "cleanup": "NOT_PERFORMED",
+          "projectPublished": false
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "active",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "ACTIVE",
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "corrupt",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "OWNERSHIP_OR_INTEGRITY_REJECTED",
+          "projectMutations": 0,
+          "journalMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "gap",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "OWNERSHIP_OR_INTEGRITY_REJECTED",
+          "projectMutations": 0,
+          "journalMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "oversized",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "OWNERSHIP_OR_INTEGRITY_REJECTED",
+          "projectMutations": 0,
+          "journalMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "unknown-owner",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "OWNERSHIP_OR_INTEGRITY_REJECTED",
+          "projectMutations": 0,
+          "journalMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "unsafe-acl",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "OWNERSHIP_OR_INTEGRITY_REJECTED",
+          "projectMutations": 0,
+          "journalMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "project-replaced",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "PROJECT_IDENTITY_REJECTED",
+          "projectMutations": 0
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "user-change",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "version": 1,
+          "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+          "transactionId": "75917e06223d4650932dda32570a6189",
+          "projectIdentity": "f42c40802c403fba:001400000000a1d80000000000000000",
+          "draftId": "7ca5042733a34d5b8e94dd79262fe4f2",
+          "draftVersion": 1,
+          "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+          "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+          "phase": "CONFLICT",
+          "sequence": 3,
+          "operationIndex": 0,
+          "operations": [
+            {
+              "path": "input.txt",
+              "kind": "REPLACE",
+              "baseIdentity": "f42c40802c403fba:001a000000046f740000000000000000",
+              "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+              "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+              "newBytes": 12
+            }
+          ],
+          "tempIdentity": null,
+          "committedIdentity": null,
+          "filesCommitted": [],
+          "pendingOperations": 1,
+          "recoveryState": "CONFLICT",
+          "cleanup": "NOT_PERFORMED",
+          "projectPublished": false
+        },
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "same-content-replaced",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "CONFLICT",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "abcaaa0d1923494089ac3e0f99af46c4",
+            "projectIdentity": "f42c40802c403fba:001500000000a1d80000000000000000",
+            "draftId": "9c75f6f6e265408b864d4d0b114bde09",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "PREPARED",
+            "sequence": 0,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:001b000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "CONFLICT",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": false,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": true,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "protected",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": null,
+        "actualProcessKilled": false,
+        "childGone": false,
+        "restartedInspector": false,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "crash-prepared",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "RECOVERY_REQUIRED",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "62fec075a1e4423d8a59bddc263f2aa4",
+            "projectIdentity": "f42c40802c403fba:001700000000a1d80000000000000000",
+            "draftId": "999c9c80690a49a38731a76f4e79d31b",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "PREPARED",
+            "sequence": 0,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:001d000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "RECOVERY_REQUIRED",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": true,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "crash-written",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "RECOVERY_REQUIRED",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "75ee6aa80ef145f4be89fa196847bbf8",
+            "projectIdentity": "f42c40802c403fba:001800000000a1d80000000000000000",
+            "draftId": "250e7ff7ba2f45989a36702a862acf99",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "TEMP_WRITTEN",
+            "sequence": 1,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:001e000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "RECOVERY_REQUIRED",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": true,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "crash-flushed",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "RECOVERY_REQUIRED",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "e9df36ecc1fc4c70afe9dc38eabe062b",
+            "projectIdentity": "f42c40802c403fba:001900000000a1d80000000000000000",
+            "draftId": "adfafe63178044b9ad054c8dede16bd5",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "TEMP_FLUSHED",
+            "sequence": 2,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:001f000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "RECOVERY_REQUIRED",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": true,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "crash-ready",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "RECOVERY_REQUIRED",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "f461263397fc4d219ed674082e772009",
+            "projectIdentity": "f42c40802c403fba:001a00000000a1d80000000000000000",
+            "draftId": "a6621a91b2df48579f3b0a01086122a5",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "READY_TO_COMMIT",
+            "sequence": 3,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:0020000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "RECOVERY_REQUIRED",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": true,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      },
+      {
+        "control": "PUBLICATION_DURABLE_JOURNAL_ONLY",
+        "caseName": "crash-commit-started",
+        "passed": true,
+        "scope": "DURABLE_JOURNAL_ONLY_NOT_PUBLICATION_CRASH_RECOVERY",
+        "evidence": {
+          "status": "RECOVERY_REQUIRED",
+          "metadata": {
+            "version": 1,
+            "scope": "DURABLE_JOURNAL_NOT_PROJECT_PUBLICATION",
+            "transactionId": "9e84e18dea994f4383d0a4f5d4b25e75",
+            "projectIdentity": "f42c40802c403fba:001b00000000a1d80000000000000000",
+            "draftId": "720c7871217246ad90f580be9280092a",
+            "draftVersion": 1,
+            "verifiedDigest": "ce8f3d239be52d3248191a2cc7cafe502d51968f077c076b81f47c2949c0e2a6",
+            "baseDigest": "d8280d57b3e78038a5f8416d61e2091c47b68626be3dd3b3b4030e4458bed687",
+            "phase": "COMMIT_STARTED",
+            "sequence": 4,
+            "operationIndex": 0,
+            "operations": [
+              {
+                "path": "input.txt",
+                "kind": "REPLACE",
+                "baseIdentity": "f42c40802c403fba:0021000000046f740000000000000000",
+                "baseDigest": "de7640bf50158cae13a1e71247d3066621ee40871f69914b1d8518b6c6855904",
+                "newDigest": "ba155ede6dea8dc589f17673ad2ec5c774be3ef913f2dfa48c8106dd9c08ff30",
+                "newBytes": 12
+              }
+            ],
+            "tempIdentity": null,
+            "committedIdentity": null,
+            "filesCommitted": [],
+            "pendingOperations": 1,
+            "recoveryState": "RECOVERY_REQUIRED",
+            "cleanup": "NOT_PERFORMED",
+            "projectPublished": false
+          },
+          "ownerGenerationAlive": false,
+          "baseMatches": true,
+          "projectMutations": 0,
+          "journalMutations": 0,
+          "processKills": 0,
+          "projectPublished": false
+        },
+        "actualProcessKilled": true,
+        "childGone": true,
+        "restartedInspector": true,
+        "pinnedRenameDenied": false,
+        "fixtureCleanup": true,
+        "externalRequests": 0,
+        "projectPublished": false
+      }
+    ]
+  },
+  "independentSourceClones": [
+    {
+      "version": 2,
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "version": 1,
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "d817f0962f1875d01407ba08ffebb00a7334fd84",
+        "platform": "linux",
+        "tests": {
+          "total": 264,
+          "passed": 117,
+          "failed": 0,
+          "skipped": 147
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fixedScopeRecovery": "NOT_NATIVE_WINDOWS",
+        "recoveryAfterTests": "NOT_NATIVE_WINDOWS",
+        "ownedCommands": 0,
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": 264,
+              "passed": 117,
+              "failed": 0
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": null
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 29,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": "UNKNOWN",
+        "inheritedHandleAfter": "UNKNOWN",
+        "residualOwnedProcesses": null,
+        "processOwnership": "NOT_NATIVE_WINDOWS",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    },
+    {
+      "version": 2,
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "version": 1,
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "d817f0962f1875d01407ba08ffebb00a7334fd84",
+        "platform": "win32",
+        "tests": {
+          "total": 264,
+          "passed": 254,
+          "failed": 0,
+          "skipped": 10
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fixedScopeRecovery": "PASS",
+        "recoveryAfterTests": {
+          "status": "PASS",
+          "active": 0,
+          "stale": 0,
+          "quarantined": 0,
+          "processKills": 0,
+          "cleanupPerformed": false
+        },
+        "ownedCommands": 10,
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 2248,
+              "childGeneration": "134350858232245184"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 5016,
+              "childGeneration": "134350858234167531"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 5012,
+              "childGeneration": "134350858243856563"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3748,
+              "childGeneration": "134350858246172002"
+            }
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 1232,
+              "childGeneration": "134350858247989502"
+            }
+          },
+          {
+            "stage": "pinned-lsp-runtime",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4540,
+              "childGeneration": "134350858255982062"
+            }
+          },
+          {
+            "stage": "windows-process-build",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 1712,
+              "childGeneration": "134350859055064875"
+            }
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": 264,
+              "passed": 254,
+              "failed": 0
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 2068,
+              "childGeneration": "134350859068010340"
+            }
+          },
+          {
+            "stage": "post-test-recovery",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 8552,
+              "childGeneration": "134350862000878961"
+            }
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "exitCode": 0,
+            "timedOut": false,
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 1856,
+              "childGeneration": "134350862003594650"
+            }
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 9476,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": false,
+        "inheritedHandleAfter": false,
+        "residualOwnedProcesses": 0,
+        "processOwnership": "NATIVE_JOB_HANDLES",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    }
+  ],
+  "retainedRealPiControls": [
+    {
+      "step": "native-foundation (windows-latest)|Real Pi foreground Worker factory to native LPAC broker (zero external provider calls)",
+      "status": "PASS",
+      "platform": "win32",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 6,
+      "brokerReceipts": 5,
+      "externalProviderCalls": 0,
+      "externalRequests": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      }
+    },
+    {
+      "step": "native-foundation (windows-latest)|Real Pi revoked Worker denies built-in host write (zero external provider calls)",
+      "status": "PASS",
+      "platform": "win32",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 3,
+      "brokerReceipts": 1,
+      "externalProviderCalls": 0,
+      "externalRequests": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      }
+    },
+    {
+      "step": "native-foundation (windows-latest)|Real Pi Worker edit to same-draft LSP on-write and semantic_nav (zero external provider calls)",
+      "status": "PASS",
+      "platform": "win32",
+      "piVersion": "0.87.1",
+      "subagentsVersion": "0.66.0",
+      "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB",
+      "foregroundExitCode": 0,
+      "boundEvents": 1,
+      "localDeterministicTurns": 3,
+      "brokerReceipts": 3,
+      "externalProviderCalls": 0,
+      "externalRequests": 0,
+      "sourceUnchanged": true,
+      "cleanup": {
+        "temporaryRemoved": true,
+        "authorityRevoked": true,
+        "draftPayloadCleared": true
+      }
+    }
+  ],
+  "functionalSourceAudits": {
+    "index": {
+      "scope": "CURRENT_GIT_INDEX_BLOBS_NOT_UNSTAGED_USER_CONTENT_OR_HISTORY",
+      "status": "WARN",
+      "files": 619,
+      "totalBytes": 4271937,
+      "modelCalls": 0,
+      "findings": {
+        "WARN": 13
+      },
+      "limitations": [
+        "Heuristic secret scan is not proof of absence of every secret",
+        "Sensitive prose and Git metadata require separate review before public publishing",
+        "WARN paths in historical docs/fixtures are not production path dependencies"
+      ]
+    },
+    "history": {
+      "scope": "HEAD_ANCESTRY_BLOBS_NOT_OTHER_BRANCHES_OR_COMMIT_MESSAGES",
+      "status": "WARN",
+      "files": 1814,
+      "totalBytes": 22873267,
+      "modelCalls": 0,
+      "findings": {
+        "WARN": 126
+      },
+      "limitations": [
+        "Heuristic secret scan is not proof of absence of every secret",
+        "Sensitive prose and Git metadata require separate review before public publishing",
+        "WARN paths in historical docs/fixtures are not production path dependencies"
+      ]
+    }
+  },
+  "rejectedNativeCandidates": [
+    {
+      "head": "094adc0bd3c548d1b948fccd81aa43a1efbab2f8",
+      "runId": 36447540525,
+      "conclusion": "failure",
+      "journalTests": 19,
+      "passed": 18,
+      "failed": 1,
+      "failedCase": "same-content-replaced",
+      "cause": "UNKNOWN_IN_INITIAL_LOG",
+      "windowsSubsequentFullClonePi": "NOT_RUN",
+      "accepted": false
+    },
+    {
+      "head": "f6f826f48b7cd0b917660d45a02d6cd89aad6b19",
+      "runId": 36448118577,
+      "conclusion": "failure",
+      "journalTests": 19,
+      "passed": 18,
+      "failed": 1,
+      "failedCase": "same-content-replaced",
+      "nativeFailurePhase": "USER_RENAME",
+      "hresult": "80070020",
+      "win32": 32,
+      "cause": "FIXED_TEST_FILE_MOVE_CONFLICTS_WITH_LIVE_PARENT_PINS",
+      "accepted": false
+    }
+  ],
+  "correction": {
+    "scope": "FIXED_SAME_CONTENT_REPLACEMENT_FIXTURE_ONLY",
+    "livePinnedRenameDenied": true,
+    "originalUserContentPreservedWhileLive": true,
+    "producerActuallyKilled": true,
+    "identicalTextRecreatedWithDifferentNativeIdentity": true,
+    "freshInspectorResult": "CONFLICT",
+    "productionAccessSharingPinsBudgetsAssertionsUnchanged": true
+  },
+  "preserved": {
+    "protectedUserDocumentUnchanged": true,
+    "protectedUserDocumentNeverStaged": true,
+    "authenticationFingerprintUnchanged": true,
+    "activePiUnchanged": true,
+    "routingSecondBrainCouncilJudgeGovernorsRetriesUnchanged": true,
+    "externalModelProviderCalls": 0
+  },
+  "limitations": [
+    "D remains IN_PROGRESS; this is not project publication, real replacement, rollback or complete crash recovery.",
+    "TEMP_WRITTEN/TEMP_FLUSHED/COMMIT_STARTED controls simulate journal phases; no physical project temp/write/flush/replacement occurred.",
+    "Fixed aggregate draft/base digests and draft identity/version validate schema only, not continuity from real Worker verification.",
+    "Read-only inspection requires a separately trusted project root locator; automatic startup discovery and retained-journal reclamation are not implemented.",
+    "Per-ID leases do not globally serialize the nominal 64-transaction admission census; cross-ID concurrent allocation requires a proven global allocator before production.",
+    "COMMITTED/VERIFIED/CLEANED certificates remain denied until a real commit/cleanup adapter provides actual observations.",
+    "RegFlushKey/readback and process termination are not a power-loss/hardware persistence certificate.",
+    "Whole clone Doctor is intentionally FAIL and fullEngine BLOCKED_NOT_INSTALLED; PASS_FOUNDATION_ONLY is not full fresh-machine product reconstruction.",
+    "Native owned-process census is real on Windows; Linux clone residualOwnedProcesses null and child/handle UNKNOWN are not zero-process claims.",
+    "Index/ancestry secret audits are heuristic bounded scans, excluding unstaged user content, other branches and commit messages; warnings remain classified.",
+    "Historical earlier Worker timeout and LSP 70/124 causes remain UNKNOWN."
+  ]
+}

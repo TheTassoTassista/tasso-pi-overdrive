@@ -1,6 +1,16 @@
 # D — transactional project publication (IN PROGRESS)
 
-## Durable journal continuation (native candidate, not publication)
+## Durable journal continuation (native verified subsystem, not publication)
+
+Exact functional **d817f0962f1875d01407ba08ffebb00a7334fd84** /
+[CI36448649855](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36448649855)
+SUCCESS: dedicated journal19/19PASS (18 native controls plus1 source guard),
+Windows264/254PASS/0FAIL/10Linux-only skips, Ubuntu264/117PASS/0FAIL/147native
+skips, retained CREATE18/18, both independent clones/cleanup and three actual-Pi
+deterministic regressions PASS. Full Linux797/650PASS/0FAIL/147native skips and
+syntax/TypeScript/package validation PASS. [Metadata-only proof](phi-publication-journal-evidence.json).
+This accepts the precommit journal only: D remains IN_PROGRESS and Windows
+autonomy BLOCKED; no actual project publication/crash recovery is claimed.
 
 `platform/windows/native/PublicationJournal.cs` is now the trusted native journal
 subsystem. Its class is not a model tool, publication endpoint or project writer.
@@ -11,7 +21,10 @@ generation**, project root native ID, original target IDs/digests, draft ID/vers
 verified/base digests and explicit CREATE/REPLACE/DELETE metadata. No project
 absolute path, source contents, environment or credential payload is stored.
 Metadata is deep-copied; protected paths/case aliases/duplicate IDs/extra fields
-are rejected. Ceilings:64 transactions,512 events,64KiB/event,64 operations.
+are rejected. Fixed per-transaction bounds:512 events,64KiB/event,64 operations.
+The64-record admission census is checked under a per-ID lease, not a global
+allocator; concurrent different-ID creators require proven serialization before
+production. Do not advertise it as a hard cross-ID concurrent resource cap.
 
 The journal is append-only `E00000000` onward: bounded binary format/version/length,
 SHA256 envelope integrity plus previous-event hash and strict sequence/state graph.
@@ -41,6 +54,11 @@ never changes project/temp files or journal keys, kills processes, infers a
 commit from a temp file, or performs rollback. Unknown resources remain untouched.
 Full unchanged-manifest preflight remains the controller's separate responsibility;
 this journal check is per planned target, not a replacement for that preflight.
+Startup inspection requires a separately trusted caller supplying the project
+root; the journal deliberately stores no absolute project locator. Automatic
+whole-project startup recovery/discovery is not implemented. Registry records
+are retained in production; retention/terminal reclamation still needs the
+publication adapter rather than an arbitrary key/path cleaner.
 
 Required native fixed fixtures include persistence/phase/duplicate/live-lease,
 corrupt/gap/size/unknown-schema/ACL, wrong-root, user-change/same-content-ID change,
@@ -52,6 +70,15 @@ TEMP_* fixture phase events simulate **journal progression only**, not physical
 temp operations. These receipts always projectPublished=false, committed=[] and
 cleanup=NOT_PERFORMED (journal inspection); owned test-fixture cleanup is separate.
 They are NOT actual publication-crash, restart rollback or D completion proof.
+Fixture draft ID/version and aggregate verified/base digests are schema-only
+fixed metadata, not actual Worker verification proof. Actual per-target native
+IDs/hashes and conflict/ownership checks are exercised; a future controller
+adapter must bind aggregate digests to the real opaque verified draft grant.
+The same-content replacement control additionally requires actual sharing32
+denial while the producer pins are live, kills that producer, then recreates the
+same text as a new native object and requires CONFLICT from the new inspector.
+Thus a blocked live namespace operation is not mistaken for successful concurrent
+replacement, nor worked around by widening production sharing or releasing pins.
 
 Safe replacement remains unresolved. Microsoft's
 [FILE_RENAME_INFORMATION](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
@@ -202,9 +229,9 @@ operations; partial multi-file publication must be detectable and recovered only
 when ownership/base/current IDs match. Unknown identity or concurrent user changes
 must retain evidence/FAIL safe, never repair arbitrary files.
 
-Next subsystem: durable minimal project transaction ownership/phase journal and
-safe native replacement design, then recovery at each phase including real
-process kill. Only after those proofs integrate controller publication into the
+Next subsystem: expected-ID safe native replacement design and proof, then bind
+the now-proven precommit journal to physical temp/commit observations and recover
+at each actual mutation phase including real process kill. Only after those proofs integrate controller publication into the
 real disposable Git fixture pipeline, require exact verified/LSP/published digest,
 host tests/intended Git diff/receipts/cleanup and all D acceptance controls. Then
 E1/E2/E3 full engine certification, Doctor/backup/reconstruction. Current D is
