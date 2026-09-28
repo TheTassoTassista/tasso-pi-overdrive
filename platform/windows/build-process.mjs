@@ -21,7 +21,8 @@ export function buildWindowsProcess() {
   const anchoredFileSource = path.join(root, 'platform', 'windows', 'native', 'AnchoredFile.cs');
   const brokerSource = path.join(root, 'platform', 'windows', 'native', 'ExecutionBroker.cs');
   const publicationJournalSource = path.join(root, 'platform', 'windows', 'native', 'PublicationJournal.cs');
-  for (const file of [recoverySource, recoveryFilesystemSource, anchoredFileSource, brokerSource, publicationJournalSource]) {
+  const atomicModifySource = path.join(root, 'platform', 'windows', 'native', 'AtomicModify.cs');
+  for (const file of [recoverySource, recoveryFilesystemSource, anchoredFileSource, brokerSource, publicationJournalSource, atomicModifySource]) {
     const stat = fs.lstatSync(file, { throwIfNoEntry: false });
     if (!stat?.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) fail('UNSAFE_PATH');
   }
@@ -44,13 +45,13 @@ export function buildWindowsProcess() {
     if (!fs.existsSync(manifest)) fail('STATE_INVALID');
     let record;
     try { record = JSON.parse(fs.readFileSync(manifest, 'utf8').replace(/^\uFEFF/u, '')); } catch { fail('STATE_INVALID'); }
-    if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== hash(source) || record.confinementSourceSha256 !== hash(confinementSource) || record.recoverySourceSha256 !== hash(recoverySource) || record.recoveryFilesystemSourceSha256 !== hash(recoveryFilesystemSource) || record.anchoredFileSourceSha256 !== hash(anchoredFileSource) || record.brokerSourceSha256 !== hash(brokerSource) || record.publicationJournalSourceSha256 !== hash(publicationJournalSource) || record.binarySha256 !== hash(binary)) fail('IDENTITY_MISMATCH');
+    if (record.schemaVersion !== 1 || record.abi !== 1 || record.sourceSha256 !== hash(source) || record.confinementSourceSha256 !== hash(confinementSource) || record.recoverySourceSha256 !== hash(recoverySource) || record.recoveryFilesystemSourceSha256 !== hash(recoveryFilesystemSource) || record.anchoredFileSourceSha256 !== hash(anchoredFileSource) || record.brokerSourceSha256 !== hash(brokerSource) || record.publicationJournalSourceSha256 !== hash(publicationJournalSource) || record.atomicModifySourceSha256 !== hash(atomicModifySource) || record.binarySha256 !== hash(binary)) fail('IDENTITY_MISMATCH');
     return { status: 'ALREADY_BUILT', abi: 1, scope: 'TRUSTED_PROCESS_OWNERSHIP_NOT_SANDBOX' };
   }
   if (fs.existsSync(manifest)) fail('STATE_INVALID');
   // Fixed system compiler and explicit references: no PowerShell runtime,
   // command string, ambient response file, downloaded SDK or host policy change.
-  const args = ['/nologo', '/noconfig', '/nostdlib+', '/target:exe', '/platform:x64', '/optimize+', ...references.map((file) => `/reference:${file}`), `/out:${binary}`, source, confinementSource, recoverySource, recoveryFilesystemSource, anchoredFileSource, brokerSource, publicationJournalSource];
+  const args = ['/nologo', '/noconfig', '/nostdlib+', '/target:exe', '/platform:x64', '/optimize+', ...references.map((file) => `/reference:${file}`), `/out:${binary}`, source, confinementSource, recoverySource, recoveryFilesystemSource, anchoredFileSource, brokerSource, publicationJournalSource, atomicModifySource];
   const compile = spawnSync(compiler, args, { cwd: root, shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000, maxBuffer: 65536 });
   if (compile.status !== 0) {
     const codes = [...new Set(`${compile.stdout}\n${compile.stderr}`.match(/\bCS\d{4}\b/gu) ?? [])].slice(0, 8);
@@ -59,7 +60,7 @@ export function buildWindowsProcess() {
   }
   const version = spawnSync(binary, ['--version'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 5000, maxBuffer: 4096 });
   if (version.status !== 0 || !version.stdout.startsWith('Phi owned-process ABI 1;')) fail('ABI_FAILED');
-  const record = { schemaVersion: 1, abi: 1, sourceSha256: hash(source), confinementSourceSha256: hash(confinementSource), recoverySourceSha256: hash(recoverySource), recoveryFilesystemSourceSha256: hash(recoveryFilesystemSource), anchoredFileSourceSha256: hash(anchoredFileSource), brokerSourceSha256: hash(brokerSource), publicationJournalSourceSha256: hash(publicationJournalSource), binarySha256: hash(binary) };
+  const record = { schemaVersion: 1, abi: 1, sourceSha256: hash(source), confinementSourceSha256: hash(confinementSource), recoverySourceSha256: hash(recoverySource), recoveryFilesystemSourceSha256: hash(recoveryFilesystemSource), anchoredFileSourceSha256: hash(anchoredFileSource), brokerSourceSha256: hash(brokerSource), publicationJournalSourceSha256: hash(publicationJournalSource), atomicModifySourceSha256: hash(atomicModifySource), binarySha256: hash(binary) };
   fs.writeFileSync(manifest, `${JSON.stringify(record)}\n`, { flag: 'wx' });
   return { status: 'BUILT', abi: 1, scope: 'TRUSTED_PROCESS_OWNERSHIP_NOT_SANDBOX' };
 }

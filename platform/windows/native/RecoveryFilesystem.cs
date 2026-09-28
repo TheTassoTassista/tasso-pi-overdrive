@@ -36,6 +36,7 @@ namespace Phi.Native {
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly Dictionary<IntPtr, string> publicationFiles = new Dictionary<IntPtr, string>();
     readonly string directoryPath;
+    internal IntPtr DirectoryHandle { get { return parents[parents.Count - 1]; } }
     internal static volatile int TransientDeleteRetries;
     internal static volatile int TransientOpenRetries;
     static void Failure(string operation, IntPtr parent, string name, uint access, uint share, uint options, int status, int error) {
@@ -133,6 +134,11 @@ namespace Phi.Native {
     internal IntPtr OpenReadFile(string leaf, out Info info) {
       // Broker runtime snapshot: read only, no write/delete sharing, no reparse.
       return OpenRelative(parents[parents.Count - 1], leaf, 0x81, 1, 1, 0x40, IntPtr.Zero, out info);
+    }
+    internal IntPtr OpenPublicationReadFile(string leaf, out Info info) {
+      // Publication postverify additionally reads, never changes, the exact
+      // security descriptor. No write/delete/WRITE_DAC or broader sharing.
+      return OpenRelative(parents[parents.Count - 1], leaf, 0x20081, 1, 1, 0x40, IntPtr.Zero, out info);
     }
     internal IntPtr CreateExclusiveFile(string leaf, out Info info) {
       // FILE_CREATE, never OPEN_IF/OVERWRITE. Parent and temp handles remain

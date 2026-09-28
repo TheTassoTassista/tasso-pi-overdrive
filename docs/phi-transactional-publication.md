@@ -1,5 +1,44 @@
 # D — transactional project publication (IN PROGRESS)
 
+## D3 native mechanism under evaluation — NOT production publication
+
+`AtomicModify.cs` extends the trusted native primitive layer for the existing
+publication adapter; it does not mint controller authority or journal success.
+The candidate requires a local NTFS volume advertising transaction support, then
+uses an actual finite non-distributed KTM transaction. An exclusively created
+same-volume private transacted temp receives the complete UTF8 replacement,
+flush and SHA256 verification. An expected-ID/hash transacted destination writer
+locks the original object; only its transaction-private unnamed stream is
+rewritten/truncated, flushed and verified. File handles close before synchronous
+commit while the transactional lock must remain effective. The temporary object
+is deleted inside the same transaction, not by a broad/path-only cleaner.
+Anchored read-only postverify checks original ID, new digest, ACL/owner/group
+descriptor, attributes and creation time. Existing object/other streams are not
+exchanged or copied; no ordinary in-place/path overwrite fallback exists.
+
+The mandatory real-native controls require outside readers to see OLD before
+commit and outside writers to be rejected even after file handles close; the
+identical ordinary write must succeed before the transaction with parents pinned.
+Successful commit must expose only NEW. Content/new-ID conflicts preserve the
+user object. Exact source-write/flush/precommit/postcommit exception controls
+must retain complete old/new versions and reclaim only the owned test scope.
+These controls are not yet real publisher-death/recovery or production E2E proof.
+Current controller still denies BACKEND_UNAVAILABLE; D1 postcommit certificates
+remain denied, and Windows autonomy remains BLOCKED.
+
+Primary API rationale:
+
+- [TxF concepts](https://learn.microsoft.com/en-us/windows/win32/fileio/txf-basic-concepts): transaction-private reads/writes and transactional writer exclusion, in addition to ordinary sharing rules.
+- [CreateTransaction](https://learn.microsoft.com/en-us/windows/win32/api/ktmw32/nf-ktmw32-createtransaction): finite timeout, no promotion, closing the last uncommitted transaction handle rolls back.
+- [TxF handle lifecycle](https://learn.microsoft.com/en-us/windows/win32/fileio/how-to-use-transactional-ntfs): close transacted file handles before commit; commit invalidates them, so final verification uses a new anchored read-only handle.
+- [Microsoft's TxF warning](https://learn.microsoft.com/en-us/windows/win32/fileio/deprecation-of-txf): legacy API, future availability not guaranteed, alternatives recommended. The candidate cannot claim general Windows/filesystem portability or power-loss hardware guarantees.
+
+The mechanism is UNPROVEN until actual candidate Windows compilation/API tests.
+Unsupported volume/API/locking/flush behavior fails closed, never substitutes
+unvalidated rename, plain write/copy or increased rights. Only after the native
+primitive is proven bind the already-existing journal and real verified opaque
+grant, then real mutation/process-death/recovery and production Git publication.
+
 ## Durable journal continuation (native verified subsystem, not publication)
 
 Exact functional **d817f0962f1875d01407ba08ffebb00a7334fd84** /

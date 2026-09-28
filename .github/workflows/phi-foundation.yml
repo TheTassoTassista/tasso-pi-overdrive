@@ -40,6 +40,9 @@ jobs:
       - name: Native Windows durable publication journal and real writer death (not project publication)
         if: runner.os == 'Windows'
         run: node --test tests/phi-publication-journal.test.mjs
+      - name: Native Windows atomic MODIFY primitive (NTFS transaction, not production publication)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-atomic-modify.test.mjs
       - name: Native Windows clean-clone primary/cleanup and ownership controls (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-clone-cleanup.test.mjs

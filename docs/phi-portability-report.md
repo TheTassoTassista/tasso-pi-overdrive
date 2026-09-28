@@ -2,6 +2,14 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## D3 continuation candidate — native atomic MODIFY prerequisite, not accepted yet
+
+Exact starting local/remote a3f8afca0459b52045c82dc8918507bee143e11b and d817f09/CI36448649855 proof confirmed. Existing production preflight/journal/broker/CREATE retained. New source-attested internal atomic MODIFY primitive uses a finite non-distributed native NTFS transaction and only transaction-bound target writes: complete same-volume private temp/flush/hash -> expected-ID/hash locked destination -> staged whole default stream -> commit -> anchored identity/content/security/creation-time verification. Native existing-object ID/ACL/other streams are not exchanged. Required controls prove old visibility and writer exclusion after handles close, actual commit, conflicts and exceptions, pending real Windows CI. No ordinary write/copy/path-replace fallback or new model endpoint.
+
+TxF/KTM is legacy NTFS-only, not a broad portable Windows readiness guarantee; its actual availability/API/sharing/flush behavior must be proved on the runner and unsupported systems fail closed. No actual process-death publication recovery, durable postcommit adapter, real Worker publication/Git-diff E2E or PUBLISHED state yet. Bind the existing journal/controller path only after this native mechanism is proven. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED. Protected document/auth/stable installation/provider/routing/security unchanged;0external model/provider calls.
+
+Current local full Linux807/651PASS/0FAIL/156native skips; syntax/installed-Pi TypeScript/package validation PASS, original650Linux passes retained. Focused62/14PASS/0FAIL/48native skips;9new MODIFY native cases remain UNPROVEN until exact Windows CI. Static guard path corrected to actual Windows index; no security assertion/skip relaxed. Fixed native phase/HRESULT/error metadata will identify real API failures without raw exceptions/source/paths. This is not publication or crash-recovery acceptance.
+
 ## Current verified D1 checkpoint — bounded journal, not transactional publication
 
 Exact functional **d817f0962f1875d01407ba08ffebb00a7334fd84**, same private `feature/routing-presets-quality` branch; [CI36448649855](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36448649855) **SUCCESS Windows/Ubuntu**. Windows264total/254PASS/0FAIL/0cancelled/10Linux-only skips; Ubuntu264/117PASS/0FAIL/147native skips. Dedicated journal19/19PASS/0FAIL/0skip (18 native controls + 1 source guard); CREATE18/18, cleanup14/14, Worker16/16 and retained LSP/broker/production/recovery suites green. Full Linux797/650PASS/0FAIL/147native skips; syntax/installed-Pi TypeScript/package-pinned-policy-secret validation PASS. [Exact metadata receipts](phi-publication-journal-evidence.json), [architecture/limitations](phi-transactional-publication.md).
