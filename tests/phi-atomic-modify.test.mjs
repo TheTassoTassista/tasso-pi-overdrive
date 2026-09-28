@@ -13,6 +13,8 @@ test('atomic MODIFY uses native transaction-bound handles only; no ordinary targ
   assert.match(source, /Hash\(Read\(target\)\) != expectedDigest/u);
   assert.match(source, /SecurityDigest\(target\) != security/u);
   assert.doesNotMatch(source, /extern.*(?:MoveFile|ReplaceFile|CopyFile|CreateFileW)\b/u);
+  assert.match(source, /CreateFileTransactedW\(path,[^\n]+, 0, IntPtr.Zero/u); // Publisher sharing remains exclusive.
+  assert.match(source, /FileAccess.Read, FileShare.ReadWrite \| FileShare.Delete/u); // Non-blocking fixed observer, never a writer.
   for (const name of ['build-process.mjs', 'process.mjs']) assert.match(fs.readFileSync(new URL('../platform/windows/' + name, import.meta.url), 'utf8'), /atomicModifySourceSha256/u);
   assert.equal(fs.readFileSync(new URL('../platform/windows/index.mjs', import.meta.url), 'utf8').includes('autonomousReady: true'), false);
 });

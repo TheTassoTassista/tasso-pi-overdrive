@@ -161,11 +161,11 @@ namespace Phi.Native {
               if (File.ReadAllText(destination) != "old-complete") throw new InvalidDataException(); outsideWritePositive = true;
             }
             if (phase == "before-commit" && (name == "old-visible-before-commit" || name == "locked-after-handles-close")) {
-              if (File.ReadAllText(destination) != "old-complete") throw new InvalidDataException(); oldVisible = true;
+              if (ReadCommittedFixture(destination) != "old-complete") throw new InvalidDataException(); oldVisible = true;
               if (name == "locked-after-handles-close") {
                 try { File.WriteAllText(destination, "user-must-not-overwrite", Utf8); }
                 catch (IOException error) { int code = error.HResult & 0xffff; if (code != 32 && code != 6800) throw; locked = true; }
-                if (!locked || File.ReadAllText(destination) != "old-complete") throw new InvalidDataException();
+                if (!locked || ReadCommittedFixture(destination) != "old-complete") throw new InvalidDataException();
               }
             }
             if (phase == name) { injected = true; throw new IOException("PHI_ATOMIC_MODIFY_INJECTED"); }
@@ -183,6 +183,15 @@ namespace Phi.Native {
       Console.WriteLine(Json().Serialize(new { caseName = name, passed, fixtureCleanup = cleanup, injected, committed, lockedAfterHandlesClose = locked, outsideWritePositive, oldVisibleBeforeCommit = oldVisible,
         evidence, scope = "NATIVE_TRANSACTION_PRIMITIVE_NOT_PRODUCTION_PUBLICATION", projectPublished = false, externalRequests = 0 }));
       return passed && cleanup ? 0 : 70;
+    }
+    static string ReadCommittedFixture(string path) {
+      // Observer only, in a fixed disposable fixture with held parent pins.
+      // File.ReadAllText uses FileShare.Read, which denies a transaction's write
+      // access independently of isolation. This observer requests READ only but
+      // does not itself exclude that access. The publisher's exclusive handles,
+      // anchored postverify and KTM writer lock are unchanged.
+      using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+      using (StreamReader reader = new StreamReader(stream, Utf8, false)) return reader.ReadToEnd();
     }
   }
 }
