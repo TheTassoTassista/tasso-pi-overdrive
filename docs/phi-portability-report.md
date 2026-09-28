@@ -2,13 +2,21 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## D3 production controller candidate — NOT native accepted yet
+## D3 final-lock conflict candidate — native acceptance pending
+
+Local final-lock candidate gate847/653PASS/0FAIL/194Windows-only skips; syntax/installed-Pi TypeScript/package-pinned-policy validation PASS, focused102/16PASS/0FAIL/86native skips. Added a mandatory actual native post-READY/pre-lock concurrent change case and propagation of its persisted CONFLICT through the fixed native endpoint/controller adapter. User bytes and journal remain preserved, transaction aborts, no retry or rights/policy widening. Its matching native proof is not yet claimed.
+
+Preceding journal10294757c5c6305accdead550d4faadfc2760189 / CI36459467660 SUCCESS Windows/Ubuntu: atomic/namespace19/19, journal-MODIFY27/27 with13 distinct real publisher kills/fresh recovery scenarios, Windows310/300PASS/0FAIL/10skips, Ubuntu310/119PASS/0FAIL/191skips. Both independent clones/cleanup and actual-Pi local normal/revoked/LSP smokes PASS. Current controllerf50a0218ac3a0a755c9a9a76701e164ab1bc1b25 / CI36461530347 dedicated real Worker/LSP/Tester/MODIFY/PUBLISHED/Git-diff and post-READY CONFLICT steps PASS; complete clone/Pi acceptance still pending at this entry.
+
+Single-file native mutation and controller verification are separate scopes. Restart NEW observation remains RECOVERY_REQUIRED without restored original metadata/controller proof; trusted root discovery, retained-record reclamation and safe DELETE/RENAME/multifile publication remain unfinished. Legacy NTFS TxF support only, unsupported behavior fails closed. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS.0external model/provider calls; active Pi/auth/providers/routing/Council/Judge/Second Brain/security/governors unchanged. Next obtain the exact final-lock candidate native proof and permanent metadata receipts before advancing D.
+
+## Preceding D3 production controller candidate — historical pending entry
 
 Original opaque approved READY grant now drives the existing single-file V2 journal/native NTFS transaction, with one-use authority, fixed source-attested helper, bounded pipe-only payload, generation-bound native guardian/30s maximum and no runner/profile/shell override or automatic retry. Actual CLEANED/commit/ID/temp/security evidence plus full anchored project readback must match the exact verified controller draft aggregate before a private certificate permits PUBLISHED. JSON/public receipts cannot mint/replay that certificate; uncertain native failures retain commitState UNKNOWN and journal evidence. Current normal Windows autonomy remains BLOCKED; this is internal explicit-controller publication, not E1/E2/E3 certification.
 
 Required production-API fixtures exercise actual LPAC Worker EDIT/real JSON LSP/non-mutating TEST/READY/journal/MODIFY/PUBLISHED/exact Git diff/cleanup and a user change after READY. Native proof pending. Full local846/653PASS/0FAIL/193native-only skips, syntax/installed-Pi TypeScript/package validation PASS; focused52/22PASS/0FAIL/30skips. Native1029475/CI36459467660 dedicated mutation/namespace/13death-recovery steps PASS, its complete acceptance pending at this entry. Original metadata/restart verified draft, journal discovery/retention, DELETE/RENAME/multifile/full coding E2Es remain unfinished. D IN_PROGRESS.0new model/provider calls; protected/auth/Pi/provider/routing/Second Brain/security/governor caps unchanged.
 
-## D3 continuation candidate — native atomic MODIFY prerequisite, not accepted yet
+## Historical D3 journal/primitive candidates — subsequently accepted in bounded scopes
 
 Initial202e670 / CI36456091523 FAILED two outside-read fixtures with real sharing32; source/native commit/metadata/conflicts and seven native cases passed. Fixed observer27cb3244fee5ab0a3eff9ee00b34e54012630eec / CI36456773708 SUCCESS Windows/Ubuntu: all9native atomic controls+guard, Windows aggregate274/264PASS/0FAIL/10skips, CREATE18/18/D1journal19/19, both independent clones/retained real-Pi smoke steps PASS. Publisher share0/permissions unchanged, no weakening of expected OLD content or denied outside writer assertions. The observer alone is read-only and does not exclude transactional writer access.
 
@@ -22,7 +30,7 @@ TxF/KTM is legacy NTFS-only, not a broad portable Windows readiness guarantee; i
 
 Current local full Linux807/651PASS/0FAIL/156native skips; syntax/installed-Pi TypeScript/package validation PASS, original650Linux passes retained. Focused62/14PASS/0FAIL/48native skips;9new MODIFY native cases remain UNPROVEN until exact Windows CI. Static guard path corrected to actual Windows index; no security assertion/skip relaxed. Fixed native phase/HRESULT/error metadata will identify real API failures without raw exceptions/source/paths. This is not publication or crash-recovery acceptance.
 
-## Current verified D1 checkpoint — bounded journal, not transactional publication
+## Historical verified D1 checkpoint — bounded journal, not transactional publication
 
 Exact functional **d817f0962f1875d01407ba08ffebb00a7334fd84**, same private `feature/routing-presets-quality` branch; [CI36448649855](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36448649855) **SUCCESS Windows/Ubuntu**. Windows264total/254PASS/0FAIL/0cancelled/10Linux-only skips; Ubuntu264/117PASS/0FAIL/147native skips. Dedicated journal19/19PASS/0FAIL/0skip (18 native controls + 1 source guard); CREATE18/18, cleanup14/14, Worker16/16 and retained LSP/broker/production/recovery suites green. Full Linux797/650PASS/0FAIL/147native skips; syntax/installed-Pi TypeScript/package-pinned-policy-secret validation PASS. [Exact metadata receipts](phi-publication-journal-evidence.json), [architecture/limitations](phi-transactional-publication.md).
 

@@ -1,6 +1,27 @@
 # D — transactional project publication (IN PROGRESS)
 
-## Live verified-controller single-file MODIFY adapter (native acceptance pending)
+## Current proof scopes and final-lock candidate
+
+Native journal integration1029475 / CI36459467660 is SUCCESS Windows/Ubuntu,
+including19atomic/namespace controls,27journal-MODIFY controls and13distinct real
+publisher-death/fresh recovery scenarios. Both independent source clones/cleanup
+and retained actual-Pi deterministic controls pass. Controllerf50a021 /
+CI36461530347 has passed the actual Worker/LSP/Tester/MODIFY/PUBLISHED/Git-diff
+and post-READY CONFLICT steps; complete acceptance is still pending here.
+
+New mandatory final-lock native control changes user content after actual temp
+flush/hash/READY and before the transactional writer locks the expected target.
+The real locked expected-ID/hash check must reject it, abort private staged bytes
+and append CONFLICT. The fixed endpoint/adapter propagates only matching actual
+native CONFLICT evidence, never model-supplied receipts. No retry or permission
+relaxation. This extra case requires its own exact native candidate validation.
+Linux847/653PASS/0FAIL/194native skips proves regressions, not native atomicity.
+
+The sections below record implementation and historical acceptance boundaries;
+older BACKEND_UNAVAILABLE/pending statements refer to their preceding candidates,
+not the new live controller adapter. D remains IN_PROGRESS, autonomy BLOCKED.
+
+## Live verified-controller single-file MODIFY adapter
 
 `executePreparedWindowsPublication` consumes the ORIGINAL controller-only opaque
 READY grant once and calls `platform/windows/publication.mjs`. Actual fixed native

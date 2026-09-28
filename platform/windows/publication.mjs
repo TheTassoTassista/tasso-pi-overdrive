@@ -37,6 +37,9 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
         j.draftVersion === header.draftVersion && j.verifiedDigest === header.verifiedDigest && j.baseDigest === header.baseDigest && same(j.operations, operations)) {
       error.publicationEvidence = freeze({ phase: /^[a-zA-Z-]{1,40}$/u.test(value.phase ?? '') ? value.phase : 'UNKNOWN',
         nativeCode: /^[0-9a-f]{8}$/u.test(value.nativeCode ?? '') ? value.nativeCode : null, journal: j });
+      if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && j.pendingOperations === 1) {
+        error.code = 'PHI_PUBLICATION_CONFLICT'; error.message = error.code;
+      }
     }
     throw error;
   }

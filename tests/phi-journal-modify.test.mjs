@@ -15,7 +15,7 @@ test('single-file MODIFY extends the existing journal; native observations alone
   assert.equal(fs.readFileSync(new URL('../platform/windows/index.mjs', import.meta.url), 'utf8').includes('autonomousReady: true'), false);
 });
 const points = ['before-transaction', 'temp', 'write', 'flush', 'validation', 'staged', 'before-commit', 'before-journal-committed', 'committed', 'postverify', 'cleanup'];
-const cases = ['commit', 'unobserved-advance', ...points, ...points.filter(p => p !== 'before-transaction').map(p => 'crash-' + p), 'user-content-after-crash', 'same-content-recreated-after-crash', 'user-delete-after-crash'];
+const cases = ['commit', 'unobserved-advance', 'concurrent-change-at-ready', ...points, ...points.filter(p => p !== 'before-transaction').map(p => 'crash-' + p), 'user-content-after-crash', 'same-content-recreated-after-crash', 'user-delete-after-crash'];
 for (const name of cases) test('native journal-bound MODIFY: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
   const result = spawnSync(ownedWindowsHelper(), ['--publication-modify-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 22000, maxBuffer: 16384 });
   assert.equal(result.status, 0, result.stderr);
@@ -30,6 +30,7 @@ for (const name of cases) test('native journal-bound MODIFY: ' + name, { skip: p
     if (name === 'user-delete-after-crash') { assert.equal(receipt.evidence.destinationMissing, true); assert.equal(receipt.evidence.observedDigest, null); }
   }
   if (name === 'commit') { assert.equal(receipt.evidence.journal.phase, 'CLEANED'); assert.equal(receipt.evidence.journal.cleanup, 'PASS'); assert.equal(receipt.evidence.nativeProof.tempAbsent, true); }
+  if (name === 'concurrent-change-at-ready') { assert.equal(receipt.evidence.phase, 'CONFLICT'); assert.deepEqual(receipt.evidence.filesCommitted, []); assert.equal(receipt.evidence.committedIdentity, null); }
   assert.doesNotMatch(JSON.stringify(receipt), /old-complete|new-complete|user-complete|unrelated-user/u);
   assert.equal(windowsRecoveryStatus().status, 'PASS');
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_MODIFY_ONLY', ...receipt }));

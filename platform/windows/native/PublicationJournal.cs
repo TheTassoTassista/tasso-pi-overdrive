@@ -222,7 +222,8 @@ namespace Phi.Native {
       if ((int)header["version"] != 2 || (string)last["phase"] != "PREPARED") throw new InvalidDataException();
       Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
       if (bytes == null || bytes.Length != (int)op["newBytes"] || Hash(bytes) != (string)op["newDigest"]) throw new InvalidDataException();
-      object proof = AtomicModify.ReplaceDefaultStream(project, (string)header["projectIdentity"], (string)op["path"], (string)op["baseIdentity"], (string)op["baseDigest"], bytes, delegate(string phase, string temp) {
+      object proof;
+      try { proof = AtomicModify.ReplaceDefaultStream(project, (string)header["projectIdentity"], (string)op["path"], (string)op["baseIdentity"], (string)op["baseDigest"], bytes, delegate(string phase, string temp) {
         if (phase == "temp") Observe("TEMP_CREATED", temp, null);
         else if (phase == "write") Observe("TEMP_WRITTEN", temp, null);
         else if (phase == "flush") Observe("TEMP_FLUSHED", temp, null);
@@ -237,7 +238,11 @@ namespace Phi.Native {
         else if (phase == "postverify") Observe("POST_COMMIT_VERIFIED", temp, (string)op["baseIdentity"]);
         else if (phase == "cleanup") Observe("CLEANED", temp, (string)op["baseIdentity"]);
         checkpoint(phase);
-      });
+      }); } catch (InvalidOperationException error) {
+        if (error.Message != "PHI_ATOMIC_MODIFY_CONFLICT" && error.Message != "PHI_PUBLICATION_CONFLICT") throw;
+        if ((string)last["phase"] != "CONFLICT") Observe("CONFLICT", last["tempIdentity"] as string, null);
+        throw new InvalidOperationException("PHI_PUBLICATION_CONFLICT");
+      }
       if ((string)last["phase"] != "CLEANED") throw new InvalidDataException();
       return new { journal = Metadata("NOT_REQUIRED"), nativeProof = proof };
     }
@@ -317,7 +322,9 @@ namespace Phi.Native {
         });
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_MODIFY", receipt = result, projectPublished = false, externalRequests = 0 })); return 0;
       } catch (Exception error) {
-        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_NATIVE_SINGLE_MODIFY", phase, nativeCode = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"),
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_NATIVE_SINGLE_MODIFY", phase,
+          reason = error is InvalidOperationException && error.Message == "PHI_PUBLICATION_CONFLICT" ? "CONFLICT" : "UNCONFIRMED",
+          nativeCode = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"),
           journal = journal == null ? null : journal.Metadata("INSPECTION_REQUIRED"), projectPublished = false, externalRequests = 0 })); return 70;
       } finally { if (journal != null) journal.Dispose(); }
     }
@@ -467,7 +474,7 @@ namespace Phi.Native {
     internal static int ModifySelfTest(string name) {
       bool crash = name.StartsWith("crash-", StringComparison.Ordinal), userConflict = name == "user-content-after-crash" || name == "same-content-recreated-after-crash" || name == "user-delete-after-crash";
       string point = crash ? name.Substring(6) : userConflict ? "before-journal-committed" : name;
-      if (name != "commit" && name != "unobserved-advance" && !userConflict && !ModifyCheckpoints.Contains(point)) return 70;
+      if (name != "commit" && name != "unobserved-advance" && name != "concurrent-change-at-ready" && !userConflict && !ModifyCheckpoints.Contains(point)) return 70;
       if (crash && point == "before-transaction") return 70;
       ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null;
       string tx = Guid.NewGuid().ToString("N"), rootId = null, stage = "BEGIN";
@@ -514,6 +521,11 @@ namespace Phi.Native {
           if (name == "unobserved-advance") {
             bool denied = false; try { journal.Advance("TEMP_CREATED", rootId); } catch (InvalidOperationException) { denied = true; }
             if (!denied || (string)journal.last["phase"] != "PREPARED" || File.ReadAllText(target) != "old-complete") throw new InvalidDataException();
+          } else if (name == "concurrent-change-at-ready") {
+            bool conflict = false;
+            try { journal.PublishSingleModify(Encoding.UTF8.GetBytes("new-complete"), delegate(string observed) { if (observed == "validation") File.WriteAllText(target, "user-complete", new UTF8Encoding(false)); }); }
+            catch (InvalidOperationException error) { if (error.Message != "PHI_PUBLICATION_CONFLICT") throw; conflict = true; }
+            if (!conflict || (string)journal.last["phase"] != "CONFLICT" || File.ReadAllText(target) != "user-complete") throw new InvalidDataException();
           } else {
             try { evidence = journal.PublishSingleModify(Encoding.UTF8.GetBytes("new-complete"), delegate(string observed) { if (observed == name) { injected = true; throw new IOException("PHI_MODIFY_JOURNAL_INJECTED"); } }); }
             catch (IOException) { if (!injected) throw; }
