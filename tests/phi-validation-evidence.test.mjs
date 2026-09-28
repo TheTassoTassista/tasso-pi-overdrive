@@ -51,6 +51,25 @@ test('failure metadata fails closed for unknown stages and records timeout witho
   assert.equal(evidence.failureStage, 'UNKNOWN'); assert.equal(evidence.exitCode, null); assert.equal(evidence.timedOut, true);
   assert.doesNotMatch(JSON.stringify(evidence), /private/u);
 });
+test('reproduced pinned runtime timeout identifies the real stage and only fixed npm progress metadata', () => {
+  const row = validationFailureEvidence('pinned-lsp-runtime', { status: 124, error: { code: 'ETIMEDOUT', message: 'PRIVATE_ERROR' }, stderr: [
+    'npm verbose cli PRIVATE_NODE PRIVATE_NPM', 'npm verbose title npm ci --prefix PRIVATE_PATH',
+    'npm silly fetch manifest PRIVATE_PACKAGE', 'npm silly fetch manifest PRIVATE_PACKAGE',
+    'npm http fetch GET 200 https://PRIVATE_URL/?token=PRIVATE_TOKEN (cache hit)',
+    'npm http fetch GET 200 https://PRIVATE_URL (cache miss)', 'npm silly tarball no local data for PRIVATE_PACKAGE',
+    'npm silly reify moves PRIVATE_PATH', 'npm error code ECONNRESET', 'npm error code PRIVATE_CODE',
+  ].join('\n') });
+  assert.equal(row.failureStage, 'pinned-lsp-runtime'); assert.equal(row.timedOut, true); assert.equal(row.exitCode, 124);
+  assert.deepEqual(row.packageInstall, { cliStarted: true, ciRecognized: true, manifestRequests: 2, httpResponses: 2,
+    cacheHitResponses: 1, cacheMissResponses: 1, tarballCacheMisses: 1, reifyRecords: 1, codes: ['ECONNRESET'] });
+  assert.doesNotMatch(JSON.stringify(row), /PRIVATE|https:|token=/u);
+});
+test('npm diagnostic data is absent outside the fixed install stage and deduplicates/bounds known codes', () => {
+  const stderr = Array(20).fill('npm error code ENOTCACHED\nnpm error code PRIVATE_CODE').join('\n');
+  assert.equal(validationFailureEvidence('foundation-tests', { stderr }).packageInstall, undefined);
+  assert.deepEqual(validationFailureEvidence('pinned-lsp-runtime', { stderr }).packageInstall.codes, ['ENOTCACHED']);
+  assert.equal(validationFailureEvidence('pinned-lsp-runtime').packageInstall.cliStarted, false);
+});
 test('native PowerShell policy failure is reduced to a fixed code, never its path or command', () => {
   const evidence = validationFailureEvidence('windows-process-build', { status: 1, stderr: 'private-script-path cannot be loaded because running scripts is disabled on this system private-command' });
   assert.deepEqual(evidence.diagnosticCodes, ['PHI_BUILD_SCRIPT_POLICY_BLOCKED']);

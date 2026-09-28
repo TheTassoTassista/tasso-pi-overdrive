@@ -51,7 +51,10 @@ try {
   await run(process.execPath, [npm, 'ci', '--legacy-peer-deps', '--ignore-scripts', '--no-audit', '--no-fund'], clone);
   if (process.platform === 'win32') {
     stage = 'pinned-lsp-runtime';
-    await run(process.execPath, [npm, 'ci', '--prefix', 'runtime/lsp', '--ignore-scripts', '--no-audit', '--no-fund'], clone);
+    // Diagnose the reproduced owned-install timeout without publishing raw npm
+    // output or writing verbose log files. Pins/integrity, lifecycle denial,
+    // online behavior, retries and the ordinary 120s deadline are unchanged.
+    await run(process.execPath, [npm, 'ci', '--prefix', 'runtime/lsp', '--ignore-scripts', '--no-audit', '--no-fund', '--loglevel=silly', '--logs-max=0'], clone);
   }
   stage = 'windows-process-build';
   if (process.platform === 'win32') await run(process.execPath, [path.join(clone, 'scripts', 'build-windows-process.mjs')], clone);
