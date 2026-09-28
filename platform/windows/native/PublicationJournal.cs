@@ -380,7 +380,8 @@ namespace Phi.Native {
             if (!denied) throw new InvalidDataException(); evidence = new { status = "PROJECT_IDENTITY_REJECTED", projectMutations = 0 };
           } else if (name == "user-change" || name == "same-content-replaced") {
             if (name == "user-change") File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "user-complete", new UTF8Encoding(false));
-            else { File.Move(Path.Combine(scope.Root, "input.txt"), Path.Combine(scope.Root, "previous.txt")); File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "old-complete", new UTF8Encoding(false)); }
+            else { stage = "USER_RENAME"; File.Move(Path.Combine(scope.Root, "input.txt"), Path.Combine(scope.Root, "previous.txt")); stage = "USER_RECREATE"; File.WriteAllText(Path.Combine(scope.Root, "input.txt"), "old-complete", new UTF8Encoding(false)); }
+            stage = "USER_BASE_CHECK";
             if (MatchesBase(scope.Root, journal.header)) throw new InvalidDataException();
             journal.Advance("TEMP_WRITTEN", null); journal.Advance("TEMP_FLUSHED", null);
             bool denied = false; try { journal.Advance("READY_TO_COMMIT", null); } catch (InvalidOperationException error) { denied = error.Message == "PHI_PUBLICATION_CONFLICT"; }
@@ -393,7 +394,7 @@ namespace Phi.Native {
         }
         string expected = name == "user-change" ? "user-complete" : "old-complete";
         if (File.ReadAllText(Path.Combine(scope.Root, "input.txt")) != expected) throw new InvalidDataException(); passed = true;
-      } catch { Console.Error.WriteLine("PHI_PUBLICATION_JOURNAL_SELFTEST_FAILED:" + stage); }
+      } catch (Exception error) { Console.Error.WriteLine("PHI_PUBLICATION_JOURNAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
       finally {
         if (child != null) { try { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } childGone = child.HasExited; } catch { passed = false; } child.Dispose(); }
         if (journal != null) journal.Dispose();
