@@ -2,7 +2,13 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current D5 candidate — V4 RENAME journal awaits Windows certification
+## Current verified D5 unit — native V4 RENAME journal, not full D
+
+Exact tested functional `f507a3c4bf9e7ecabb480b5cb97c12d01f5b32a1` / [CI36644001398](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36644001398) **SUCCESS**. Windows aggregate393/383PASS/0FAIL/0cancelled/10Linux skips; Ubuntu393/135PASS/0FAIL/0cancelled/258native skips. Dedicated V4 RENAME29/29 PASS (28 actual Windows cases), including production native endpoint, seven publisher-death/fresh-inspector points, admission/concurrent-conflict and no-clobber controls. Independent Windows/Ubuntu clones PASS_FOUNDATION_ONLY/cleanupPASS; Windows clone repeats383PASS with owned residual0. Windows clone pinned LSP install exited0 in78524ms (<unchanged120000ms); the historical timeout cause is still UNKNOWN. All three actual Pi local smokes PASS, each reports revoked authority/temporary cleanup and0external provider requests. Full local `npm run check`:926tests/668PASS/0FAIL/258native skips plus syntax/TypeScript/package validation PASS. Protected audit remains unstaged/unchanged.
+
+This is **not** original verified-controller RENAME publication, cross-directory MOVE, trusted discovery/retention, multi-file or D-wide crash/restart E2E. B1/B2/C remain complete; **D IN_PROGRESS, WINDOWS AUTONOMY BLOCKED, PHI PORTABILITY IN PROGRESS**. Next connect explicit RENAME to one-use verified controller/grant and whole-project readback; then complete D reconstruction, discovery, retention and multi-file recovery without claiming whole-filesystem atomicity. E1/E2/E3 remain gated on D.
+
+## Historical D5 candidate — V4 RENAME journal before certification
 
 Candidate `695a548` / CI36643342538 **FAILED** at the new native V4 suite: 27PASS/2FAIL (`crash-before-rename`, `crash-intent`); native build/prior steps and Ubuntu job pass, but later Windows aggregate, clones, LSP and three Pi smokes did not run. Diagnostic `aace7fc` / CI36643713512 reproduced exactly the same two failures and showed both recovery children exit0 with `OLD_COMPLETE_OBSERVED`/`ROLLED_BACK`. The fixture alone incorrectly expected a destination even before the native rename. Its corrected old-state assertion now requires source bytes preserved and destination absent. This is not a product recovery change; exact complete Windows/clone/Pi validation is still pending. D and Windows autonomy remain blocked.
 
