@@ -2,6 +2,8 @@
 
 ## D4 candidate — single DELETE without TxF (native acceptance pending)
 
+Initial candidate1c75888 / [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) is FAILURE: DELETE25PASS/1FAIL, replacement fixture `BEGIN:80070020`; later Windows production/aggregate/clone/Pi phases did not run. The fixed fixture replaces its .NET pathname move with an independent source-handle/same-directory no-replace rename under unchanged sharing pins. It requires a genuinely new native ID with the original digest, preserved original ID/digest and pre-intent CONFLICT. No release of pins, access/sharing increase, weakened expected-ID check or masked failure. Complete corrected native CI remains mandatory.
+
 V3 extends the SAME PublicationJournal registry/ACL/lease/envelope/flush/bounds;
 it is not a second journal or a new model tool. V1/V2 semantics remain. The
 controller's original explicit one-use READY grant dispatches exactly one DELETE
@@ -55,6 +57,13 @@ metadata only. This checkpoint does not implement D6 full controller restoration
 D7 discovery or D8 reclamation. The fixed trusted fixture locator is not discovery.
 The existing64record bound remains fail-closed.
 
+The exact `phi-delete-<32hex>.quarantine` component is reserved (case-insensitive,
+including nested paths) in JS publication baseline and native segment validation.
+Anchored snapshot enumeration rejects it before opening rather than silently
+omitting/copying transaction evidence or admitting it as a new Worker input.
+Its presence blocks ordinary admission until separately trusted recovery resolves
+it. The reserved name alone is never ownership proof or cleanup authority.
+
 The controller can certify PUBLISHED only after actual CLEANED/exit0/expected
 original-ID/hash/no-TxF receipt plus secure whole-project readback exactly matching
 the real verified draft aggregate and unchanged IDs of every retained file. A
@@ -63,7 +72,7 @@ unstarted conflict/success. Replayed/model/JSON/public receipts cannot mint the
 one-use private WeakMap proof. Ordinary Windows autonomy stays BLOCKED.
 
 Required fixed native controls include normal deletion, known missing, concurrent
-content/identity replacement before exclusive lock, invalid/protected/root/sharing,
+content/identity replacement before exclusive lock, invalid/protected/reserved/root/sharing,
 quarantine collision and unobserved phase denial. Nine real publisher kills cover
 before-delete/intent/rename/quarantine/commit/postverify/cleanup-intent/unlinked/
 CLEANED, each followed by a fresh process reading durable state. Post-death new
@@ -71,8 +80,8 @@ user target, same-text new target and replaced/missing quarantine controls must
 preserve data and reject blind cleanup. Separate production fixtures exercise
 actual LPAC Worker DELETE -> same-draft JSON LSP -> non-mutating TEST -> original
 READY -> native DELETE -> private PUBLISHED proof -> intended-only Git deletion.
-None is accepted until the exact complete native CI. Local886/660PASS/0FAIL/
-226native skips plus syntax/TypeScript/package validation prove regressions only.
+None is accepted until the exact complete native CI. Local888/661PASS/0FAIL/
+227native skips plus syntax/TypeScript/package validation prove regressions only.
 
 This is process-death recoverability, not hardware/power-loss durability or broad
 filesystem support. DELETE does not require TxF; retained MODIFY remains the

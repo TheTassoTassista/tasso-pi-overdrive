@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { windowsPublicationFailure, consumeWindowsPublicationProof } from '../platform/windows/publication.mjs';
+import { publicationBase } from '../lib/phi-publication-plan.mjs';
 
 test('DELETE extends the same journal with exclusive identity-checked quarantine, never TxF or bare production unlink', () => {
   const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8').split('// Fixed fixtures only.')[0];
@@ -18,6 +19,17 @@ test('DELETE extends the same journal with exclusive identity-checked quarantine
   assert.match(native, /leaf, 0x30081, 0, 1, 0x40/u); // No write rights, sharing or overwrite-open.
   assert.match(native, /QuarantineDeleteSource[\s\S]*?RenameRegisteredFile\(file, destination, deletionFiles\)/u);
   assert.match(native, /RenameNewFile[\s\S]*?RenameRegisteredFile\(file, destination, publicationFiles\)/u);
+});
+
+test('transaction quarantine cannot become ordinary source/draft/publication input, including case aliases and nested paths', () => {
+  const id = 'a'.repeat(16) + ':' + 'b'.repeat(32), reserved = 'phi-delete-' + 'c'.repeat(32) + '.quarantine';
+  for (const path of [reserved, reserved.toUpperCase(), 'nested/' + reserved]) {
+    assert.throws(() => publicationBase({ rootIdentity: id, files: { [path]: 'fixture' }, identities: { [path]: id } }), /RESERVED_TRANSACTION_EVIDENCE/u);
+  }
+  const native = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
+  assert.ok(native.includes('phi-delete-[0-9a-f]{32}\\\\.quarantine\\\\z'));
+  const anchored = fs.readFileSync(new URL('../platform/windows/native/AnchoredFile.cs', import.meta.url), 'utf8');
+  assert.ok(anchored.includes('phi-delete-[0-9a-f]{32}\\\\.quarantine\\\\z'));
 });
 
 test('DELETE failure metadata cannot claim unstarted conflict after recorded commit or mint a private certificate', () => {
@@ -40,7 +52,7 @@ test('DELETE failure metadata cannot claim unstarted conflict after recorded com
 });
 
 const points = ['before-delete', 'intent', 'renamed', 'quarantined', 'committed', 'verified', 'cleanup-started', 'unlinked', 'cleaned'];
-const cases = ['normal', 'already-missing', 'concurrent-modification', 'delete-recreate', 'replacement-before-mutation', 'unauthorized-delete', 'protected', 'root-identity', 'sharing', 'quarantine-collision', 'unobserved-advance',
+const cases = ['normal', 'already-missing', 'concurrent-modification', 'delete-recreate', 'replacement-before-mutation', 'unauthorized-delete', 'protected', 'reserved-target', 'root-identity', 'sharing', 'quarantine-collision', 'unobserved-advance',
   ...points.map(p => 'crash-' + p), 'user-recreate-after-crash', 'same-text-recreate-after-crash', 'quarantine-replace-after-crash', 'quarantine-missing-after-crash'];
 for (const name of cases) test('native same-journal recoverable DELETE: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
   const result = spawnSync(ownedWindowsHelper(), ['--publication-delete-selftest', name], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 22000, maxBuffer: 20000 });
@@ -48,6 +60,12 @@ for (const name of cases) test('native same-journal recoverable DELETE: ' + name
   for (const key of ['passed', 'fixtureCleanup', 'unrelatedPreserved']) assert.equal(receipt[key], true, key);
   assert.equal(receipt.scope, 'NATIVE_JOURNAL_DELETE_NOT_VERIFIED_WORKER_PUBLICATION');
   assert.equal(receipt.txfUsed, false); assert.equal(receipt.projectPublished, false); assert.equal(receipt.externalRequests, 0);
+  assert.equal(receipt.sameTextReplacementObserved, name === 'replacement-before-mutation');
+  if (name === 'replacement-before-mutation') {
+    assert.equal(receipt.evidence.phase, 'CONFLICT');
+    assert.equal(receipt.evidence.tempIdentity, null); assert.equal(receipt.evidence.committedIdentity, null);
+    assert.deepEqual(receipt.evidence.filesCommitted, []); assert.equal(receipt.evidence.pendingOperations, 1);
+  }
   if (name.startsWith('crash-') || name.endsWith('after-crash')) {
     for (const key of ['actualProcessKilled', 'childGone', 'restartedRecovery']) assert.equal(receipt[key], true, key);
     assert.equal(receipt.evidence.projectMutations, 0); assert.equal(receipt.evidence.processKills, 0); assert.equal(receipt.evidence.projectPublished, false);

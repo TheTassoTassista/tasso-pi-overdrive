@@ -2,7 +2,15 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current continuation — D4 DELETE candidate, not native acceptance
+## Current continuation — local D4 correction, still NOT Windows-certified
+
+Actual local/remote1c75888a73b157c268d7095860f4726488f16330; interrupted state had five source/test corrections, no staged changes or partially written Phi document/receipt. [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) remains **FAILURE**: native build and retained CREATE18/18/D1journal19/19/atomic19/19/MODIFY34/34 PASS, DELETE25PASS/1FAIL at pre-delete replacement (`BEGIN:80070020`). Later Windows production/aggregate/clone/Pi phases NOT RUN. Ubuntu353/127PASS/0FAIL/226native skips and clone PASS do not certify Windows.
+
+The fixture uses an independently opened source/native same-directory no-replace rename under unchanged pins, then genuinely recreates the same content with a new native ID. Postconditions prove both new and preserved original identities/digests and pre-intent CONFLICT, not a blocked operation misreported as replacement. The exact reserved quarantine namespace is rejected as ordinary project/draft/publication input in JS/native segment validation and anchored snapshot enumeration (fail closed, never silently omitted/copied). No protection, permission, ownership check, assertion, required case or timeout is relaxed; no unrestricted fallback or dependency added.
+
+Focused141/22PASS/0FAIL/119native skips; authoritative local888/661PASS/0FAIL/227Windows-only skips plus syntax/installed-Pi TypeScript/package validation PASS. Three portable DELETE tests/25mandatory native controls, including all13actual death/new-process recovery scenarios, still require the exact corrected Windows gate. Local regressions are not native certification. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls. Next same-private-branch candidate CI, all previously unrun downstream phases and metadata-only receipt/bookkeeping delivery before D5. Original controller restart continuity, automatic trusted transaction discovery, bounded retention, RENAME/multifile/D-wide E2Es and E1/E2/E3 remain open. Protected/auth/active Pi/routes/security/caps unchanged.
+
+## Historical continuation — D4 DELETE candidate before failed CI
 
 Starts from verified9680111/functional0d673ce/CI36474391450, preserving all accepted scopes. Same journal V3 single DELETE: expected-ID/hash exclusive read/delete source handle, flushed intent, same-parent no-replace quarantine, actual absence verification, committed journal, cleanup intent, SAME-object unlink, verified absence/CLEANED. No source data writes, bare unlink, TxF dependency or copied runtime. Original one-use approved controller grant and private proof require real native completion and exact whole-project verified-draft readback before PUBLISHED; intent/possible mutation stays UNKNOWN on failed controller publication, not falsely NOT_STARTED.
 

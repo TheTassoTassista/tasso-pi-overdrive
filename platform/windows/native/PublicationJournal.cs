@@ -643,11 +643,11 @@ namespace Phi.Native {
       } catch { Console.Error.WriteLine("PHI_DELETE_FIXTURE_RECOVERY_FAILED"); return 70; }
     }
     internal static int DeleteSelfTest(string name) {
-      string[] controls = { "normal", "already-missing", "concurrent-modification", "delete-recreate", "replacement-before-mutation", "unauthorized-delete", "protected", "root-identity", "sharing", "quarantine-collision", "unobserved-advance",
+      string[] controls = { "normal", "already-missing", "concurrent-modification", "delete-recreate", "replacement-before-mutation", "unauthorized-delete", "protected", "reserved-target", "root-identity", "sharing", "quarantine-collision", "unobserved-advance",
         "user-recreate-after-crash", "same-text-recreate-after-crash", "quarantine-replace-after-crash", "quarantine-missing-after-crash" };
       if (!controls.Contains(name) && !(name.StartsWith("crash-") && DeleteCheckpoints.Contains(name.Substring(6)))) return 70;
       ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null;
-      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool passed = false, clean = false, killed = false, childGone = false, restarted = false;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool passed = false, clean = false, killed = false, childGone = false, restarted = false, sameTextReplacementObserved = false;
       object evidence = null; string phaseAtDeath = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready(); string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
@@ -694,8 +694,9 @@ namespace Phi.Native {
           if (name == "delete-recreate") { File.Move(target, target + ".user-owned"); File.WriteAllText(target, "old-delete-complete", new UTF8Encoding(false)); }
           if (name == "unauthorized-delete") ((Dictionary<string, object>)Operations(header)[0])["kind"] = "CREATE";
           if (name == "protected") ((Dictionary<string, object>)Operations(header)[0])["path"] = ".env";
+          if (name == "reserved-target") ((Dictionary<string, object>)Operations(header)[0])["path"] = DeleteLeaf(Guid.NewGuid().ToString("N"));
           if (name == "root-identity") header["projectIdentity"] = new string('a', 16) + ":" + new string('b', 32);
-          if (name == "delete-recreate" || name == "unauthorized-delete" || name == "protected" || name == "root-identity") {
+          if (name == "delete-recreate" || name == "unauthorized-delete" || name == "protected" || name == "reserved-target" || name == "root-identity") {
             bool denied = false; try { using (PublicationJournal rejected = Begin(scope.Root, header)) { } } catch (Exception error) { denied = error is AdmissionConflict || error is InvalidDataException; }
             if (!denied || !File.Exists(target) || File.Exists(quarantine)) throw new InvalidDataException(); evidence = new { rejected = true, journalAbsent = true, mutationStarted = false };
           } else {
@@ -715,10 +716,30 @@ namespace Phi.Native {
                 if (p != "before-delete") return;
                 if (name == "already-missing") File.Delete(target);
                 if (name == "concurrent-modification") File.WriteAllText(target, "new-delete-user", new UTF8Encoding(false));
-                if (name == "replacement-before-mutation") { File.Move(target, target + ".user-owned"); File.WriteAllText(target, "old-delete-complete", new UTF8Encoding(false)); }
+                if (name == "replacement-before-mutation") {
+                  // Real legal same-directory replacement under pinned parents.
+                  // .NET File.Move reopens directory WRITE_DATA and was denied
+                  // by the existing sharing pins (CI36573711599/80070020).
+                  // Do not relax pins: use the independently opened file object.
+                  using (RecoveryFilesystem user = new RecoveryFilesystem(scope.Root)) {
+                    RecoveryFilesystem.Info info; IntPtr file = user.OpenDeleteSource("input.txt", out info);
+                    try { user.QuarantineDeleteSource(file, "input.txt.user-owned"); } finally { CloseNative(file); }
+                  }
+                  File.WriteAllText(target, "old-delete-complete", new UTF8Encoding(false));
+                }
               }); } catch (InvalidOperationException error) { if (error.Message != "PHI_PUBLICATION_CONFLICT") throw; failed = true; }
               catch (System.ComponentModel.Win32Exception error) { if (name != "quarantine-collision" || error.NativeErrorCode != 80 && error.NativeErrorCode != 183) throw; failed = true; }
               if (failed != (name != "normal")) throw new InvalidDataException();
+              if (name == "replacement-before-mutation") {
+                using (RecoveryFilesystem observer = new RecoveryFilesystem(scope.Root)) {
+                  Dictionary<string, object> original = (Dictionary<string, object>)Operations(header)[0];
+                  DeleteObject replacement = ReadDeleteLeaf(observer, "input.txt"), preserved = ReadDeleteLeaf(observer, "input.txt.user-owned");
+                  if (replacement == null || replacement.Identity == (string)original["baseIdentity"] || replacement.Digest != (string)original["baseDigest"] ||
+                      !DeleteBaseMatches(preserved, original) || (string)journal.last["phase"] != "CONFLICT" || journal.last["tempIdentity"] != null || journal.last["committedIdentity"] != null)
+                    throw new InvalidDataException();
+                  sameTextReplacementObserved = true;
+                }
+              }
               if (name == "normal" ? File.Exists(target) || File.Exists(quarantine) || (string)journal.last["phase"] != "CLEANED" : name == "already-missing" ? File.Exists(target) : !File.Exists(target)) throw new InvalidDataException();
               if (name == "concurrent-modification" && File.ReadAllText(target) != "new-delete-user" || name == "quarantine-collision" && File.ReadAllText(quarantine) != "new-delete-user") throw new InvalidDataException();
             }
@@ -737,7 +758,7 @@ namespace Phi.Native {
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone, restartedRecovery = restarted,
-        journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed, scope = "NATIVE_JOURNAL_DELETE_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
+        journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed, sameTextReplacementObserved, scope = "NATIVE_JOURNAL_DELETE_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
     internal static int ModifyFixtureChild(string phase) {

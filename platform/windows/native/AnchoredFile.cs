@@ -31,7 +31,7 @@ namespace Phi.Native {
       string[] parts = relative.Split('/');
       string[] blocked = { ".git", "node_modules", ".aws", ".gnupg", ".password-store", ".ssh", "browser-data", "keyrings", ".env", "auth.json", "credentials", "credentials.json", "id_dsa", "id_ed25519", "id_ecdsa", "id_rsa", "known_hosts", "netrc" };
       foreach (string part in parts) {
-        if (part.Length == 0 || part == "." || part == ".." || part.Any(c => c < 32) || part.EndsWith(".") || part.EndsWith(" ") || blocked.Contains(part.ToLowerInvariant()) || part.StartsWith(".env.", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(part, "\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
+        if (part.Length == 0 || part == "." || part == ".." || part.Any(c => c < 32) || part.EndsWith(".") || part.EndsWith(" ") || blocked.Contains(part.ToLowerInvariant()) || part.StartsWith(".env.", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(part, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z|\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
       }
       return parts;
     }

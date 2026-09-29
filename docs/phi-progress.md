@@ -2,7 +2,19 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current continuation — D4 same-journal DELETE candidate, native proof pending
+## Current continuation — repair failed D4 replacement fixture; native acceptance pending
+
+Resumed actual local/remote **1c75888a73b157c268d7095860f4726488f16330**. Index was empty; five source/test corrections were present, but interrupted documentation/staging had not run. No partial receipt or generated artifact was found. The pre-existing protected user edit remains byte-identical and unstaged. Accepted D3/B1/B2/C are retained, not redesigned.
+
+[CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599), exact1c75888, is **FAILURE**. Native build/CREATE18/18/D1journal19/19/atomic19/19/MODIFY34/34 passed; dedicated DELETE26total/25PASS/1FAIL. `replacement-before-mutation` failed with `PHI_DELETE_SELFTEST_FAILED:BEGIN:80070020`: the fixture's .NET pathname move could not perform replacement under the existing directory sharing pins. Later Windows aggregate/production publication/independent clone/actual-Pi phases did NOT RUN and are not credited. Ubuntu353/127PASS/0FAIL/226native skips/foundation clone passed; this does not accept the whole candidate.
+
+The fixed fixture independently opens the real original file and uses the already proven same-directory native no-replace handle rename before the publisher acquires its exclusive source lock. It then creates the same text as a genuinely new native object. Stronger postconditions require the new ID/digest, preserved original ID/digest, CONFLICT before intent/commit and no files committed. No pins, sharing/access rights, quarantine ownership, expected-ID checks, OS skips, assertions or budgets are weakened.
+
+The locally reproduced reserved-input gap is closed: a `phi-delete-<32hex>.quarantine` component, including case aliases/nested paths, is rejected by publication baseline validation and native path validation. Native snapshot enumeration fails closed on reserved transaction evidence instead of silently copying/omitting it or granting a new Worker draft access. This is not trusted automatic discovery or recovery. One portable regression and one mandatory native reserved-target control are added; all prior death/conflict controls remain. Dedicated DELETE now contains25native controls and3portable tests. Full D6/controller reconstruction, discovery/retention and multi-file recovery remain open.
+
+Final resumed focused141total/22PASS/0FAIL/0cancelled/119native skips. Authoritative local Linux888total/661PASS/0FAIL/0cancelled/227Windows-only skips, syntax/installed-Pi TypeScript/package-pinned-policy validation PASS. Native skips are NOT Windows proof. Next commit/push only the corrected fixture/reserved boundary/tests/accurate Phi docs to the same PRIVATE branch, inspect the exact whole mandatory Windows/Ubuntu/clone/actual-Pi gate, and save metadata-only receipts only after evidence validation. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls.** Active Pi/auth/providers/routes/presets/Council/Judge/Second Brain/governors/security/retry/spawn limits remain unchanged. Do not advance D5 until that whole native gate is green.
+
+## Historical continuation — D4 same-journal DELETE candidate before failed CI
 
 Resumed exact local/remote9680111e95abb0b3740c5ec25837793227f73798 and independently confirmed functional0d673ce/CI36474391450 SUCCESS. No accepted admission/MODIFY/B1/B2/C redesign or re-certification. V3 extends the SAME durable flushed/checksummed publication journal for one DELETE. Actual exclusive source open validates expected native ID/digest; durable DELETE_INTENT precedes a handle-relative same-directory no-replace quarantine rename. COMMITTED/postverify/CLEANUP_STARTED precede unlink of the SAME held object; qualified absence precedes CLEANED. No bare production unlink, source data write, TxF requirement, arbitrary destination, shell/profile/helper override or extra role authority.
 

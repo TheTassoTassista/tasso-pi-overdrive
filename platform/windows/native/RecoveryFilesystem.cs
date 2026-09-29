@@ -245,6 +245,10 @@ namespace Phi.Native {
             string name = Marshal.PtrToStringUni(IntPtr.Add(entry, 68), (int)length / 2);
             if (name != "." && name != "..") {
               if (--remaining < 0 || !names.Add(name)) throw new InvalidDataException();
+              // Reserved transaction evidence is not ordinary Worker input.
+              // Until trusted discovery resolves it, fail closed rather than
+              // silently omitting it or granting a new draft access to it.
+              if (Regex.IsMatch(name, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
               // Names only: protected entries are never opened/read.
               bool protectedName = Regex.IsMatch(name, "\\A(?:\\.git|node_modules|\\.phi-cache|\\.env(?:\\..*)?|\\.ssh|\\.aws|\\.gnupg|\\.password-store|browser-data|keyrings|auth\\.json|credentials(?:\\.json)?|id_(?:rsa|dsa|ecdsa|ed25519)|known_hosts|netrc)\\z|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase);
               if (protectedName && strictDraft) throw new InvalidDataException();
