@@ -2,6 +2,12 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current continuation — D4 DELETE candidate, not native acceptance
+
+Starts from verified9680111/functional0d673ce/CI36474391450, preserving all accepted scopes. Same journal V3 single DELETE: expected-ID/hash exclusive read/delete source handle, flushed intent, same-parent no-replace quarantine, actual absence verification, committed journal, cleanup intent, SAME-object unlink, verified absence/CLEANED. No source data writes, bare unlink, TxF dependency or copied runtime. Original one-use approved controller grant and private proof require real native completion and exact whole-project verified-draft readback before PUBLISHED; intent/possible mutation stays UNKNOWN on failed controller publication, not falsely NOT_STARTED.
+
+24native controls, including9actual death points/4post-death conflicts and fresh-process journal/filesystem cross-validation, plus2actual Worker/LSP/TEST/DELETE/Git-diff/concurrency fixtures are mandatory, still awaiting exact Windows CI. Local focused120/20PASS/0FAIL/100native skips; authoritative886/660PASS/0FAIL/226native skips and syntax/TypeScript/package validation PASS. No Windows credit from Linux skips. Recovery retains quarantine/uncertainty and never overwrites a new user file, automatically purges evidence or reconstructs lost live controller authority. Original metadata/controller reconstruction, discovery, retention, RENAME/multifile/full crash E2Es still open. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls; protected/auth/active Pi/routes/security/caps unchanged. Next exact native candidate gate/receipt delivery before advancing D5.
+
 ## Current verified checkpoint — bounded D3 admission correction accepted
 
 Exact tested functional **0d673ceb18e35f678d23ea17933168bda2c23612** / [CI36474391450](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36474391450) **SUCCESS Windows/Ubuntu**, including both independent source clones and all three retained actual-Pi local controls. Windows325/315PASS/0FAIL/0cancelled/10Linux-only skips; Ubuntu325/125PASS/0FAIL/0cancelled/200native skips. Authoritative local Linux858/658PASS/0FAIL/0cancelled/200native skips, syntax/installed-Pi TypeScript/package-pinned-policy validation PASS; focused100/37PASS/0FAIL/63native skips. Native skips are not native proof. [Exact metadata receipts, failed predecessors and limitations](phi-admission-conflict-evidence.json).

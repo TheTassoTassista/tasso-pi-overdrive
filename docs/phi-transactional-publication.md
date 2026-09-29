@@ -1,5 +1,85 @@
 # D — transactional project publication (IN PROGRESS)
 
+## D4 candidate — single DELETE without TxF (native acceptance pending)
+
+V3 extends the SAME PublicationJournal registry/ACL/lease/envelope/flush/bounds;
+it is not a second journal or a new model tool. V1/V2 semantics remain. The
+controller's original explicit one-use READY grant dispatches exactly one DELETE
+or the retained single MODIFY. Other operation sets still fail closed. Actual
+Worker may remove a file in its confined persistent draft; Tester stays read-only.
+Authorization, verified draft revision/digest, whole base manifest and original
+native IDs are checked before calling the fixed source-attested native helper.
+
+The production native path opens the target relative to pinned non-reparse
+parents, with read/control/DELETE only and NO sharing or data write right.
+Regular-file/single-link/size/expected native ID/SHA256 checks precede mutation.
+While the SAME object is exclusively held, DELETE_INTENT is appended/flushed.
+Native same-directory rename moves that handle's object to the transaction-bound
+`phi-delete-<transactionId>.quarantine` leaf, ReplaceIfExists=false. A colliding
+user object is never overwritten. The original target's known absence and held
+object's unchanged ID/digest precede COMMITTED/POST_COMMIT_VERIFIED. A flushed
+CLEANUP_STARTED precedes disposition/unlink of that SAME handle; it never reopens
+the original path for deletion. Actual quarantine/target absence precedes CLEANED.
+No TxF, DeleteFile/path unlink, mutable caller-selected quarantine path or retry.
+
+The kernel primitive reuses the existing same-directory handle rename layout but
+has a separate exclusive-existing-object registration table; a foreign handle
+cannot borrow CREATE or DELETE ownership. The documented
+[same-directory rename/no-replace rules](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
+and [handle disposition](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_disposition_info)
+are the API basis, not by themselves a runtime certificate. D4 native controls
+and production fixtures must prove the actual implementation on Windows.
+
+Namespace deletion's linearization point is the no-replace quarantine rename;
+COMMITTED is journal confirmation AFTER actual absence/identity checks. A kill
+between them retains a durable DELETE_INTENT and complete original object. A new
+process reads the complete validated chain, original IDs/digests and actual
+destination/quarantine; it never trusts journal phase alone. Quarantine ownership
+requires the private valid journal, fixed transaction-bound leaf, pinned expected
+root and matching regular-file/single-link native ID/hash, not the filename alone.
+
+| Actual files and validated durable prefix | Recovery decision |
+| --- | --- |
+| Original expected ID/hash exists, quarantine absent, no commit; PREPARED/DELETE_INTENT | OLD_COMPLETE_OBSERVED; metadata-only ROLLBACK_REQUIRED/ROLLED_BACK, no project rollback needed |
+| Original absent, quarantine expected ID/hash, DELETE_INTENT or later compatible prefix | DELETE_COMMITTED_QUARANTINE_RETAINED; reconcile missing phase metadata and retain RECOVERY_REQUIRED |
+| Both absent, recorded original committed ID AND actual durable CLEANUP_STARTED somewhere in chain | DELETE_COMMITTED_CLEANUP_OBSERVED; retain RECOVERY_REQUIRED unless already CLEANED |
+| New user target, unexpected quarantine ID/hash, both objects present | CONFLICT; preserve all current files/evidence, no overwrite/unlink |
+| Both absent without cleanup intent, corrupt/unknown/root/link/IO/ownership mismatch | UNKNOWN_FAIL_SAFE/error; manual inspection, no guessed deletion, restore or cleanup |
+
+Recovery is metadata-only and performs0project mutations/0process kills. Matching
+old/new state does not recreate the dead live verified controller, mint PUBLISHED
+or authorize resume. No automatic rollback can overwrite a new user file. The
+quarantine retains original eligible project bytes until successful live cleanup
+or a later separately proven recovery/retention policy; journal/receipts contain
+metadata only. This checkpoint does not implement D6 full controller restoration,
+D7 discovery or D8 reclamation. The fixed trusted fixture locator is not discovery.
+The existing64record bound remains fail-closed.
+
+The controller can certify PUBLISHED only after actual CLEANED/exit0/expected
+original-ID/hash/no-TxF receipt plus secure whole-project readback exactly matching
+the real verified draft aggregate and unchanged IDs of every retained file. A
+DELETE failure with durable intent or recorded mutation is UNKNOWN, never an
+unstarted conflict/success. Replayed/model/JSON/public receipts cannot mint the
+one-use private WeakMap proof. Ordinary Windows autonomy stays BLOCKED.
+
+Required fixed native controls include normal deletion, known missing, concurrent
+content/identity replacement before exclusive lock, invalid/protected/root/sharing,
+quarantine collision and unobserved phase denial. Nine real publisher kills cover
+before-delete/intent/rename/quarantine/commit/postverify/cleanup-intent/unlinked/
+CLEANED, each followed by a fresh process reading durable state. Post-death new
+user target, same-text new target and replaced/missing quarantine controls must
+preserve data and reject blind cleanup. Separate production fixtures exercise
+actual LPAC Worker DELETE -> same-draft JSON LSP -> non-mutating TEST -> original
+READY -> native DELETE -> private PUBLISHED proof -> intended-only Git deletion.
+None is accepted until the exact complete native CI. Local886/660PASS/0FAIL/
+226native skips plus syntax/TypeScript/package validation prove regressions only.
+
+This is process-death recoverability, not hardware/power-loss durability or broad
+filesystem support. DELETE does not require TxF; retained MODIFY remains the
+legacy NTFS-only optional path, with no unsafe ordinary-write fallback. A complete
+non-TxF canonical multi-operation engine still requires D5-D9 and D-wide E2Es;
+no whole-transaction atomicity or general Windows readiness is claimed.
+
 ## Current proved scope — single MODIFY, explicit trusted-controller approval
 
 Latest exact tested functional **0d673ceb18e35f678d23ea17933168bda2c23612** /

@@ -35,6 +35,7 @@ namespace Phi.Native {
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr file);
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly Dictionary<IntPtr, string> publicationFiles = new Dictionary<IntPtr, string>();
+    readonly Dictionary<IntPtr, string> deletionFiles = new Dictionary<IntPtr, string>();
     readonly string directoryPath;
     internal IntPtr DirectoryHandle { get { return parents[parents.Count - 1]; } }
     internal static volatile int TransientDeleteRetries;
@@ -147,14 +148,40 @@ namespace Phi.Native {
       try { publicationFiles.Add(file, HandleIdentity(file)); return file; }
       catch { CloseHandle(file); throw; }
     }
+    internal IntPtr OpenDeleteSource(string leaf, out Info info) {
+      // Existing regular object only, read/control/delete; no data write right,
+      // no sharing, reparse following, OPEN_IF or path-based unlink capability.
+      IntPtr file = OpenRelative(parents[parents.Count - 1], leaf, 0x30081, 0, 1, 0x40, IntPtr.Zero, out info);
+      try {
+        if ((info.Attributes & (0x10 | 0x400)) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 1024 * 1024) throw new InvalidDataException();
+        deletionFiles.Add(file, HandleIdentity(file)); return file;
+      } catch { CloseHandle(file); throw; }
+    }
     internal void RenameNewFile(IntPtr file, string destination) {
+      RenameRegisteredFile(file, destination, publicationFiles);
+    }
+    internal void QuarantineDeleteSource(IntPtr file, string destination) {
+      RenameRegisteredFile(file, destination, deletionFiles);
+      // Keep the same exclusively held object's ownership for later unlink.
+      deletionFiles.Add(file, HandleIdentity(file));
+    }
+    internal void UnlinkQuarantinedFile(IntPtr file, string expectedIdentity) {
+      string registered;
+      if (!deletionFiles.TryGetValue(file, out registered) || registered != expectedIdentity || HandleIdentity(file) != registered) throw new InvalidDataException();
+      Disposition remove = new Disposition { Delete = 1 };
+      if (!SetFileInformationByHandle(file, 4, ref remove, (uint)Marshal.SizeOf(typeof(Disposition)))) throw new Win32Exception(Marshal.GetLastWin32Error());
+      deletionFiles.Remove(file);
+    }
+    void RenameRegisteredFile(IntPtr file, string destination, Dictionary<IntPtr, string> registeredFiles) {
       Leaf(destination);
       IntPtr parent = parents[parents.Count - 1]; Info info;
       string sourceIdentity;
-      if (!publicationFiles.TryGetValue(file, out sourceIdentity) || HandleIdentity(file) != sourceIdentity) throw new InvalidDataException();
+      if (!registeredFiles.TryGetValue(file, out sourceIdentity) || HandleIdentity(file) != sourceIdentity) throw new InvalidDataException();
       if (!GetFileInformationByHandle(parent, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
       if ((info.Attributes & 0x400) != 0 || (info.Attributes & 0x10) == 0 || IntPtr.Size != 8) throw new InvalidDataException();
-      // This exact source was exclusively created under this held parent.
+      // This exact source was exclusively created OR opened/registered under
+      // this held parent. The two independent registration tables prevent a
+      // foreign handle from borrowing either operation's authority.
       // RootDirectory=NULL plus one leaf is Windows' SAME-DIRECTORY rename,
       // relative to the source file object, not a reopened DOS pathname. Giving
       // the same parent as RootDirectory asks IopOpenLinkOrRenameTarget for a
@@ -170,7 +197,7 @@ namespace Phi.Native {
         Marshal.Copy(name, 0, IntPtr.Add(buffer, 20), name.Length);
         IoStatus status; int result = NtSetInformationFile(file, out status, buffer, (uint)length, 10);
         if (result != 0) { int error = (int)RtlNtStatusToDosError(result); Failure("RENAME_NEW", parent, destination, 0, 0, 0, result, error); throw new Win32Exception(error); }
-        publicationFiles.Remove(file);
+        registeredFiles.Remove(file);
       } finally { Marshal.FreeHGlobal(buffer); }
     }
     // Read-only controller extraction. Every component is opened from a held

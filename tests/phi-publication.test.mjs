@@ -192,7 +192,7 @@ test('failure decoder preserves actual bound post-journal conflicts, without pro
   assert.equal(windowsPublicationFailure(run, bad, header).publicationEvidence, undefined);
 });
 
-function nativeFixture(task = 'Fix JSON configuration code and test diagnostics') {
+function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
   const files = {
     'config.json': '{}',
@@ -200,6 +200,11 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
     'edit.cjs': "require('node:fs').writeFileSync('config.json','{\"changed\":true}');console.log(process.pid)",
     'test.cjs': "const f=require('node:fs'),a=require('node:assert/strict');a.equal(JSON.parse(f.readFileSync('config.json','utf8')).changed,true);a.throws(()=>f.writeFileSync('config.json','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)",
   };
+  if (operation === 'delete') {
+    files['remove.txt'] = 'obsolete-delete-fixture';
+    files['edit.cjs'] = "require('node:fs').unlinkSync('remove.txt');console.log(process.pid)";
+    files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);a.throws(()=>f.unlinkSync('config.json'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
+  }
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   const sessionId = randomUUID();
@@ -300,6 +305,52 @@ test('native user change after READY is CONFLICT, preserving real user bytes and
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_MODIFY_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native production Worker DELETE/LSP/TEST/READY/same-journal publishes only intended Git deletion without TxF', native, async () => {
+  const item = nativeFixture('Fix JSON code and remove obsolete fixture with tests', 'delete');
+  try {
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', 'config.json', 'package.json', 'edit.cjs', 'test.cjs', 'remove.txt'], { shell: false }).status, 0);
+    assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'DELETE fixture baseline'], { shell: false }).status, 0);
+    const evidence = await nativeVerified(item), before = item.reservation.status().draft;
+    assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), true); // Real Worker only edited its isolated draft.
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH'); assert.deepEqual(ready.receipt.operations.map(o => [o.path, o.kind]), [['remove.txt', 'DELETE']]);
+    for (const fake of [item.token, structuredClone(ready.authority)]) assert.throws(() => executePreparedWindowsPublication(fake), /PUBLISH_AUTHORITY_DENIED/u);
+    const publication = executePreparedWindowsPublication(ready.authority), proof = publication.publicationProof;
+    assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
+    assert.deepEqual(publication.filesCommitted, ['remove.txt']); assert.equal(proof.scope, 'VERIFIED_WORKER_SINGLE_DELETE'); assert.equal(proof.operation, 'DELETE');
+    assert.equal(proof.native.txfUsed, false); assert.equal(proof.native.sourceIdentity, publication.operations[0].baseIdentity);
+    assert.equal(proof.native.oldDigest, publication.operations[0].baseDigest); assert.equal(proof.native.quarantineAbsent, true);
+    assert.equal(proof.journal.version, 3); assert.equal(proof.journal.phase, 'CLEANED'); assert.equal(proof.journal.pendingOperations, 0);
+    assert.equal(proof.verifiedDigest, before.contentDigest); assert.equal(proof.finalDigest, before.contentDigest);
+    assert.equal(proof.publisherExited, true); assert.equal(proof.publisherExitCode, 0);
+    assert.throws(() => process.kill(proof.publisherPid, 0), e => e.code === 'ESRCH');
+    assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), false);
+    const diff = spawnSync('git', ['-C', item.project, 'diff', '--name-status', '--no-renames'], { shell: false, encoding: 'utf8' });
+    assert.equal(diff.status, 0); assert.equal(diff.stdout.trim(), 'D\tremove.txt');
+    assert.equal(spawnSync('git', ['-C', item.project, 'diff', '--check'], { shell: false }).status, 0);
+    assert.equal(fs.readdirSync(item.project).some(name => name.startsWith('phi-delete-')), false);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => consumeWindowsPublicationProof(proof, {}), /NATIVE_PROOF_DENIED/u);
+    await assert.rejects(executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 }, { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token }), /ATTEMPT_ALREADY_PUBLISHED/u);
+    item.reservation.revoke(); assert.equal(item.reservation.status().draft.payloadCleared, true); assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_DELETE', receipts: [evidence.edit, evidence.lsp, ...evidence.verification.results.map(x => x.receipt)], publication,
+      gitDiffOnlyIntendedDeletion: true, sourceWasUnchangedUntilCommit: true, publisherGone: true, authorityRevoked: true, payloadCleared: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native production Worker DELETE concurrent replacement after READY is preserved and cannot be replayed', native, async () => {
+  const item = nativeFixture('Fix JSON code and remove obsolete fixture with tests', 'delete');
+  try {
+    await nativeVerified(item); const ready = item.reservation.preparePublication({ approveProjectMutation: true }), before = item.reservation.status().draft;
+    fs.renameSync(path.join(item.project, 'remove.txt'), path.join(item.project, 'previous.txt'));
+    fs.writeFileSync(path.join(item.project, 'remove.txt'), 'obsolete-delete-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(item.reservation.publicationStatus().state, 'CONFLICT'); assert.equal(item.reservation.publicationStatus().projectPublished, false);
+    assert.equal(item.reservation.status().draft.contentDigest, before.contentDigest); assert.equal(fs.readFileSync(path.join(item.project, 'remove.txt'), 'utf8'), 'obsolete-delete-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.readdirSync(item.project).some(name => name.startsWith('phi-delete-')), false);
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_DELETE_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
 });
 test('native controller approval cannot override read-only Task/Tool Governor policy', native, () => {

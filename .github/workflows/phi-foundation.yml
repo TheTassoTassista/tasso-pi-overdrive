@@ -49,6 +49,9 @@ jobs:
       - name: Native Windows journal-bound MODIFY and real publisher death (not Worker publication)
         if: runner.os == 'Windows'
         run: node --test tests/phi-journal-modify.test.mjs
+      - name: Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-journal-delete.test.mjs
       - name: Native Windows clean-clone primary/cleanup and ownership controls (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-clone-cleanup.test.mjs

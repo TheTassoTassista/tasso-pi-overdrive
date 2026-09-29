@@ -23,15 +23,17 @@ const admissionKeys = ['version', 'scope', 'phase', 'transactionId', 'projectIde
 export function windowsPublicationFailure(run, value, header) {
   const error = new Error('PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); error.code = error.message;
   if (run.error || run.status !== 70 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1 || value?.version !== 1 ||
-      value.status !== 'FAIL_NATIVE_SINGLE_MODIFY' || value.projectPublished !== false || value.externalRequests !== 0) return error;
+      !['FAIL_NATIVE_SINGLE_MODIFY', 'FAIL_NATIVE_SINGLE_DELETE'].includes(value.status) || value.projectPublished !== false || value.externalRequests !== 0) return error;
+  const deletion = value.status === 'FAIL_NATIVE_SINGLE_DELETE';
+  if (!Array.isArray(header.operations) || header.operations.length !== 1 || header.operations[0].kind !== (deletion ? 'DELETE' : 'REPLACE')) return error;
   const bound = item => Object.keys(header).every(key => same(item?.[key], header[key]));
   const phase = /^[a-zA-Z-]{1,40}$/u.test(value.phase ?? '') ? value.phase : 'UNKNOWN';
   const nativeCode = /^[0-9a-f]{8}$/u.test(value.nativeCode ?? '') ? value.nativeCode : null;
   const j = value.journal, a = value.admission;
-  if (exactKeys(j, journalKeys) && j.version === 2 && j.scope === 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION' &&
+  if (exactKeys(j, journalKeys) && j.version === (deletion ? 3 : 2) && j.scope === (deletion ? 'SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION' : 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION') &&
       j.projectPublished === false && bound(j)) {
     error.publicationEvidence = freeze({ phase, nativeCode, journal: j });
-    if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && j.pendingOperations === 1 && same(j.filesCommitted, [])) {
+    if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && (!deletion || j.tempIdentity === null) && j.pendingOperations === 1 && same(j.filesCommitted, [])) {
       error.code = 'PHI_PUBLICATION_CONFLICT'; error.message = error.code;
     }
   } else if (value.reason === 'CONFLICT' && value.phase === 'ADMISSION' && nativeCode !== null && j === null && exactKeys(a, admissionKeys) &&
@@ -77,6 +79,48 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
   const proof = Object.freeze({});
   proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'MODIFY', native, journal, publisherPid: run.pid,
     publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true, backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_MODIFY' }));
+  return proof;
+}
+
+// Same opaque trusted-controller grant, journal, source-attested helper and
+// one-use private certificate. No extra role/model execution authority.
+export function publishWindowsSingleOperation(options) {
+  const operations = publicationOperations(options.base, options.snapshot);
+  if (operations.length === 1 && operations[0].kind === 'DELETE') return publishWindowsSingleDelete(options);
+  return publishWindowsSingleModify(options); // Existing MODIFY path unchanged.
+}
+function publishWindowsSingleDelete({ cwd, base, snapshot, binding, metadata, remainingMs }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  const operations = publicationOperations(base, snapshot), op = operations[0];
+  if (operations.length !== 1 || op.kind !== 'DELETE') fail('SINGLE_DELETE_ONLY');
+  if (metadata.transactionId === null || binding.digest !== draftContentDigest(snapshot.files) || metadata.verifiedDigest !== binding.digest ||
+      metadata.baseDigest !== base.digest || !same(metadata.operations, operations) || !Number.isSafeInteger(remainingMs) || remainingMs < 1) fail('BINDING_INVALID');
+  if (publicationConflicts(base, readWindowsProjectSnapshot(cwd)).length) fail('CONFLICT');
+  const timeoutMs = Math.min(remainingMs, 30000);
+  const header = { transactionId: metadata.transactionId, projectIdentity: base.rootIdentity, draftId: binding.id, draftVersion: binding.revision,
+    verifiedDigest: binding.digest, baseDigest: base.digest, operations };
+  const request = { version: 1, root: cwd, header, guardianPid: process.pid, timeoutMs };
+  const input = JSON.stringify(request) + '\n'; if (Buffer.byteLength(input) > 65536) fail('REQUEST_LIMIT');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-delete'], { shell: false, windowsHide: true, encoding: 'utf8', input,
+    timeout: timeoutMs + 1000, maxBuffer: 32768 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('NATIVE_RECEIPT_INVALID'); }
+  if (run.error || run.status !== 0 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1) throw windowsPublicationFailure(run, value, header);
+  const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
+  const nativeKeys = ['backend', 'sourceIdentity', 'oldDigest', 'quarantineIdentity', 'sameDirectory', 'noClobber', 'committed', 'destinationAbsent', 'quarantineAbsent', 'txfUsed'];
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_DELETE' || value.projectPublished !== false || value.externalRequests !== 0 ||
+      !exactKeys(journal, journalKeys) || journal.version !== 3 || journal.scope !== 'SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION' ||
+      journal.phase !== 'CLEANED' || journal.cleanup !== 'PASS' || journal.projectPublished !== false || journal.pendingOperations !== 0 ||
+      !same(journal.filesCommitted, [op.path]) || !same(journal.operations, operations) || Object.keys(header).some(k => !same(journal[k], header[k])) ||
+      journal.tempIdentity !== op.baseIdentity || journal.committedIdentity !== op.baseIdentity || !exactKeys(native, nativeKeys) ||
+      native.backend !== 'HANDLE_ANCHORED_QUARANTINE_DELETE' || native.sourceIdentity !== op.baseIdentity || native.quarantineIdentity !== op.baseIdentity ||
+      native.oldDigest !== op.baseDigest || native.txfUsed !== false ||
+      !['sameDirectory', 'noClobber', 'committed', 'destinationAbsent', 'quarantineAbsent'].every(k => native[k] === true)) fail('NATIVE_RECEIPT_INVALID');
+  const final = readWindowsProjectSnapshot(cwd);
+  if (final.rootIdentity !== base.rootIdentity || draftContentDigest(final.files) !== binding.digest || !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) ||
+      Object.hasOwn(final.files, op.path) || Object.entries(base.files).some(([name, file]) => name !== op.path && final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
+  const proof = Object.freeze({});
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'DELETE', native, journal, publisherPid: run.pid,
+    publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true, backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_DELETE' }));
   return proof;
 }
 
