@@ -21,7 +21,7 @@ test('explicit same-directory RENAME is V4 journaled, bound to the expected sour
   assert.match(journal, /if \(old && \(!File\.Exists\(source\) \|\| File\.ReadAllText\(source\) != "old-rename-complete"\)\)/u);
   assert.match(journal, /File\.Exists\(target\) != \(!old && name != "destination-missing-after-crash"\)/u);
   const plan = fs.readFileSync(new URL('../lib/phi-publication-plan.mjs', import.meta.url), 'utf8');
-  assert.match(plan, /Renames are explicitly DELETE\+CREATE, NOT inferred/u);
+  assert.match(plan, /Without explicit controller intent, equal content remains DELETE\+CREATE/u);
 });
 
 const points = ['before-rename', 'intent', 'renamed', 'journal-renamed', 'committed', 'verified', 'cleaned'];

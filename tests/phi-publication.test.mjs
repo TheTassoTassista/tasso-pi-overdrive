@@ -47,6 +47,26 @@ test('CREATE/REPLACE/DELETE and rename DELETE+CREATE are explicit, unchanged exe
   assert.throws(() => { ops[0].kind = 'PUBLISHED'; }, TypeError);
   assert.doesNotMatch(JSON.stringify(ops), /"(?:added|gone|move|old)"/u);
 });
+test('explicit RENAME intent requires exactly one same-directory, byte-identical DELETE+CREATE pair', () => {
+  const base = publicationBase(snapshot({ 'old.txt': 'unchanged bytes', 'keep.txt': 'same' }));
+  const next = snapshot({ 'new.txt': 'unchanged bytes', 'keep.txt': 'same' }, 10);
+  const intent = { sourcePath: 'old.txt', destinationPath: 'new.txt' };
+  assert.deepEqual(publicationOperations(base, next).map(op => op.kind), ['CREATE', 'DELETE']);
+  const [op] = publicationOperations(base, next, intent);
+  assert.deepEqual([op.kind, op.sourcePath, op.path], ['RENAME', 'old.txt', 'new.txt']);
+  assert.equal(op.baseIdentity, base.files['old.txt'].identity);
+  assert.equal(op.baseDigest, op.newDigest);
+  assert.equal(op.newBytes, base.files['old.txt'].bytes);
+  assert.throws(() => { op.path = 'other.txt'; }, TypeError);
+  for (const bad of [
+    { ...intent, runner: 'copy' }, { sourcePath: 'old.txt' }, { sourcePath: 'OLD.txt', destinationPath: 'new.txt' },
+    { sourcePath: 'old.txt', destinationPath: 'old.txt' }, { sourcePath: 'old.txt', destinationPath: 'sub/new.txt' },
+    { sourcePath: 'keep.txt', destinationPath: 'new.txt' }, { sourcePath: 'old.txt', destinationPath: 'keep.txt' },
+  ]) assert.throws(() => publicationOperations(base, next, bad), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'modified bytes', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'unchanged bytes', 'keep.txt': 'changed' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'unchanged bytes', 'old.txt': 'unchanged bytes', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
+});
 test('baseline conflicts detect root/file identity, identical-text delete/recreate, edit, removal and new user file', () => {
   const original = snapshot(), base = publicationBase(original);
   assert.deepEqual(publicationConflicts(base, original), []);
@@ -191,6 +211,22 @@ test('failure decoder preserves actual bound post-journal conflicts, without pro
   const bad = structuredClone(value); bad.journal.prompt = 'RAW_PROMPT_SENTINEL';
   assert.equal(windowsPublicationFailure(run, bad, header).publicationEvidence, undefined);
 });
+test('RENAME failure decoder accepts only bound V4 pre-mutation conflicts, never post-intent ambiguity', () => {
+  const { run, value, header } = admissionFixture();
+  header.operations = publicationOperations(publicationBase(snapshot({ 'old.txt': 'bytes' })), snapshot({ 'new.txt': 'bytes' }, 10),
+    { sourcePath: 'old.txt', destinationPath: 'new.txt' });
+  value.status = 'FAIL_NATIVE_SINGLE_RENAME'; value.admission.operations = header.operations;
+  assert.equal(windowsPublicationFailure(run, value, header).code, 'PHI_PUBLICATION_CONFLICT');
+  value.admission = null; value.phase = 'RENAME_INTENT';
+  value.journal = { version: 4, scope: 'SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION', ...header,
+    phase: 'CONFLICT', sequence: 2, operationIndex: 0, tempIdentity: null, committedIdentity: null, filesCommitted: [], pendingOperations: 1,
+    recoveryState: 'INSPECTION_REQUIRED', cleanup: 'NOT_PROVEN', projectPublished: false };
+  assert.equal(windowsPublicationFailure(run, value, header).code, 'PHI_PUBLICATION_CONFLICT');
+  value.journal = { ...value.journal, tempIdentity: header.operations[0].baseIdentity };
+  assert.equal(windowsPublicationFailure(run, value, header).code, 'PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED');
+  value.journal = { ...value.journal, tempIdentity: null, operations: [] };
+  assert.equal(windowsPublicationFailure(run, value, header).publicationEvidence, undefined);
+});
 
 function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
@@ -204,6 +240,11 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
     files['remove.txt'] = 'obsolete-delete-fixture';
     files['edit.cjs'] = "require('node:fs').unlinkSync('remove.txt');console.log(process.pid)";
     files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);a.throws(()=>f.unlinkSync('config.json'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
+  }
+  if (operation === 'rename') {
+    files['move.txt'] = 'unchanged-rename-fixture';
+    files['edit.cjs'] = "require('node:fs').renameSync('move.txt','moved.txt');console.log(process.pid)";
+    files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'unchanged-rename-fixture');a.throws(()=>f.writeFileSync('moved.txt','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
   }
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
@@ -351,6 +392,64 @@ test('native production Worker DELETE concurrent replacement after READY is pres
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
     assert.equal(fs.readdirSync(item.project).some(name => name.startsWith('phi-delete-')), false);
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_DELETE_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native production Worker RENAME/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', native, async () => {
+  const item = nativeFixture('Fix JSON code and rename obsolete fixture with tests', 'rename');
+  const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+  try {
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', 'config.json', 'package.json', 'edit.cjs', 'test.cjs', 'move.txt'], { shell: false }).status, 0);
+    assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'RENAME fixture baseline'], { shell: false }).status, 0);
+    const evidence = await nativeVerified(item), before = item.reservation.status().draft;
+    assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), true);
+    assert.equal(fs.existsSync(path.join(item.project, 'moved.txt')), false);
+    for (const bad of [
+      { approveProjectMutation: true, rename: null }, { approveProjectMutation: true, rename: { ...intent, runner: 'copy' } },
+      { approveProjectMutation: true, rename: intent, runner: 'copy' },
+    ]) assert.throws(() => item.reservation.preparePublication(bad), /PUBLISH_AUTHORITY_DENIED|RENAME_INTENT_INVALID/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    assert.deepEqual(ready.receipt.operations.map(op => [op.sourcePath, op.path, op.kind]), [['move.txt', 'moved.txt', 'RENAME']]);
+    assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    const publication = executePreparedWindowsPublication(ready.authority), proof = publication.publicationProof;
+    assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
+    assert.deepEqual(publication.filesCommitted, ['moved.txt']); assert.equal(proof.scope, 'VERIFIED_WORKER_SINGLE_RENAME');
+    assert.equal(proof.operation, 'RENAME'); assert.equal(proof.native.txfUsed, false);
+    assert.equal(proof.native.sourceIdentity, ready.receipt.operations[0].baseIdentity);
+    assert.equal(proof.native.destinationIdentity, ready.receipt.operations[0].baseIdentity);
+    assert.equal(proof.journal.version, 4); assert.equal(proof.journal.phase, 'CLEANED'); assert.equal(proof.journal.pendingOperations, 0);
+    assert.equal(proof.verifiedDigest, before.contentDigest); assert.equal(proof.finalDigest, before.contentDigest);
+    assert.equal(proof.publisherExited, true); assert.equal(proof.publisherExitCode, 0);
+    assert.throws(() => process.kill(proof.publisherPid, 0), error => error.code === 'ESRCH');
+    assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), false);
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'unchanged-rename-fixture');
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', '-N', 'moved.txt'], { shell: false }).status, 0);
+    const diff = spawnSync('git', ['-C', item.project, 'diff', '--name-status', '--no-renames'], { shell: false, encoding: 'utf8' });
+    assert.equal(diff.status, 0); assert.deepEqual(diff.stdout.trim().split('\n').sort(), ['A\tmoved.txt', 'D\tmove.txt']);
+    assert.equal(spawnSync('git', ['-C', item.project, 'diff', '--check'], { shell: false }).status, 0);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => consumeWindowsPublicationProof(proof, {}), /NATIVE_PROOF_DENIED/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    item.reservation.revoke(); assert.equal(item.reservation.status().draft.payloadCleared, true);
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_RENAME', receipts: [evidence.edit, evidence.lsp, ...evidence.verification.results.map(x => x.receipt)], publication,
+      gitDiffOnlyIntendedRename: true, sourceWasUnchangedUntilCommit: true, publisherGone: true, authorityRevoked: true, payloadCleared: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native user change after READY RENAME is CONFLICT; user destination and verified draft survive', native, async () => {
+  const item = nativeFixture('Fix JSON code and rename obsolete fixture with tests', 'rename');
+  const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+  try {
+    await nativeVerified(item);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), before = item.reservation.status().draft;
+    fs.writeFileSync(path.join(item.project, 'moved.txt'), 'user-destination');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(item.reservation.publicationStatus().state, 'CONFLICT'); assert.equal(item.reservation.publicationStatus().projectPublished, false);
+    assert.equal(item.reservation.status().draft.contentDigest, before.contentDigest);
+    assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'user-destination');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_RENAME_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
 });
 test('native controller approval cannot override read-only Task/Tool Governor policy', native, () => {
