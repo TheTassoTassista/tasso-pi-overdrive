@@ -1,10 +1,16 @@
 # D — transactional project publication (IN PROGRESS)
 
-## D4 candidate — single DELETE without TxF (native acceptance pending)
+## D4 proved bounded single DELETE without TxF (not full D)
 
-Initial candidate1c75888 / [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) is FAILURE: DELETE25PASS/1FAIL, replacement fixture `BEGIN:80070020`; later Windows production/aggregate/clone/Pi phases did not run. The fixed fixture replaces its .NET pathname move with an independent source-handle/same-directory no-replace rename under unchanged sharing pins. It requires a genuinely new native ID with the original digest, preserved original ID/digest and pre-intent CONFLICT. No release of pins, access/sharing increase, weakened expected-ID check or masked failure. Complete corrected native CI remains mandatory.
+Exact functional **ae3735ea19f7417073a87f512cce79207c5ab55c** / [CI36579488486](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36579488486) SUCCESS Windows/Ubuntu, both foundation clones/cleanup and all3retained actual-Pi local smokes. Windows356/346PASS/0FAIL/0cancelled/10skips, Ubuntu356/128PASS/0FAIL/228native skips. DELETE28/28,13distinct real deaths/new-process recoveries and actual verified-controller MODIFY+DELETE publication/conflict4/4 PASS; retained scopes unaffected. Full local889/661PASS/0FAIL/228native skips plus syntax/TypeScript/package validation PASS. [Exact metadata and failure history](phi-single-delete-evidence.json). This accepts only single DELETE/original live controller, not full D, original controller reconstruction, broad filesystem/power-loss support or Windows autonomy.
 
-Correctedb58f503 / [CI36576742179](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36576742179) proves all28DELETE tests (including actual replacement/reserved target/13real deaths), retained native scopes and actual Worker/LSP/TEST/controller publication/conflict4/4. Whole CI remains FAILURE at an unrelated compound two-call broker setup test's30000ms deadline: aggregate355/344PASS/0FAIL/1cancelled/10skips; later Windows clone/Pi steps did not run. The individual delayed phase/root cause is UNKNOWN, no overall cleanup certificate after cancellation. The diagnostic test-only continuation splits those same two requests into independently bounded30000ms cases/exact failure assertions/metadata-only timing, without changing any product budget or security boundary. Full acceptance is still required before D5.
+### Historical failures before accepted D4
+
+Initial candidate1c75888 / [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) is FAILURE: DELETE25PASS/1FAIL, replacement fixture `BEGIN:80070020`; later Windows production/aggregate/clone/Pi phases did not run. The fixed fixture replaces its .NET pathname move with an independent source-handle/same-directory no-replace rename under unchanged sharing pins. It requires a genuinely new native ID with the original digest, preserved original ID/digest and pre-intent CONFLICT. No release of pins, access/sharing increase, weakened expected-ID check or masked failure. The then-required complete corrected native gate is now supplied above, not waived.
+
+Correctedb58f503 / [CI36576742179](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36576742179) proves all28DELETE tests (including actual replacement/reserved target/13real deaths), retained native scopes and actual Worker/LSP/TEST/controller publication/conflict4/4. Whole CI remains FAILURE at an unrelated compound two-call broker setup test's30000ms deadline: aggregate355/344PASS/0FAIL/1cancelled/10skips; later Windows clone/Pi steps did not run. The individual delayed phase/root cause is UNKNOWN, no overall cleanup certificate after cancellation. The diagnostic test-only continuation splits those same two requests into independently bounded30000ms cases/exact failure assertions/metadata-only timing, without changing any product budget or security boundary. Full acceptance was still required before D5; that complete later proof is recorded above.
+
+### Mechanism and recovery contract
 
 V3 extends the SAME PublicationJournal registry/ACL/lease/envelope/flush/bounds;
 it is not a second journal or a new model tool. V1/V2 semantics remain. The
@@ -31,8 +37,9 @@ has a separate exclusive-existing-object registration table; a foreign handle
 cannot borrow CREATE or DELETE ownership. The documented
 [same-directory rename/no-replace rules](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information)
 and [handle disposition](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_disposition_info)
-are the API basis, not by themselves a runtime certificate. D4 native controls
-and production fixtures must prove the actual implementation on Windows.
+are the API basis, not by themselves a runtime certificate. The exact accepted
+D4 native controls and production fixtures above separately prove this bounded
+implementation on the Windows CI runner.
 
 Namespace deletion's linearization point is the no-replace quarantine rename;
 COMMITTED is journal confirmation AFTER actual absence/identity checks. A kill
@@ -82,9 +89,9 @@ user target, same-text new target and replaced/missing quarantine controls must
 preserve data and reject blind cleanup. Separate production fixtures exercise
 actual LPAC Worker DELETE -> same-draft JSON LSP -> non-mutating TEST -> original
 READY -> native DELETE -> private PUBLISHED proof -> intended-only Git deletion.
-Bounded native DELETE/controller controls now pass, but the complete gate is not
-accepted. Local889/661PASS/0FAIL/228native skips plus syntax/TypeScript/package
-validation prove local regressions only; no credit for unrun clone/Pi phases.
+The whole exact mandatory gate now passes, including clone/Pi phases unrun in
+both historical failed candidates. Local native skips alone still prove no
+Windows behavior; accepted metadata cross-validation is recorded separately.
 
 This is process-death recoverability, not hardware/power-loss durability or broad
 filesystem support. DELETE does not require TxF; retained MODIFY remains the
@@ -92,7 +99,7 @@ legacy NTFS-only optional path, with no unsafe ordinary-write fallback. A comple
 non-TxF canonical multi-operation engine still requires D5-D9 and D-wide E2Es;
 no whole-transaction atomicity or general Windows readiness is claimed.
 
-## Current proved scope — single MODIFY, explicit trusted-controller approval
+## Retained preceding proved scope — single MODIFY, explicit trusted-controller approval
 
 Latest exact tested functional **0d673ceb18e35f678d23ea17933168bda2c23612** /
 [CI36474391450](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36474391450)
@@ -446,7 +453,7 @@ controller receive READY_TO_PUBLISH plus a separate opaque WeakMap grant. Grants
 are bound to record/lifetime/exact draft/transaction ID; copies, Worker tokens,
 stale preparations, revocation and in-flight tools cannot use them.
 `executePreparedWindowsPublication` consumes an original opaque live grant once
-and invokes the fixed single-MODIFY adapter. On unsupported platforms/operations
+and invokes the fixed single-MODIFY or single-DELETE adapter. On unsupported platforms/operations
 it fails closed; no runner injection, recursive copy or ordinary host-write
 fallback exists. The full ordinary Windows workflow platform gate remains closed
 and does not automatically call this explicit-controller publication API.
@@ -526,7 +533,7 @@ Its dedicated step passed. No timeout extension or retrospective fix claim.
 | --- | --- | --- |
 | CREATE | Metadata plan; separate fixed no-clobber native primitive | Durable ownership journal, adapter, recovery/crash proof |
 | REPLACE | Implemented single-file V2 journal/KTM + approved verified-controller adapter; exact final native gate required above | Restart original metadata/controller continuity, discovery/retention and full E1/E2/E3 certification |
-| DELETE | Metadata plan only; backend denied | Recoverable staged deletion; no irreversible early removal |
+| DELETE | Proven V3 single-file quarantine journal and original approved verified-controller adapter, no TxF | Full controller restart continuity, trusted discovery/retention, multi-file/D-wide and E1/E2/E3 certification |
 | RENAME | Explicit DELETE+CREATE plan, never guessed | Destination conflict + recoverable paired operation semantics |
 
 No multi-file atomicity is claimed. Intended future contract is per-file old/new
