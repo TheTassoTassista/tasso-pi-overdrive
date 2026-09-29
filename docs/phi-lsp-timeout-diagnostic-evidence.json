@@ -1,0 +1,1543 @@
+{
+  "version": 1,
+  "status": "PASS_DIAGNOSTIC_NATIVE_GATE_UNRESOLVED_HISTORICAL_TIMEOUT",
+  "testedFunctionalHead": "d8097d3a2e30930f0c768b99ce75321d4324900c",
+  "runId": 36592593100,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36592593100",
+  "wholeCiConclusion": "success",
+  "rootCause": "UNKNOWN",
+  "functionalFix": "NONE_DIAGNOSTICS_ONLY",
+  "reproduction": {
+    "exactInvocationValidated": true,
+    "actualPathProfile": "INDEPENDENT_GIT_CLONE_SOURCE_WITH_SPACES",
+    "timeoutMs": 120000,
+    "elapsedMs": 98698,
+    "exitCode": 0,
+    "timedOut": false,
+    "npmVersion": "10.9.8",
+    "nodeVersion": "v22.23.2",
+    "npmCompletedSummary": "added 96 packages in 2m",
+    "receipt": {
+      "version": 1,
+      "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+      "resultExitCode": 0,
+      "primaryExitCode": 0,
+      "timedOut": false,
+      "jobAttested": true,
+      "targetStarted": true,
+      "jobEmptyVerified": true,
+      "pipesDrained": true,
+      "residualOwnedProcesses": 0,
+      "childPid": 7260,
+      "childGeneration": "134351710970045254"
+    },
+    "observationStatus": "CAPTURED",
+    "native": {
+      "version": 1,
+      "scope": "FIXED_TRUSTED_LSP_INSTALL_OBSERVATION_NOT_SANDBOX",
+      "phases": [
+        {
+          "phase": "REQUEST_VALIDATED",
+          "utc": "2026-09-29T15:58:16.9957689Z",
+          "elapsedMs": 1
+        },
+        {
+          "phase": "CREATE_START",
+          "utc": "2026-09-29T15:58:17.0012035Z",
+          "elapsedMs": 5
+        },
+        {
+          "phase": "TARGET_RESUMED",
+          "utc": "2026-09-29T15:58:17.0072828Z",
+          "elapsedMs": 12
+        },
+        {
+          "phase": "TARGET_WAIT_END",
+          "utc": "2026-09-29T15:59:55.4423884Z",
+          "elapsedMs": 98448
+        },
+        {
+          "phase": "JOB_TERMINATION_START",
+          "utc": "2026-09-29T15:59:55.4444043Z",
+          "elapsedMs": 98449
+        },
+        {
+          "phase": "JOB_EMPTY",
+          "utc": "2026-09-29T15:59:55.4444043Z",
+          "elapsedMs": 98449
+        },
+        {
+          "phase": "PIPES_DRAINED",
+          "utc": "2026-09-29T15:59:55.4444043Z",
+          "elapsedMs": 98449
+        }
+      ],
+      "snapshots": [
+        {
+          "point": "RESUMED",
+          "utc": "2026-09-29T15:58:17.0292878Z",
+          "elapsedMs": 35,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 2,
+          "terminated": 0,
+          "processes": [
+            {
+              "pid": 7260,
+              "generation": "134351710970045254",
+              "image": "node",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 0,
+              "user100ns": 0,
+              "ioAvailable": true,
+              "readOps": 0,
+              "writeOps": 0,
+              "readBytes": 0,
+              "writeBytes": 0,
+              "handlesAvailable": true,
+              "handleCount": 27,
+              "threadStates": {
+                "Wait:Executive": 1
+              }
+            },
+            {
+              "pid": 5200,
+              "generation": "134351710970103778",
+              "image": "conhost",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 156250,
+              "user100ns": 0,
+              "ioAvailable": true,
+              "readOps": 0,
+              "writeOps": 0,
+              "readBytes": 0,
+              "writeBytes": 0,
+              "handlesAvailable": true,
+              "handleCount": 69,
+              "threadStates": {
+                "Wait:EventPairLow": 1,
+                "Ready": 3
+              }
+            }
+          ],
+          "streams": {
+            "stdoutBytes": 0,
+            "stderrBytes": 0,
+            "firstStdoutMs": null,
+            "lastStdoutMs": null,
+            "firstStderrMs": null,
+            "lastStderrMs": null
+          }
+        },
+        {
+          "point": "RUNNING",
+          "utc": "2026-09-29T15:58:47.3448478Z",
+          "elapsedMs": 30350,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 2,
+          "terminated": 0,
+          "processes": [
+            {
+              "pid": 7260,
+              "generation": "134351710970045254",
+              "image": "node",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 36875000,
+              "user100ns": 38437500,
+              "ioAvailable": true,
+              "readOps": 3399,
+              "writeOps": 4982,
+              "readBytes": 37890388,
+              "writeBytes": 79393749,
+              "handlesAvailable": true,
+              "handleCount": 204,
+              "threadStates": {
+                "Wait:EventPairLow": 5,
+                "Wait:UserRequest": 2,
+                "Wait:Unknown": 4,
+                "Wait:Executive": 4
+              }
+            },
+            {
+              "pid": 5200,
+              "generation": "134351710970103778",
+              "image": "conhost",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 156250,
+              "user100ns": 0,
+              "ioAvailable": true,
+              "readOps": 0,
+              "writeOps": 0,
+              "readBytes": 0,
+              "writeBytes": 0,
+              "handlesAvailable": true,
+              "handleCount": 95,
+              "threadStates": {
+                "Wait:EventPairLow": 2,
+                "Wait:UserRequest": 2
+              }
+            }
+          ],
+          "streams": {
+            "stdoutBytes": 0,
+            "stderrBytes": 12565,
+            "firstStdoutMs": null,
+            "lastStdoutMs": null,
+            "firstStderrMs": 223,
+            "lastStderrMs": 1188
+          }
+        },
+        {
+          "point": "RUNNING",
+          "utc": "2026-09-29T15:59:18.7094690Z",
+          "elapsedMs": 61714,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 2,
+          "terminated": 0,
+          "processes": [
+            {
+              "pid": 7260,
+              "generation": "134351710970045254",
+              "image": "node",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 119375000,
+              "user100ns": 67968750,
+              "ioAvailable": true,
+              "readOps": 3399,
+              "writeOps": 7502,
+              "readBytes": 37890388,
+              "writeBytes": 120477712,
+              "handlesAvailable": true,
+              "handleCount": 195,
+              "threadStates": {
+                "Wait:EventPairLow": 3,
+                "Wait:UserRequest": 2,
+                "Wait:Unknown": 7,
+                "Wait:Executive": 1
+              }
+            },
+            {
+              "pid": 5200,
+              "generation": "134351710970103778",
+              "image": "conhost",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 156250,
+              "user100ns": 0,
+              "ioAvailable": true,
+              "readOps": 0,
+              "writeOps": 0,
+              "readBytes": 0,
+              "writeBytes": 0,
+              "handlesAvailable": true,
+              "handleCount": 95,
+              "threadStates": {
+                "Wait:UserRequest": 2
+              }
+            }
+          ],
+          "streams": {
+            "stdoutBytes": 0,
+            "stderrBytes": 12565,
+            "firstStdoutMs": null,
+            "lastStdoutMs": null,
+            "firstStderrMs": 223,
+            "lastStderrMs": 1188
+          }
+        },
+        {
+          "point": "RUNNING",
+          "utc": "2026-09-29T15:59:48.9923350Z",
+          "elapsedMs": 91998,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 2,
+          "terminated": 0,
+          "processes": [
+            {
+              "pid": 7260,
+              "generation": "134351710970045254",
+              "image": "node",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 173281250,
+              "user100ns": 95468750,
+              "ioAvailable": true,
+              "readOps": 3399,
+              "writeOps": 7502,
+              "readBytes": 37890388,
+              "writeBytes": 120477712,
+              "handlesAvailable": true,
+              "handleCount": 195,
+              "threadStates": {
+                "Wait:EventPairLow": 3,
+                "Wait:UserRequest": 2,
+                "Wait:Unknown": 7,
+                "Running": 1
+              }
+            },
+            {
+              "pid": 5200,
+              "generation": "134351710970103778",
+              "image": "conhost",
+              "observedExitCode": 259,
+              "signaled": false,
+              "kernel100ns": 156250,
+              "user100ns": 0,
+              "ioAvailable": true,
+              "readOps": 0,
+              "writeOps": 0,
+              "readBytes": 0,
+              "writeBytes": 0,
+              "handlesAvailable": true,
+              "handleCount": 95,
+              "threadStates": {
+                "Wait:UserRequest": 2
+              }
+            }
+          ],
+          "streams": {
+            "stdoutBytes": 0,
+            "stderrBytes": 12565,
+            "firstStdoutMs": null,
+            "lastStdoutMs": null,
+            "firstStderrMs": 223,
+            "lastStderrMs": 1188
+          }
+        },
+        {
+          "point": "BEFORE_TERMINATION",
+          "utc": "2026-09-29T15:59:55.4444043Z",
+          "elapsedMs": 98449,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 0,
+          "terminated": 0,
+          "processes": [],
+          "streams": {
+            "stdoutBytes": 25,
+            "stderrBytes": 17425,
+            "firstStdoutMs": 98395,
+            "lastStdoutMs": 98395,
+            "firstStderrMs": 223,
+            "lastStderrMs": 98396
+          }
+        },
+        {
+          "point": "AFTER_TERMINATION",
+          "utc": "2026-09-29T15:59:55.4444043Z",
+          "elapsedMs": 98449,
+          "accountingAvailable": true,
+          "totalCreated": 2,
+          "active": 0,
+          "terminated": 0,
+          "processes": [],
+          "streams": {
+            "stdoutBytes": 25,
+            "stderrBytes": 17425,
+            "firstStdoutMs": 98395,
+            "lastStdoutMs": 98395,
+            "firstStderrMs": 223,
+            "lastStderrMs": 98396
+          }
+        }
+      ],
+      "observedProcesses": [
+        {
+          "pid": 7260,
+          "generation": "134351710970045254",
+          "image": "node",
+          "firstObservedMs": 34
+        },
+        {
+          "pid": 5200,
+          "generation": "134351710970103778",
+          "image": "conhost",
+          "firstObservedMs": 35
+        }
+      ],
+      "processEnumeration": "OWNED_JOB_ONLY_SAMPLED_NOT_EXHAUSTIVE",
+      "observerStopped": true,
+      "streamEventsBound": 256,
+      "streams": {
+        "stdoutBytes": 25,
+        "stderrBytes": 17425,
+        "firstStdoutMs": 98395,
+        "lastStdoutMs": 98395,
+        "firstStderrMs": 223,
+        "lastStderrMs": 98396
+      }
+    },
+    "streamEventCount": 215,
+    "files": {
+      "fixed": [
+        {
+          "relative": "package-lock.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 43692,
+          "modifiedUtc": "2026-09-29T15:58:14.732Z"
+        },
+        {
+          "relative": "node_modules/.package-lock.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 42811,
+          "modifiedUtc": "2026-09-29T15:59:55.388Z"
+        },
+        {
+          "relative": "node_modules/.staging",
+          "exists": false,
+          "error": "ENOENT"
+        },
+        {
+          "relative": "node_modules/.cache",
+          "exists": false,
+          "error": "ENOENT"
+        },
+        {
+          "relative": "node_modules/.bin",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:59:55.345Z"
+        }
+      ],
+      "packageManifests": [
+        {
+          "relative": "node_modules/@vtsls/language-server/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 747,
+          "modifiedUtc": "2026-09-29T15:58:21.966Z"
+        },
+        {
+          "relative": "node_modules/bash-language-server/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 976,
+          "modifiedUtc": "2026-09-29T15:58:32.962Z"
+        },
+        {
+          "relative": "node_modules/pyright/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 1401,
+          "modifiedUtc": "2026-09-29T15:58:35.099Z"
+        },
+        {
+          "relative": "node_modules/typescript/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 3527,
+          "modifiedUtc": "2026-09-29T15:58:53.465Z"
+        },
+        {
+          "relative": "node_modules/vscode-jsonrpc/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 1947,
+          "modifiedUtc": "2026-09-29T15:58:30.999Z"
+        },
+        {
+          "relative": "node_modules/vscode-langservers-extracted/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 1792,
+          "modifiedUtc": "2026-09-29T15:58:44.220Z"
+        },
+        {
+          "relative": "node_modules/yaml-language-server/package.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 3196,
+          "modifiedUtc": "2026-09-29T15:59:00.504Z"
+        }
+      ],
+      "entries": [
+        {
+          "relative": "node_modules/.bin",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:59:55.345Z"
+        },
+        {
+          "relative": "node_modules/.package-lock.json",
+          "exists": true,
+          "type": "FILE",
+          "size": 42811,
+          "modifiedUtc": "2026-09-29T15:59:55.388Z"
+        },
+        {
+          "relative": "node_modules/@mixmark-io",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:17.942Z"
+        },
+        {
+          "relative": "node_modules/@nodelib",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:18.049Z"
+        },
+        {
+          "relative": "node_modules/@one-ini",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:17.944Z"
+        },
+        {
+          "relative": "node_modules/@vscode",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:17.944Z"
+        },
+        {
+          "relative": "node_modules/@vtsls",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:18.051Z"
+        },
+        {
+          "relative": "node_modules/ajv",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:54.622Z"
+        },
+        {
+          "relative": "node_modules/ajv-draft-04",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:29.416Z"
+        },
+        {
+          "relative": "node_modules/ajv-i18n",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:38.321Z"
+        },
+        {
+          "relative": "node_modules/balanced-match",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:26.926Z"
+        },
+        {
+          "relative": "node_modules/bash-language-server",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:45.453Z"
+        },
+        {
+          "relative": "node_modules/boolbase",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.055Z"
+        },
+        {
+          "relative": "node_modules/brace-expansion",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.180Z"
+        },
+        {
+          "relative": "node_modules/braces",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:25.389Z"
+        },
+        {
+          "relative": "node_modules/commander",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:26.910Z"
+        },
+        {
+          "relative": "node_modules/core-js",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:59:16.144Z"
+        },
+        {
+          "relative": "node_modules/css-select",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:42.230Z"
+        },
+        {
+          "relative": "node_modules/css-what",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:29.919Z"
+        },
+        {
+          "relative": "node_modules/dom-serializer",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.035Z"
+        },
+        {
+          "relative": "node_modules/domelementtype",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:24.866Z"
+        },
+        {
+          "relative": "node_modules/domhandler",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.198Z"
+        },
+        {
+          "relative": "node_modules/domutils",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:37.351Z"
+        },
+        {
+          "relative": "node_modules/editorconfig",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:24.037Z"
+        },
+        {
+          "relative": "node_modules/entities",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:38.498Z"
+        },
+        {
+          "relative": "node_modules/fast-deep-equal",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:25.292Z"
+        },
+        {
+          "relative": "node_modules/fast-glob",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:33.041Z"
+        },
+        {
+          "relative": "node_modules/fast-uri",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:34.167Z"
+        },
+        {
+          "relative": "node_modules/fastq",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:26.510Z"
+        },
+        {
+          "relative": "node_modules/fill-range",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.569Z"
+        },
+        {
+          "relative": "node_modules/fuzzy-search",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.542Z"
+        },
+        {
+          "relative": "node_modules/glob-parent",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:22.065Z"
+        },
+        {
+          "relative": "node_modules/he",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:23.659Z"
+        },
+        {
+          "relative": "node_modules/is-extglob",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.458Z"
+        },
+        {
+          "relative": "node_modules/is-glob",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.444Z"
+        },
+        {
+          "relative": "node_modules/is-number",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.444Z"
+        },
+        {
+          "relative": "node_modules/json-schema-traverse",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:24.896Z"
+        },
+        {
+          "relative": "node_modules/jsonc-parser",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:30.169Z"
+        },
+        {
+          "relative": "node_modules/lru-cache",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.444Z"
+        },
+        {
+          "relative": "node_modules/merge2",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.444Z"
+        },
+        {
+          "relative": "node_modules/micromatch",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.639Z"
+        },
+        {
+          "relative": "node_modules/minimatch",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:36.921Z"
+        },
+        {
+          "relative": "node_modules/node-fetch",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:23.727Z"
+        },
+        {
+          "relative": "node_modules/node-html-parser",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:22.063Z"
+        },
+        {
+          "relative": "node_modules/nth-check",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:29.953Z"
+        },
+        {
+          "relative": "node_modules/picomatch",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:25.233Z"
+        },
+        {
+          "relative": "node_modules/prettier",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:46.143Z"
+        },
+        {
+          "relative": "node_modules/pyright",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:59:55.220Z"
+        },
+        {
+          "relative": "node_modules/queue-microtask",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:22.013Z"
+        },
+        {
+          "relative": "node_modules/regenerator-runtime",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:22.110Z"
+        },
+        {
+          "relative": "node_modules/request-light",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:24.392Z"
+        },
+        {
+          "relative": "node_modules/require-from-string",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.442Z"
+        },
+        {
+          "relative": "node_modules/reusify",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:25.781Z"
+        },
+        {
+          "relative": "node_modules/run-parallel",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.442Z"
+        },
+        {
+          "relative": "node_modules/semver",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:35.385Z"
+        },
+        {
+          "relative": "node_modules/to-regex-range",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.442Z"
+        },
+        {
+          "relative": "node_modules/tr46",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.378Z"
+        },
+        {
+          "relative": "node_modules/turndown",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:26.231Z"
+        },
+        {
+          "relative": "node_modules/typescript",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:58.286Z"
+        },
+        {
+          "relative": "node_modules/vscode-css-languageservice",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:45.918Z"
+        },
+        {
+          "relative": "node_modules/vscode-html-languageservice",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:43.122Z"
+        },
+        {
+          "relative": "node_modules/vscode-json-languageservice",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:40.672Z"
+        },
+        {
+          "relative": "node_modules/vscode-jsonrpc",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:36.897Z"
+        },
+        {
+          "relative": "node_modules/vscode-langservers-extracted",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:44.237Z"
+        },
+        {
+          "relative": "node_modules/vscode-languageserver",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:39.570Z"
+        },
+        {
+          "relative": "node_modules/vscode-languageserver-protocol",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:40.931Z"
+        },
+        {
+          "relative": "node_modules/vscode-languageserver-textdocument",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:26.021Z"
+        },
+        {
+          "relative": "node_modules/vscode-languageserver-types",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.764Z"
+        },
+        {
+          "relative": "node_modules/vscode-markdown-languageservice",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:38.487Z"
+        },
+        {
+          "relative": "node_modules/vscode-nls",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:33.566Z"
+        },
+        {
+          "relative": "node_modules/vscode-uri",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:27.413Z"
+        },
+        {
+          "relative": "node_modules/web-tree-sitter",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:24.150Z"
+        },
+        {
+          "relative": "node_modules/webidl-conversions",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.378Z"
+        },
+        {
+          "relative": "node_modules/whatwg-url",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.378Z"
+        },
+        {
+          "relative": "node_modules/yallist",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:21.997Z"
+        },
+        {
+          "relative": "node_modules/yaml",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:47.578Z"
+        },
+        {
+          "relative": "node_modules/yaml-language-server",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:59:09.940Z"
+        },
+        {
+          "relative": "node_modules/zod",
+          "exists": true,
+          "type": "DIRECTORY",
+          "size": 0,
+          "modifiedUtc": "2026-09-29T15:58:35.640Z"
+        }
+      ],
+      "limit": 128,
+      "lockOwnership": "UNKNOWN_NOT_A_HANDLE_LOCK_CENSUS",
+      "fileContentsRead": false
+    },
+    "rawOutputRetained": "BOUNDED_REDACTED_PRIVATE_CI_LOG_ONLY_NOT_IN_REPOSITORY"
+  },
+  "localValidation": {
+    "total": 897,
+    "passed": 667,
+    "failed": 0,
+    "cancelled": 0,
+    "skippedNativeWindows": 230,
+    "focused": {
+      "total": 33,
+      "passed": 25,
+      "failed": 0,
+      "cancelled": 0,
+      "skippedNativeWindows": 8
+    },
+    "syntax": "PASS",
+    "typescript": "PASS_INSTALLED_PI",
+    "package": "PASS",
+    "indexedAudit": {
+      "files": 632,
+      "blockingFailures": 0,
+      "classifiedWarnings": 13
+    }
+  },
+  "nativeGate": {
+    "counts": [
+      {
+        "step": "native-foundation (ubuntu-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+        "tests": 364,
+        "pass": 134,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 230
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows no-clobber CREATE primitive (not project publication)",
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows durable publication journal and real writer death (not project publication)",
+        "tests": 19,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows atomic MODIFY primitive (NTFS transaction, not production publication)",
+        "tests": 19,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows journal-bound MODIFY and real publisher death (not Worker publication)",
+        "tests": 34,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)",
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)",
+        "tests": 4,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows clean-clone primary/cleanup and ownership controls (no model calls)",
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Real Windows LSP via governed draft and LPAC broker (no model calls)",
+        "tests": 8,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 1
+      },
+      {
+        "step": "native-foundation (windows-latest)|Real verified Worker single-file publication and final concurrency (no model calls, autonomy blocked)",
+        "tests": 4,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows structured broker fixtures (no model calls)",
+        "tests": 20,
+        "pass": 19,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 1
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows production safe_exec and verification (no model calls)",
+        "tests": 11,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 1
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native Windows governed Worker transport (no model calls, autonomy blocked)",
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      {
+        "step": "native-foundation (windows-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+        "tests": 364,
+        "pass": 354,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 10
+      }
+    ],
+    "clones": [
+      {
+        "step": "native-foundation (ubuntu-latest)|Clean Git-source clone (foundation only, engine must be unavailable)",
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "d8097d3a2e30930f0c768b99ce75321d4324900c",
+        "tests": {
+          "total": 364,
+          "passed": 134,
+          "failed": 0,
+          "skipped": 230
+        },
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "processReceipt": null
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "processReceipt": null
+          }
+        ],
+        "recoveryAfterTests": "NOT_NATIVE_WINDOWS",
+        "cleanup": {
+          "status": "PASS",
+          "cleanupAttempted": true,
+          "attemptCount": 1,
+          "elapsedMs": 35,
+          "directoryRemoved": true,
+          "currentCwdInsideBefore": false,
+          "currentCwdInsideAfter": false,
+          "childCwdInsideAfter": "UNKNOWN",
+          "inheritedHandleAfter": "UNKNOWN",
+          "residualOwnedProcesses": null,
+          "processOwnership": "NOT_NATIVE_WINDOWS",
+          "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+          "quarantineState": "NONE",
+          "diagnostics": [],
+          "error": null
+        }
+      },
+      {
+        "step": "native-foundation (windows-latest)|Clean Git-source clone (foundation only, engine must be unavailable)",
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "d8097d3a2e30930f0c768b99ce75321d4324900c",
+        "tests": {
+          "total": 364,
+          "passed": 354,
+          "failed": 0,
+          "skipped": 10
+        },
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 8048,
+              "childGeneration": "134351710937280402"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 6712,
+              "childGeneration": "134351710939944088"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 6224,
+              "childGeneration": "134351710951365740"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 7592,
+              "childGeneration": "134351710955983311"
+            }
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4004,
+              "childGeneration": "134351710959054363"
+            }
+          },
+          {
+            "stage": "pinned-lsp-runtime",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 7260,
+              "childGeneration": "134351710970045254"
+            }
+          },
+          {
+            "stage": "windows-process-build",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3832,
+              "childGeneration": "134351711960706380"
+            }
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3900,
+              "childGeneration": "134351711988129856"
+            }
+          },
+          {
+            "stage": "post-test-recovery",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 3360,
+              "childGeneration": "134351715835924537"
+            }
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 748,
+              "childGeneration": "134351715839758698"
+            }
+          }
+        ],
+        "recoveryAfterTests": {
+          "status": "PASS",
+          "active": 0,
+          "stale": 0,
+          "quarantined": 0,
+          "processKills": 0,
+          "cleanupPerformed": false
+        },
+        "cleanup": {
+          "status": "PASS",
+          "cleanupAttempted": true,
+          "attemptCount": 1,
+          "elapsedMs": 8247,
+          "directoryRemoved": true,
+          "currentCwdInsideBefore": false,
+          "currentCwdInsideAfter": false,
+          "childCwdInsideAfter": false,
+          "inheritedHandleAfter": false,
+          "residualOwnedProcesses": 0,
+          "processOwnership": "NATIVE_JOB_HANDLES",
+          "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+          "quarantineState": "NONE",
+          "diagnostics": [],
+          "error": null
+        }
+      }
+    ],
+    "piSmokes": [
+      {
+        "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB",
+        "status": "PASS",
+        "piVersion": "0.87.1",
+        "subagentsVersion": "0.66.0",
+        "foregroundExitCode": 0,
+        "localDeterministicTurns": 6,
+        "externalProviderCalls": 0,
+        "externalRequests": 0,
+        "sourceUnchanged": true,
+        "receiptCount": 5,
+        "allReceiptCleanupPass": true,
+        "cleanup": {
+          "temporaryRemoved": true,
+          "authorityRevoked": true,
+          "draftPayloadCleared": true
+        }
+      },
+      {
+        "proof": "REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED",
+        "status": "PASS",
+        "piVersion": "0.87.1",
+        "subagentsVersion": "0.66.0",
+        "foregroundExitCode": 0,
+        "localDeterministicTurns": 3,
+        "externalProviderCalls": 0,
+        "externalRequests": 0,
+        "sourceUnchanged": true,
+        "receiptCount": 1,
+        "allReceiptCleanupPass": true,
+        "cleanup": {
+          "temporaryRemoved": true,
+          "authorityRevoked": true,
+          "draftPayloadCleared": true
+        }
+      },
+      {
+        "proof": "REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB",
+        "status": "PASS",
+        "piVersion": "0.87.1",
+        "subagentsVersion": "0.66.0",
+        "foregroundExitCode": 0,
+        "localDeterministicTurns": 3,
+        "externalProviderCalls": 0,
+        "externalRequests": 0,
+        "sourceUnchanged": true,
+        "receiptCount": 3,
+        "allReceiptCleanupPass": true,
+        "cleanup": {
+          "temporaryRemoved": true,
+          "authorityRevoked": true,
+          "draftPayloadCleared": true
+        }
+      }
+    ],
+    "validation": {
+      "status": "PASS_BOUNDED_D5_PRIMITIVE_NOT_FULL_D5",
+      "actualDeleteDeaths": 13,
+      "renamePrimitiveCases": 20,
+      "wholeCiMatched": true,
+      "retainedRegressions": true,
+      "nativeControlsAndPublicationRolesDigestsIdsAndCleanupMatched": true,
+      "overallWindowsCleanup": "PASS_OWNED_SCOPES_ONLY",
+      "metadataPayloadRedaction": true,
+      "externalProviderCalls": 0,
+      "limitations": [
+        "Not original verified-controller reconstruction after restart",
+        "No trusted automatic discovery/retention",
+        "No general power-loss guarantee",
+        "No journal-bound RENAME/multi-file/D-wide or E1/E2/E3 certification",
+        "Independent clones are foundation only"
+      ]
+    }
+  },
+  "priorFailure": {
+    "head": "24061e8b488c86cf3b05fd3f27563b166a55e515",
+    "runId": 36585303714,
+    "status": "FAILURE_NOT_SUPERSEDED_AS_ROOT_CAUSE_PROOF",
+    "evidence": "phi-rename-primitive-evidence.json"
+  },
+  "preservation": {
+    "protectedAuditSha256": "f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba",
+    "protectedUserEdit": "UNCHANGED_UNSTAGED",
+    "authFingerprintUnchanged": true,
+    "activePiRoutingProvidersPresetsUnchanged": true,
+    "executionAndCleanupBudgetsUnchanged": true,
+    "externalProviderCalls": 0,
+    "renameJournalIntegration": "NOT_ADVANCED"
+  },
+  "D": "IN_PROGRESS",
+  "windowsAutonomy": "BLOCKED",
+  "limitations": [
+    "Sampled process enumeration is not exhaustive process creation tracking",
+    "No handle lock owner census",
+    "Cache hits alone do not prove network absence",
+    "Success alone does not repair an unidentified intermittent timeout"
+  ]
+}
