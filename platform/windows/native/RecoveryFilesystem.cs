@@ -36,6 +36,7 @@ namespace Phi.Native {
     readonly List<IntPtr> parents = new List<IntPtr>();
     readonly Dictionary<IntPtr, string> publicationFiles = new Dictionary<IntPtr, string>();
     readonly Dictionary<IntPtr, string> deletionFiles = new Dictionary<IntPtr, string>();
+    readonly Dictionary<IntPtr, string> renameSources = new Dictionary<IntPtr, string>();
     readonly string directoryPath;
     internal IntPtr DirectoryHandle { get { return parents[parents.Count - 1]; } }
     internal static volatile int TransientDeleteRetries;
@@ -160,8 +161,53 @@ namespace Phi.Native {
     internal void RenameNewFile(IntPtr file, string destination) {
       RenameRegisteredFile(file, destination, publicationFiles);
     }
+    internal IntPtr OpenRenameSource(string leaf, out Info info) {
+      // Ordinary eligible source only. Quarantine/CREATE handles do not acquire
+      // this separate, instance-private source-name capability.
+      if (AnchoredFile.Segments(leaf).Length != 1) throw new InvalidDataException();
+      IntPtr file = OpenDeleteSource(leaf, out info);
+      try { renameSources.Add(file, leaf); return file; }
+      catch { deletionFiles.Remove(file); CloseHandle(file); throw; }
+    }
+    static string RenameSourceDigest(IntPtr file) {
+      Info info;
+      if (!GetFileInformationByHandle(file, out info)) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if ((info.Attributes & (0x10 | 0x400)) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 1024 * 1024) throw new InvalidDataException();
+      using (FileStream input = new FileStream(new SafeFileHandle(file, false), FileAccess.Read)) {
+        input.Position = 0;
+        using (MemoryStream data = new MemoryStream()) {
+          byte[] block = new byte[4096]; int count;
+          while ((count = input.Read(block, 0, block.Length)) != 0) {
+            if (data.Length + count > 1024 * 1024) throw new InvalidDataException(); data.Write(block, 0, count);
+          }
+          if (data.Length != info.SizeLow) throw new InvalidDataException();
+          using (SHA256 hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(data.ToArray())).Replace("-", "").ToLowerInvariant();
+        }
+      }
+    }
+    internal object RenameExpectedSource(IntPtr file, string source, string destination, string expectedIdentity, string expectedDigest) {
+      // Bounded SAME-directory primitive, not a publication/recovery endpoint.
+      // Explicit names/ID/hash only; never infer a rename from equal content.
+      if (AnchoredFile.Segments(source).Length != 1 || AnchoredFile.Segments(destination).Length != 1 ||
+          String.Equals(source, destination, StringComparison.OrdinalIgnoreCase) ||
+          expectedIdentity == null || !Regex.IsMatch(expectedIdentity, "\\A[0-9a-f]{16}:[0-9a-f]{32}\\z") ||
+          expectedDigest == null || !Regex.IsMatch(expectedDigest, "\\A[0-9a-f]{64}\\z")) throw new InvalidDataException();
+      string origin, registered;
+      if (!renameSources.TryGetValue(file, out origin) || origin != source || !deletionFiles.TryGetValue(file, out registered)) throw new InvalidDataException();
+      if (registered != expectedIdentity || HandleIdentity(file) != expectedIdentity || RenameSourceDigest(file) != expectedDigest)
+        throw new InvalidOperationException("PHI_RENAME_SOURCE_CONFLICT");
+      // No-replace kernel rename of this exclusively held expected object.
+      // Parents/share modes remain unchanged; no destination pathname reopen.
+      RenameRegisteredFile(file, destination, deletionFiles);
+      renameSources.Remove(file); // consumed, NEVER re-register for unlink
+      if (HandleIdentity(file) != expectedIdentity || RenameSourceDigest(file) != expectedDigest) throw new InvalidDataException();
+      return new { backend = "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME", sourceIdentity = expectedIdentity,
+        destinationIdentity = expectedIdentity, digest = expectedDigest, sameDirectory = true, noClobber = true,
+        sourceAuthorityConsumed = true, txfUsed = false, journalUsed = false, projectPublished = false };
+    }
     internal void QuarantineDeleteSource(IntPtr file, string destination) {
       RenameRegisteredFile(file, destination, deletionFiles);
+      renameSources.Remove(file);
       // Keep the same exclusively held object's ownership for later unlink.
       deletionFiles.Add(file, HandleIdentity(file));
     }
@@ -427,6 +473,6 @@ namespace Phi.Native {
         System.Threading.Thread.Sleep(10);
       }
     }
-    public void Dispose() { for (int index = parents.Count - 1; index >= 0; index--) CloseHandle(parents[index]); parents.Clear(); }
+    public void Dispose() { for (int index = parents.Count - 1; index >= 0; index--) CloseHandle(parents[index]); parents.Clear(); renameSources.Clear(); }
   }
 }

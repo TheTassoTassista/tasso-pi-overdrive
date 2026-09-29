@@ -109,6 +109,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--atomic-create-selftest") return AnchoredFile.AtomicCreateSelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--atomic-modify-selftest") return AtomicModify.SelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--rename-primitive-selftest") return PublicationJournal.RenamePrimitiveSelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-journal-selftest") return PublicationJournal.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-journal-fixture-child") return PublicationJournal.FixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-journal-fixture-inspect") return PublicationJournal.FixtureInspect();

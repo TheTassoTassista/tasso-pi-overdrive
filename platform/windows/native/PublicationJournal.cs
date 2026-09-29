@@ -567,6 +567,121 @@ namespace Phi.Native {
     }
 
     // Fixed fixtures only. No arbitrary project/transaction or write endpoint.
+    static readonly string[] RenamePrimitiveCases = { "normal", "destination-exists", "destination-created-after-lock", "case-alias-destination", "same-source-alias",
+      "expected-id-mismatch", "expected-digest-mismatch", "source-name-mismatch", "foreign-owner", "create-handle", "delete-handle",
+      "protected-destination", "reserved-destination", "cross-parent-destination", "traversal-destination", "ads-destination",
+      "source-sharing", "pinned-parent", "source-writer-denied", "consumed-authority" };
+    internal static int RenamePrimitiveSelfTest(string name) {
+      // One fixed batch, only fresh owned scopes. No caller path, journal,
+      // verified-draft/controller authority or arbitrary native execution.
+      if (name != "same-parent") return 70;
+      var receipts = new List<object>(); bool passed = true;
+      foreach (string control in RenamePrimitiveCases) {
+        bool ok; receipts.Add(RenamePrimitiveCase(control, out ok)); if (!ok) { passed = false; break; }
+      }
+      Console.WriteLine(Serializer().Serialize(new { version = 1, status = passed ? "PASS" : "FAIL", scope = "NATIVE_RENAME_PRIMITIVE_NOT_JOURNAL_OR_PUBLICATION",
+        expectedCases = RenamePrimitiveCases.Length, completedCases = receipts.Count, receipts, journalUsed = false,
+        recoveryImplemented = false, projectPublished = false, txfUsed = false, externalRequests = 0 }));
+      return passed ? 0 : 70;
+    }
+    static object RenamePrimitiveCase(string name, out bool ok) {
+      ScopeRecovery scope = null; IntPtr file = IntPtr.Zero; FileStream sharing = null;
+      bool passed = false, clean = false, denied = false, moved = false, writerDenied = false, parentRenameDenied = false, consumed = false;
+      string stage = "BEGIN", originalId = null, originalDigest = null, sourceId = null, sourceDigest = null, destinationId = null, destinationDigest = null;
+      string collisionId = null, collisionDigest = null; object proof = null; int? rejectionCode = null;
+      bool securityPreserved = false, creationPreserved = false, unrelatedPreserved = false;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string sourcePath = Path.Combine(scope.Root, "input.txt"), targetPath = Path.Combine(scope.Root, "renamed.txt");
+        string unrelated = Path.Combine(scope.Root, "unrelated.txt");
+        File.WriteAllText(sourcePath, "rename-original-complete", new UTF8Encoding(false));
+        File.WriteAllText(unrelated, "rename-unrelated-user", new UTF8Encoding(false));
+        string security = File.GetAccessControl(sourcePath).GetSecurityDescriptorSddlForm(AccessControlSections.All);
+        DateTime created = File.GetCreationTimeUtc(sourcePath);
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
+          DeleteObject original = ReadDeleteLeaf(parent, "input.txt"); originalId = original.Identity; originalDigest = original.Digest;
+          string collision = name == "case-alias-destination" ? "RENAMED.txt" : "renamed.txt";
+          if (name == "destination-exists" || name == "case-alias-destination") File.WriteAllText(Path.Combine(scope.Root, collision), "rename-new-user", new UTF8Encoding(false));
+          if (name == "source-sharing") sharing = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+          stage = "SOURCE_OPEN";
+          RecoveryFilesystem.Info info;
+          try {
+            file = name == "create-handle" ? parent.CreateExclusiveFile("created.txt", out info) : name == "delete-handle" ? parent.OpenDeleteSource("input.txt", out info) : parent.OpenRenameSource("input.txt", out info);
+          } catch (System.ComponentModel.Win32Exception error) {
+            if (name != "source-sharing" || error.NativeErrorCode != 32 && error.NativeErrorCode != 33) throw;
+            denied = true; rejectionCode = error.NativeErrorCode;
+          }
+          if (sharing != null) { sharing.Dispose(); sharing = null; }
+          if (name == "destination-created-after-lock") File.WriteAllText(targetPath, "rename-new-user", new UTF8Encoding(false));
+          if (name == "destination-exists" || name == "case-alias-destination" || name == "destination-created-after-lock") {
+            DeleteObject user = ReadDeleteLeaf(parent, collision); collisionId = user.Identity; collisionDigest = user.Digest;
+          }
+          if (file != IntPtr.Zero) {
+            stage = "PRE_RENAME_CONTROLS";
+            if (name == "source-writer-denied") {
+              try { File.WriteAllText(sourcePath, "rename-writer-forbidden", new UTF8Encoding(false)); }
+              catch (IOException error) { uint code = unchecked((uint)Marshal.GetHRForException(error)); if (code != 0x80070020U && code != 0x80070021U) throw; writerDenied = true; }
+              if (!writerDenied) throw new InvalidDataException();
+            }
+            if (name == "pinned-parent") {
+              try { Directory.Move(scope.Root, scope.Root + ".user-owned"); }
+              catch (IOException error) { if (unchecked((uint)Marshal.GetHRForException(error)) != 0x80070020U) throw; parentRenameDenied = true; }
+              if (!parentRenameDenied) throw new InvalidDataException();
+            }
+            string sourceName = name == "source-name-mismatch" ? "unrelated.txt" : "input.txt";
+            string destination = name == "same-source-alias" ? "INPUT.txt" : name == "protected-destination" ? ".env" : name == "reserved-destination" ? DeleteLeaf(Guid.NewGuid().ToString("N")) :
+              name == "cross-parent-destination" ? "nested/renamed.txt" : name == "traversal-destination" ? "../escape.txt" : name == "ads-destination" ? "renamed.txt:ads" : "renamed.txt";
+            string expected = name == "expected-id-mismatch" ? new string('a', 16) + ":" + new string('b', 32) : originalId;
+            string digest = name == "expected-digest-mismatch" ? new string('a', 64) : originalDigest;
+            stage = "RENAME";
+            try {
+              if (name == "foreign-owner") using (RecoveryFilesystem foreign = new RecoveryFilesystem(scope.Root)) { proof = foreign.RenameExpectedSource(file, sourceName, destination, expected, digest); }
+              else proof = parent.RenameExpectedSource(file, sourceName, destination, expected, digest);
+              moved = true;
+            } catch (System.ComponentModel.Win32Exception error) {
+              if (!(name == "destination-exists" || name == "case-alias-destination" || name == "destination-created-after-lock") || error.NativeErrorCode != 80 && error.NativeErrorCode != 183) throw;
+              denied = true; rejectionCode = error.NativeErrorCode;
+            } catch (InvalidOperationException error) {
+              if (!(name == "expected-id-mismatch" || name == "expected-digest-mismatch") || error.Message != "PHI_RENAME_SOURCE_CONFLICT") throw; denied = true;
+            } catch (InvalidDataException) {
+              if (!(name == "same-source-alias" || name == "source-name-mismatch" || name == "foreign-owner" || name == "create-handle" || name == "delete-handle" ||
+                name == "protected-destination" || name == "reserved-destination" || name == "cross-parent-destination" || name == "traversal-destination" || name == "ads-destination")) throw;
+              denied = true;
+            }
+            if (name == "consumed-authority") {
+              bool unlinkDenied = false, repeatDenied = false, createDenied = false, quarantineDenied = false;
+              try { parent.UnlinkQuarantinedFile(file, originalId); } catch (InvalidDataException) { unlinkDenied = true; }
+              try { parent.RenameExpectedSource(file, "input.txt", "again.txt", originalId, originalDigest); } catch (InvalidDataException) { repeatDenied = true; }
+              try { parent.RenameNewFile(file, "again.txt"); } catch (InvalidDataException) { createDenied = true; }
+              try { parent.QuarantineDeleteSource(file, DeleteLeaf(Guid.NewGuid().ToString("N"))); } catch (InvalidDataException) { quarantineDenied = true; }
+              consumed = unlinkDenied && repeatDenied && createDenied && quarantineDenied; if (!consumed) throw new InvalidDataException();
+            }
+          }
+          CloseNative(file); file = IntPtr.Zero; stage = "READBACK";
+          DeleteObject actualSource = ReadDeleteLeaf(parent, "input.txt"), actualDestination = ReadDeleteLeaf(parent, collision);
+          sourceId = actualSource == null ? null : actualSource.Identity; sourceDigest = actualSource == null ? null : actualSource.Digest;
+          destinationId = actualDestination == null ? null : actualDestination.Identity; destinationDigest = actualDestination == null ? null : actualDestination.Digest;
+          bool expectedMove = name == "normal" || name == "source-writer-denied" || name == "pinned-parent" || name == "consumed-authority";
+          if (moved != expectedMove || denied == expectedMove || (expectedMove ? actualSource != null || destinationId != originalId || destinationDigest != originalDigest : sourceId != originalId || sourceDigest != originalDigest)) throw new InvalidDataException();
+          if (collisionId == null ? !expectedMove && actualDestination != null : destinationId != collisionId || destinationDigest != collisionDigest) throw new InvalidDataException();
+        }
+        string retainedPath = moved ? targetPath : sourcePath;
+        securityPreserved = File.GetAccessControl(retainedPath).GetSecurityDescriptorSddlForm(AccessControlSections.All) == security;
+        creationPreserved = File.GetCreationTimeUtc(retainedPath) == created;
+        unrelatedPreserved = File.ReadAllText(unrelated) == "rename-unrelated-user";
+        if (!securityPreserved || !creationPreserved || !unrelatedPreserved) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_RENAME_PRIMITIVE_FAILED:" + name + ":" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally {
+        CloseNative(file); if (sharing != null) sharing.Dispose();
+        try { if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); } }
+        catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      ok = passed && clean;
+      return new { caseName = name, passed, fixtureCleanup = clean, denied, moved, rejectionCode, originalId, originalDigest,
+        sourceId, sourceDigest, destinationId, destinationDigest, collisionId, collisionDigest, proof,
+        securityPreserved, creationPreserved, unrelatedPreserved, writerDenied, parentRenameDenied, consumedAuthorityDenied = consumed };
+    }
     static Dictionary<string, object> FixtureRequest() {
       using (Stream input = Console.OpenStandardInput()) using (MemoryStream line = new MemoryStream()) {
         for (int i = 0; i < 2048; i++) {

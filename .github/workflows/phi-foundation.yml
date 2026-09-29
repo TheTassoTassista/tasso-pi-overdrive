@@ -52,6 +52,9 @@ jobs:
       - name: Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-journal-delete.test.mjs
+      - name: Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-rename-primitive.test.mjs
       - name: Native Windows clean-clone primary/cleanup and ownership controls (no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-clone-cleanup.test.mjs

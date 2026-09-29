@@ -1,5 +1,34 @@
 # D — transactional project publication (IN PROGRESS)
 
+## D5 candidate — expected-source same-parent RENAME primitive (not journal publication)
+
+`RecoveryFilesystem.OpenRenameSource` adds an eligible one-component source-name
+registration to the existing private exclusive existing-file registration.
+`RenameExpectedSource` validates explicit source/destination, original native ID
+and SHA256 under the same no-sharing read/control/DELETE handle. Protected and
+reserved names, source case aliases, cross-parent/traversal/ADS destinations and
+borrowed handles are denied before mutation. It reuses the accepted native
+same-directory RootDirectory=NULL/one-leaf/ReplaceIfExists=false rename under
+unchanged directory pins; no additional data-write right or relaxed sharing.
+Successful movement consumes both registrations, verifies the same held ID/hash,
+and never re-registers unlink/quarantine ownership. Its metadata is not a private
+verified-controller publication certificate.
+
+Twenty fixed owned native cases (one bounded mandatory Node batch) and one
+invalid-suite case require actual object/digest readback, no-clobber collisions,
+owner/group/DACL and creation-time preservation, writer/parent interference
+denial, foreign/CREATE/DELETE handle denial and consumed-authority checks.
+They still require the exact full Windows CI; local focused24PASS/full663PASS,
+zero failures and230full native skips are not native proof. Existing D4 acceptance
+is retained. There is no production `--publication-rename` endpoint, new journal
+or inferred rename. Explicit DELETE+CREATE plan is unchanged.
+
+This first D5 unit does not yet establish journal intent/commit/recovery, real
+publisher death, cross-directory MOVE or live-controller PUBLISHED. Integrate
+explicit approved source/destination pairing through the SAME PublicationJournal
+next, before claiming recoverability; do not substitute this bare primitive for
+the governed publication adapter. Full D and Windows autonomy remain blocked.
+
 ## D4 proved bounded single DELETE without TxF (not full D)
 
 Exact functional **ae3735ea19f7417073a87f512cce79207c5ab55c** / [CI36579488486](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36579488486) SUCCESS Windows/Ubuntu, both foundation clones/cleanup and all3retained actual-Pi local smokes. Windows356/346PASS/0FAIL/0cancelled/10skips, Ubuntu356/128PASS/0FAIL/228native skips. DELETE28/28,13distinct real deaths/new-process recoveries and actual verified-controller MODIFY+DELETE publication/conflict4/4 PASS; retained scopes unaffected. Full local889/661PASS/0FAIL/228native skips plus syntax/TypeScript/package validation PASS. [Exact metadata and failure history](phi-single-delete-evidence.json). This accepts only single DELETE/original live controller, not full D, original controller reconstruction, broad filesystem/power-loss support or Windows autonomy.

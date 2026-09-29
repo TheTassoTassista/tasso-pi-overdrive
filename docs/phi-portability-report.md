@@ -2,6 +2,12 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current D5 candidate — bounded RENAME primitive, native proof pending
+
+After accepted D4 `ae3735e` / CI36579488486 and delivery `2570e96`, the next unit implements same-parent expected source-name/ID/hash rename under unchanged exclusive handles, parent pins and no-clobber kernel semantics. Private per-instance name authority is consumed after movement; ordinary protected/reserved names, aliases, cross-parent paths, foreign/CREATE/DELETE handles and later unlink/quarantine borrowing are rejected. Twenty actual fixed owned controls in one bounded native batch plus invalid-suite denial are mandatory, not yet certified on Windows.
+
+Focused145/24PASS/0FAIL/121native skips; full local893/663PASS/0FAIL/0cancelled/230native skips, syntax/installed-Pi TypeScript/package validation PASS. Source clones and all downstream retained Windows steps must finish on the exact candidate before acceptance. This is NOT journal-bound publication/recovery/crash proof, cross-directory MOVE, a restored controller or full D5. Explicit DELETE+CREATE plan and active Pi/auth/routes/security/budgets remain unchanged; zero external model/provider calls. Next SAME-journal explicit-pair intent/observation/recovery integration. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.**
+
 ## Current verified checkpoint — bounded single DELETE accepted, not full D
 
 Exact tested functional **ae3735ea19f7417073a87f512cce79207c5ab55c** / [CI36579488486](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36579488486) **SUCCESS Windows/Ubuntu**, both source clones/cleanup and all3actual-Pi local smokes. Windows356/346PASS/0FAIL/0cancelled/10Linux-only skips, Ubuntu356/128PASS/0FAIL/0cancelled/228native skips. Full local889/661PASS/0FAIL/0cancelled/228native skips plus syntax/installed-Pi TypeScript/package validation PASS; focused161/28PASS/0FAIL/133skips. [Current exact metadata proof and failed histories](phi-single-delete-evidence.json).
