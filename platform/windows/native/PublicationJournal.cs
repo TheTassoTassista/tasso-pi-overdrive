@@ -1110,7 +1110,8 @@ namespace Phi.Native {
             } finally { if (!recovery.HasExited) { recovery.Kill(); recovery.WaitForExit(3000); } }
           }
           if (name == "source-recreate-after-crash" && File.ReadAllText(source) != "new-rename-user") throw new InvalidDataException();
-          if (File.Exists(target) != (name != "destination-missing-after-crash")) throw new InvalidDataException();
+          if (old && (!File.Exists(source) || File.ReadAllText(source) != "old-rename-complete")) throw new InvalidDataException();
+          if (File.Exists(target) != (!old && name != "destination-missing-after-crash")) throw new InvalidDataException();
         } else {
           Dictionary<string, object> header = RenameFixtureHeader(scope.Root, tx);
           Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];

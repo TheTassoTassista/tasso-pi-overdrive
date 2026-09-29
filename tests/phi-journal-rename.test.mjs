@@ -18,6 +18,8 @@ test('explicit same-directory RENAME is V4 journaled, bound to the expected sour
   assert.doesNotMatch(rename, /File\.Move|File\.Delete|Directory\.Move|CreateTransaction|CommitTransaction|CreateFileTransacted/u);
   const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
   for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover']) assert.ok(dispatch.includes(option));
+  assert.match(journal, /if \(old && \(!File\.Exists\(source\) \|\| File\.ReadAllText\(source\) != "old-rename-complete"\)\)/u);
+  assert.match(journal, /File\.Exists\(target\) != \(!old && name != "destination-missing-after-crash"\)/u);
   const plan = fs.readFileSync(new URL('../lib/phi-publication-plan.mjs', import.meta.url), 'utf8');
   assert.match(plan, /Renames are explicitly DELETE\+CREATE, NOT inferred/u);
 });
