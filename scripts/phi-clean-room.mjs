@@ -7,6 +7,7 @@ import { validationFailureEvidence, validationExceptionEvidence } from '../lib/p
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
+import { installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
@@ -18,6 +19,7 @@ async function run(command, args, cwd = source, env = process.env) {
   // Aggregate suite budget only. Ordinary/LPAC commands keep their 120s cap;
   // the fixed serial validation entry is owned by a real native Job throughout.
   let result;
+  const startedUtc = new Date().toISOString(), started = performance.now();
   try { result = await runValidationCommand(command, args, { cwd, env, timeoutMs: validationCommandTimeout(command, args, cwd) }); }
   catch (cause) {
     commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' });
@@ -26,6 +28,7 @@ async function run(command, args, cwd = source, env = process.env) {
     const error = new Error('PHI_CLEAN_ROOM_OWNER_FAILED'); error.evidence = evidence; throw error;
   }
   if (result.receipt) commandReceipts.push(result.receipt);
+  if (stage === 'pinned-lsp-runtime') console.log(JSON.stringify(installDiagnostic({ command, args, cwd, env, startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started), result })));
   commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
     ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
   if (result.status !== 0 || result.error || process.platform === 'win32' && (!result.receipt.jobEmptyVerified || !result.receipt.pipesDrained)) {

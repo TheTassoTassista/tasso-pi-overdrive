@@ -47,6 +47,9 @@ namespace Phi.Native {
     [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr CreateJobObjectW(IntPtr attributes, string name);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job, int type, ref ExtendedLimits info, uint size);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int type, out Accounting info, uint size, IntPtr returned);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(IntPtr job, int type, IntPtr info, uint size, IntPtr returned);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetProcessIoCounters(IntPtr process, out IoCounters counters);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetProcessHandleCount(IntPtr process, out uint count);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateJobObject(IntPtr job, uint code);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool InitializeProcThreadAttributeList(IntPtr attributes, int count, int flags, ref IntPtr size);
     [DllImport("kernel32.dll", SetLastError=true)] static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
@@ -176,6 +179,7 @@ namespace Phi.Native {
       internal string ChildGeneration;
       internal Action<byte[], int> OnOutput;
       internal Action OnStarted;
+      internal InstallObservation Install;
       int bytes;
       internal Thread Drain(IntPtr handle, MemoryStream destination) {
         Thread thread = new Thread(delegate() {
@@ -185,6 +189,7 @@ namespace Phi.Native {
               while ((count = pipe.Read(block, 0, block.Length)) != 0) {
                 if (Interlocked.Add(ref bytes, count) > 2 * 1024 * 1024) { Overflow.Set(); break; }
                 destination.Write(block, 0, count);
+                if (Install != null) Install.Data(destination == Output, count);
                 if (destination == Output && OnOutput != null) OnOutput(block, count);
               }
             }
@@ -193,12 +198,94 @@ namespace Phi.Native {
         thread.IsBackground = true; thread.Start(); return thread;
       }
     }
+    // Read-only observations of the SAME owned Job, for the fixed trusted clone
+    // install only. No extra process, target argument/environment change, wait
+    // budget, signal, retry, filesystem authority or agent endpoint is added.
+    internal sealed class InstallObservation {
+      readonly Stopwatch clock = Stopwatch.StartNew();
+      readonly object sync = new object();
+      readonly List<object> phases = new List<object>(), snapshots = new List<object>(), streamEvents = new List<object>();
+      readonly Dictionary<string, object> seen = new Dictionary<string, object>();
+      readonly ManualResetEvent stop = new ManualResetEvent(false);
+      Thread observer;
+      bool observerStopped = true;
+      long outBytes, errBytes;
+      long? firstOutput, lastOutput, firstError, lastError;
+      internal void Phase(string name) { lock (sync) phases.Add(new { phase = name, utc = DateTime.UtcNow.ToString("o"), elapsedMs = clock.ElapsedMilliseconds }); }
+      internal void Data(bool stdout, int count) {
+        lock (sync) {
+          long elapsed = clock.ElapsedMilliseconds;
+          if (streamEvents.Count < 256) streamEvents.Add(new { stream = stdout ? "stdout" : "stderr", offset = stdout ? outBytes : errBytes, bytes = count, utc = DateTime.UtcNow.ToString("o"), elapsedMs = elapsed });
+          if (stdout) { outBytes += count; if (!firstOutput.HasValue) firstOutput = elapsed; lastOutput = elapsed; }
+          else { errBytes += count; if (!firstError.HasValue) firstError = elapsed; lastError = elapsed; }
+        }
+      }
+      object StreamProgress() { return new { stdoutBytes = outBytes, stderrBytes = errBytes, firstStdoutMs = firstOutput, lastStdoutMs = lastOutput, firstStderrMs = firstError, lastStderrMs = lastError }; }
+      object[] Processes(IntPtr job) {
+        // JobBasicProcessIdList; 32 is the EXISTING enforced active-process cap.
+        IntPtr buffer = Marshal.AllocHGlobal(8 + 32 * IntPtr.Size);
+        try {
+          if (!QueryInformationJobObject(job, 3, buffer, (uint)(8 + 32 * IntPtr.Size), IntPtr.Zero)) return new object[] { new { observationError = Marshal.GetLastWin32Error() } };
+          int count = Marshal.ReadInt32(buffer, 4);
+          if (count < 0 || count > 32) return new object[] { new { observationError = -1 } };
+          List<object> rows = new List<object>();
+          for (int i = 0; i < count; i++) {
+            uint pid = (uint)Marshal.ReadIntPtr(buffer, 8 + i * IntPtr.Size).ToInt64();
+            IntPtr handle = OpenProcess(0x00100000 | 0x1000, false, pid);
+            try {
+              bool owned; FileTime created, exited, kernel, user; uint exit, handles; IoCounters io;
+              if (handle == IntPtr.Zero || !IsProcessInJob(handle, job, out owned) || !owned || !GetProcessTimes(handle, out created, out exited, out kernel, out user) || !GetExitCodeProcess(handle, out exit)) { rows.Add(new { pid, observationError = Marshal.GetLastWin32Error() }); continue; }
+              bool hasIo = GetProcessIoCounters(handle, out io), hasHandles = GetProcessHandleCount(handle, out handles);
+              string image = "UNKNOWN"; Dictionary<string, int> waits = new Dictionary<string, int>();
+              // Metadata only; the generation-bound owned handle, not a PID,
+              // remains the authority. Never terminate an observed PID.
+              try { using (Process process = Process.GetProcessById((int)pid)) {
+                image = process.ProcessName;
+                foreach (ProcessThread thread in process.Threads) using (thread) {
+                  string state; try { state = thread.ThreadState == System.Diagnostics.ThreadState.Wait ? "Wait:" + thread.WaitReason.ToString() : thread.ThreadState.ToString(); } catch { state = "UNKNOWN"; }
+                  if (!waits.ContainsKey(state)) waits[state] = 0; waits[state]++;
+                }
+              } } catch { waits["UNKNOWN"] = 1; }
+              string generation = created.Value.ToString();
+              object row = new { pid, generation, image, observedExitCode = exit, signaled = WaitForSingleObject(handle, 0) == 0,
+                kernel100ns = kernel.Value, user100ns = user.Value, ioAvailable = hasIo, readOps = io.ReadOps, writeOps = io.WriteOps, readBytes = io.ReadBytes, writeBytes = io.WriteBytes,
+                handlesAvailable = hasHandles, handleCount = handles, threadStates = waits };
+              rows.Add(row);
+              lock (sync) { string key = pid + ":" + generation; if (!seen.ContainsKey(key) && seen.Count < 128) seen.Add(key, new { pid, generation, image, firstObservedMs = clock.ElapsedMilliseconds }); }
+            } finally { Close(ref handle); }
+          }
+          return rows.ToArray();
+        } finally { Marshal.FreeHGlobal(buffer); }
+      }
+      internal void Snapshot(IntPtr job, string point) {
+        try {
+          Accounting accounting; bool counted = QueryInformationJobObject(job, 1, out accounting, (uint)Marshal.SizeOf(typeof(Accounting)), IntPtr.Zero);
+          object[] processes = Processes(job);
+          lock (sync) { if (snapshots.Count < 8) snapshots.Add(new { point, utc = DateTime.UtcNow.ToString("o"), elapsedMs = clock.ElapsedMilliseconds, accountingAvailable = counted,
+            totalCreated = accounting.TotalProcesses, active = accounting.ActiveProcesses, terminated = accounting.TerminatedProcesses, processes, streams = StreamProgress() }); }
+        } catch { lock (sync) { if (snapshots.Count < 8) snapshots.Add(new { point, elapsedMs = clock.ElapsedMilliseconds, observationError = "UNKNOWN" }); } }
+      }
+      internal void Start(IntPtr job) {
+        observerStopped = false;
+        observer = new Thread(delegate() {
+          Snapshot(job, "RESUMED");
+          int samples = 0;
+          while (!stop.WaitOne(1000)) {
+            try { Processes(job); } catch { }
+            if (++samples % 30 == 0) Snapshot(job, "RUNNING");
+          }
+        }); observer.IsBackground = true; observer.Start();
+      }
+      internal void Stop() { stop.Set(); observerStopped = observer == null || observer.Join(1000); }
+      internal object Result() { lock (sync) return new { version = 1, scope = "FIXED_TRUSTED_LSP_INSTALL_OBSERVATION_NOT_SANDBOX", phases = phases.ToArray(), snapshots = snapshots.ToArray(), observedProcesses = seen.Values.ToArray(), processEnumeration = "OWNED_JOB_ONLY_SAMPLED_NOT_EXHAUSTIVE", observerStopped, streamEvents = streamEvents.ToArray(), streamEventsBound = 256, streams = StreamProgress() }; }
+    }
     // Controller validation only, NOT an agent tool or a sandbox. The longer
     // aggregate-suite budget is available only to the fixed tracked check entry;
     // every ordinary request and every LPAC request retains MaxLifetime.
     static int ValidationRun() {
       Capture capture = new Capture();
       int code = Execute(Console.OpenStandardInput(), null, capture, true);
+      if (capture.Install != null) Console.Error.WriteLine("PHI_LSP_INSTALL_DIAGNOSTIC:" + new JavaScriptSerializer().Serialize(capture.Install.Result()));
       Console.WriteLine(new JavaScriptSerializer().Serialize(new {
         version = 1, scope = "TRUSTED_VALIDATION_JOB_NOT_SANDBOX", resultExitCode = code,
         primaryExitCode = capture.PrimaryExitCode, timedOut = capture.TimedOut,
@@ -294,6 +381,12 @@ namespace Phi.Native {
           arguments.Count == 2 && String.Equals(StringValue(arguments[0]), Path.Combine(cwd, "scripts", "phi-check.mjs"), StringComparison.OrdinalIgnoreCase) &&
           StringValue(arguments[1]) == "--owned-validation";
         if (timeout < 1 || timeout > (suite ? 600000 : MaxLifetime)) throw new InvalidDataException();
+        if (validation && scope == null && capture != null && timeout == MaxLifetime &&
+            String.Equals(command, Path.Combine(Path.GetDirectoryName(command), "node.exe"), StringComparison.OrdinalIgnoreCase) &&
+            arguments.Count == 9 && String.Equals(StringValue(arguments[0]), Path.Combine(Path.GetDirectoryName(command), "node_modules", "npm", "bin", "npm-cli.js"), StringComparison.OrdinalIgnoreCase) &&
+            String.Join("\n", arguments.Cast<object>().Skip(1).Select(StringValue)) == "ci\n--prefix\nruntime/lsp\n--ignore-scripts\n--no-audit\n--no-fund\n--loglevel=silly\n--logs-max=0") {
+          capture.Install = new InstallObservation(); capture.Install.Phase("REQUEST_VALIDATED");
+        }
         if (!(request["guardianPid"] is int) || (int)request["guardianPid"] < 1) throw new InvalidDataException();
         guardian = OpenProcess(0x00100000 | 0x1000, false, (uint)(int)request["guardianPid"]); Check(guardian != IntPtr.Zero);
         FileTime parentCreated, selfCreated, unused1, unused2, unused3;
@@ -350,6 +443,7 @@ namespace Phi.Native {
         startup.Startup.Input = inputRead; startup.Startup.Output = output; startup.Startup.Error = error; startup.Attributes = list;
         // Atomic job assignment at CreateProcess closes the suspended-unassigned orphan window.
         phase = "CREATE";
+        if (capture != null && capture.Install != null) capture.Install.Phase("CREATE_START");
         Check(CreateProcessW(command, encoded, IntPtr.Zero, IntPtr.Zero, true, ExtendedStartup | UnicodeEnvironment | Suspended | NoWindow, environment, cwd, ref startup, out child));
         phase = "ATTEST";
         bool inside; Check(IsProcessInJob(child.Process, job, out inside)); if (!inside) throw new InvalidDataException();
@@ -379,8 +473,10 @@ namespace Phi.Native {
         if (ResumeThread(child.Thread) == UInt32.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
         if (capture != null) capture.Started = true;
         if (capture != null && capture.OnStarted != null) capture.OnStarted();
+        if (capture != null && capture.Install != null) { capture.Install.Phase("TARGET_RESUMED"); capture.Install.Start(job); }
         IntPtr[] waitHandles = capture == null ? new IntPtr[] { child.Process, guardian } : new IntPtr[] { child.Process, guardian, capture.Overflow.SafeWaitHandle.DangerousGetHandle() };
         uint waited = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, (uint)timeout);
+        if (capture != null && capture.Install != null) { capture.Install.Phase(waited == 258 ? "TARGET_DEADLINE" : "TARGET_WAIT_END"); capture.Install.Stop(); capture.Install.Snapshot(job, "BEFORE_TERMINATION"); }
         if (capture != null && waited == 2) throw new InvalidDataException();
         if (waited != 0 && waited != 1 && waited != 258) throw new Win32Exception(Marshal.GetLastWin32Error());
         uint code = waited == 1 ? 125U : 124U;
@@ -388,19 +484,23 @@ namespace Phi.Native {
         if (capture != null) { capture.PrimaryExitCode = code <= 255 ? (int)code : 1; capture.TimedOut = waited == 258; }
         // A successful parent exit is not evidence that descendants finished.
         phase = "CLEANUP";
+        if (capture != null && capture.Install != null) capture.Install.Phase("JOB_TERMINATION_START");
         Check(TerminateJobObject(job, 137));
         Stopwatch deadline = Stopwatch.StartNew();
         while (!EmptyJob(job)) { if (deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException(); Thread.Sleep(10); }
         if (capture != null) capture.JobEmptyVerified = true;
+        if (capture != null && capture.Install != null) { capture.Install.Phase("JOB_EMPTY"); capture.Install.Snapshot(job, "AFTER_TERMINATION"); }
         writeHandle.Dispose();
         if (capture != null) {
           if (!outputThread.Join(5000) || !errorThread.Join(5000) || capture.Overflow.WaitOne(0)) throw new InvalidDataException();
           capture.Drained = true;
+          if (capture.Install != null) capture.Install.Phase("PIPES_DRAINED");
         }
         return code <= 255 ? (int)code : 1;
       } catch (Win32Exception ex) { Console.Error.WriteLine("PHI_NATIVE_PROCESS_FAILED:" + ex.NativeErrorCode + ":" + phase); return 70; }
         catch { Console.Error.WriteLine("PHI_NATIVE_PROCESS_INVALID_OR_CLEANUP_FAILED:" + phase); return 70; }
       finally {
+        if (capture != null && capture.Install != null) capture.Install.Stop();
         // On pre-resume attestation failure, closing a Job initiates asynchronous
         // termination. Drain it before the outer scope deletes profile/state.
         if (job != IntPtr.Zero) {
