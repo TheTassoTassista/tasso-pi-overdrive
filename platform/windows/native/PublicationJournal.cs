@@ -1050,7 +1050,7 @@ namespace Phi.Native {
       if (!controls.Contains(name) && !(name.StartsWith("crash-") && RenameCheckpoints.Contains(name.Substring(6)))) return 70;
       ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool passed = false, clean = false, killed = false, childGone = false, restarted = false;
-      object evidence = null; string phaseAtDeath = null;
+      object evidence = null; string phaseAtDeath = null, recoveryStatus = null, recoveryPhase = null; int? recoveryExit = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready(); string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
         string source = Path.Combine(scope.Root, "input.txt"), target = Path.Combine(scope.Root, "renamed.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt");
@@ -1096,12 +1096,15 @@ namespace Phi.Native {
             UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
             try {
               recovery.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); recovery.StandardInput.Close();
-              if (!recovery.WaitForExit(5000) || recovery.ExitCode != 0) throw new InvalidDataException();
+              if (!recovery.WaitForExit(5000)) throw new InvalidDataException();
+              recoveryExit = recovery.ExitCode; if (recoveryExit != 0) throw new InvalidDataException();
               string output = recovery.StandardOutput.ReadToEnd(); if (output.Length > 16384) throw new InvalidDataException();
               Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = result; restarted = true;
+              recoveryStatus = result["status"] as string;
               string expectedStatus = name == "destination-missing-after-crash" ? "UNKNOWN_FAIL_SAFE" : name.EndsWith("after-crash") ? "CONFLICT" : old ? "OLD_COMPLETE_OBSERVED" : "RENAME_COMMITTED_DESTINATION_RETAINED";
               if ((string)result["status"] != expectedStatus || (bool)result["ownerGenerationAlive"] || (bool)result["projectPublished"] || (int)result["projectMutations"] != 0 || (int)result["processKills"] != 0) throw new InvalidDataException();
               Dictionary<string, object> metadata = (Dictionary<string, object>)result["metadata"];
+              recoveryPhase = metadata["phase"] as string;
               string expectedPhase = name.EndsWith("after-crash") ? phaseAtDeath : old ? "ROLLED_BACK" : point == "cleaned" ? "CLEANED" : "RECOVERY_REQUIRED";
               if ((string)metadata["phase"] != expectedPhase || name.EndsWith("after-crash") && (int)result["journalMutations"] != 0) throw new InvalidDataException();
             } finally { if (!recovery.HasExited) { recovery.Kill(); recovery.WaitForExit(3000); } }
@@ -1165,7 +1168,8 @@ namespace Phi.Native {
           }
         }
         if (File.ReadAllText(unrelated) != "unrelated-rename-user") throw new InvalidDataException(); passed = true;
-      } catch (Exception error) { Console.Error.WriteLine("PHI_RENAME_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      } catch (Exception error) { Console.Error.WriteLine("PHI_RENAME_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") +
+        ":recoveryExit=" + (recoveryExit.HasValue ? recoveryExit.Value.ToString() : "none") + ":status=" + (recoveryStatus ?? "none") + ":phase=" + (recoveryPhase ?? "none")); }
       finally {
         if (journal != null) journal.Dispose();
         if (child != null) { try { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } } finally { child.Dispose(); } }
