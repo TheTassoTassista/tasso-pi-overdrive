@@ -1,6 +1,28 @@
 # D — transactional project publication (IN PROGRESS)
 
-## D5 candidate — expected-source same-parent RENAME primitive (not journal publication)
+## D5 current result — native primitive controls pass; whole candidate NOT accepted
+
+Exact functional `24061e8` / [CI36585303714](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36585303714)
+is FAILURE at independent Windows clone's unchanged120s owned pinned-LSP install
+deadline. RENAME4/4 and all20actual cases in dedicated/aggregate batches pass;
+Windows360/350PASS/0FAIL/0cancelled/10skips and Ubuntu360/130PASS/0FAIL/230skips,
+retained native CREATE/MODIFY/DELETE and production publication/conflict controls
+pass. [Validated failed-run metadata](phi-rename-primitive-evidence.json).
+Native IDs/hash/no-clobber/name ownership/consumption/security/time/fixture
+cleanup are bounded passed evidence, not full-candidate or journal-bound rename
+certification. Clone later build/tests/recovery/brand and all3Pi steps NOT RUN.
+
+Native timeout result124/96cache observations/4reify records/no allowlisted npm
+codes do not establish the stalled install's cause. Its owned Jobs are empty,
+drained and residual0; clone directory cleanupPASS11453ms, not a global census.
+Do not guess a RENAME regression, relax120s or retry the same source into PASS.
+Diagnose this repeated owned-install stage before advancing the SAME-journal
+explicit pair intent/commit/crash/recovery adapter. Last accepted D4 remains
+`ae3735e` / CI36579488486. No source edits followed this failure; Windows autonomy
+and full D remain blocked. The implementation description below is current,
+but its pending-before-native statements are retained candidate history.
+
+## D5 implementation — expected-source same-parent RENAME primitive (not journal publication)
 
 `RecoveryFilesystem.OpenRenameSource` adds an eligible one-component source-name
 registration to the existing private exclusive existing-file registration.

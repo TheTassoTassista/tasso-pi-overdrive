@@ -2,7 +2,15 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current D5 candidate — bounded RENAME primitive, native proof pending
+## Current D5 candidate — whole CI FAIL at owned pinned-runtime installation
+
+Exact functional `24061e8b488c86cf3b05fd3f27563b166a55e515` / [CI36585303714](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36585303714) FAILURE. Windows360/350PASS/0FAIL/0cancelled/10skips; Ubuntu360/130PASS/0FAIL/230native skips. RENAME4/4 includes20actual fixed owned cases in both dedicated and aggregate batches; IDs/digests/no-clobber/consumed authority/security/creation-time/cleanup validated. Retained native CREATE/MODIFY/DELETE and production verified-controller publication/conflict controls pass, not redesigned. [Metadata-only failed-run proof](phi-rename-primitive-evidence.json).
+
+First error: independent Windows clone's pinned LSP install still running at unchanged120s deadline, native timeout/termination124.96cache observations/0misses/4reify records/no allowlisted npm errors; underlying causeUNKNOWN, not proved network/AV/source regression. The same stage failed in earlier D3 source states; no speculative fix or increase/retry. All later Windows clone build/foundation/tests/post-test recovery and all3Pi smokes NOT RUN. Clone Job ownership/empty/drain/residual owned0 and directory cleanupPASS11453ms; not global process/scope proof. Ubuntu clonePASS_FOUNDATION_ONLY/cleanupPASS23ms/native censusUNKNOWN. Whole acceptance rejects FAIL despite zero aggregate test failures.
+
+Full local893/663PASS/0FAIL/230native skips, syntax/installed-Pi TypeScript/package validation PASS. No executable change after failed CI; docs/evidence only delivery, protected user file/auth/Pi/routes/presets/security/budgets unchanged, zero external model/provider calls. Last accepted D4 remains `ae3735e` / CI36579488486/delivery `2570e96`. Diagnose owned install timeout safely before further D5 SAME-journal explicit pairing/death/recovery/cross-directory MOVE or controller publication. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN_PROGRESS.** No full-candidate or D5 certification.
+
+## Historical D5 candidate — bounded RENAME primitive, before native gate
 
 After accepted D4 `ae3735e` / CI36579488486 and delivery `2570e96`, the next unit implements same-parent expected source-name/ID/hash rename under unchanged exclusive handles, parent pins and no-clobber kernel semantics. Private per-instance name authority is consumed after movement; ordinary protected/reserved names, aliases, cross-parent paths, foreign/CREATE/DELETE handles and later unlink/quarantine borrowing are rejected. Twenty actual fixed owned controls in one bounded native batch plus invalid-suite denial are mandatory, not yet certified on Windows.
 

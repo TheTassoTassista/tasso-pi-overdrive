@@ -1,0 +1,1901 @@
+{
+  "version": 1,
+  "status": "FAIL_FULL_CI_D5_NATIVE_CONTROLS_VALIDATED_NOT_ACCEPTED",
+  "scope": "BOUNDED_D5_RENAME_PRIMITIVE_NOT_FULL_D5_ACCEPTANCE",
+  "functionalHead": "24061e8b488c86cf3b05fd3f27563b166a55e515",
+  "runId": 36585303714,
+  "url": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36585303714",
+  "conclusion": "failure",
+  "counts": [
+    {
+      "step": "native-foundation (windows-latest)|Native Windows no-clobber CREATE primitive (not project publication)",
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows durable publication journal and real writer death (not project publication)",
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows atomic MODIFY primitive (NTFS transaction, not production publication)",
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows journal-bound MODIFY and real publisher death (not Worker publication)",
+      "tests": 34,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)",
+      "tests": 28,
+      "pass": 28,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)",
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows clean-clone primary/cleanup and ownership controls (no model calls)",
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Real Windows LSP via governed draft and LPAC broker (no model calls)",
+      "tests": 8,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Real verified Worker single-file publication and final concurrency (no model calls, autonomy blocked)",
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows structured broker fixtures (no model calls)",
+      "tests": 20,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows production safe_exec and verification (no model calls)",
+      "tests": 11,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native Windows governed Worker transport (no model calls, autonomy blocked)",
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+      "tests": 360,
+      "pass": 350,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 10
+    },
+    {
+      "step": "native-foundation (ubuntu-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+      "tests": 360,
+      "pass": 130,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 230
+    }
+  ],
+  "steps": [
+    {
+      "name": "native-foundation (windows-latest)",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install source-only dependencies (no peers, no lifecycle scripts)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Bootstrap zero-write plan",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows foundation bootstrap",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build trusted native Windows process owner (not a sandbox)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Linux foundation bootstrap",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows no-clobber CREATE primitive (not project publication)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows durable publication journal and real writer death (not project publication)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows atomic MODIFY primitive (NTFS transaction, not production publication)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows journal-bound MODIFY and real publisher death (not Worker publication)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows clean-clone primary/cleanup and ownership controls (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install existing pinned LSP runtime for native same-draft diagnostics",
+          "conclusion": "success"
+        },
+        {
+          "name": "Real Windows LSP via governed draft and LPAC broker (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Real verified Worker single-file publication and final concurrency (no model calls, autonomy blocked)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows structured broker fixtures (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows production safe_exec and verification (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows governed Worker transport (no model calls, autonomy blocked)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows recovery individually and sequentially (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Non-interactive brand smoke (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Indexed source/artifact/path/secret audit (no raw matches)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clean Git-source clone (foundation only, engine must be unavailable)",
+          "conclusion": "failure"
+        },
+        {
+          "name": "Isolated pinned Pi runtime for real Worker session proof (no auth, no lifecycle scripts)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi foreground Worker factory to native LPAC broker (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi revoked Worker denies built-in host write (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi Worker edit to same-draft LSP on-write and semantic_nav (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Scope reminder",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "native-foundation (ubuntu-latest)",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install source-only dependencies (no peers, no lifecycle scripts)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Bootstrap zero-write plan",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows foundation bootstrap",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Build trusted native Windows process owner (not a sandbox)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Linux foundation bootstrap",
+          "conclusion": "success"
+        },
+        {
+          "name": "Native Windows no-clobber CREATE primitive (not project publication)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows durable publication journal and real writer death (not project publication)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows atomic MODIFY primitive (NTFS transaction, not production publication)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows journal-bound MODIFY and real publisher death (not Worker publication)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows journal-bound DELETE quarantine and restarted recovery (no TxF, no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows clean-clone primary/cleanup and ownership controls (no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Install existing pinned LSP runtime for native same-draft diagnostics",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Windows LSP via governed draft and LPAC broker (no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real verified Worker single-file publication and final concurrency (no model calls, autonomy blocked)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows structured broker fixtures (no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows production safe_exec and verification (no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows governed Worker transport (no model calls, autonomy blocked)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native Windows recovery individually and sequentially (no model calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "Non-interactive brand smoke (no model calls)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Indexed source/artifact/path/secret audit (no raw matches)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clean Git-source clone (foundation only, engine must be unavailable)",
+          "conclusion": "success"
+        },
+        {
+          "name": "Isolated pinned Pi runtime for real Worker session proof (no auth, no lifecycle scripts)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi foreground Worker factory to native LPAC broker (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi revoked Worker denies built-in host write (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Real Pi Worker edit to same-draft LSP on-write and semantic_nav (zero external provider calls)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Scope reminder",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "renameReceipts": [
+    {
+      "step": "native-foundation (windows-latest)|Native Windows expected-ID no-clobber RENAME primitive (not journal/publication, no model calls)",
+      "control": "NATIVE_EXPECTED_SOURCE_RENAME_PRIMITIVE_ONLY",
+      "version": 1,
+      "status": "PASS",
+      "scope": "NATIVE_RENAME_PRIMITIVE_NOT_JOURNAL_OR_PUBLICATION",
+      "expectedCases": 20,
+      "completedCases": 20,
+      "receipts": [
+        {
+          "caseName": "normal",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:003d000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:003d000000046f780000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:003d000000046f780000000000000000",
+            "destinationIdentity": "f42c40802c403fba:003d000000046f780000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "destination-exists",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:003e000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:003e000000046f780000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:0027000000046f850000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:0027000000046f850000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "destination-created-after-lock",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:003f000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:003f000000046f780000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:0028000000046f850000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:0028000000046f850000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "case-alias-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:0040000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0040000000046f780000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:0029000000046f850000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:0029000000046f850000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "same-source-alias",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0041000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0041000000046f780000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "expected-id-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0042000000046f780000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0042000000046f780000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "expected-digest-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0067000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0067000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-name-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0068000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0068000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "foreign-owner",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0069000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0069000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "create-handle",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006a000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006a000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "delete-handle",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006b000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006b000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "protected-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006c000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006c000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "reserved-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006d000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006d000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "cross-parent-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006e000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006e000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "traversal-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:006f000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:006f000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "ads-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0070000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0070000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-sharing",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 32,
+          "originalId": "f42c40802c403fba:0071000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:0071000000046f830000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "pinned-parent",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0072000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:0072000000046f830000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:0072000000046f830000000000000000",
+            "destinationIdentity": "f42c40802c403fba:0072000000046f830000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": true,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-writer-denied",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0073000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:0073000000046f830000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:0073000000046f830000000000000000",
+            "destinationIdentity": "f42c40802c403fba:0073000000046f830000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": true,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "consumed-authority",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:0074000000046f830000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:0074000000046f830000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:0074000000046f830000000000000000",
+            "destinationIdentity": "f42c40802c403fba:0074000000046f830000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": true
+        }
+      ],
+      "journalUsed": false,
+      "recoveryImplemented": false,
+      "projectPublished": false,
+      "txfUsed": false,
+      "externalRequests": 0
+    },
+    {
+      "step": "native-foundation (windows-latest)|Native platform, filesystem, themes, CLI, backup policy and bootstrap tests",
+      "control": "NATIVE_EXPECTED_SOURCE_RENAME_PRIMITIVE_ONLY",
+      "version": 1,
+      "status": "PASS",
+      "scope": "NATIVE_RENAME_PRIMITIVE_NOT_JOURNAL_OR_PUBLICATION",
+      "expectedCases": 20,
+      "completedCases": 20,
+      "receipts": [
+        {
+          "caseName": "normal",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00a00000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:00a00000000471b30000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:00a00000000471b30000000000000000",
+            "destinationIdentity": "f42c40802c403fba:00a00000000471b30000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "destination-exists",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:00a10000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a10000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:00890000000471d60000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:00890000000471d60000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "destination-created-after-lock",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:00a20000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a20000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:008a0000000471d60000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:008a0000000471d60000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "case-alias-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 183,
+          "originalId": "f42c40802c403fba:00a30000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a30000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": "f42c40802c403fba:008b0000000471d60000000000000000",
+          "destinationDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "collisionId": "f42c40802c403fba:008b0000000471d60000000000000000",
+          "collisionDigest": "d15d97ef24d93883cbdbe4ec46220e2c7a9f5524fde86f8d57e1a80186177a4d",
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "same-source-alias",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00a40000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a40000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "expected-id-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00a50000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a50000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "expected-digest-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00a60000000471b30000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00a60000000471b30000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-name-mismatch",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00850000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00850000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "foreign-owner",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00860000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00860000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "create-handle",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00870000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00870000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "delete-handle",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00880000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00880000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "protected-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00890000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:00890000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "reserved-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:008a0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:008a0000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "cross-parent-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:008b0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:008b0000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "traversal-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:008c0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:008c0000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "ads-destination",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:008d0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:008d0000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-sharing",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": true,
+          "moved": false,
+          "rejectionCode": 32,
+          "originalId": "f42c40802c403fba:008e0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": "f42c40802c403fba:008e0000000471d50000000000000000",
+          "sourceDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "destinationId": null,
+          "destinationDigest": null,
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": null,
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "pinned-parent",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:008f0000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:008f0000000471d50000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:008f0000000471d50000000000000000",
+            "destinationIdentity": "f42c40802c403fba:008f0000000471d50000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": true,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "source-writer-denied",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00900000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:00900000000471d50000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:00900000000471d50000000000000000",
+            "destinationIdentity": "f42c40802c403fba:00900000000471d50000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": true,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": false
+        },
+        {
+          "caseName": "consumed-authority",
+          "passed": true,
+          "fixtureCleanup": true,
+          "denied": false,
+          "moved": true,
+          "rejectionCode": null,
+          "originalId": "f42c40802c403fba:00910000000471d50000000000000000",
+          "originalDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "sourceId": null,
+          "sourceDigest": null,
+          "destinationId": "f42c40802c403fba:00910000000471d50000000000000000",
+          "destinationDigest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+          "collisionId": null,
+          "collisionDigest": null,
+          "proof": {
+            "backend": "HANDLE_ANCHORED_EXPECTED_SOURCE_RENAME",
+            "sourceIdentity": "f42c40802c403fba:00910000000471d50000000000000000",
+            "destinationIdentity": "f42c40802c403fba:00910000000471d50000000000000000",
+            "digest": "3d7d6f04cc9f3fb7ff6381bbcf1a73e7f39ef8f66b915405e786987e480dafcc",
+            "sameDirectory": true,
+            "noClobber": true,
+            "sourceAuthorityConsumed": true,
+            "txfUsed": false,
+            "journalUsed": false,
+            "projectPublished": false
+          },
+          "securityPreserved": true,
+          "creationPreserved": true,
+          "unrelatedPreserved": true,
+          "writerDenied": false,
+          "parentRenameDenied": false,
+          "consumedAuthorityDenied": true
+        }
+      ],
+      "journalUsed": false,
+      "recoveryImplemented": false,
+      "projectPublished": false,
+      "txfUsed": false,
+      "externalRequests": 0
+    }
+  ],
+  "cloneReports": [
+    {
+      "step": "native-foundation (windows-latest)|Clean Git-source clone (foundation only, engine must be unavailable)",
+      "version": 2,
+      "status": "FAIL",
+      "primary": {
+        "version": 1,
+        "status": "TIMEOUT",
+        "modelCalls": 0,
+        "cause": "local clone/bootstrap/foundation invariant failed; no raw command output or private values printed",
+        "failureStage": "pinned-lsp-runtime",
+        "exitCode": 124,
+        "timedOut": true,
+        "diagnosticCodes": [],
+        "packageInstall": {
+          "cliStarted": true,
+          "ciRecognized": true,
+          "manifestRequests": 0,
+          "httpResponses": 0,
+          "cacheHitResponses": 96,
+          "cacheMissResponses": 0,
+          "tarballCacheMisses": 0,
+          "reifyRecords": 4,
+          "codes": []
+        },
+        "testCounts": {
+          "total": null,
+          "passed": null,
+          "failed": null
+        },
+        "failedTestNumbers": [],
+        "processReceipt": {
+          "version": 1,
+          "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+          "resultExitCode": 124,
+          "primaryExitCode": 124,
+          "timedOut": true,
+          "jobAttested": true,
+          "targetStarted": true,
+          "jobEmptyVerified": true,
+          "pipesDrained": true,
+          "residualOwnedProcesses": 0,
+          "childPid": 4436,
+          "childGeneration": "134351675797852514"
+        },
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 5584,
+              "childGeneration": "134351675771051855"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4320,
+              "childGeneration": "134351675772946070"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 184,
+              "childGeneration": "134351675788064030"
+            }
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4064,
+              "childGeneration": "134351675790229341"
+            }
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "failureStage": "source-dependencies",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 0,
+              "primaryExitCode": 0,
+              "timedOut": false,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4296,
+              "childGeneration": "134351675791722807"
+            }
+          },
+          {
+            "stage": "pinned-lsp-runtime",
+            "status": "TIMEOUT",
+            "failureStage": "pinned-lsp-runtime",
+            "exitCode": 124,
+            "timedOut": true,
+            "diagnosticCodes": [],
+            "packageInstall": {
+              "cliStarted": true,
+              "ciRecognized": true,
+              "manifestRequests": 0,
+              "httpResponses": 0,
+              "cacheHitResponses": 96,
+              "cacheMissResponses": 0,
+              "tarballCacheMisses": 0,
+              "reifyRecords": 4,
+              "codes": []
+            },
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": [],
+            "processReceipt": {
+              "version": 1,
+              "scope": "TRUSTED_VALIDATION_JOB_NOT_SANDBOX",
+              "resultExitCode": 124,
+              "primaryExitCode": 124,
+              "timedOut": true,
+              "jobAttested": true,
+              "targetStarted": true,
+              "jobEmptyVerified": true,
+              "pipesDrained": true,
+              "residualOwnedProcesses": 0,
+              "childPid": 4436,
+              "childGeneration": "134351675797852514"
+            }
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 11453,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": false,
+        "inheritedHandleAfter": false,
+        "residualOwnedProcesses": 0,
+        "processOwnership": "NATIVE_JOB_HANDLES",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    },
+    {
+      "step": "native-foundation (ubuntu-latest)|Clean Git-source clone (foundation only, engine must be unavailable)",
+      "version": 2,
+      "status": "PASS_FOUNDATION_ONLY",
+      "primary": {
+        "version": 1,
+        "status": "PASS_FOUNDATION_ONLY",
+        "head": "24061e8b488c86cf3b05fd3f27563b166a55e515",
+        "platform": "linux",
+        "tests": {
+          "total": 360,
+          "passed": 130,
+          "failed": 0,
+          "skipped": 230
+        },
+        "bootstrap": "PASS_FOUNDATION_ONLY",
+        "doctor": "FAIL",
+        "fixedScopeRecovery": "NOT_NATIVE_WINDOWS",
+        "recoveryAfterTests": "NOT_NATIVE_WINDOWS",
+        "ownedCommands": 0,
+        "fullEngine": "BLOCKED_NOT_INSTALLED",
+        "modelCalls": 0,
+        "authCopied": false,
+        "ignoredRuntimesCopied": false,
+        "limitation": "Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending",
+        "commands": [
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "git-source",
+            "status": "PASS",
+            "failureStage": "git-source",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "source-dependencies",
+            "status": "PASS",
+            "failureStage": "source-dependencies",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "foundation-tests",
+            "status": "PASS",
+            "failureStage": "foundation-tests",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": 360,
+              "passed": 130,
+              "failed": 0
+            },
+            "failedTestNumbers": []
+          },
+          {
+            "stage": "brand-smoke",
+            "status": "PASS",
+            "failureStage": "brand-smoke",
+            "exitCode": 0,
+            "timedOut": false,
+            "diagnosticCodes": [],
+            "testCounts": {
+              "total": null,
+              "passed": null,
+              "failed": null
+            },
+            "failedTestNumbers": []
+          }
+        ]
+      },
+      "cleanup": {
+        "status": "PASS",
+        "cleanupAttempted": true,
+        "attemptCount": 1,
+        "elapsedMs": 23,
+        "directoryRemoved": true,
+        "currentCwdInsideBefore": false,
+        "currentCwdInsideAfter": false,
+        "childCwdInsideAfter": "UNKNOWN",
+        "inheritedHandleAfter": "UNKNOWN",
+        "residualOwnedProcesses": null,
+        "processOwnership": "NOT_NATIVE_WINDOWS",
+        "gitReferences": "INDEPENDENT_CLONE_NOT_WORKTREE",
+        "quarantineState": "NONE",
+        "diagnostics": [],
+        "error": null
+      },
+      "modelCalls": 0
+    }
+  ],
+  "piReports": [],
+  "validation": {
+    "status": "FAIL_FULL_CI_D5_NATIVE_CONTROLS_VALIDATED_NOT_ACCEPTED",
+    "actualDeleteDeaths": 13,
+    "renamePrimitiveCases": 20,
+    "wholeCiMatched": false,
+    "retainedRegressions": true,
+    "nativeControlsAndPublicationRolesDigestsIdsAndCleanupMatched": true,
+    "overallWindowsCleanup": "PASS_OWNED_CLONE_COMMANDS_NOT_GLOBAL_CENSUS_OR_UNRUN_PHASES",
+    "metadataPayloadRedaction": true,
+    "externalProviderCalls": 0,
+    "limitations": [
+      "Not original verified-controller reconstruction after restart",
+      "No trusted automatic discovery/retention",
+      "No general power-loss guarantee",
+      "No journal-bound RENAME/multi-file/D-wide or E1/E2/E3 certification",
+      "Independent clones are foundation only"
+    ]
+  },
+  "local": {
+    "tests": 893,
+    "passed": 663,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 230,
+    "focused": {
+      "tests": 145,
+      "passed": 24,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 121
+    },
+    "syntax": "PASS",
+    "typescript": "PASS_INSTALLED_PI",
+    "package": "PASS",
+    "indexedScan": {
+      "files": 629,
+      "blockingFailures": 0,
+      "classifiedWarnings": 13,
+      "scope": "BOUNDED_HEURISTIC_NOT_SECRET_ABSENCE_PROOF"
+    }
+  },
+  "lastAccepted": {
+    "functionalHead": "ae3735ea19f7417073a87f512cce79207c5ab55c",
+    "runId": 36579488486,
+    "documentationDelivery": "2570e96b8e7b2c55e6947f7dd807a7fb520cf69d"
+  },
+  "preserved": {
+    "protectedFileSha256": "f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba",
+    "authSha256": "2c6c8f0895e7d0e3cef00845f53cb985b29b89b242106eabc2a556a0b3d10af4",
+    "activePi": "UNCHANGED",
+    "routes": "UNCHANGED",
+    "retryAndBudgets": "UNCHANGED",
+    "windowsAutonomy": "BLOCKED",
+    "phaseD": "IN_PROGRESS"
+  },
+  "next": "Diagnose unchanged owned pinned-LSP install deadline on Windows before advancing D5 SAME-journal explicit pair intent/death/recovery or cross-directory MOVE. No same-source CI rerun, timeout/retry/security relaxation or guessed root cause.",
+  "failureInterpretation": "Native Job timeout selected and terminated the still-running target; 124 is its bounded timeout result, not proof of an npm-originated error. Cache counters do not identify the cause. Windows clone later stages and all three Pi smokes NOT RUN; overall gate remains FAIL."
+}
