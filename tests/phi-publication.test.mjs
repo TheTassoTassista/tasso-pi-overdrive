@@ -243,7 +243,9 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
   }
   if (operation === 'rename') {
     files['move.txt'] = 'unchanged-rename-fixture';
-    files['edit.cjs'] = "try{require('node:fs').renameSync('move.txt','moved.txt');console.log(process.pid)}catch(e){process.stderr.write('PHI_RENAME_FIXTURE:'+e.code+':'+e.syscall);process.exitCode=1}";
+    // Draft intent is DELETE+CREATE. Only the trusted publisher executes the
+    // native expected-ID, no-clobber RENAME after the full verification gate.
+    files['edit.cjs'] = "try{const f=require('node:fs');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log(process.pid)}catch(e){process.stderr.write('PHI_MOVE_DRAFT:'+e.code+':'+e.syscall);process.exitCode=1}";
     files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'unchanged-rename-fixture');a.throws(()=>f.writeFileSync('moved.txt','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
   }
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
@@ -256,7 +258,7 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
 }
 async function nativeVerified(item) {
   const edit = await executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 }, { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token });
-  const boundedRenameFailure = /^PHI_RENAME_FIXTURE:[A-Z0-9]+:[a-z]+$/u.test(edit.stderr?.trim() ?? '') ? edit.stderr.trim() : 'EDIT_NONZERO';
+  const boundedRenameFailure = /^PHI_MOVE_DRAFT:[A-Z0-9]+:[a-z]+$/u.test(edit.stderr?.trim() ?? '') ? edit.stderr.trim() : 'EDIT_NONZERO';
   assert.equal(edit.code, 0, boundedRenameFailure); assert.equal(edit.metadata.profile, 'EDIT'); assert.equal(edit.metadata.cleanup, 'PASS');
   assert.throws(() => process.kill(Number(edit.stdout.trim()), 0), e => e.code === 'ESRCH');
   const lsp = await executeCodingLsp(item.project, { operation: 'diagnostics', path: 'config.json' }, item.context);
@@ -395,7 +397,7 @@ test('native production Worker DELETE concurrent replacement after READY is pres
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_DELETE_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
 });
-test('native production Worker RENAME/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', native, async () => {
+test('native production Worker move intent/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', native, async () => {
   const item = nativeFixture('Fix JSON code and rename obsolete fixture with tests', 'rename');
   const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
   try {
