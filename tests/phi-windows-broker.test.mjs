@@ -89,13 +89,19 @@ test('native broker independently rejects invalid requests before any target sta
     assert.doesNotMatch(result.stdout, /NEVER_EMIT_PRIVATE_SENTINEL/u);
   }
 });
-test('native hash/grant setup failure is fail closed with owned cleanup', native, async () => {
-  for (const patch of [{ executable: { ...request().executable, sha256: 'b'.repeat(64) } }, { cwd: 'missing' }]) {
-    const result = await runWindowsSecureBroker(request('tester', 'process.exit(99)', patch));
-    assert.equal(result.code, 70); assert.equal(result.receipt.targetStarted, false);
-    assert.equal(result.receipt.tokenVerified, false); assert.equal(result.receipt.cleanup, 'PASS');
-    assert.ok(['RUNTIME', 'GRANTS'].includes(result.receipt.securityFailure));
-  }
+// CI36576742179: the combined two-call case exhausted its 30s test deadline
+// under aggregate load despite passing the dedicated run. Do not stretch any
+// deadline or guess which native phase slowed down: keep one real call per
+// independently bounded case, with identical rejection/cleanup requirements.
+for (const failure of ['RUNTIME', 'GRANTS']) test(`native hash/grant setup failure ${failure} is fail closed with owned cleanup`, native, async () => {
+  const patch = failure === 'RUNTIME' ? { executable: { ...request().executable, sha256: 'b'.repeat(64) } } : { cwd: 'missing' };
+  const started = performance.now();
+  console.log(JSON.stringify({ control: 'NATIVE_SETUP_REJECTION', expectedPhase: failure, stage: 'START', testDeadlineMs: native.timeout, targetDeadlineMs: 8000 }));
+  const result = await runWindowsSecureBroker(request('tester', 'process.exit(99)', patch));
+  console.log(JSON.stringify({ control: 'NATIVE_SETUP_REJECTION', expectedPhase: failure, stage: 'END', elapsedMs: Math.ceil(performance.now() - started), code: result.code, receipt: result.receipt }));
+  assert.equal(result.code, 70); assert.equal(result.receipt.targetStarted, false);
+  assert.equal(result.receipt.tokenVerified, false); assert.equal(result.receipt.cleanup, 'PASS');
+  assert.equal(result.receipt.securityFailure, failure);
 });
 test('native runtime junction/hardlink substitution is rejected before target launch', native, async () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-broker-source-'));

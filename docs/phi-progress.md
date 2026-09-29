@@ -2,7 +2,17 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
-## Current continuation — repair failed D4 replacement fixture; native acceptance pending
+## Current continuation — D4 native repair proved; compound broker fixture deadline blocks whole gate
+
+Exact corrected **b58f503a5290b63ce32030c4bcd600e85a5a24d8** / [CI36576742179](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36576742179) is **FAILURE**, not accepted D4. The corrected replacement/new-object/same-digest/preserved-original/pre-intent-CONFLICT fixture and native reserved-target control PASS. Dedicated DELETE28/28 (25native +3portable), all13actual publisher deaths/new-process recoveries, retained CREATE18/18/D1journal19/19/atomic19/19/MODIFY34/34 and actual Worker/LSP/non-mutating TEST/controller publication/conflict4/4 (including2DELETE) PASS. Receipt native IDs/digests/roles/cleanup and redaction were independently cross-validated. These are bounded passed controls, not whole-CI acceptance.
+
+First meaningful Windows aggregate failure: `native hash/grant setup failure is fail closed with owned cleanup`, test deadline30000ms, `testTimeoutFailure`/cancelled. Windows355total/344PASS/0FAIL/**1cancelled**/10Linux-only skips; fail0 alone is not success. The same two-call case passed the dedicated broker step in1184ms; subsequent aggregate alias/reviewer cases took22451/26667ms. Which individual setup phase slowed, and the underlying delay cause, remain UNKNOWN. Windows clone/three actual-Pi steps did NOT RUN; overall cleanup after the cancelled fixture is not certified. Ubuntu355/128PASS/0FAIL/0cancelled/227native skips and foundation clone PASS.
+
+The next diagnostic/test-only candidate separates the original RUNTIME(hash) and GRANTS(missing cwd) negative controls into two independently bounded native cases, each with the SAME30000ms test deadline and8000ms target limit. Exactly the same two broker requests; no retry, extra call, product timeout/security/permission change. Each requires its exact rejection phase, exit70/no target/token, cleanupPASS, and emits bounded START/END phase/deadline/elapsed/receipt metadata only. This removes the compound-test deadline ambiguity without claiming to repair an unknown native slowdown. Native deadline expiry remains a genuine failure.
+
+Focused161total/28PASS/0FAIL/0cancelled/133native skips. Authoritative local889total/661PASS/0FAIL/0cancelled/228Windows-only skips, syntax/installed-Pi TypeScript/package-pinned-policy validation PASS. Next commit/push this evidenced diagnostic candidate to the same PRIVATE branch, require the entire exact Windows/Ubuntu/independent-clone/three-local-Pi gate, and retain both failed predecessors. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls.** Do not advance DELETE/RENAME/multifile until whole native acceptance. Protected/auth/active Pi/provider/routes/presets/Council/Judge/Second Brain/security/governors/model retry/spawn limits unchanged.
+
+## Historical continuation — repair failed D4 replacement fixture; before subsequent aggregate timeout
 
 Resumed actual local/remote **1c75888a73b157c268d7095860f4726488f16330**. Index was empty; five source/test corrections were present, but interrupted documentation/staging had not run. No partial receipt or generated artifact was found. The pre-existing protected user edit remains byte-identical and unstaged. Accepted D3/B1/B2/C are retained, not redesigned.
 

@@ -4,6 +4,8 @@
 
 Initial candidate1c75888 / [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) is FAILURE: DELETE25PASS/1FAIL, replacement fixture `BEGIN:80070020`; later Windows production/aggregate/clone/Pi phases did not run. The fixed fixture replaces its .NET pathname move with an independent source-handle/same-directory no-replace rename under unchanged sharing pins. It requires a genuinely new native ID with the original digest, preserved original ID/digest and pre-intent CONFLICT. No release of pins, access/sharing increase, weakened expected-ID check or masked failure. Complete corrected native CI remains mandatory.
 
+Correctedb58f503 / [CI36576742179](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36576742179) proves all28DELETE tests (including actual replacement/reserved target/13real deaths), retained native scopes and actual Worker/LSP/TEST/controller publication/conflict4/4. Whole CI remains FAILURE at an unrelated compound two-call broker setup test's30000ms deadline: aggregate355/344PASS/0FAIL/1cancelled/10skips; later Windows clone/Pi steps did not run. The individual delayed phase/root cause is UNKNOWN, no overall cleanup certificate after cancellation. The diagnostic test-only continuation splits those same two requests into independently bounded30000ms cases/exact failure assertions/metadata-only timing, without changing any product budget or security boundary. Full acceptance is still required before D5.
+
 V3 extends the SAME PublicationJournal registry/ACL/lease/envelope/flush/bounds;
 it is not a second journal or a new model tool. V1/V2 semantics remain. The
 controller's original explicit one-use READY grant dispatches exactly one DELETE
@@ -80,8 +82,9 @@ user target, same-text new target and replaced/missing quarantine controls must
 preserve data and reject blind cleanup. Separate production fixtures exercise
 actual LPAC Worker DELETE -> same-draft JSON LSP -> non-mutating TEST -> original
 READY -> native DELETE -> private PUBLISHED proof -> intended-only Git deletion.
-None is accepted until the exact complete native CI. Local888/661PASS/0FAIL/
-227native skips plus syntax/TypeScript/package validation prove regressions only.
+Bounded native DELETE/controller controls now pass, but the complete gate is not
+accepted. Local889/661PASS/0FAIL/228native skips plus syntax/TypeScript/package
+validation prove local regressions only; no credit for unrun clone/Pi phases.
 
 This is process-death recoverability, not hardware/power-loss durability or broad
 filesystem support. DELETE does not require TxF; retained MODIFY remains the

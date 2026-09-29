@@ -2,7 +2,15 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current continuation — local D4 correction, still NOT Windows-certified
+## Current continuation — bounded D4 controls proved; whole gate still FAIL
+
+Exactb58f503a5290b63ce32030c4bcd600e85a5a24d8 / [CI36576742179](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36576742179) FAILURE. Corrected replacement and reserved-target controls PASS; dedicated DELETE28/28 with13real deaths/new-process recoveries, CREATE18/18/D1journal19/19/atomic19/19/MODIFY34/34 and actual verified-controller Worker/LSP/TEST/MODIFY+DELETE publication/conflict4/4 PASS, with independently validated native IDs/digests/roles/cleanup/redaction. Not whole D4 acceptance.
+
+The first meaningful aggregate error is the combined hash/grant setup negative test exhausting30000ms. Windows355/344PASS/0FAIL/1cancelled/10skips; fail0 does not mean PASS. Same dedicated case1184ms; which setup call delayed and native slowdown cause UNKNOWN. Windows independent clone/three Pi smokes NOT RUN, overall cancelled-fixture cleanup not proved. Ubuntu355/128PASS/0FAIL/227native skips/foundation clone PASS.
+
+Next diagnostic candidate splits only those same two actual negative requests into separate RUNTIME/GRANTS tests, each still30000ms/target8000ms, with exact-phase/exit70/no target/no token/cleanupPASS assertions and metadata-only START/END timing/receipts. No timeout increase, retry, extra call, permission or production code change; unknown native delay is not claimed fixed. Local focused161/28PASS/0FAIL/133skips; full889/661PASS/0FAIL/228native skips plus syntax/TypeScript/package validation PASS. Whole exact private Windows/Ubuntu/clone/Pi proof pending. D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external model/provider calls; protected/auth/Pi/routes/security/caps unchanged. D5 and all later recovery/discovery/retention/multifile/E1/E2/E3 remain open.
+
+## Historical continuation — local D4 correction before failed aggregate CI
 
 Actual local/remote1c75888a73b157c268d7095860f4726488f16330; interrupted state had five source/test corrections, no staged changes or partially written Phi document/receipt. [CI36573711599](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36573711599) remains **FAILURE**: native build and retained CREATE18/18/D1journal19/19/atomic19/19/MODIFY34/34 PASS, DELETE25PASS/1FAIL at pre-delete replacement (`BEGIN:80070020`). Later Windows production/aggregate/clone/Pi phases NOT RUN. Ubuntu353/127PASS/0FAIL/226native skips and clone PASS do not certify Windows.
 
