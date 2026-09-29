@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current D5 candidate — whole CI FAIL at owned pinned-runtime installation
+## Current D5 candidate — V4 RENAME journal awaits Windows certification
+
+The verified predecessor is exact functional `d8097d3` / CI36592593100 SUCCESS, including Windows354PASS/0FAIL, Ubuntu134PASS/0FAIL, both clones/cleanup and three local Pi smokes. The older LSP timeout remains cause UNKNOWN and was not treated as a product fix. A new same-directory explicit RENAME V4 journal candidate is now present; it adds flushed intent/native observation and fresh-process old/new/conflict reconstruction with 28 fixed native controls, including two actual endpoint executions. Local `npm run check` PASS; Linux skips do not certify the native path. The candidate's exact Windows build, complete gate, owned cleanup and Pi smokes are PENDING. Cross-directory MOVE, verified Worker/controller RENAME publication, original-controller reconstruction, trusted discovery, retention, multi-file recovery and D-wide/E1–E3 E2Es remain open. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED;0external provider/model calls.** Protected user audit remains unchanged/unstaged.
+
+## Historical D5 candidate — whole CI FAIL at owned pinned-runtime installation
 
 Exact functional `24061e8b488c86cf3b05fd3f27563b166a55e515` / [CI36585303714](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36585303714) FAILURE. Windows360/350PASS/0FAIL/0cancelled/10skips; Ubuntu360/130PASS/0FAIL/230native skips. RENAME4/4 includes20actual fixed owned cases in both dedicated and aggregate batches; IDs/digests/no-clobber/consumed authority/security/creation-time/cleanup validated. Retained native CREATE/MODIFY/DELETE and production verified-controller publication/conflict controls pass, not redesigned. [Metadata-only failed-run proof](phi-rename-primitive-evidence.json).
 

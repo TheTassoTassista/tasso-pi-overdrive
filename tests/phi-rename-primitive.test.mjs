@@ -21,7 +21,7 @@ test('bounded expected-source RENAME consumes private name/ID/hash authority wit
   assert.match(source, /leaf, 0x30081, 0, 1, 0x40/u);
   const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
   assert.match(dispatch, /args.Length == 2 && args\[0\] == "--rename-primitive-selftest"/u);
-  assert.doesNotMatch(dispatch, /args\[0\] == "--publication-rename"/u); // Not a production publication endpoint yet.
+  assert.match(dispatch, /args\[0\] == "--publication-rename"/u); // Explicit journal path, separate from the primitive fixture.
 });
 
 test('equal content still produces explicit DELETE+CREATE, never an inferred rename or JSON publication authority', () => {
