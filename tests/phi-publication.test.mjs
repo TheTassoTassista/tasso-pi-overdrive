@@ -243,7 +243,7 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
   }
   if (operation === 'rename') {
     files['move.txt'] = 'unchanged-rename-fixture';
-    files['edit.cjs'] = "require('node:fs').renameSync('move.txt','moved.txt');console.log(process.pid)";
+    files['edit.cjs'] = "try{require('node:fs').renameSync('move.txt','moved.txt');console.log(process.pid)}catch(e){process.stderr.write('PHI_RENAME_FIXTURE:'+e.code+':'+e.syscall);process.exitCode=1}";
     files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'unchanged-rename-fixture');a.throws(()=>f.writeFileSync('moved.txt','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
   }
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
@@ -256,7 +256,8 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
 }
 async function nativeVerified(item) {
   const edit = await executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 }, { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token });
-  assert.equal(edit.code, 0); assert.equal(edit.metadata.profile, 'EDIT'); assert.equal(edit.metadata.cleanup, 'PASS');
+  const boundedRenameFailure = /^PHI_RENAME_FIXTURE:[A-Z0-9]+:[a-z]+$/u.test(edit.stderr?.trim() ?? '') ? edit.stderr.trim() : 'EDIT_NONZERO';
+  assert.equal(edit.code, 0, boundedRenameFailure); assert.equal(edit.metadata.profile, 'EDIT'); assert.equal(edit.metadata.cleanup, 'PASS');
   assert.throws(() => process.kill(Number(edit.stdout.trim()), 0), e => e.code === 'ESRCH');
   const lsp = await executeCodingLsp(item.project, { operation: 'diagnostics', path: 'config.json' }, item.context);
   assert.equal(lsp.status, 'PASS'); assert.equal(lsp.count, 0); assert.equal(lsp.receipt.profile, 'LSP_READ_ONLY');
