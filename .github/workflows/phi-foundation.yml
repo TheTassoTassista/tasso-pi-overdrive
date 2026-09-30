@@ -11,10 +11,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    # CI36461530347 passed both suites/clones but hit 20m during the last Pi
-    # smoke after adding actual publication controls. Validation allowance only;
-    # all production/agent/individual-command budgets remain unchanged.
-    timeout-minutes: 25
+    # CI36647998566 passed Windows suites and clone but hit the 25m job ceiling
+    # before the three Pi smokes. Only Windows CI gets the authorized 40m cap;
+    # Ubuntu remains 25m. LSP, tool, production and agent limits are unchanged.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 40 || 25 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
         with:
