@@ -2,7 +2,17 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current accepted D unit — verified-controller single RENAME, not Windows autonomy
+## Current D6 partial unit — fresh-process known-transaction inspection
+
+Functional `cae617ca644e752092ca6894e9f51e0fd81b9232` / [CI36734211948](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36734211948) **SUCCESS Windows/Ubuntu**, exact local `npm run check`933/673PASS/0FAIL/260native skips plus syntax/TypeScript/package validation PASS. The new internal endpoint is read-only, known-locator only and never a model tool. A fresh native process pins the actual project root, validates journal ownership/creator generation and physical filesystem state, then returns only a bounded decision. Native death/restart controls prove old state `ROLLBACK` advisory, retained new RENAME `MANUAL_RECOVERY_REQUIRED`, and user replacement `CONFLICT`; fabricated locator exit70. All three actual receipts show0journal/project mutations,0process kills, no `PUBLISHED`, fixture cleanupPASS. This does not reconstruct the original one-use controller grant, authorize RESUME or clean retained evidence.
+
+Windows400/389PASS/0FAIL/0cancelled/11skips; Ubuntu400/140PASS/0FAIL/0cancelled/260native skips. Independent Windows clone repeats400/389/0/11, PASS_FOUNDATION_ONLY/cleanupPASS, directory removed/owned residual0. Pinned LSP install exit0 at118523ms target within the unchanged120000ms deadline with CPU/I/O sampling and empty Job. Isolated pinned Pi runtime installed228packages in46s; all three real deterministic Pi foreground smokes PASS, 9 broker receipts all cleanupPASS/Job empty and each authority/temp/draft cleared. External provider calls0; both jobs/post-actions SUCCESS. These are owned-scope attestations, not a runner-wide process census.
+
+The prior documentation-only `03d979c` / [CI36731571002](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36731571002) is separately **FAILURE** at the independent-clone LSP120s/exit124, with increasing sampled CPU until deadline, owned residual0 and clone cleanupPASS. Root cause of the intermittent npm duration remains UNKNOWN; neither the later success nor the CI job40m allowance repairs or masks the internal deadline. No timeout/retry/security boundary changed. The protected user audit remains byte-identical/unstaged.
+
+**D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN PROGRESS.** Next: actual trusted-controller restart continuity/verified-state disposition, then owned-root discovery, retention, multi-file/D-wide recovery and E1–E3. No automatic project mutation/replay/new publication certificate is enabled.
+
+## Preceding accepted D unit — verified-controller single RENAME, not Windows autonomy
 
 Functional RENAME candidate `b9aa6b6f209696459eeafbc0534be414477f5e27`, exact tested CI source `6387cd5fd1a0ee8fb2a110a43de1c1b5d49f7afd` / [CI36727049204](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36727049204) **SUCCESS Windows/Ubuntu**. The only executable change after the functional candidate is the authorized Windows CI job ceiling 25 -> 40 minutes; Ubuntu remains 25. The product, LPAC/Job boundaries, routing and fixed 120 s owned LSP limit are unchanged.
 

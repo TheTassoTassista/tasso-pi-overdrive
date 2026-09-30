@@ -1,6 +1,12 @@
 # D — transactional project publication (IN PROGRESS)
 
-## D5 current result — native primitive controls pass; whole candidate NOT accepted
+## Current bounded D5/D6 status
+
+The verified-controller single same-directory RENAME production path is accepted only in its narrow scope: functional `b9aa6b6f209696459eeafbc0534be414477f5e27`, full [CI36727049204](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36727049204) SUCCESS at exact CI source `6387cd5fd1a0ee8fb2a110a43de1c1b5d49f7afd`. The only source change between those commits is the authorized Windows CI job allowance25->40min; the internal LSP120s deadline and all product limits remain unchanged. Windows387PASS/0FAIL/10skips, Ubuntu137PASS/0FAIL/260skips; clone, three Pi smokes and owned cleanup PASS. This does not certify cross-directory MOVE or whole D.
+
+Next initial D6 unit `cae617ca644e752092ca6894e9f51e0fd81b9232` / [CI36734211948](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36734211948) SUCCESS adds a read-only known-transaction restart bridge only. A fresh native process compares the complete durable journal and actual pinned filesystem/root identity; actual killed-publisher controls classify old/ROLLBACK-advisory, retained new/MANUAL_RECOVERY_REQUIRED and user conflict/CONFLICT, with0project/journal mutations,0process kills and no `PUBLISHED`. An invented locator has native exit70; ACTIVE/unbound receipts are rejected by source checks and portable decoder, not credited as a native crash fixture. Windows389PASS/0FAIL/11skips, Ubuntu140PASS/0FAIL/260skips; both clones, three Pi smokes and owned cleanup PASS. Original verified-controller grant/restart continuity, automatic trusted discovery, bounded retention, multi-file recovery and D-wide certification remain open. The intermittent Windows clone npm LSP120s timeout root cause is UNKNOWN: [CI36731571002](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36731571002) failed on the documentation-only predecessor; later success does not fix it. **D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED.**
+
+## Historical D5 result — native primitive controls pass; whole candidate NOT accepted
 
 Exact functional `24061e8` / [CI36585303714](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36585303714)
 is FAILURE at independent Windows clone's unchanged120s owned pinned-LSP install
