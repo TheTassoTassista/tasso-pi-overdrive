@@ -134,6 +134,13 @@ jobs:
       - name: Indexed source/artifact/path/secret audit (no raw matches)
         run: node scripts/phi-repository-audit.mjs
       - name: Clean Git-source clone (foundation only, engine must be unavailable)
+        if: runner.os != 'Windows'
+        run: node scripts/phi-clean-room.mjs
+      - name: Clean Git-source clone on runner temporary volume (foundation only)
+        if: runner.os == 'Windows'
+        env:
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
         run: node scripts/phi-clean-room.mjs
       - name: Isolated pinned Pi runtime for real Worker session proof (no auth, no lifecycle scripts)
         if: runner.os == 'Windows'

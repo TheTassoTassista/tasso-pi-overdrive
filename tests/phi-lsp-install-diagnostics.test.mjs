@@ -5,6 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { redactInstallText, installFileInventory, installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 
+test('Windows clean clone uses runner temp while Linux keeps its original clone path', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const linux = workflow.split('      - name: Clean Git-source clone (foundation only, engine must be unavailable)\n')[1]?.split('      - name: ')[0];
+  const windows = workflow.split('      - name: Clean Git-source clone on runner temporary volume (foundation only)\n')[1]?.split('      - name: ')[0];
+  assert.ok(linux && windows, 'both independent-clone steps must remain registered');
+  assert.match(linux, /if: runner\.os != 'Windows'\n\s+run: node scripts\/phi-clean-room\.mjs/u);
+  assert.match(windows, /if: runner\.os == 'Windows'\n\s+env:\n\s+TMP: \$\{\{ runner\.temp \}\}\n\s+TEMP: \$\{\{ runner\.temp \}\}\n\s+run: node scripts\/phi-clean-room\.mjs/u);
+});
+
 test('trusted install diagnostics redact known environment secrets and credentials without dumping env', () => {
   const text = 'known-credential https://user:password@registry.example/p?token=unknown-token&x=1 Authorization: Bearer abc.123 _authToken=another-secret';
   const result = redactInstallText(text, { ACTIONS_RUNTIME_TOKEN: 'known-credential', PUBLIC_LABEL: 'must-not-be-redacted' });
