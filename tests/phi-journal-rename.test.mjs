@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
+import { validateWindowsKnownReconstruction } from '../platform/windows/publication.mjs';
 
 test('explicit same-directory RENAME is V4 journaled, bound to the expected source, and never inferred from equal content', () => {
   const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
@@ -17,7 +18,7 @@ test('explicit same-directory RENAME is V4 journaled, bound to the expected sour
   assert.ok(rename.indexOf('Observe("COMMITTED"') < rename.indexOf('Observe("POST_COMMIT_VERIFIED"'));
   assert.doesNotMatch(rename, /File\.Move|File\.Delete|Directory\.Move|CreateTransaction|CommitTransaction|CreateFileTransacted/u);
   const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
-  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover']) assert.ok(dispatch.includes(option));
+  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover', '--publication-inspect-known']) assert.ok(dispatch.includes(option));
   assert.match(journal, /if \(old && \(!File\.Exists\(source\) \|\| File\.ReadAllText\(source\) != "old-rename-complete"\)\)/u);
   assert.match(journal, /File\.Exists\(target\) != \(!old && name != "destination-missing-after-crash"\)/u);
   const plan = fs.readFileSync(new URL('../lib/phi-publication-plan.mjs', import.meta.url), 'utf8');
@@ -45,6 +46,14 @@ for (const name of cases) test('native same-journal expected-source RENAME: ' + 
     assert.equal(receipt.evidence.projectPublished, false);
     if (name.endsWith('after-crash')) assert.equal(receipt.evidence.journalMutations, 0);
   }
+  const reconstruction = name === 'crash-intent' ? 'ROLLBACK' : name === 'source-recreate-after-crash' ? 'CONFLICT' :
+    name === 'crash-journal-renamed' ? 'MANUAL_RECOVERY_REQUIRED' : null;
+  assert.equal(receipt.reconstructionDecision, reconstruction);
+  if (reconstruction) {
+    const result = receipt.reconstructionReceipt;
+    assert.equal(result.decision, reconstruction);
+    assert.deepEqual(validateWindowsKnownReconstruction({ status: 0, signal: null, pid: 1 }, result, result.transactionId), result);
+  } else assert.equal(receipt.reconstructionReceipt, null);
   if (name === 'normal') {
     assert.equal(receipt.evidence.journal.phase, 'CLEANED');
     assert.equal(receipt.evidence.nativeProof.backend, 'JOURNALED_HANDLE_ANCHORED_RENAME');

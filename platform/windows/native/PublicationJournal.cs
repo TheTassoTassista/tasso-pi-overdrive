@@ -698,6 +698,52 @@ namespace Phi.Native {
         } finally { mutex.ReleaseMutex(); }
       }
     }
+    internal static int InspectKnownTransaction(Stream input) {
+      // Trusted-controller, read-only restart bridge for a known transaction.
+      // A caller supplies a project root and transaction ID, never a claimed
+      // root identity, publication grant, executable, profile or recovery mode.
+      // Discovery and mutation of retained evidence are separate D units.
+      try {
+        Dictionary<string, object> request;
+        using (MemoryStream line = new MemoryStream()) {
+          bool complete = false;
+          for (int i = 0; i < MaxBytes; i++) {
+            int next = input.ReadByte(); if (next < 0) throw new InvalidDataException();
+            if (next == 10) { complete = true; break; } line.WriteByte((byte)next);
+          }
+          if (!complete) throw new InvalidDataException();
+          request = Serializer().Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(line.ToArray()));
+        }
+        Keys(request, "version", "root", "transactionId"); Number(request, "version", 1, 1);
+        string project = request["root"] as string, transactionId = StringField(request, "transactionId", Id);
+        if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project)) throw new InvalidDataException();
+        string rootIdentity;
+        using (RecoveryFilesystem root = new RecoveryFilesystem(project)) rootIdentity = RecoveryFilesystem.HandleIdentity(root.DirectoryHandle);
+        Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(Inspect(transactionId, project, rootIdentity, false)));
+        string state = observed["status"] as string;
+        // ACTIVE can be returned before the journal/root binding is read (a
+        // contended lease). It is never a successful reconstruction receipt.
+        if (state == null || !new string[] { "OLD_COMPLETE_OBSERVED", "NEW_COMPLETE_OBSERVED", "DELETE_COMMITTED_QUARANTINE_RETAINED",
+            "DELETE_COMMITTED_CLEANUP_OBSERVED", "RENAME_COMMITTED_DESTINATION_RETAINED", "CONFLICT", "UNKNOWN_FAIL_SAFE", "RECOVERY_REQUIRED" }.Contains(state) ||
+            (int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 || (int)observed["processKills"] != 0 || (bool)observed["projectPublished"]) throw new InvalidDataException();
+        Dictionary<string, object> metadata = observed.ContainsKey("metadata") ? observed["metadata"] as Dictionary<string, object> : null;
+        if (metadata == null || (string)metadata["projectIdentity"] != rootIdentity || (string)metadata["transactionId"] != transactionId ||
+            (bool)metadata["projectPublished"]) throw new InvalidDataException();
+        // OLD is physically intact, so a fresh controller may select rollback
+        // for separate authorized metadata reconciliation. No action here.
+        // NEW cannot reconstruct the lost one-use verified-draft certificate.
+        string decision = state == "OLD_COMPLETE_OBSERVED" ? "ROLLBACK" : state == "CONFLICT" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_READ_ONLY_RECONSTRUCTION", transactionId, rootIdentity,
+          rootIdentityVerified = true, observedStatus = state, decision,
+          phase = metadata["phase"], journalVersion = metadata["version"],
+          actionPerformed = false, journalMutations = 0, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 }));
+        return 0;
+      } catch {
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_READ_ONLY_RECONSTRUCTION", decision = "MANUAL_RECOVERY_REQUIRED",
+          actionPerformed = false, journalMutations = 0, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 }));
+        return 70;
+      }
+    }
     public void Dispose() {
       if (disposed) return; disposed = true;
       if (pins != null) pins.Dispose();
@@ -1050,7 +1096,7 @@ namespace Phi.Native {
       if (!controls.Contains(name) && !(name.StartsWith("crash-") && RenameCheckpoints.Contains(name.Substring(6)))) return 70;
       ScopeRecovery scope = null; PublicationJournal journal = null; Process child = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN"; bool passed = false, clean = false, killed = false, childGone = false, restarted = false;
-      object evidence = null; string phaseAtDeath = null, recoveryStatus = null, recoveryPhase = null; int? recoveryExit = null;
+      object evidence = null, reconstructionReceipt = null; string phaseAtDeath = null, recoveryStatus = null, recoveryPhase = null, reconstructionDecision = null; int? recoveryExit = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready(); string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
         string source = Path.Combine(scope.Root, "input.txt"), target = Path.Combine(scope.Root, "renamed.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt");
@@ -1108,6 +1154,43 @@ namespace Phi.Native {
               string expectedPhase = name.EndsWith("after-crash") ? phaseAtDeath : old ? "ROLLED_BACK" : point == "cleaned" ? "CLEANED" : "RECOVERY_REQUIRED";
               if ((string)metadata["phase"] != expectedPhase || name.EndsWith("after-crash") && (int)result["journalMutations"] != 0) throw new InvalidDataException();
             } finally { if (!recovery.HasExited) { recovery.Kill(); recovery.WaitForExit(3000); } }
+          }
+          if (name == "crash-intent" || name == "crash-journal-renamed" || name == "source-recreate-after-crash") {
+            // A *third* process uses only the owned root locator, transaction
+            // ID, durable journal and actual filesystem, never fixture memory.
+            stage = "NEW_CONTROLLER_READ_ONLY_RECONSTRUCTION";
+            using (Process inspector = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+              Arguments = "--publication-inspect-known", UseShellExecute = false, RedirectStandardInput = true,
+              RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+              try {
+                inspector.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root, transactionId = tx })); inspector.StandardInput.Close();
+                if (!inspector.WaitForExit(5000) || inspector.ExitCode != 0) throw new InvalidDataException();
+                string output = inspector.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+                Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output); reconstructionReceipt = result;
+                reconstructionDecision = result["decision"] as string;
+                string expected = name == "crash-intent" ? "ROLLBACK" : name == "source-recreate-after-crash" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+                if ((string)result["status"] != "PASS_READ_ONLY_RECONSTRUCTION" || reconstructionDecision != expected ||
+                    (string)result["transactionId"] != tx || (string)result["rootIdentity"] != rootId || !(bool)result["rootIdentityVerified"] ||
+                    (string)result["phase"] != recoveryPhase || (bool)result["actionPerformed"] || (int)result["journalMutations"] != 0 ||
+                    (int)result["projectMutations"] != 0 || (int)result["processKills"] != 0 || (bool)result["projectPublished"] ||
+                    (int)result["externalRequests"] != 0) throw new InvalidDataException();
+              } finally { if (!inspector.HasExited) { inspector.Kill(); inspector.WaitForExit(3000); } }
+            }
+            if (name == "crash-intent") {
+              // A fabricated locator must not become a recovery decision.
+              using (Process invalid = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+                Arguments = "--publication-inspect-known", UseShellExecute = false, RedirectStandardInput = true,
+                RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+                try {
+                  invalid.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root, transactionId = Guid.NewGuid().ToString("N") })); invalid.StandardInput.Close();
+                  if (!invalid.WaitForExit(5000) || invalid.ExitCode != 70) throw new InvalidDataException();
+                  string rejected = invalid.StandardOutput.ReadToEnd(); if (rejected.Length > 1024) throw new InvalidDataException();
+                  Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(rejected);
+                  if ((string)result["status"] != "FAIL_READ_ONLY_RECONSTRUCTION" || (bool)result["projectPublished"] ||
+                      (bool)result["actionPerformed"] || (int)result["projectMutations"] != 0 || (int)result["journalMutations"] != 0) throw new InvalidDataException();
+                } finally { if (!invalid.HasExited) { invalid.Kill(); invalid.WaitForExit(3000); } }
+              }
+            }
           }
           if (name == "source-recreate-after-crash" && File.ReadAllText(source) != "new-rename-user") throw new InvalidDataException();
           if (old && (!File.Exists(source) || File.ReadAllText(source) != "old-rename-complete")) throw new InvalidDataException();
@@ -1180,7 +1263,7 @@ namespace Phi.Native {
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
-        restartedRecovery = restarted, journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed,
+        restartedRecovery = restarted, reconstructionDecision, reconstructionReceipt, journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed,
         scope = "NATIVE_JOURNAL_RENAME_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }

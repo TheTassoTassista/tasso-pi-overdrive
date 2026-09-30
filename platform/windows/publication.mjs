@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper } from './process.mjs';
 import { readWindowsProjectSnapshot } from './coding-tools.mjs';
@@ -16,6 +17,39 @@ const journalKeys = ['version', 'scope', 'transactionId', 'projectIdentity', 'dr
   'sequence', 'operationIndex', 'operations', 'tempIdentity', 'committedIdentity', 'filesCommitted', 'pendingOperations', 'recoveryState', 'cleanup', 'projectPublished'];
 const admissionKeys = ['version', 'scope', 'phase', 'transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'operations',
   'journalCreated', 'mutationStarted', 'filesCommitted', 'pendingOperations', 'commitState', 'recoveryState', 'cleanup', 'projectPublished'];
+const reconstructionKeys = ['version', 'status', 'transactionId', 'rootIdentity', 'rootIdentityVerified', 'observedStatus', 'decision', 'phase',
+  'journalVersion', 'actionPerformed', 'journalMutations', 'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];
+const reconstructionStates = new Set(['OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED',
+  'DELETE_COMMITTED_CLEANUP_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE', 'RECOVERY_REQUIRED']);
+
+// A dead controller's private WeakMap publication proof is intentionally not
+// serialized. This decoder can report only read-only filesystem/journal
+// observations; it cannot mint PUBLISHED, replay an approval or clean evidence.
+export function validateWindowsKnownReconstruction(run, value, transactionId) {
+  if (run?.error || run?.status !== 0 || run?.signal || !Number.isSafeInteger(run?.pid) || run.pid < 1 ||
+      !exactKeys(value, reconstructionKeys) || value.version !== 1 || value.status !== 'PASS_READ_ONLY_RECONSTRUCTION' ||
+      value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
+      !reconstructionStates.has(value.observedStatus) || value.rootIdentityVerified !== true ||
+      value.decision !== (value.observedStatus === 'OLD_COMPLETE_OBSERVED' ? 'ROLLBACK' : value.observedStatus === 'CONFLICT' ? 'CONFLICT' : 'MANUAL_RECOVERY_REQUIRED') ||
+      typeof value.phase !== 'string' || !/^[A-Z_]{3,32}$/u.test(value.phase) || !Number.isInteger(value.journalVersion) || value.journalVersion < 1 || value.journalVersion > 4 ||
+      value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 || value.processKills !== 0 ||
+      value.projectPublished !== false || value.externalRequests !== 0) fail('RECONSTRUCTION_UNCONFIRMED');
+  return freeze({ ...value });
+}
+
+// Internal trusted-controller known-locator bridge. Transaction discovery is
+// separate; this is never registered as a model tool or a recovery mutation.
+export function inspectKnownWindowsTransaction({ cwd, transactionId }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0') || !/^[0-9a-f]{32}$/u.test(transactionId ?? '')) fail('RECONSTRUCTION_REQUEST_INVALID');
+  const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('RECONSTRUCTION_REQUEST_INVALID');
+  const input = JSON.stringify({ version: 1, root, transactionId }) + '\n';
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-inspect-known'], { shell: false, windowsHide: true, encoding: 'utf8', input,
+    timeout: 15000, maxBuffer: 8192 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('RECONSTRUCTION_UNCONFIRMED'); }
+  return validateWindowsKnownReconstruction(run, value, transactionId);
+}
 
 // Pure bounded failure decoder, not an execution endpoint or publication proof.
 // Production calls it ONLY with the result of the fixed attested native spawn.
