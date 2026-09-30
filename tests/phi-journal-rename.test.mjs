@@ -65,7 +65,7 @@ for (const name of cases) test('native same-journal expected-source RENAME: ' + 
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_RENAME_ONLY', ...receipt }));
 });
 
-for (const name of ['rollback', 'resume', 'finalize', 'cleanup-only', 'conflict', 'manual', 'invalid-locator']) {
+for (const name of ['rollback', 'resume', 'resume-journal', 'finalize', 'cleanup-only', 'conflict', 'unrelated-change', 'source-replaced', 'manual', 'invalid-locator']) {
   test('native killed-publisher fresh-controller bounded recovery: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-rename-controller-recovery-selftest', name], {
       shell: false, windowsHide: true, encoding: 'utf8', timeout: 22000, maxBuffer: 10000,
@@ -85,7 +85,7 @@ for (const name of ['rollback', 'resume', 'finalize', 'cleanup-only', 'conflict'
     assert.equal(receipt.digestContractVector, draftContentDigest({ 'sample.txt': 'A/\b\t\n\r\f"\\<>&é😀\u2028' }));
     if (name !== 'invalid-locator') assert.deepEqual(validateWindowsKnownRecovery({ status: 0, signal: null, pid: 1 }, receipt.evidence, receipt.evidence.transactionId), receipt.evidence);
     else assert.equal(receipt.controllerExit, 70);
-    assert.doesNotMatch(JSON.stringify(receipt), /old-rename-complete|new-rename-user|unrelated-rename-user/u);
+    assert.doesNotMatch(JSON.stringify(receipt), /old-rename-complete|new-rename-user|unrelated-rename-user|new-unrelated-user/u);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'NATIVE_BOUNDED_RENAME_RECOVERY', ...receipt }));
   });

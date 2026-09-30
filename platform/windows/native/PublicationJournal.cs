@@ -34,7 +34,8 @@ namespace Phi.Native {
     readonly RecoveryFilesystem pins;
     Dictionary<string, object> header, last;
     string lastDigest;
-    bool acquired, poisoned, disposed, deleteCleanupIntent;
+    bool acquired, poisoned, disposed, deleteCleanupIntent, recoveryMutationUncertain;
+    int recoveryProjectMutations;
     sealed class AdmissionConflict : InvalidOperationException {
       internal readonly object Evidence;
       internal AdmissionConflict(Dictionary<string, object> value) : base("PHI_PUBLICATION_CONFLICT") {
@@ -806,10 +807,11 @@ namespace Phi.Native {
       return ProjectBaseDigest((string)header["projectIdentity"], baseFiles, baseIds) == (string)header["baseDigest"] &&
         ProjectDraftDigest(draftFiles) == (string)header["verifiedDigest"];
     }
-    object RecoverKnownRename(string expectedRootIdentity) {
+    object RecoverKnownRename(string expectedRootIdentity, Action live) {
       // Called only after a dead creator and a complete, private, pinned journal
-      // have been validated under this transaction's exclusive lease. This is
-      // recovery authority for metadata ONLY, never new publication authority.
+      // have been validated under this transaction's exclusive lease. Only a
+      // flushed RENAME_INTENT can authorize the exact pending no-clobber move;
+      // no recovered state can grant general publication authority.
       string before = (string)last["phase"];
       int sequence = (int)last["sequence"];
       object inspected = InspectSingleRename(false);
@@ -818,25 +820,51 @@ namespace Phi.Native {
       bool old = observed == "OLD_COMPLETE_OBSERVED", next = observed == "RENAME_COMMITTED_DESTINATION_RETAINED";
       bool wholeVerified = (old || next) && VerifiedRenameSnapshot(Snapshot(project, expectedRootIdentity), next);
       string decision = observed == "CONFLICT" || (old || next) && !wholeVerified ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
-      if (wholeVerified && old && new string[] { "PREPARED", "RENAME_INTENT" }.Contains(before)) {
+      if (wholeVerified && old && before == "RENAME_INTENT") {
+        // Durable INTENT is a recovery-only capability for this exact bounded
+        // move. The verified new bytes still exist in the expected source.
+        // PREPARED alone cannot authorize this project mutation.
+        Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+        string[] sourceParts = AnchoredFile.Segments((string)op["sourcePath"]), targetParts = AnchoredFile.Segments((string)op["path"]);
+        string sourcePath = sourceParts.Aggregate(project, (current, part) => Path.Combine(current, part));
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(sourcePath))) {
+          IntPtr source = IntPtr.Zero;
+          try {
+            RecoveryFilesystem.Info info; source = parent.OpenRenameSource(sourceParts.Last(), out info);
+            DeleteObject held = ReadDeleteObject(source);
+            if (!DeleteBaseMatches(held, op) || held.Bytes != (int)op["newBytes"] || ReadDeleteLeaf(parent, targetParts.Last()) != null)
+              throw new InvalidOperationException("PHI_PUBLICATION_CONFLICT");
+            live(); recoveryMutationUncertain = true;
+            parent.RenameExpectedSource(source, sourceParts.Last(), targetParts.Last(), (string)op["baseIdentity"], (string)op["baseDigest"]);
+            recoveryProjectMutations = 1;
+            live();
+          } finally { CloseNative(source); }
+        }
+        // Never finalize a project mutation if the complete verified draft is
+        // no longer the actual project. A failure retains the intent/evidence.
+        if (!VerifiedRenameSnapshot(Snapshot(project, expectedRootIdentity), true)) throw new InvalidDataException();
+        recoveryMutationUncertain = false;
+        old = false; next = true; decision = "RESUME";
+      }
+      if (wholeVerified && old && before == "PREPARED") {
         decision = "ROLLBACK";
         Observe("ROLLBACK_REQUIRED", last["tempIdentity"] as string, null);
         Observe("ROLLED_BACK", last["tempIdentity"] as string, null);
       } else if (wholeVerified && next && new string[] { "RENAME_INTENT", "RENAMED", "COMMITTED", "POST_COMMIT_VERIFIED", "RECOVERY_REQUIRED" }.Contains(before)) {
-        decision = before == "RENAME_INTENT" || before == "RENAMED" ? "RESUME" : "FINALIZE_COMMIT";
+        if (decision != "RESUME") decision = before == "RENAME_INTENT" || before == "RENAMED" ? "RESUME" : "FINALIZE_COMMIT";
         string expected = (string)((Dictionary<string, object>)Operations(header)[0])["baseIdentity"];
         if ((string)last["phase"] == "RENAME_INTENT") Observe("RENAMED", expected, null);
         if ((string)last["phase"] == "RENAMED") Observe("COMMITTED", expected, expected);
         if ((string)last["phase"] == "COMMITTED") Observe("POST_COMMIT_VERIFIED", expected, expected);
         Observe("CLEANED", expected, expected);
       } else if (wholeVerified && (old && before == "ROLLED_BACK" || next && before == "CLEANED")) decision = "CLEANUP_ONLY";
-      // No project writes, deletes or process kills, even on RESUME. The new
-      // project state must have been completed by the original publisher.
+      // Only a durable INTENT plus exact held source permits one no-clobber
+      // project rename. All other recovery decisions are metadata-only.
       return new { version = 1, status = "PASS_BOUNDED_RENAME_RECOVERY", transactionId = id, rootIdentity = expectedRootIdentity,
         rootIdentityVerified = true, observedStatus = observed, decision, phaseBefore = before, phaseAfter = last["phase"],
         baseDigestVerified = wholeVerified, verifiedDraftDigestMatched = wholeVerified,
-        actionPerformed = (int)last["sequence"] != sequence, journalMutations = (int)last["sequence"] - sequence,
-        projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 };
+        actionPerformed = (int)last["sequence"] != sequence || recoveryProjectMutations != 0, journalMutations = (int)last["sequence"] - sequence,
+        projectMutations = recoveryProjectMutations, processKills = 0, projectPublished = false, externalRequests = 0 };
     }
     internal static int RecoverKnownTransaction(Stream input) {
       PublicationJournal journal = null;
@@ -849,22 +877,28 @@ namespace Phi.Native {
           if (!complete) throw new InvalidDataException();
           request = Serializer().Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(line.ToArray()));
         }
-        Keys(request, "version", "root", "transactionId"); Number(request, "version", 1, 1);
+        Keys(request, "version", "root", "transactionId", "guardianPid", "timeoutMs"); Number(request, "version", 1, 1);
         string project = request["root"] as string, tx = StringField(request, "transactionId", Id);
         if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project)) throw new InvalidDataException();
-        journal = new PublicationJournal(tx, project);
-        string rootIdentity = RecoveryFilesystem.HandleIdentity(journal.pins.DirectoryHandle);
-        using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
-          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
-          if ((string)journal.header["projectIdentity"] != rootIdentity) throw new InvalidDataException();
-        }
-        bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
-        if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
-        if ((int)journal.header["version"] != 4) throw new InvalidDataException();
-        Console.WriteLine(Serializer().Serialize(journal.RecoverKnownRename(rootIdentity))); return 0;
+        object result = null;
+        OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 15000), delegate(Action live) {
+          journal = new PublicationJournal(tx, project);
+          string rootIdentity = RecoveryFilesystem.HandleIdentity(journal.pins.DirectoryHandle);
+          using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+            if ((string)journal.header["projectIdentity"] != rootIdentity) throw new InvalidDataException();
+          }
+          bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
+          if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
+          if ((int)journal.header["version"] != 4) throw new InvalidDataException();
+          live(); result = journal.RecoverKnownRename(rootIdentity, live);
+        });
+        Console.WriteLine(Serializer().Serialize(result)); return 0;
       } catch {
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
-          actionPerformed = false, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
+          actionPerformed = journal != null && (journal.recoveryMutationUncertain || journal.recoveryProjectMutations != 0),
+          projectMutations = journal == null ? (object)0 : journal.recoveryMutationUncertain ? (object)"UNKNOWN" : journal.recoveryProjectMutations,
+          processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
       } finally { if (journal != null) journal.Dispose(); }
     }
     public void Dispose() {
@@ -1397,7 +1431,7 @@ namespace Phi.Native {
       return passed && clean ? 0 : 70;
     }
     internal static int RenameControllerRecoverySelfTest(string name) {
-      string[] cases = { "rollback", "resume", "finalize", "cleanup-only", "conflict", "manual", "invalid-locator" };
+      string[] cases = { "rollback", "resume", "resume-journal", "finalize", "cleanup-only", "conflict", "unrelated-change", "source-replaced", "manual", "invalid-locator" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; Process publisher = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
@@ -1415,7 +1449,9 @@ namespace Phi.Native {
         Dictionary<string, object> initialIds = (Dictionary<string, object>)initial["identities"];
         rootIdEvidence = rootId; sourceIdEvidence = (string)initialIds["input.txt"]; unrelatedIdEvidence = (string)initialIds["unrelated.txt"];
         baseDigestEvidence = (string)expectedHeader["baseDigest"]; verifiedDigestEvidence = (string)expectedHeader["verifiedDigest"];
-        string point = name == "rollback" || name == "invalid-locator" ? "intent" : name == "finalize" ? "committed" : name == "cleanup-only" ? "cleaned" : "renamed";
+        string point = name == "rollback" || name == "invalid-locator" ? "before-rename" :
+          new string[] { "resume", "unrelated-change", "source-replaced" }.Contains(name) ? "intent" :
+          name == "finalize" ? "committed" : name == "cleanup-only" ? "cleaned" : "renamed";
         stage = "START_PUBLISHER";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-rename-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true,
@@ -1428,6 +1464,8 @@ namespace Phi.Native {
         phaseAtDeath = announcement["phase"] as string; stage = "KILL_PUBLISHER";
         publisher.Kill(); killed = true; if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException(); childGone = true;
         if (name == "conflict") File.WriteAllText(source, "new-rename-user", new UTF8Encoding(false));
+        if (name == "unrelated-change") File.WriteAllText(unrelated, "new-unrelated-user", new UTF8Encoding(false));
+        if (name == "source-replaced") { File.Move(source, source + ".user-owned"); File.WriteAllText(source, "old-rename-complete", new UTF8Encoding(false)); }
         if (name == "manual") File.Move(target, target + ".user-owned");
         stage = "NEW_CONTROLLER";
         using (Process controller = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
@@ -1435,7 +1473,8 @@ namespace Phi.Native {
           RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
           try {
             controller.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root,
-              transactionId = name == "invalid-locator" ? Guid.NewGuid().ToString("N") : tx })); controller.StandardInput.Close();
+              transactionId = name == "invalid-locator" ? Guid.NewGuid().ToString("N") : tx,
+              guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 })); controller.StandardInput.Close();
             if (!controller.WaitForExit(5000)) throw new InvalidDataException(); controllerGone = controller.HasExited; controllerExit = controller.ExitCode;
             if (controllerExit != (name == "invalid-locator" ? 70 : 0)) throw new InvalidDataException();
             string output = controller.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
@@ -1444,32 +1483,36 @@ namespace Phi.Native {
               if ((string)receipt["status"] != "FAIL_BOUNDED_RENAME_RECOVERY" || (bool)receipt["actionPerformed"] ||
                   (bool)receipt["projectPublished"] || (int)receipt["projectMutations"] != 0) throw new InvalidDataException();
             } else {
-              string decision = name == "cleanup-only" ? "CLEANUP_ONLY" : name == "conflict" ? "CONFLICT" :
-                name == "manual" ? "MANUAL_RECOVERY_REQUIRED" : name == "finalize" ? "FINALIZE_COMMIT" : name.ToUpperInvariant();
-              bool action = name == "rollback" || name == "resume" || name == "finalize";
+              string decision = name == "cleanup-only" ? "CLEANUP_ONLY" : new string[] { "conflict", "unrelated-change", "source-replaced" }.Contains(name) ? "CONFLICT" :
+                name == "manual" ? "MANUAL_RECOVERY_REQUIRED" : name == "finalize" ? "FINALIZE_COMMIT" :
+                name == "resume-journal" ? "RESUME" : name.ToUpperInvariant();
+              bool action = name == "rollback" || name == "resume" || name == "resume-journal" || name == "finalize";
               string finalPhase = name == "rollback" ? "ROLLED_BACK" : action || name == "cleanup-only" ? "CLEANED" : phaseAtDeath;
               if ((string)receipt["status"] != "PASS_BOUNDED_RENAME_RECOVERY" || (string)receipt["decision"] != decision ||
                   (string)receipt["transactionId"] != tx || (string)receipt["rootIdentity"] != rootId || !(bool)receipt["rootIdentityVerified"] ||
                   (string)receipt["phaseBefore"] != phaseAtDeath || (string)receipt["phaseAfter"] != finalPhase ||
                   (bool)receipt["actionPerformed"] != action || ((int)receipt["journalMutations"] > 0) != action ||
-                  (int)receipt["projectMutations"] != 0 || (int)receipt["processKills"] != 0 || (bool)receipt["projectPublished"] ||
+                  (int)receipt["projectMutations"] != (name == "resume" ? 1 : 0) || (int)receipt["processKills"] != 0 || (bool)receipt["projectPublished"] ||
                   (int)receipt["externalRequests"] != 0 ||
-                  (bool)receipt["baseDigestVerified"] != (name != "conflict" && name != "manual") ||
-                  (bool)receipt["verifiedDraftDigestMatched"] != (name != "conflict" && name != "manual")) throw new InvalidDataException();
+                  (bool)receipt["baseDigestVerified"] != !new string[] { "conflict", "unrelated-change", "source-replaced", "manual" }.Contains(name) ||
+                  (bool)receipt["verifiedDraftDigestMatched"] != !new string[] { "conflict", "unrelated-change", "source-replaced", "manual" }.Contains(name)) throw new InvalidDataException();
             }
           } finally { if (!controller.HasExited) { controller.Kill(); controller.WaitForExit(3000); } }
         }
         stage = "VERIFY_PROJECT_AND_JOURNAL";
-        if (File.ReadAllText(unrelated) != "unrelated-rename-user" || File.Exists(source) != (name == "rollback" || name == "invalid-locator" || name == "conflict") ||
-            File.Exists(target) != !(name == "rollback" || name == "invalid-locator" || name == "manual") ||
+        if (File.ReadAllText(unrelated) != (name == "unrelated-change" ? "new-unrelated-user" : "unrelated-rename-user") ||
+            File.Exists(source) != new string[] { "rollback", "invalid-locator", "conflict", "unrelated-change", "source-replaced" }.Contains(name) ||
+            File.Exists(target) != !new string[] { "rollback", "invalid-locator", "unrelated-change", "source-replaced", "manual" }.Contains(name) ||
             name == "conflict" && File.ReadAllText(source) != "new-rename-user" ||
+            name == "source-replaced" && (File.ReadAllText(source) != "old-rename-complete" || File.ReadAllText(source + ".user-owned") != "old-rename-complete") ||
             name == "manual" && File.ReadAllText(target + ".user-owned") != "old-rename-complete" ||
-            name != "conflict" && name != "manual" && File.ReadAllText(name == "rollback" || name == "invalid-locator" ? source : target) != "old-rename-complete") throw new InvalidDataException();
+            !new string[] { "conflict", "manual", "unrelated-change", "source-replaced" }.Contains(name) &&
+              File.ReadAllText(name == "rollback" || name == "invalid-locator" ? source : target) != "old-rename-complete") throw new InvalidDataException();
         using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
           if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
           if ((string)journal.header["baseDigest"] != (string)expectedHeader["baseDigest"] ||
               (string)journal.header["verifiedDigest"] != (string)expectedHeader["verifiedDigest"] ||
-              (string)journal.last["phase"] != (name == "rollback" ? "ROLLED_BACK" : new string[] { "resume", "finalize", "cleanup-only" }.Contains(name) ? "CLEANED" : phaseAtDeath)) throw new InvalidDataException();
+              (string)journal.last["phase"] != (name == "rollback" ? "ROLLED_BACK" : new string[] { "resume", "resume-journal", "finalize", "cleanup-only" }.Contains(name) ? "CLEANED" : phaseAtDeath)) throw new InvalidDataException();
         }
         passed = true;
       } catch (Exception error) { Console.Error.WriteLine("PHI_RENAME_CONTROLLER_RECOVERY_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":controllerExit=" + controllerExit); }

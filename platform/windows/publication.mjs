@@ -58,7 +58,7 @@ export function validateWindowsKnownRecovery(run, value, transactionId) {
   const action = new Set(['ROLLBACK', 'RESUME', 'FINALIZE_COMMIT']);
   const terminal = value?.decision === 'ROLLBACK' ? 'ROLLED_BACK' : 'CLEANED';
   const phaseActions = {
-    ROLLBACK: { PREPARED: 2, RENAME_INTENT: 2 },
+    ROLLBACK: { PREPARED: 2 },
     RESUME: { RENAME_INTENT: 4, RENAMED: 3 },
     FINALIZE_COMMIT: { COMMITTED: 2, POST_COMMIT_VERIFIED: 1, RECOVERY_REQUIRED: 1 },
   };
@@ -69,15 +69,21 @@ export function validateWindowsKnownRecovery(run, value, transactionId) {
       !/^[A-Z_]{3,32}$/u.test(value.phaseAfter ?? '') ||
       !['OLD_COMPLETE_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE'].includes(value.observedStatus) ||
       !['ROLLBACK', 'RESUME', 'FINALIZE_COMMIT', 'CLEANUP_ONLY', 'CONFLICT', 'MANUAL_RECOVERY_REQUIRED'].includes(value.decision) ||
-      value.projectMutations !== 0 || value.processKills !== 0 || value.projectPublished !== false || value.externalRequests !== 0 ||
+      !Number.isInteger(value.projectMutations) || value.projectMutations < 0 || value.projectMutations > 1 ||
+      value.processKills !== 0 || value.projectPublished !== false || value.externalRequests !== 0 ||
       !Number.isInteger(value.journalMutations) || value.journalMutations < 0 || value.journalMutations > 4 ||
       typeof value.baseDigestVerified !== 'boolean' || typeof value.verifiedDraftDigestMatched !== 'boolean' ||
       value.baseDigestVerified !== value.verifiedDraftDigestMatched) fail('RECOVERY_UNCONFIRMED');
   if (action.has(value.decision)) {
     if (value.actionPerformed !== true || value.journalMutations !== phaseActions[value.decision][value.phaseBefore] || value.phaseAfter !== terminal ||
         value.baseDigestVerified !== true ||
-        (value.decision === 'ROLLBACK' ? value.observedStatus !== 'OLD_COMPLETE_OBSERVED' : value.observedStatus !== 'RENAME_COMMITTED_DESTINATION_RETAINED')) fail('RECOVERY_UNCONFIRMED');
+        (value.decision === 'ROLLBACK' ? value.observedStatus !== 'OLD_COMPLETE_OBSERVED' : value.decision === 'RESUME'
+          ? !['OLD_COMPLETE_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED'].includes(value.observedStatus)
+          : value.observedStatus !== 'RENAME_COMMITTED_DESTINATION_RETAINED') ||
+        value.projectMutations !== (value.decision === 'RESUME' && value.observedStatus === 'OLD_COMPLETE_OBSERVED' ? 1 : 0) ||
+        value.decision === 'RESUME' && value.observedStatus === 'OLD_COMPLETE_OBSERVED' && value.phaseBefore !== 'RENAME_INTENT') fail('RECOVERY_UNCONFIRMED');
   } else if (value.actionPerformed !== false || value.journalMutations !== 0 || value.phaseAfter !== value.phaseBefore ||
+      value.projectMutations !== 0 ||
       value.decision === 'CLEANUP_ONLY' && (!value.baseDigestVerified || !['CLEANED', 'ROLLED_BACK'].includes(value.phaseAfter)) ||
       value.decision === 'CLEANUP_ONLY' && (value.phaseAfter === 'CLEANED' ? value.observedStatus !== 'RENAME_COMMITTED_DESTINATION_RETAINED' : value.observedStatus !== 'OLD_COMPLETE_OBSERVED') ||
       value.decision === 'MANUAL_RECOVERY_REQUIRED' && value.observedStatus !== 'UNKNOWN_FAIL_SAFE' ||
@@ -85,16 +91,16 @@ export function validateWindowsKnownRecovery(run, value, transactionId) {
   return freeze({ ...value });
 }
 
-// This fixed endpoint can only reconcile V4 metadata for a dead creator after
-// revalidating the full base/verified project digests. It does not execute a
-// project write, restore the live WeakMap grant, or mint PUBLISHED.
+// Recovery-only: V4 INTENT may complete exactly one held-source no-clobber
+// rename; all other dispositions are metadata-only. No restored WeakMap grant
+// or new PUBLISHED certificate is minted.
 export function recoverKnownWindowsRename({ cwd, transactionId }) {
   if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
   if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0') || !/^[0-9a-f]{32}$/u.test(transactionId ?? '')) fail('RECOVERY_REQUEST_INVALID');
   const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
   if (!stat.isDirectory() || stat.isSymbolicLink()) fail('RECOVERY_REQUEST_INVALID');
   const run = spawnSync(ownedWindowsHelper(), ['--publication-recover-known'], { shell: false, windowsHide: true, encoding: 'utf8',
-    input: JSON.stringify({ version: 1, root, transactionId }) + '\n', timeout: 15000, maxBuffer: 8192 });
+    input: JSON.stringify({ version: 1, root, transactionId, guardianPid: process.pid, timeoutMs: 10000 }) + '\n', timeout: 11000, maxBuffer: 8192 });
   let value; try { value = JSON.parse(run.stdout); } catch { fail('RECOVERY_UNCONFIRMED'); }
   return validateWindowsKnownRecovery(run, value, transactionId);
 }

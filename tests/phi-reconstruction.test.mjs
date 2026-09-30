@@ -58,7 +58,8 @@ const recoveryReceipt = (decision, observedStatus, phaseBefore, phaseAfter, jour
 
 test('bounded restarted-controller receipt accepts only terminal metadata recovery, never publication', () => {
   const accepted = [
-    recoveryReceipt('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'RENAME_INTENT', 'ROLLED_BACK', 2),
+    recoveryReceipt('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'PREPARED', 'ROLLED_BACK', 2),
+    { ...recoveryReceipt('RESUME', 'OLD_COMPLETE_OBSERVED', 'RENAME_INTENT', 'CLEANED', 4), projectMutations: 1 },
     recoveryReceipt('RESUME', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'RENAME_INTENT', 'CLEANED', 4),
     recoveryReceipt('FINALIZE_COMMIT', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'COMMITTED', 'CLEANED', 2),
     recoveryReceipt('CLEANUP_ONLY', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CLEANED', 'CLEANED', 0),
@@ -68,7 +69,7 @@ test('bounded restarted-controller receipt accepts only terminal metadata recove
   for (const value of accepted) {
     const decoded = validateWindowsKnownRecovery(run, value, transactionId);
     assert.equal(decoded.projectPublished, false);
-    assert.equal(decoded.projectMutations, 0);
+    assert.equal(decoded.projectMutations, value.projectMutations);
     assert.throws(() => { decoded.decision = 'PUBLISHED'; }, TypeError);
   }
 });
