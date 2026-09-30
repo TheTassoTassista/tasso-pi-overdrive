@@ -19,7 +19,7 @@ test('explicit same-directory RENAME is V4 journaled, bound to the expected sour
   assert.ok(rename.indexOf('Observe("COMMITTED"') < rename.indexOf('Observe("POST_COMMIT_VERIFIED"'));
   assert.doesNotMatch(rename, /File\.Move|File\.Delete|Directory\.Move|CreateTransaction|CommitTransaction|CreateFileTransacted/u);
   const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
-  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover', '--publication-inspect-known', '--publication-discover', '--publication-recover-known', '--publication-rename-controller-recovery-selftest']) assert.ok(dispatch.includes(option));
+  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover', '--publication-inspect-known', '--publication-discover', '--publication-discovery-selftest', '--publication-recover-known', '--publication-rename-controller-recovery-selftest']) assert.ok(dispatch.includes(option));
   assert.match(journal, /if \(old && \(!File\.Exists\(source\) \|\| File\.ReadAllText\(source\) != "old-rename-complete"\)\)/u);
   assert.match(journal, /File\.Exists\(target\) != \(!old && name != "destination-missing-after-crash"\)/u);
   const plan = fs.readFileSync(new URL('../lib/phi-publication-plan.mjs', import.meta.url), 'utf8');
@@ -93,5 +93,39 @@ for (const name of ['rollback', 'resume', 'resume-journal', 'finalize', 'cleanup
     assert.doesNotMatch(JSON.stringify(receipt), /old-rename-complete|new-rename-user|unrelated-rename-user|new-unrelated-user/u);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'NATIVE_BOUNDED_RENAME_RECOVERY', ...receipt }));
+  });
+}
+
+for (const name of ['empty', 'foreign', 'active', 'corrupt']) {
+  test('native private-index discovery fails closed: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-discovery-selftest', name], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 22000, maxBuffer: 10000,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.caseName, name);
+    for (const key of ['passed', 'fixtureCleanup', 'readerGone']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.scope, 'NATIVE_READ_ONLY_PHI_INDEX_DISCOVERY_NOT_RECOVERY_AUTHORITY');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    const evidence = receipt.evidence;
+    if (name === 'corrupt') {
+      assert.equal(receipt.readerExit, 70);
+      assert.equal(evidence.status, 'FAIL_READ_ONLY_DISCOVERY');
+      assert.equal(evidence.decision, 'UNKNOWN_FAIL_SAFE');
+      assert.equal('entries' in evidence, false);
+    } else {
+      assert.equal(receipt.readerExit, 0);
+      assert.deepEqual(validateWindowsTransactionDiscovery({ status: 0, signal: null, pid: 1 }, evidence), evidence);
+      assert.equal(evidence.projectTransactions, name === 'active' ? 1 : 0);
+      if (name === 'active') assert.equal(evidence.entries[0].classification, 'ACTIVE_UNVERIFIED');
+    }
+    assert.equal(evidence.projectMutations, 0);
+    assert.equal(evidence.journalMutations, 0);
+    assert.equal(evidence.processKills, 0);
+    assert.equal(evidence.projectPublished, false);
+    assert.doesNotMatch(JSON.stringify(receipt), /old-rename-complete|unrelated-rename-user/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'NATIVE_READ_ONLY_PHI_INDEX_DISCOVERY', ...receipt }));
   });
 }

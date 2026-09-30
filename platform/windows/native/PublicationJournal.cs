@@ -1630,6 +1630,77 @@ namespace Phi.Native {
         scope = "NATIVE_BOUNDED_RENAME_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
+    internal static int DiscoverySelfTest(string name) {
+      if (!new string[] { "empty", "foreign", "active", "corrupt" }.Contains(name)) return 70;
+      ScopeRecovery scope = null, foreign = null; PublicationJournal held = null; Process reader = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", rootIdentity = null;
+      bool passed = false, clean = false, readerGone = false;
+      object evidence = null; int exit = -1;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        rootIdentity = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string journalRoot = scope.Root;
+        if (name == "foreign") {
+          foreign = ScopeRecovery.Begin(); foreign.CreateRoot(); foreign.Ready(); journalRoot = foreign.Root;
+        }
+        if (name != "empty") {
+          File.WriteAllText(Path.Combine(journalRoot, "input.txt"), "old-rename-complete", new UTF8Encoding(false));
+          File.WriteAllText(Path.Combine(journalRoot, "unrelated.txt"), "unrelated-rename-user", new UTF8Encoding(false));
+          held = Begin(journalRoot, RenameFixtureHeader(journalRoot, tx));
+          if (name != "active" && name != "foreign") { held.Dispose(); held = null; }
+          if (name == "corrupt") {
+            // Only this fresh owned fixture key is damaged; never touch user
+            // transaction evidence or production keys.
+            using (RegistryKey root = OpenBase(true)) using (RegistryKey key = root.OpenSubKey(tx, true)) {
+              if (key == null) throw new InvalidDataException(); ScopeRecovery.ValidateRegistry(key);
+              key.SetValue("E00000000", new byte[] { 1, 2, 3 }, RegistryValueKind.Binary);
+              if (RegFlushKey(key.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException();
+            }
+          }
+        }
+        stage = "FRESH_READER";
+        reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-discover", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        reader.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root })); reader.StandardInput.Close();
+        if (!reader.WaitForExit(5000)) throw new InvalidDataException(); readerGone = reader.HasExited; exit = reader.ExitCode;
+        if (exit != (name == "corrupt" ? 70 : 0)) throw new InvalidDataException();
+        string output = reader.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+        Dictionary<string, object> receipt = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = receipt;
+        if ((bool)receipt["actionPerformed"] || (int)receipt["journalMutations"] != 0 || (int)receipt["projectMutations"] != 0 ||
+            (int)receipt["processKills"] != 0 || (bool)receipt["projectPublished"] || (int)receipt["externalRequests"] != 0) throw new InvalidDataException();
+        if (name == "corrupt") {
+          if ((string)receipt["status"] != "FAIL_READ_ONLY_DISCOVERY" || (string)receipt["decision"] != "UNKNOWN_FAIL_SAFE" ||
+              receipt.ContainsKey("entries")) throw new InvalidDataException();
+        } else {
+          IList entries = receipt["entries"] as IList;
+          if ((string)receipt["status"] != "PASS_READ_ONLY_DISCOVERY" || (string)receipt["rootIdentity"] != rootIdentity ||
+              !(bool)receipt["rootIdentityVerified"] || entries == null ||
+              (int)receipt["projectTransactions"] != (name == "active" ? 1 : 0) || entries.Count != (name == "active" ? 1 : 0)) throw new InvalidDataException();
+          if (name == "active") {
+            Dictionary<string, object> entry = entries[0] as Dictionary<string, object>;
+            if (entry == null || (string)entry["transactionId"] != tx || (int)entry["journalVersion"] != 4 ||
+                (string)entry["phase"] != "UNKNOWN_ACTIVE" || (string)entry["observedStatus"] != "ACTIVE" ||
+                (string)entry["classification"] != "ACTIVE_UNVERIFIED") throw new InvalidDataException();
+          }
+        }
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_DISCOVERY_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":exit=" + exit); }
+      finally {
+        if (reader != null) { try { if (!reader.HasExited) { reader.Kill(); reader.WaitForExit(3000); } } finally { reader.Dispose(); } }
+        if (held != null) held.Dispose();
+        try {
+          using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          bool foreignRemoved = true;
+          if (foreign != null) { foreign.CleanupFiles(); foreignRemoved = !Directory.Exists(foreign.Root); foreign.Complete(foreignRemoved); }
+          if (scope != null) { scope.CleanupFiles(); bool scopeRemoved = !Directory.Exists(scope.Root); scope.Complete(scopeRemoved); clean = foreignRemoved && scopeRemoved; }
+        } catch { clean = false; if (foreign != null) foreign.Dispose(); if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, readerGone, readerExit = exit,
+        rootIdentity, evidence, scope = "NATIVE_READ_ONLY_PHI_INDEX_DISCOVERY_NOT_RECOVERY_AUTHORITY",
+        projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
+    }
     internal static int ModifyFixtureChild(string phase) {
       if (!ModifyCheckpoints.Contains(phase) || phase == "before-transaction") return 70;
       try {

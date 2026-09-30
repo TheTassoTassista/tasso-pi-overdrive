@@ -127,6 +127,7 @@ namespace Phi.Native {
       if (args.Length == 1 && args[0] == "--publication-rename" && IntPtr.Size == 8) return PublicationJournal.RunSingleRename(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-inspect-known" && IntPtr.Size == 8) return PublicationJournal.InspectKnownTransaction(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-discover" && IntPtr.Size == 8) return PublicationJournal.DiscoverProjectTransactions(Console.OpenStandardInput());
+      if (args.Length == 2 && args[0] == "--publication-discovery-selftest") return PublicationJournal.DiscoverySelfTest(args[1]);
       if (args.Length == 1 && args[0] == "--publication-recover-known" && IntPtr.Size == 8) return PublicationJournal.RecoverKnownTransaction(Console.OpenStandardInput());
       if (args.Length == 2 && args[0] == "--publication-rename-selftest") return PublicationJournal.RenameSelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-rename-controller-recovery-selftest") return PublicationJournal.RenameControllerRecoverySelfTest(args[1]);
