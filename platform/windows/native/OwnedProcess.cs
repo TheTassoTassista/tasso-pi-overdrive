@@ -126,7 +126,9 @@ namespace Phi.Native {
       if (args.Length == 1 && args[0] == "--publication-delete-fixture-recover") return PublicationJournal.DeleteFixtureRecover();
       if (args.Length == 1 && args[0] == "--publication-rename" && IntPtr.Size == 8) return PublicationJournal.RunSingleRename(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-inspect-known" && IntPtr.Size == 8) return PublicationJournal.InspectKnownTransaction(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--publication-recover-known" && IntPtr.Size == 8) return PublicationJournal.RecoverKnownTransaction(Console.OpenStandardInput());
       if (args.Length == 2 && args[0] == "--publication-rename-selftest") return PublicationJournal.RenameSelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--publication-rename-controller-recovery-selftest") return PublicationJournal.RenameControllerRecoverySelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-rename-fixture-child") return PublicationJournal.RenameFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-rename-fixture-recover") return PublicationJournal.RenameFixtureRecover();
       if (args.Length == 5 && args[0] == "--confinement-failure-probe") return AppContainerScope.Probe(args[1], args[2], args[3], args[4]);

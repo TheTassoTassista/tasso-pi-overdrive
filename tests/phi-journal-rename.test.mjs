@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { validateWindowsKnownReconstruction } from '../platform/windows/publication.mjs';
+import { validateWindowsKnownReconstruction, validateWindowsKnownRecovery } from '../platform/windows/publication.mjs';
+import { draftContentDigest, publicationBase } from '../lib/phi-publication-plan.mjs';
 
 test('explicit same-directory RENAME is V4 journaled, bound to the expected source, and never inferred from equal content', () => {
   const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
@@ -18,7 +19,7 @@ test('explicit same-directory RENAME is V4 journaled, bound to the expected sour
   assert.ok(rename.indexOf('Observe("COMMITTED"') < rename.indexOf('Observe("POST_COMMIT_VERIFIED"'));
   assert.doesNotMatch(rename, /File\.Move|File\.Delete|Directory\.Move|CreateTransaction|CommitTransaction|CreateFileTransacted/u);
   const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
-  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover', '--publication-inspect-known']) assert.ok(dispatch.includes(option));
+  for (const option of ['--publication-rename', '--publication-rename-selftest', '--publication-rename-fixture-child', '--publication-rename-fixture-recover', '--publication-inspect-known', '--publication-recover-known', '--publication-rename-controller-recovery-selftest']) assert.ok(dispatch.includes(option));
   assert.match(journal, /if \(old && \(!File\.Exists\(source\) \|\| File\.ReadAllText\(source\) != "old-rename-complete"\)\)/u);
   assert.match(journal, /File\.Exists\(target\) != \(!old && name != "destination-missing-after-crash"\)/u);
   const plan = fs.readFileSync(new URL('../lib/phi-publication-plan.mjs', import.meta.url), 'utf8');
@@ -63,3 +64,29 @@ for (const name of cases) test('native same-journal expected-source RENAME: ' + 
   assert.equal(windowsRecoveryStatus().status, 'PASS');
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_RENAME_ONLY', ...receipt }));
 });
+
+for (const name of ['rollback', 'resume', 'finalize', 'cleanup-only', 'conflict', 'manual', 'invalid-locator']) {
+  test('native killed-publisher fresh-controller bounded recovery: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-rename-controller-recovery-selftest', name], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 22000, maxBuffer: 10000,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.caseName, name);
+    for (const key of ['passed', 'fixtureCleanup', 'actualProcessKilled', 'childGone', 'restartedControllerGone']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.scope, 'NATIVE_BOUNDED_RENAME_RECOVERY_NOT_RESTORED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    const base = publicationBase({ rootIdentity: receipt.rootIdentity,
+      files: { 'input.txt': 'old-rename-complete', 'unrelated.txt': 'unrelated-rename-user' },
+      identities: { 'input.txt': receipt.sourceIdentity, 'unrelated.txt': receipt.unrelatedIdentity } });
+    assert.equal(receipt.baseDigest, base.digest);
+    assert.equal(receipt.verifiedDigest, draftContentDigest({ 'renamed.txt': 'old-rename-complete', 'unrelated.txt': 'unrelated-rename-user' }));
+    assert.equal(receipt.digestContractVector, draftContentDigest({ 'sample.txt': 'A/\b\t\n\r\f"\\<>&é😀\u2028' }));
+    if (name !== 'invalid-locator') assert.deepEqual(validateWindowsKnownRecovery({ status: 0, signal: null, pid: 1 }, receipt.evidence, receipt.evidence.transactionId), receipt.evidence);
+    else assert.equal(receipt.controllerExit, 70);
+    assert.doesNotMatch(JSON.stringify(receipt), /old-rename-complete|new-rename-user|unrelated-rename-user/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'NATIVE_BOUNDED_RENAME_RECOVERY', ...receipt }));
+  });
+}

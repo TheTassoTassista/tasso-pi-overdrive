@@ -137,7 +137,9 @@ namespace Phi.Native {
       if (!Phases.Contains(to) || from == "CLEANED" || from == "ROLLED_BACK" || from == "FAILED" || from == "CONFLICT") return false;
       if (to == "CONFLICT" || to == "FAILED" || to == "RECOVERY_REQUIRED" || to == "ROLLBACK_REQUIRED") return previousOp == nextOp;
       if (from == "ROLLBACK_REQUIRED") return to == "ROLLED_BACK" && previousOp == nextOp;
-      if (from == "RECOVERY_REQUIRED") return false; // needs a separately proven recovery adapter, not a guessed phase
+      // Only the private V4 recovery adapter may append this observation. The
+      // generic Advance endpoint still rejects every V2+ native phase.
+      if (from == "RECOVERY_REQUIRED") return version == 4 && to == "CLEANED" && previousOp == nextOp && nextOp == count - 1;
       if (from == "VERIFIED" && to == "TEMP_WRITTEN") return nextOp == previousOp + 1 && nextOp < count;
       if (previousOp != nextOp) return false;
       string[] normal = version == 4 ? new string[] { "PREPARED", "RENAME_INTENT", "RENAMED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }
@@ -744,6 +746,127 @@ namespace Phi.Native {
         return 70;
       }
     }
+    static string JsonString(string value) {
+      // Match JSON.stringify for a valid UTF-8 project snapshot. This is used
+      // only for digest comparison; file contents never enter a receipt/journal.
+      StringBuilder result = new StringBuilder("\"");
+      foreach (char c in value) {
+        if (c == '\"' || c == '\\') { result.Append('\\'); result.Append(c); }
+        else if (c == '\b') result.Append("\\b");
+        else if (c == '\f') result.Append("\\f");
+        else if (c == '\n') result.Append("\\n");
+        else if (c == '\r') result.Append("\\r");
+        else if (c == '\t') result.Append("\\t");
+        else if (c < 0x20) result.Append("\\u").Append(((int)c).ToString("x4"));
+        else result.Append(c);
+      }
+      return result.Append('\"').ToString();
+    }
+    static string ProjectBaseDigest(string rootIdentity, Dictionary<string, object> files, Dictionary<string, object> identities) {
+      if (files.Count != identities.Count) throw new InvalidDataException();
+      StringBuilder json = new StringBuilder("{\"rootIdentity\":").Append(JsonString(rootIdentity)).Append(",\"files\":{");
+      bool first = true;
+      foreach (string name in files.Keys.OrderBy(x => x, StringComparer.Ordinal)) {
+        if (!identities.ContainsKey(name) || !(files[name] is string) || !(identities[name] is string)) throw new InvalidDataException();
+        if (!first) json.Append(','); first = false;
+        string value = (string)files[name];
+        json.Append(JsonString(name)).Append(":{\"identity\":").Append(JsonString((string)identities[name]))
+          .Append(",\"digest\":").Append(JsonString(Hash(Encoding.UTF8.GetBytes(value))))
+          .Append(",\"bytes\":").Append(Encoding.UTF8.GetByteCount(value)).Append('}');
+      }
+      return Hash(Encoding.UTF8.GetBytes(json.Append("}}").ToString()));
+    }
+    static string ProjectDraftDigest(Dictionary<string, object> files) {
+      StringBuilder json = new StringBuilder("["); bool first = true;
+      foreach (string name in files.Keys.OrderBy(x => x, StringComparer.Ordinal)) {
+        if (!(files[name] is string)) throw new InvalidDataException();
+        if (!first) json.Append(','); first = false;
+        json.Append('[').Append(JsonString(name)).Append(',').Append(JsonString((string)files[name])).Append(']');
+      }
+      return Hash(Encoding.UTF8.GetBytes(json.Append(']').ToString()));
+    }
+    bool VerifiedRenameSnapshot(Dictionary<string, object> snapshot, bool alreadyRenamed) {
+      if ((int)header["version"] != 4 || (string)snapshot["rootIdentity"] != (string)header["projectIdentity"]) return false;
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      string source = (string)op["sourcePath"], target = (string)op["path"];
+      Dictionary<string, object> actualFiles = (Dictionary<string, object>)snapshot["files"], actualIds = (Dictionary<string, object>)snapshot["identities"];
+      string present = alreadyRenamed ? target : source, absent = alreadyRenamed ? source : target;
+      if (!actualFiles.ContainsKey(present) || actualFiles.ContainsKey(absent) || !actualIds.ContainsKey(present) ||
+          (string)actualIds[present] != (string)op["baseIdentity"] ||
+          Hash(Encoding.UTF8.GetBytes((string)actualFiles[present])) != (string)op["baseDigest"] ||
+          Encoding.UTF8.GetByteCount((string)actualFiles[present]) != (int)op["newBytes"]) return false;
+      Dictionary<string, object> baseFiles = new Dictionary<string, object>(actualFiles), baseIds = new Dictionary<string, object>(actualIds);
+      Dictionary<string, object> draftFiles = new Dictionary<string, object>(actualFiles);
+      if (alreadyRenamed) {
+        baseFiles.Remove(target); baseIds.Remove(target);
+        baseFiles.Add(source, actualFiles[target]); baseIds.Add(source, actualIds[target]);
+      } else {
+        draftFiles.Remove(source); draftFiles.Add(target, actualFiles[source]);
+      }
+      return ProjectBaseDigest((string)header["projectIdentity"], baseFiles, baseIds) == (string)header["baseDigest"] &&
+        ProjectDraftDigest(draftFiles) == (string)header["verifiedDigest"];
+    }
+    object RecoverKnownRename(string expectedRootIdentity) {
+      // Called only after a dead creator and a complete, private, pinned journal
+      // have been validated under this transaction's exclusive lease. This is
+      // recovery authority for metadata ONLY, never new publication authority.
+      string before = (string)last["phase"];
+      int sequence = (int)last["sequence"];
+      object inspected = InspectSingleRename(false);
+      Dictionary<string, object> observation = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(inspected));
+      string observed = observation["status"] as string;
+      bool old = observed == "OLD_COMPLETE_OBSERVED", next = observed == "RENAME_COMMITTED_DESTINATION_RETAINED";
+      bool wholeVerified = (old || next) && VerifiedRenameSnapshot(Snapshot(project, expectedRootIdentity), next);
+      string decision = observed == "CONFLICT" || (old || next) && !wholeVerified ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+      if (wholeVerified && old && new string[] { "PREPARED", "RENAME_INTENT" }.Contains(before)) {
+        decision = "ROLLBACK";
+        Observe("ROLLBACK_REQUIRED", last["tempIdentity"] as string, null);
+        Observe("ROLLED_BACK", last["tempIdentity"] as string, null);
+      } else if (wholeVerified && next && new string[] { "RENAME_INTENT", "RENAMED", "COMMITTED", "POST_COMMIT_VERIFIED", "RECOVERY_REQUIRED" }.Contains(before)) {
+        decision = before == "RENAME_INTENT" || before == "RENAMED" ? "RESUME" : "FINALIZE_COMMIT";
+        string expected = (string)((Dictionary<string, object>)Operations(header)[0])["baseIdentity"];
+        if ((string)last["phase"] == "RENAME_INTENT") Observe("RENAMED", expected, null);
+        if ((string)last["phase"] == "RENAMED") Observe("COMMITTED", expected, expected);
+        if ((string)last["phase"] == "COMMITTED") Observe("POST_COMMIT_VERIFIED", expected, expected);
+        Observe("CLEANED", expected, expected);
+      } else if (wholeVerified && (old && before == "ROLLED_BACK" || next && before == "CLEANED")) decision = "CLEANUP_ONLY";
+      // No project writes, deletes or process kills, even on RESUME. The new
+      // project state must have been completed by the original publisher.
+      return new { version = 1, status = "PASS_BOUNDED_RENAME_RECOVERY", transactionId = id, rootIdentity = expectedRootIdentity,
+        rootIdentityVerified = true, observedStatus = observed, decision, phaseBefore = before, phaseAfter = last["phase"],
+        baseDigestVerified = wholeVerified, verifiedDraftDigestMatched = wholeVerified,
+        actionPerformed = (int)last["sequence"] != sequence, journalMutations = (int)last["sequence"] - sequence,
+        projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 };
+    }
+    internal static int RecoverKnownTransaction(Stream input) {
+      PublicationJournal journal = null;
+      try {
+        Dictionary<string, object> request;
+        using (MemoryStream line = new MemoryStream()) {
+          bool complete = false;
+          for (int i = 0; i < MaxBytes; i++) { int next = input.ReadByte(); if (next < 0) throw new InvalidDataException();
+            if (next == 10) { complete = true; break; } line.WriteByte((byte)next); }
+          if (!complete) throw new InvalidDataException();
+          request = Serializer().Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(line.ToArray()));
+        }
+        Keys(request, "version", "root", "transactionId"); Number(request, "version", 1, 1);
+        string project = request["root"] as string, tx = StringField(request, "transactionId", Id);
+        if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project)) throw new InvalidDataException();
+        journal = new PublicationJournal(tx, project);
+        string rootIdentity = RecoveryFilesystem.HandleIdentity(journal.pins.DirectoryHandle);
+        using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          if ((string)journal.header["projectIdentity"] != rootIdentity) throw new InvalidDataException();
+        }
+        bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
+        if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
+        if ((int)journal.header["version"] != 4) throw new InvalidDataException();
+        Console.WriteLine(Serializer().Serialize(journal.RecoverKnownRename(rootIdentity))); return 0;
+      } catch {
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
+          actionPerformed = false, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
+      } finally { if (journal != null) journal.Dispose(); }
+    }
     public void Dispose() {
       if (disposed) return; disposed = true;
       if (pins != null) pins.Dispose();
@@ -1067,6 +1190,12 @@ namespace Phi.Native {
       op["sourcePath"] = "input.txt"; op["path"] = "renamed.txt"; op["kind"] = "RENAME";
       op["newDigest"] = op["baseDigest"];
       op["newBytes"] = Encoding.UTF8.GetByteCount("old-rename-complete");
+      Dictionary<string, object> snapshot = Snapshot(project, (string)header["projectIdentity"]);
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"], ids = (Dictionary<string, object>)snapshot["identities"];
+      Dictionary<string, object> desired = new Dictionary<string, object>(files);
+      desired.Remove("input.txt"); desired.Add("renamed.txt", files["input.txt"]);
+      header["baseDigest"] = ProjectBaseDigest((string)header["projectIdentity"], files, ids);
+      header["verifiedDigest"] = ProjectDraftDigest(desired);
       return header;
     }
     internal static int RenameFixtureChild(string point) {
@@ -1265,6 +1394,97 @@ namespace Phi.Native {
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
         restartedRecovery = restarted, reconstructionDecision, reconstructionReceipt, journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed,
         scope = "NATIVE_JOURNAL_RENAME_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
+    }
+    internal static int RenameControllerRecoverySelfTest(string name) {
+      string[] cases = { "rollback", "resume", "finalize", "cleanup-only", "conflict", "manual", "invalid-locator" };
+      if (!cases.Contains(name)) return 70;
+      ScopeRecovery scope = null; Process publisher = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
+      string rootIdEvidence = null, sourceIdEvidence = null, unrelatedIdEvidence = null, baseDigestEvidence = null, verifiedDigestEvidence = null;
+      bool passed = false, clean = false, killed = false, childGone = false, controllerGone = false;
+      object evidence = null; int controllerExit = -1;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string source = Path.Combine(scope.Root, "input.txt"), target = Path.Combine(scope.Root, "renamed.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt");
+        File.WriteAllText(source, "old-rename-complete", new UTF8Encoding(false));
+        File.WriteAllText(unrelated, "unrelated-rename-user", new UTF8Encoding(false));
+        Dictionary<string, object> expectedHeader = RenameFixtureHeader(scope.Root, tx);
+        Dictionary<string, object> initial = Snapshot(scope.Root, rootId);
+        Dictionary<string, object> initialIds = (Dictionary<string, object>)initial["identities"];
+        rootIdEvidence = rootId; sourceIdEvidence = (string)initialIds["input.txt"]; unrelatedIdEvidence = (string)initialIds["unrelated.txt"];
+        baseDigestEvidence = (string)expectedHeader["baseDigest"]; verifiedDigestEvidence = (string)expectedHeader["verifiedDigest"];
+        string point = name == "rollback" || name == "invalid-locator" ? "intent" : name == "finalize" ? "committed" : name == "cleanup-only" ? "cleaned" : "renamed";
+        stage = "START_PUBLISHER";
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-rename-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); publisher.StandardInput.Close();
+        string ready = null; Thread reader = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } }); reader.IsBackground = true; reader.Start();
+        if (!reader.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announcement["ready"] || (string)announcement["checkpoint"] != point || (string)announcement["transactionId"] != tx) throw new InvalidDataException();
+        phaseAtDeath = announcement["phase"] as string; stage = "KILL_PUBLISHER";
+        publisher.Kill(); killed = true; if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+        if (name == "conflict") File.WriteAllText(source, "new-rename-user", new UTF8Encoding(false));
+        if (name == "manual") File.Move(target, target + ".user-owned");
+        stage = "NEW_CONTROLLER";
+        using (Process controller = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-recover-known", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+          try {
+            controller.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root,
+              transactionId = name == "invalid-locator" ? Guid.NewGuid().ToString("N") : tx })); controller.StandardInput.Close();
+            if (!controller.WaitForExit(5000)) throw new InvalidDataException(); controllerGone = controller.HasExited; controllerExit = controller.ExitCode;
+            if (controllerExit != (name == "invalid-locator" ? 70 : 0)) throw new InvalidDataException();
+            string output = controller.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+            Dictionary<string, object> receipt = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = receipt;
+            if (name == "invalid-locator") {
+              if ((string)receipt["status"] != "FAIL_BOUNDED_RENAME_RECOVERY" || (bool)receipt["actionPerformed"] ||
+                  (bool)receipt["projectPublished"] || (int)receipt["projectMutations"] != 0) throw new InvalidDataException();
+            } else {
+              string decision = name == "cleanup-only" ? "CLEANUP_ONLY" : name == "conflict" ? "CONFLICT" :
+                name == "manual" ? "MANUAL_RECOVERY_REQUIRED" : name == "finalize" ? "FINALIZE_COMMIT" : name.ToUpperInvariant();
+              bool action = name == "rollback" || name == "resume" || name == "finalize";
+              string finalPhase = name == "rollback" ? "ROLLED_BACK" : action || name == "cleanup-only" ? "CLEANED" : phaseAtDeath;
+              if ((string)receipt["status"] != "PASS_BOUNDED_RENAME_RECOVERY" || (string)receipt["decision"] != decision ||
+                  (string)receipt["transactionId"] != tx || (string)receipt["rootIdentity"] != rootId || !(bool)receipt["rootIdentityVerified"] ||
+                  (string)receipt["phaseBefore"] != phaseAtDeath || (string)receipt["phaseAfter"] != finalPhase ||
+                  (bool)receipt["actionPerformed"] != action || ((int)receipt["journalMutations"] > 0) != action ||
+                  (int)receipt["projectMutations"] != 0 || (int)receipt["processKills"] != 0 || (bool)receipt["projectPublished"] ||
+                  (int)receipt["externalRequests"] != 0 ||
+                  (bool)receipt["baseDigestVerified"] != (name != "conflict" && name != "manual") ||
+                  (bool)receipt["verifiedDraftDigestMatched"] != (name != "conflict" && name != "manual")) throw new InvalidDataException();
+            }
+          } finally { if (!controller.HasExited) { controller.Kill(); controller.WaitForExit(3000); } }
+        }
+        stage = "VERIFY_PROJECT_AND_JOURNAL";
+        if (File.ReadAllText(unrelated) != "unrelated-rename-user" || File.Exists(source) != (name == "rollback" || name == "invalid-locator" || name == "conflict") ||
+            File.Exists(target) != !(name == "rollback" || name == "invalid-locator" || name == "manual") ||
+            name == "conflict" && File.ReadAllText(source) != "new-rename-user" ||
+            name == "manual" && File.ReadAllText(target + ".user-owned") != "old-rename-complete" ||
+            name != "conflict" && name != "manual" && File.ReadAllText(name == "rollback" || name == "invalid-locator" ? source : target) != "old-rename-complete") throw new InvalidDataException();
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          if ((string)journal.header["baseDigest"] != (string)expectedHeader["baseDigest"] ||
+              (string)journal.header["verifiedDigest"] != (string)expectedHeader["verifiedDigest"] ||
+              (string)journal.last["phase"] != (name == "rollback" ? "ROLLED_BACK" : new string[] { "resume", "finalize", "cleanup-only" }.Contains(name) ? "CLEANED" : phaseAtDeath)) throw new InvalidDataException();
+        }
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_RENAME_CONTROLLER_RECOVERY_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":controllerExit=" + controllerExit); }
+      finally {
+        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
+        restartedControllerGone = controllerGone, controllerExit, journalPhaseAtInterruption = phaseAtDeath, evidence,
+        rootIdentity = rootIdEvidence, sourceIdentity = sourceIdEvidence, unrelatedIdentity = unrelatedIdEvidence,
+        baseDigest = baseDigestEvidence, verifiedDigest = verifiedDigestEvidence,
+        digestContractVector = ProjectDraftDigest(new Dictionary<string, object> { { "sample.txt", "A/\b\t\n\r\f\"\\<>&\u00e9\ud83d\ude00\u2028" } }),
+        scope = "NATIVE_BOUNDED_RENAME_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
     internal static int ModifyFixtureChild(string phase) {
