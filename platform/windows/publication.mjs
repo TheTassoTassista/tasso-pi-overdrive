@@ -51,6 +51,49 @@ export function inspectKnownWindowsTransaction({ cwd, transactionId }) {
   return validateWindowsKnownReconstruction(run, value, transactionId);
 }
 
+const discoveryKeys = ['version', 'status', 'rootIdentity', 'rootIdentityVerified', 'scannedTransactions', 'projectTransactions',
+  'entries', 'actionPerformed', 'journalMutations', 'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];
+const discoveryEntryKeys = ['transactionId', 'journalVersion', 'phase', 'observedStatus', 'classification'];
+export function validateWindowsTransactionDiscovery(run, value) {
+  if (run?.error || run?.status !== 0 || run?.signal || !Number.isSafeInteger(run?.pid) || run.pid < 1 ||
+      !exactKeys(value, discoveryKeys) || value.version !== 1 || value.status !== 'PASS_READ_ONLY_DISCOVERY' ||
+      !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') || value.rootIdentityVerified !== true ||
+      !Number.isInteger(value.scannedTransactions) || value.scannedTransactions < 0 || value.scannedTransactions > 64 ||
+      !Number.isInteger(value.projectTransactions) || value.projectTransactions < 0 || value.projectTransactions > value.scannedTransactions ||
+      !Array.isArray(value.entries) || value.entries.length !== value.projectTransactions ||
+      value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 ||
+      value.processKills !== 0 || value.projectPublished !== false || value.externalRequests !== 0) fail('DISCOVERY_UNCONFIRMED');
+  let previous = '';
+  for (const entry of value.entries) {
+    if (!exactKeys(entry, discoveryEntryKeys) || !/^[0-9a-f]{32}$/u.test(entry.transactionId ?? '') ||
+        entry.transactionId <= previous || !Number.isInteger(entry.journalVersion) || entry.journalVersion < 1 || entry.journalVersion > 4 ||
+        !/^[A-Z_]{3,32}$/u.test(entry.phase ?? '') ||
+        !['ACTIVE', 'OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED',
+          'DELETE_COMMITTED_CLEANUP_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE',
+          'RECOVERY_REQUIRED'].includes(entry.observedStatus)) fail('DISCOVERY_UNCONFIRMED');
+    const expected = entry.observedStatus === 'ACTIVE' ? 'ACTIVE_UNVERIFIED' : entry.observedStatus === 'CONFLICT' ? 'CONFLICT' :
+      entry.observedStatus === 'UNKNOWN_FAIL_SAFE' ? 'MANUAL_RECOVERY_REQUIRED' :
+      ['CLEANED', 'ROLLED_BACK'].includes(entry.phase) ? 'TERMINAL_RETAINED' : 'RECOVERY_REQUIRED';
+    if (entry.classification !== expected || (entry.observedStatus === 'ACTIVE') !== (entry.phase === 'UNKNOWN_ACTIVE')) fail('DISCOVERY_UNCONFIRMED');
+    previous = entry.transactionId;
+  }
+  return freeze({ ...value });
+}
+
+// This internal bridge is an advisory inventory, never a model tool or a
+// recovered publication grant. Every later action must revalidate its known
+// transaction under the native lease against the actual project state.
+export function discoverWindowsTransactions({ cwd }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0')) fail('DISCOVERY_REQUEST_INVALID');
+  const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('DISCOVERY_REQUEST_INVALID');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-discover'], { shell: false, windowsHide: true, encoding: 'utf8',
+    input: JSON.stringify({ version: 1, root }) + '\n', timeout: 15000, maxBuffer: 32768 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('DISCOVERY_UNCONFIRMED'); }
+  return validateWindowsTransactionDiscovery(run, value);
+}
+
 const recoveryKeys = ['version', 'status', 'transactionId', 'rootIdentity', 'rootIdentityVerified', 'observedStatus', 'decision',
   'phaseBefore', 'phaseAfter', 'baseDigestVerified', 'verifiedDraftDigestMatched', 'actionPerformed', 'journalMutations',
   'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];

@@ -747,6 +747,82 @@ namespace Phi.Native {
         return 70;
       }
     }
+    internal static int DiscoverProjectTransactions(Stream input) {
+      // Read-only advisory inventory. Admission serializes the private index
+      // snapshot against Begin; each selected journal is independently read
+      // and revalidated by Inspect. Nothing here supplies recovery authority.
+      try {
+        Dictionary<string, object> request;
+        using (MemoryStream line = new MemoryStream()) {
+          bool complete = false;
+          for (int i = 0; i < MaxBytes; i++) { int next = input.ReadByte(); if (next < 0) throw new InvalidDataException();
+            if (next == 10) { complete = true; break; } line.WriteByte((byte)next); }
+          if (!complete) throw new InvalidDataException();
+          request = Serializer().Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(line.ToArray()));
+        }
+        Keys(request, "version", "root"); Number(request, "version", 1, 1);
+        string project = request["root"] as string;
+        if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project)) throw new InvalidDataException();
+        string rootIdentity;
+        using (RecoveryFilesystem pinned = new RecoveryFilesystem(project)) rootIdentity = RecoveryFilesystem.HandleIdentity(pinned.DirectoryHandle);
+        List<Tuple<string, int>> selected = new List<Tuple<string, int>>(); int scanned = 0;
+        using (Mutex admission = Lease(new string('0', 32), true)) {
+          if (!Acquire(admission, 1000)) throw new InvalidDataException();
+          try {
+            using (RegistryKey root = Registry.CurrentUser.OpenSubKey(RegistryBase, false)) {
+              if (root != null) {
+                ScopeRecovery.ValidateRegistry(root);
+                string[] names = root.GetSubKeyNames().OrderBy(x => x, StringComparer.Ordinal).ToArray();
+                if (names.Length > MaxTransactions) throw new InvalidDataException();
+                scanned = names.Length;
+                foreach (string tx in names) {
+                  if (!Id.IsMatch(tx)) throw new InvalidDataException();
+                  using (RegistryKey key = root.OpenSubKey(tx, false)) {
+                    if (key == null) throw new InvalidDataException(); ScopeRecovery.ValidateRegistry(key);
+                    Dictionary<string, object> first = Decode(ReadValue(key, "E00000000"));
+                    Keys(first, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header");
+                    if (Number(first, "sequence", 0, 0) != 0 || (string)first["previousDigest"] != new string('0', 64) ||
+                        (string)first["phase"] != "PREPARED" || Number(first, "operationIndex", 0, 0) != 0 ||
+                        first["tempIdentity"] != null || first["committedIdentity"] != null) throw new InvalidDataException();
+                    Dictionary<string, object> header = first["header"] as Dictionary<string, object>; ValidateHeader(header, tx);
+                    if ((string)header["projectIdentity"] == rootIdentity) selected.Add(Tuple.Create(tx, (int)header["version"]));
+                  }
+                }
+              }
+            }
+          } finally { admission.ReleaseMutex(); }
+        }
+        var entries = new List<object>();
+        foreach (Tuple<string, int> item in selected) {
+          Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(Inspect(item.Item1, project, rootIdentity, false)));
+          if ((int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 ||
+              (int)observed["processKills"] != 0 || (bool)observed["projectPublished"]) throw new InvalidDataException();
+          string status = observed["status"] as string;
+          bool active = status == "ACTIVE";
+          Dictionary<string, object> metadata = active ? null : observed["metadata"] as Dictionary<string, object>;
+          if (!active && (metadata == null || (string)metadata["transactionId"] != item.Item1 ||
+              (string)metadata["projectIdentity"] != rootIdentity || (int)metadata["version"] != item.Item2 ||
+              (bool)metadata["projectPublished"])) throw new InvalidDataException();
+          if (!new string[] { "ACTIVE", "OLD_COMPLETE_OBSERVED", "NEW_COMPLETE_OBSERVED", "DELETE_COMMITTED_QUARANTINE_RETAINED",
+              "DELETE_COMMITTED_CLEANUP_OBSERVED", "RENAME_COMMITTED_DESTINATION_RETAINED", "CONFLICT", "UNKNOWN_FAIL_SAFE", "RECOVERY_REQUIRED" }.Contains(status)) throw new InvalidDataException();
+          string phase = active ? "UNKNOWN_ACTIVE" : (string)metadata["phase"];
+          string classification = active ? "ACTIVE_UNVERIFIED" : status == "CONFLICT" ? "CONFLICT" :
+            status == "UNKNOWN_FAIL_SAFE" ? "MANUAL_RECOVERY_REQUIRED" :
+            new string[] { "CLEANED", "ROLLED_BACK" }.Contains(phase) ? "TERMINAL_RETAINED" : "RECOVERY_REQUIRED";
+          entries.Add(new { transactionId = item.Item1, journalVersion = item.Item2, phase, observedStatus = status, classification });
+        }
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_READ_ONLY_DISCOVERY", rootIdentity,
+          rootIdentityVerified = true, scannedTransactions = scanned, projectTransactions = entries.Count, entries,
+          actionPerformed = false, journalMutations = 0, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 }));
+        return 0;
+      } catch {
+        // Never emit a partial list that a restarted controller might mistake
+        // for a complete, clean project inventory.
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_READ_ONLY_DISCOVERY", decision = "UNKNOWN_FAIL_SAFE",
+          actionPerformed = false, journalMutations = 0, projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 }));
+        return 70;
+      }
+    }
     static string JsonString(string value) {
       // Match JSON.stringify for a valid UTF-8 project snapshot. This is used
       // only for digest comparison; file contents never enter a receipt/journal.
@@ -1437,7 +1513,7 @@ namespace Phi.Native {
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
       string rootIdEvidence = null, sourceIdEvidence = null, unrelatedIdEvidence = null, baseDigestEvidence = null, verifiedDigestEvidence = null;
       bool passed = false, clean = false, killed = false, childGone = false, controllerGone = false;
-      object evidence = null; int controllerExit = -1;
+      object evidence = null, discoveryEvidence = null; int controllerExit = -1;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
@@ -1467,6 +1543,30 @@ namespace Phi.Native {
         if (name == "unrelated-change") File.WriteAllText(unrelated, "new-unrelated-user", new UTF8Encoding(false));
         if (name == "source-replaced") { File.Move(source, source + ".user-owned"); File.WriteAllText(source, "old-rename-complete", new UTF8Encoding(false)); }
         if (name == "manual") File.Move(target, target + ".user-owned");
+        if (new string[] { "resume", "conflict", "manual" }.Contains(name)) {
+          stage = "FRESH_DISCOVERY";
+          using (Process discovery = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+            Arguments = "--publication-discover", UseShellExecute = false, RedirectStandardInput = true,
+            RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+            try {
+              discovery.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root })); discovery.StandardInput.Close();
+              if (!discovery.WaitForExit(5000) || discovery.ExitCode != 0) throw new InvalidDataException();
+              string output = discovery.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+              Dictionary<string, object> inventory = Serializer().Deserialize<Dictionary<string, object>>(output);
+              IList entries = inventory["entries"] as IList;
+              if ((string)inventory["status"] != "PASS_READ_ONLY_DISCOVERY" || (string)inventory["rootIdentity"] != rootId ||
+                  entries == null || entries.Count != 1 || (int)inventory["projectTransactions"] != 1 ||
+                  (bool)inventory["actionPerformed"] || (int)inventory["journalMutations"] != 0 ||
+                  (int)inventory["projectMutations"] != 0 || (int)inventory["processKills"] != 0 ||
+                  (bool)inventory["projectPublished"]) throw new InvalidDataException();
+              Dictionary<string, object> entry = entries[0] as Dictionary<string, object>;
+              string expectedClass = name == "resume" ? "RECOVERY_REQUIRED" : name == "conflict" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+              if (entry == null || (string)entry["transactionId"] != tx || (int)entry["journalVersion"] != 4 ||
+                  (string)entry["classification"] != expectedClass) throw new InvalidDataException();
+              discoveryEvidence = inventory;
+            } finally { if (!discovery.HasExited) { discovery.Kill(); discovery.WaitForExit(3000); } }
+          }
+        }
         stage = "NEW_CONTROLLER";
         using (Process controller = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-recover-known", UseShellExecute = false, RedirectStandardInput = true,
@@ -1523,7 +1623,7 @@ namespace Phi.Native {
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
-        restartedControllerGone = controllerGone, controllerExit, journalPhaseAtInterruption = phaseAtDeath, evidence,
+        restartedControllerGone = controllerGone, controllerExit, journalPhaseAtInterruption = phaseAtDeath, evidence, discoveryEvidence,
         rootIdentity = rootIdEvidence, sourceIdentity = sourceIdEvidence, unrelatedIdentity = unrelatedIdEvidence,
         baseDigest = baseDigestEvidence, verifiedDigest = verifiedDigestEvidence,
         digestContractVector = ProjectDraftDigest(new Dictionary<string, object> { { "sample.txt", "A/\b\t\n\r\f\"\\<>&\u00e9\ud83d\ude00\u2028" } }),

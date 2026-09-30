@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectKnownWindowsTransaction, recoverKnownWindowsRename, validateWindowsKnownReconstruction,
-  validateWindowsKnownRecovery } from '../platform/windows/publication.mjs';
+import { discoverWindowsTransactions, inspectKnownWindowsTransaction, recoverKnownWindowsRename, validateWindowsKnownReconstruction,
+  validateWindowsKnownRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
 
 const transactionId = 'a'.repeat(32);
 const rootIdentity = 'b'.repeat(16) + ':' + 'c'.repeat(32);
@@ -45,6 +45,42 @@ test('new-controller decoder rejects fabricated publication, actions, root bindi
 test('new-controller inspection is unavailable off Windows rather than a portable publication fallback', { skip: process.platform === 'win32' }, () => {
   assert.throws(() => inspectKnownWindowsTransaction({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => recoverKnownWindowsRename({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
+  assert.throws(() => discoverWindowsTransactions({ cwd: '.' }), /BACKEND_UNAVAILABLE/u);
+});
+
+const discoveryReceipt = (entries = []) => ({
+  version: 1, status: 'PASS_READ_ONLY_DISCOVERY', rootIdentity, rootIdentityVerified: true,
+  scannedTransactions: entries.length, projectTransactions: entries.length, entries,
+  actionPerformed: false, journalMutations: 0, projectMutations: 0, processKills: 0,
+  projectPublished: false, externalRequests: 0,
+});
+const discovered = { transactionId, journalVersion: 4, phase: 'RENAME_INTENT',
+  observedStatus: 'OLD_COMPLETE_OBSERVED', classification: 'RECOVERY_REQUIRED' };
+
+test('private-index discovery accepts only bounded advisory metadata, not an action grant', () => {
+  for (const entries of [[], [discovered], [
+    { ...discovered, transactionId: '1'.repeat(32), phase: 'RENAMED', observedStatus: 'CONFLICT', classification: 'CONFLICT' },
+    discovered,
+  ]]) {
+    const value = validateWindowsTransactionDiscovery(run, discoveryReceipt(entries));
+    assert.equal(value.projectTransactions, entries.length);
+    assert.equal(value.projectPublished, false);
+    assert.throws(() => { value.entries.push(discovered); }, TypeError);
+  }
+});
+
+test('discovery decoder rejects truncated, reordered, action-bearing and raw-content receipts', () => {
+  const valid = discoveryReceipt([discovered]);
+  for (const change of [
+    { rootIdentityVerified: false }, { rootIdentity: 'wrong' }, { scannedTransactions: 0 },
+    { projectTransactions: 0 }, { actionPerformed: true }, { projectMutations: 1 },
+    { journalMutations: 1 }, { processKills: 1 }, { projectPublished: true },
+    { externalRequests: 1 }, { content: 'secret' },
+    { entries: [{ ...discovered, classification: 'TERMINAL_RETAINED' }] },
+    { entries: [{ ...discovered, rawContent: 'secret' }] },
+    { entries: [discovered, discovered], projectTransactions: 2, scannedTransactions: 2 },
+  ]) assert.throws(() => validateWindowsTransactionDiscovery(run, { ...valid, ...change }), /DISCOVERY_UNCONFIRMED/u);
+  assert.throws(() => validateWindowsTransactionDiscovery({ ...run, status: 70 }, valid), /DISCOVERY_UNCONFIRMED/u);
 });
 
 const recoveryReceipt = (decision, observedStatus, phaseBefore, phaseAfter, journalMutations) => ({
