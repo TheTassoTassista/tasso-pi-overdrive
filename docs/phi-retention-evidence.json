@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "scope": "BOUNDED_NATIVE_TERMINAL_RETENTION_NOT_FULL_D6",
+  "status": "PASS_BOUNDED_RETENTION",
+  "functionalHead": "d15dbc80b68961e5eb063b2c1877781715018450",
+  "runId": 36878879334,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36878879334",
+  "actualWindowsCapacity": {
+    "limit": 64,
+    "initialEntries": 0,
+    "fixtureEntriesAdded": 63,
+    "normal63To64Admission": true,
+    "noSafeEntryAdmissionBlocked": true,
+    "corruptEntryAdmissionBlocked": true,
+    "candidateLeaseHeldAdmissionBlocked": true,
+    "concurrentAdmissionsSerialized": true,
+    "safeTerminalEntriesRemoved": 1,
+    "otherEntriesPreserved": true,
+    "capacityBeforeReclaim": 64,
+    "capacityAfterReclaim": 63,
+    "capacityAfterAdmission": 64,
+    "secondAdmissionBlocked": true,
+    "freshReaderPassed": true,
+    "fixtureCleanup": "PASS"
+  },
+  "selectedCandidate": {
+    "transactionId": "b90ee7de5e1e4364b79c31f1c25b060e",
+    "journalVersion": 3,
+    "terminalPhase": "CLEANED",
+    "journalDigest": "b309ad9e1df408f9f682a4417addcdb759f288527269a4ed6891f03721d11137",
+    "eligibility": "SAFE_TO_RECLAIM",
+    "reason": "TERMINAL_CHAIN_AND_FILESYSTEM_VERIFIED",
+    "filesystemVerified": true,
+    "result": "RECLAIMED_TERMINAL"
+  },
+  "projectState": {
+    "beforeDigest": "9e731cd4d108ac88a547e139bba2131f1eaa6330888db65b16931f82ee986b80",
+    "afterDigest": "9e731cd4d108ac88a547e139bba2131f1eaa6330888db65b16931f82ee986b80",
+    "unchanged": true,
+    "publicationPerformedByRetention": false
+  },
+  "negativeCases": {
+    "active": "RETAINED",
+    "recoverableDeleteQuarantine": "RETAINED",
+    "conflict": "RETAINED",
+    "manualRecoveryRequired": "RETAINED",
+    "corruptMetadata": "RETAINED",
+    "foreignProject": "RETAINED"
+  },
+  "tests": {
+    "dedicatedWindowsDelete": { "total": 41, "passed": 41, "failed": 0 },
+    "dedicatedWindowsCapacity": { "total": 1, "passed": 1, "failed": 0 },
+    "aggregateWindows": { "total": 434, "passed": 423, "failed": 0, "cancelled": 0, "skipped": 11 },
+    "aggregateUbuntu": { "total": 434, "passed": 149, "failed": 0, "cancelled": 0, "skipped": 285 },
+    "localCheck": "PASS",
+    "syntaxTypeScriptPackageValidation": "PASS"
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 9384,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "directoryRemoved": true,
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "brokerCleanup": "PASS", "externalProviderCalls": 0 },
+  "earlierFailedCandidates": [
+    { "runId": 36874451562, "cause": "fixture selected rejected, nonexistent transaction ID for corruption case" },
+    { "runId": 36878439459, "cause": "C# CS0136 local-name collision in added concurrency fixture" }
+  ],
+  "limitations": [
+    "Only fully revalidated terminal V3 DELETE and V4 same-directory RENAME are eligible; V1/V2 and uncertain records remain capacity-consuming.",
+    "The private admission and transaction mutexes serialize Phi-owned cooperating controllers; arbitrary same-user registry tampering is outside this boundary.",
+    "The metadata-only reclamation receipt is returned with successful native admission; there is no separate durable outbox for a crash between safe key deletion and the new journal write.",
+    "D6 controller continuity, multi-file recovery, D-wide recovery E2E, E1-E3 and Windows autonomy remain incomplete."
+  ]
+}
