@@ -140,7 +140,8 @@ namespace Phi.Native {
       if (from == "ROLLBACK_REQUIRED") return to == "ROLLED_BACK" && previousOp == nextOp;
       // Only the private V4 recovery adapter may append this observation. The
       // generic Advance endpoint still rejects every V2+ native phase.
-      if (from == "RECOVERY_REQUIRED") return version == 4 && to == "CLEANED" && previousOp == nextOp && nextOp == count - 1;
+      if (from == "RECOVERY_REQUIRED") return previousOp == nextOp && nextOp == count - 1 &&
+        (version == 4 && to == "CLEANED" || version == 3 && (to == "CLEANUP_STARTED" || to == "CLEANED"));
       if (from == "VERIFIED" && to == "TEMP_WRITTEN") return nextOp == previousOp + 1 && nextOp < count;
       if (previousOp != nextOp) return false;
       string[] normal = version == 4 ? new string[] { "PREPARED", "RENAME_INTENT", "RENAMED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }
@@ -150,12 +151,12 @@ namespace Phi.Native {
       int index = Array.IndexOf(normal, from);
       return index >= 0 && index < normal.Length - 1 && normal[index + 1] == to && (to != "CLEANED" || nextOp == count - 1);
     }
-    static Dictionary<string, object> Snapshot(string project, string expected) {
+    static Dictionary<string, object> Snapshot(string project, string expected, string ownedQuarantine = null) {
       using (RecoveryFilesystem pins = new RecoveryFilesystem(project)) {
         // Extraction has its existing independent file/content bounds. It is
         // never stored in the metadata journal or emitted as a receipt.
         JavaScriptSerializer extraction = new JavaScriptSerializer { MaxJsonLength = 16 * 1024 * 1024, RecursionLimit = 16 };
-        Dictionary<string, object> snapshot = extraction.Deserialize<Dictionary<string, object>>(extraction.Serialize(pins.ReadProjectSnapshot()));
+        Dictionary<string, object> snapshot = extraction.Deserialize<Dictionary<string, object>>(extraction.Serialize(pins.ReadProjectSnapshot(false, ownedQuarantine)));
         if ((string)snapshot["rootIdentity"] != expected) throw new InvalidDataException(); return snapshot;
       }
     }
@@ -451,7 +452,7 @@ namespace Phi.Native {
         bool original = DeleteBaseMatches(current, op), ownedQuarantine = DeleteBaseMatches(quarantined, op), committed = last["committedIdentity"] != null;
         if (phase == "CONFLICT" || current != null && !original || quarantined != null && !ownedQuarantine || current != null && quarantined != null) status = "CONFLICT";
         else if (original && quarantined == null && !committed && new string[] { "PREPARED", "DELETE_INTENT", "ROLLBACK_REQUIRED", "ROLLED_BACK" }.Contains(phase)) status = "OLD_COMPLETE_OBSERVED";
-        else if (current == null && ownedQuarantine && last["tempIdentity"] != null && new string[] { "DELETE_INTENT", "DELETE_QUARANTINED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANUP_STARTED", "RECOVERY_REQUIRED" }.Contains(phase)) status = "DELETE_COMMITTED_QUARANTINE_RETAINED";
+        else if (current == null && ownedQuarantine && last["tempIdentity"] != null && new string[] { "DELETE_INTENT", "DELETE_QUARANTINED", "ROLLBACK_REQUIRED", "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANUP_STARTED", "RECOVERY_REQUIRED" }.Contains(phase)) status = "DELETE_COMMITTED_QUARANTINE_RETAINED";
         else if (current == null && quarantined == null && committed && deleteCleanupIntent && new string[] { "CLEANUP_STARTED", "CLEANED", "RECOVERY_REQUIRED" }.Contains(phase)) status = "DELETE_COMMITTED_CLEANUP_OBSERVED";
         else if (current != null) status = "CONFLICT";
         int before = (int)last["sequence"];
@@ -853,6 +854,27 @@ namespace Phi.Native {
       }
       return Hash(Encoding.UTF8.GetBytes(json.Append("}}").ToString()));
     }
+    static string ProjectBaseDigestWithRestoredDelete(string rootIdentity, Dictionary<string, object> files,
+        Dictionary<string, object> identities, string source, DeleteObject held) {
+      // Compute the canonical pre-delete aggregate without reading a reserved
+      // quarantine through the ordinary project snapshot. The exact held
+      // object's identity/digest/length are checked against the journal first.
+      if (files.Count != identities.Count || files.ContainsKey(source) || identities.ContainsKey(source)) throw new InvalidDataException();
+      StringBuilder json = new StringBuilder("{\"rootIdentity\":").Append(JsonString(rootIdentity)).Append(",\"files\":{");
+      bool first = true;
+      foreach (string name in files.Keys.Concat(new string[] { source }).OrderBy(x => x, StringComparer.Ordinal)) {
+        if (!first) json.Append(','); first = false;
+        string identity, digest; long bytes;
+        if (name == source) { identity = held.Identity; digest = held.Digest; bytes = held.Bytes; }
+        else {
+          if (!identities.ContainsKey(name) || !(files[name] is string) || !(identities[name] is string)) throw new InvalidDataException();
+          string value = (string)files[name]; identity = (string)identities[name]; digest = Hash(Encoding.UTF8.GetBytes(value)); bytes = Encoding.UTF8.GetByteCount(value);
+        }
+        json.Append(JsonString(name)).Append(":{\"identity\":").Append(JsonString(identity))
+          .Append(",\"digest\":").Append(JsonString(digest)).Append(",\"bytes\":").Append(bytes).Append('}');
+      }
+      return Hash(Encoding.UTF8.GetBytes(json.Append("}}").ToString()));
+    }
     static string ProjectDraftDigest(Dictionary<string, object> files) {
       StringBuilder json = new StringBuilder("["); bool first = true;
       foreach (string name in files.Keys.OrderBy(x => x, StringComparer.Ordinal)) {
@@ -882,6 +904,92 @@ namespace Phi.Native {
       }
       return ProjectBaseDigest((string)header["projectIdentity"], baseFiles, baseIds) == (string)header["baseDigest"] &&
         ProjectDraftDigest(draftFiles) == (string)header["verifiedDigest"];
+    }
+    bool VerifiedDeleteSnapshot(string expectedRootIdentity, DeleteObject quarantine) {
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      if (!DeleteBaseMatches(quarantine, op)) return false;
+      string[] parts = AnchoredFile.Segments((string)op["path"]);
+      string excluded = String.Join("/", parts.Take(parts.Length - 1).Concat(new string[] { DeleteLeaf(id) }));
+      Dictionary<string, object> snapshot = Snapshot(project, expectedRootIdentity, excluded);
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"], identities = (Dictionary<string, object>)snapshot["identities"];
+      return !files.ContainsKey((string)op["path"]) &&
+        ProjectBaseDigestWithRestoredDelete(expectedRootIdentity, files, identities, (string)op["path"], quarantine) == (string)header["baseDigest"] &&
+        ProjectDraftDigest(files) == (string)header["verifiedDigest"];
+    }
+    object RecoverKnownDelete(string expectedRootIdentity, Action live) {
+      string before = (string)last["phase"]; int sequence = (int)last["sequence"];
+      Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(InspectSingleDelete(false)));
+      string status = observed["status"] as string;
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      string[] parts = AnchoredFile.Segments((string)op["path"]);
+      string path = parts.Aggregate(project, (current, part) => Path.Combine(current, part));
+      string quarantineName = DeleteLeaf(id), expected = (string)op["baseIdentity"];
+      string decision = status == "CONFLICT" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+      bool wholeVerified = false, baseVerified = false, draftVerified = false;
+      using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(path))) {
+        DeleteObject current = ReadDeleteLeaf(parent, parts.Last()), quarantined = ReadDeleteLeaf(parent, quarantineName);
+        if (status == "OLD_COMPLETE_OBSERVED" && DeleteBaseMatches(current, op) && quarantined == null) {
+          Dictionary<string, object> snapshot = Snapshot(project, expectedRootIdentity);
+          Dictionary<string, object> actualFiles = (Dictionary<string, object>)snapshot["files"];
+          Dictionary<string, object> expectedDraft = new Dictionary<string, object>(actualFiles); expectedDraft.Remove((string)op["path"]);
+          baseVerified = ProjectBaseDigest(expectedRootIdentity, actualFiles,
+            (Dictionary<string, object>)snapshot["identities"]) == (string)header["baseDigest"];
+          draftVerified = ProjectDraftDigest(expectedDraft) == (string)header["verifiedDigest"];
+          wholeVerified = baseVerified && draftVerified;
+          if (!wholeVerified) decision = "CONFLICT";
+          else if (before == "ROLLED_BACK") decision = "CLEANUP_ONLY";
+          else if (new string[] { "PREPARED", "DELETE_INTENT", "ROLLBACK_REQUIRED" }.Contains(before)) {
+            decision = "ROLLBACK";
+            if (before != "ROLLBACK_REQUIRED") Observe("ROLLBACK_REQUIRED", last["tempIdentity"] as string, null);
+            Observe("ROLLED_BACK", last["tempIdentity"] as string, null);
+          }
+        } else if (status == "DELETE_COMMITTED_QUARANTINE_RETAINED" && current == null && DeleteBaseMatches(quarantined, op)) {
+          // A transaction-derived quarantine with a matching ID/hash is not
+          // enough: the entire unchanged project must match both durable
+          // base and verified-draft aggregate digests.
+          wholeVerified = VerifiedDeleteSnapshot(expectedRootIdentity, quarantined);
+          baseVerified = draftVerified = wholeVerified;
+          if (!wholeVerified) decision = "CONFLICT";
+          else if (new string[] { "DELETE_INTENT", "DELETE_QUARANTINED", "ROLLBACK_REQUIRED" }.Contains(before) && last["committedIdentity"] == null) {
+            IntPtr held = IntPtr.Zero;
+            try {
+              RecoveryFilesystem.Info info; held = parent.OpenDeleteSource(quarantineName, out info);
+              if (!DeleteBaseMatches(ReadDeleteObject(held), op) || ReadDeleteLeaf(parent, parts.Last()) != null ||
+                  !VerifiedDeleteSnapshot(expectedRootIdentity, ReadDeleteObject(held))) throw new InvalidOperationException("PHI_PUBLICATION_CONFLICT");
+              if (before != "ROLLBACK_REQUIRED") Observe("ROLLBACK_REQUIRED", expected, null);
+              live(); recoveryMutationUncertain = true;
+              parent.RestoreOwnedQuarantine(held, quarantineName, parts.Last(), expected, (string)op["baseDigest"]);
+              recoveryProjectMutations = 1; live();
+            } finally { CloseNative(held); }
+            Dictionary<string, object> restored = Snapshot(project, expectedRootIdentity);
+            if (ProjectBaseDigest(expectedRootIdentity, (Dictionary<string, object>)restored["files"],
+                (Dictionary<string, object>)restored["identities"]) != (string)header["baseDigest"] ||
+                ReadDeleteLeaf(parent, quarantineName) != null) throw new InvalidDataException();
+            recoveryMutationUncertain = false;
+            Observe("ROLLED_BACK", expected, null); decision = "ROLLBACK";
+          }
+        } else if (status == "DELETE_COMMITTED_CLEANUP_OBSERVED" && current == null && quarantined == null) {
+          Dictionary<string, object> snapshot = Snapshot(project, expectedRootIdentity);
+          draftVerified = ProjectDraftDigest((Dictionary<string, object>)snapshot["files"]) == (string)header["verifiedDigest"];
+          wholeVerified = draftVerified;
+          if (!wholeVerified) decision = "CONFLICT";
+          else if (before == "CLEANED") decision = "CLEANUP_ONLY";
+          else if (before == "CLEANUP_STARTED" || before == "RECOVERY_REQUIRED") {
+            Observe("CLEANED", expected, expected); decision = "FINALIZE_COMMIT";
+          }
+        }
+      }
+      // A proven conflict is durable evidence, not authority to remove the
+      // quarantine or overwrite a newer project object. Terminal records are
+      // immutable; repeated inspection of them remains read-only.
+      if (decision == "CONFLICT" && !new string[] { "CONFLICT", "CLEANED", "ROLLED_BACK", "FAILED" }.Contains((string)last["phase"]))
+        Observe("CONFLICT", last["tempIdentity"] as string, last["committedIdentity"] as string);
+      return new { version = 1, status = "PASS_BOUNDED_DELETE_RECOVERY", transactionId = id, rootIdentity = expectedRootIdentity,
+        rootIdentityVerified = true, observedStatus = status, decision, phaseBefore = before, phaseAfter = last["phase"],
+        baseDigestVerified = baseVerified, verifiedDraftDigestMatched = draftVerified,
+        actionPerformed = (int)last["sequence"] != sequence || recoveryProjectMutations != 0,
+        journalMutations = (int)last["sequence"] - sequence, projectMutations = recoveryProjectMutations,
+        processKills = 0, projectPublished = false, externalRequests = 0 };
     }
     object RecoverKnownRename(string expectedRootIdentity, Action live) {
       // Called only after a dead creator and a complete, private, pinned journal
@@ -966,12 +1074,14 @@ namespace Phi.Native {
           }
           bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
           if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
-          if ((int)journal.header["version"] != 4) throw new InvalidDataException();
-          live(); result = journal.RecoverKnownRename(rootIdentity, live);
+          int journalVersion = (int)journal.header["version"];
+          if (journalVersion != 3 && journalVersion != 4) throw new InvalidDataException();
+          live(); result = journalVersion == 3 ? journal.RecoverKnownDelete(rootIdentity, live) : journal.RecoverKnownRename(rootIdentity, live);
         });
         Console.WriteLine(Serializer().Serialize(result)); return 0;
       } catch {
-        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = journal != null && journal.header != null && (int)journal.header["version"] == 3 ?
+            "FAIL_BOUNDED_DELETE_RECOVERY" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
           actionPerformed = journal != null && (journal.recoveryMutationUncertain || journal.recoveryProjectMutations != 0),
           projectMutations = journal == null ? (object)0 : journal.recoveryMutationUncertain ? (object)"UNKNOWN" : journal.recoveryProjectMutations,
           processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
@@ -1153,6 +1263,11 @@ namespace Phi.Native {
     static Dictionary<string, object> DeleteFixtureHeader(string project, string transactionId) {
       Dictionary<string, object> header = FixtureHeader(project, transactionId); header["version"] = 3;
       Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0]; op["kind"] = "DELETE"; op["newDigest"] = null; op["newBytes"] = null;
+      Dictionary<string, object> snapshot = Snapshot(project, (string)header["projectIdentity"]);
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"], ids = (Dictionary<string, object>)snapshot["identities"];
+      Dictionary<string, object> desired = new Dictionary<string, object>(files); desired.Remove((string)op["path"]);
+      header["baseDigest"] = ProjectBaseDigest((string)header["projectIdentity"], files, ids);
+      header["verifiedDigest"] = ProjectDraftDigest(desired);
       return header;
     }
     internal static int DeleteFixtureChild(string point) {
@@ -1291,6 +1406,171 @@ namespace Phi.Native {
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone, restartedRecovery = restarted,
         journalPhaseAtInterruption = phaseAtDeath, evidence, unrelatedPreserved = passed, sameTextReplacementObserved, scope = "NATIVE_JOURNAL_DELETE_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
+    }
+    static string FixtureGit(string root, string arguments) {
+      using (Process git = Process.Start(new ProcessStartInfo { FileName = "git", Arguments = arguments, WorkingDirectory = root,
+        UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+        try {
+          if (!git.WaitForExit(5000) || git.ExitCode != 0) throw new InvalidDataException();
+          string output = git.StandardOutput.ReadToEnd();
+          if (output.Length > 4096) throw new InvalidDataException();
+          return output.Trim();
+        } finally { if (!git.HasExited) { git.Kill(); git.WaitForExit(3000); } }
+      }
+    }
+    internal static int DeleteControllerRecoverySelfTest(string name) {
+      string[] cases = { "rollback", "rollback-intent", "metadata-rollback", "finalize", "cleanup-only", "conflict", "unrelated-change",
+        "quarantine-replaced", "quarantine-content-changed", "manual", "invalid-locator" };
+      if (!cases.Contains(name)) return 70;
+      ScopeRecovery scope = null; Process publisher = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
+      bool passed = false, clean = false, killed = false, childGone = false, controllerGone = false;
+      object evidence = null, discoveryEvidence = null; int controllerExit = -1;
+      string rootIdEvidence = null, sourceIdEvidence = null, unrelatedIdEvidence = null, baseDigestEvidence = null, verifiedDigestEvidence = null;
+      string expectedFileDigestEvidence = null, quarantineIdentityAtDeath = null, quarantineIdentityAtRecovery = null, quarantineDigestAtRecovery = null;
+      string gitDiffEvidence = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string source = Path.Combine(scope.Root, "input.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt"), quarantine = Path.Combine(scope.Root, DeleteLeaf(tx));
+        File.WriteAllText(source, "old-delete-complete", new UTF8Encoding(false));
+        File.WriteAllText(unrelated, "unrelated-delete-user", new UTF8Encoding(false));
+        FixtureGit(scope.Root, "init -q"); FixtureGit(scope.Root, "add -- input.txt unrelated.txt");
+        FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
+        if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
+        Dictionary<string, object> expectedHeader = DeleteFixtureHeader(scope.Root, tx);
+        Dictionary<string, object> original = Snapshot(scope.Root, rootId);
+        Dictionary<string, object> originalIds = (Dictionary<string, object>)original["identities"];
+        rootIdEvidence = rootId; sourceIdEvidence = (string)originalIds["input.txt"]; unrelatedIdEvidence = (string)originalIds["unrelated.txt"];
+        baseDigestEvidence = (string)expectedHeader["baseDigest"]; verifiedDigestEvidence = (string)expectedHeader["verifiedDigest"];
+        expectedFileDigestEvidence = (string)((Dictionary<string, object>)Operations(expectedHeader)[0])["baseDigest"];
+        string point = name == "metadata-rollback" || name == "invalid-locator" ? "intent" : name == "rollback-intent" ? "renamed" :
+          name == "finalize" ? "unlinked" : name == "cleanup-only" ? "cleaned" : "quarantined";
+        stage = "START_PUBLISHER";
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-delete-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); publisher.StandardInput.Close();
+        string ready = null; Thread reader = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } }); reader.IsBackground = true; reader.Start();
+        if (!reader.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announcement["ready"] || (string)announcement["checkpoint"] != point || (string)announcement["transactionId"] != tx) throw new InvalidDataException();
+        phaseAtDeath = announcement["phase"] as string; stage = "KILL_PUBLISHER";
+        publisher.Kill(); killed = true;
+        if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
+          DeleteObject held = ReadDeleteLeaf(parent, DeleteLeaf(tx));
+          quarantineIdentityAtDeath = held == null ? null : held.Identity;
+          if (held != null && (held.Identity != sourceIdEvidence || held.Digest != expectedFileDigestEvidence)) throw new InvalidDataException();
+        }
+        if (name == "conflict") File.WriteAllText(source, "new-delete-user", new UTF8Encoding(false));
+        if (name == "unrelated-change") File.WriteAllText(unrelated, "new-unrelated-user", new UTF8Encoding(false));
+        if (name == "quarantine-replaced") { File.Move(quarantine, quarantine + ".user-owned"); File.WriteAllText(quarantine, "old-delete-complete", new UTF8Encoding(false)); }
+        if (name == "quarantine-content-changed") File.WriteAllText(quarantine, "changed-delete-user", new UTF8Encoding(false));
+        if (name == "manual") File.Move(quarantine, quarantine + ".user-owned");
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
+          DeleteObject held = ReadDeleteLeaf(parent, DeleteLeaf(tx));
+          quarantineIdentityAtRecovery = held == null ? null : held.Identity;
+          quarantineDigestAtRecovery = held == null ? null : held.Digest;
+        }
+        if (new string[] { "rollback", "conflict", "manual" }.Contains(name)) {
+          stage = "FRESH_DISCOVERY";
+          using (Process discovery = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+            Arguments = "--publication-discover", UseShellExecute = false, RedirectStandardInput = true,
+            RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+            try {
+              discovery.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root })); discovery.StandardInput.Close();
+              if (!discovery.WaitForExit(5000) || discovery.ExitCode != 0) throw new InvalidDataException();
+              string output = discovery.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+              Dictionary<string, object> inventory = Serializer().Deserialize<Dictionary<string, object>>(output);
+              IList entries = inventory["entries"] as IList;
+              string expectedClass = name == "rollback" ? "RECOVERY_REQUIRED" : name == "conflict" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+              if ((string)inventory["status"] != "PASS_READ_ONLY_DISCOVERY" || (string)inventory["rootIdentity"] != rootId ||
+                  entries == null || entries.Count != 1 || (int)inventory["projectTransactions"] != 1 ||
+                  (bool)inventory["actionPerformed"] || (int)inventory["journalMutations"] != 0 || (int)inventory["projectMutations"] != 0 ||
+                  (int)inventory["processKills"] != 0 || (bool)inventory["projectPublished"]) throw new InvalidDataException();
+              Dictionary<string, object> entry = entries[0] as Dictionary<string, object>;
+              if (entry == null || (string)entry["transactionId"] != tx || (int)entry["journalVersion"] != 3 ||
+                  (string)entry["classification"] != expectedClass) throw new InvalidDataException();
+              discoveryEvidence = inventory;
+            } finally { if (!discovery.HasExited) { discovery.Kill(); discovery.WaitForExit(3000); } }
+          }
+        }
+        stage = "NEW_CONTROLLER";
+        using (Process controller = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-recover-known", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+          try {
+            controller.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root,
+              transactionId = name == "invalid-locator" ? Guid.NewGuid().ToString("N") : tx,
+              guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 })); controller.StandardInput.Close();
+            if (!controller.WaitForExit(5000)) throw new InvalidDataException(); controllerGone = controller.HasExited; controllerExit = controller.ExitCode;
+            if (controllerExit != (name == "invalid-locator" ? 70 : 0)) throw new InvalidDataException();
+            string output = controller.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+            Dictionary<string, object> receipt = Serializer().Deserialize<Dictionary<string, object>>(output); evidence = receipt;
+            if (name == "invalid-locator") {
+              if ((string)receipt["status"] != "FAIL_BOUNDED_RENAME_RECOVERY" || (bool)receipt["actionPerformed"] ||
+                  (bool)receipt["projectPublished"] || (int)receipt["projectMutations"] != 0) throw new InvalidDataException();
+            } else {
+              string decision = name == "cleanup-only" ? "CLEANUP_ONLY" :
+                new string[] { "conflict", "unrelated-change", "quarantine-replaced", "quarantine-content-changed" }.Contains(name) ? "CONFLICT" :
+                name == "manual" ? "MANUAL_RECOVERY_REQUIRED" : name == "finalize" ? "FINALIZE_COMMIT" : "ROLLBACK";
+              bool action = new string[] { "rollback", "rollback-intent", "metadata-rollback", "finalize", "conflict", "unrelated-change",
+                "quarantine-replaced", "quarantine-content-changed" }.Contains(name);
+              string finalPhase = decision == "ROLLBACK" ? "ROLLED_BACK" : decision == "CONFLICT" ? "CONFLICT" :
+                decision == "FINALIZE_COMMIT" || decision == "CLEANUP_ONLY" ? "CLEANED" : phaseAtDeath;
+              if ((string)receipt["status"] != "PASS_BOUNDED_DELETE_RECOVERY" || (string)receipt["decision"] != decision ||
+                  (string)receipt["transactionId"] != tx || (string)receipt["rootIdentity"] != rootId || !(bool)receipt["rootIdentityVerified"] ||
+                  (string)receipt["phaseBefore"] != phaseAtDeath || (string)receipt["phaseAfter"] != finalPhase ||
+                  (bool)receipt["actionPerformed"] != action || ((int)receipt["journalMutations"] > 0) != action ||
+                  (int)receipt["projectMutations"] != (name == "rollback" || name == "rollback-intent" ? 1 : 0) ||
+                  (int)receipt["processKills"] != 0 || (bool)receipt["projectPublished"] || (int)receipt["externalRequests"] != 0 ||
+                  (bool)receipt["baseDigestVerified"] != !new string[] { "conflict", "unrelated-change", "quarantine-replaced", "quarantine-content-changed",
+                    "manual", "finalize", "cleanup-only" }.Contains(name) ||
+                  (bool)receipt["verifiedDraftDigestMatched"] != !new string[] { "conflict", "unrelated-change", "quarantine-replaced",
+                    "quarantine-content-changed", "manual" }.Contains(name)) throw new InvalidDataException();
+            }
+          } finally { if (!controller.HasExited) { controller.Kill(); controller.WaitForExit(3000); } }
+        }
+        stage = "VERIFY_PROJECT_AND_JOURNAL";
+        bool restored = new string[] { "rollback", "rollback-intent", "metadata-rollback", "invalid-locator" }.Contains(name);
+        bool foreignSource = name == "conflict";
+        if (File.Exists(source) != (restored || foreignSource) ||
+            File.Exists(quarantine) != new string[] { "conflict", "unrelated-change", "quarantine-replaced", "quarantine-content-changed" }.Contains(name) ||
+            File.ReadAllText(unrelated) != (name == "unrelated-change" ? "new-unrelated-user" : "unrelated-delete-user") ||
+            restored && File.ReadAllText(source) != "old-delete-complete" ||
+            foreignSource && File.ReadAllText(source) != "new-delete-user" ||
+            name == "manual" && File.ReadAllText(quarantine + ".user-owned") != "old-delete-complete" ||
+            name == "quarantine-replaced" && (File.ReadAllText(quarantine + ".user-owned") != "old-delete-complete" ||
+              File.ReadAllText(quarantine) != "old-delete-complete") ||
+            name == "quarantine-content-changed" && File.ReadAllText(quarantine) != "changed-delete-user") throw new InvalidDataException();
+        string gitDiff = FixtureGit(scope.Root, "diff --name-only"); gitDiffEvidence = gitDiff;
+        string expectedDiff = restored ? "" : name == "conflict" ? "input.txt" : name == "unrelated-change" ? "unrelated.txt" :
+          new string[] { "finalize", "cleanup-only", "quarantine-replaced", "quarantine-content-changed", "manual" }.Contains(name) ? "input.txt" : "";
+        if (FixtureGit(scope.Root, "rev-parse --is-inside-work-tree") != "true" || gitDiff != expectedDiff ||
+            restored && FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          if ((string)journal.header["baseDigest"] != (string)expectedHeader["baseDigest"] ||
+              (string)journal.header["verifiedDigest"] != (string)expectedHeader["verifiedDigest"] ||
+              (string)journal.last["phase"] != (restored && name != "invalid-locator" ? "ROLLED_BACK" : name == "finalize" || name == "cleanup-only" ? "CLEANED" :
+                new string[] { "conflict", "unrelated-change", "quarantine-replaced", "quarantine-content-changed" }.Contains(name) ? "CONFLICT" : phaseAtDeath)) throw new InvalidDataException();
+        }
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_DELETE_CONTROLLER_RECOVERY_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":controllerExit=" + controllerExit); }
+      finally {
+        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
+        restartedControllerGone = controllerGone, controllerExit, journalPhaseAtInterruption = phaseAtDeath, evidence, discoveryEvidence,
+        rootIdentity = rootIdEvidence, sourceIdentity = sourceIdEvidence, unrelatedIdentity = unrelatedIdEvidence,
+        baseDigest = baseDigestEvidence, verifiedDigest = verifiedDigestEvidence, expectedFileDigest = expectedFileDigestEvidence,
+        quarantineIdentityAtDeath, quarantineIdentityAtRecovery, quarantineDigestAtRecovery, gitDiff = gitDiffEvidence,
+        scope = "NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
     static readonly string[] RenameCheckpoints = { "before-rename", "intent", "renamed", "journal-renamed", "committed", "verified", "cleaned" };

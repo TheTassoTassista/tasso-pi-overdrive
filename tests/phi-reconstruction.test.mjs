@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discoverWindowsTransactions, inspectKnownWindowsTransaction, recoverKnownWindowsRename, validateWindowsKnownReconstruction,
-  validateWindowsKnownRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
+import { discoverWindowsTransactions, inspectKnownWindowsTransaction, recoverKnownWindowsRename, recoverKnownWindowsDelete, validateWindowsKnownReconstruction,
+  validateWindowsKnownRecovery, validateWindowsKnownDeleteRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
 
 const transactionId = 'a'.repeat(32);
 const rootIdentity = 'b'.repeat(16) + ':' + 'c'.repeat(32);
@@ -45,6 +45,7 @@ test('new-controller decoder rejects fabricated publication, actions, root bindi
 test('new-controller inspection is unavailable off Windows rather than a portable publication fallback', { skip: process.platform === 'win32' }, () => {
   assert.throws(() => inspectKnownWindowsTransaction({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => recoverKnownWindowsRename({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
+  assert.throws(() => recoverKnownWindowsDelete({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => discoverWindowsTransactions({ cwd: '.' }), /BACKEND_UNAVAILABLE/u);
 });
 
@@ -121,4 +122,43 @@ test('bounded recovery decoder rejects forged authority, incomplete actions and 
     { decision: 'PUBLISHED' }, { content: 'secret' },
   ]) assert.throws(() => validateWindowsKnownRecovery(run, { ...valid, ...change }, transactionId), /RECOVERY_UNCONFIRMED/u);
   assert.throws(() => validateWindowsKnownRecovery({ ...run, status: 70 }, valid, transactionId), /RECOVERY_UNCONFIRMED/u);
+});
+
+const deleteRecovery = (decision, observedStatus, phaseBefore, phaseAfter, journalMutations, projectMutations,
+  baseDigestVerified, verifiedDraftDigestMatched) => ({
+  version: 1, status: 'PASS_BOUNDED_DELETE_RECOVERY', transactionId, rootIdentity, rootIdentityVerified: true,
+  observedStatus, decision, phaseBefore, phaseAfter, baseDigestVerified, verifiedDraftDigestMatched,
+  actionPerformed: journalMutations > 0 || projectMutations > 0, journalMutations, projectMutations,
+  processKills: 0, projectPublished: false, externalRequests: 0,
+});
+
+test('fresh DELETE controller decoder distinguishes physical rollback, metadata-only finalization and fail-closed outcomes', () => {
+  const accepted = [
+    deleteRecovery('ROLLBACK', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_QUARANTINED', 'ROLLED_BACK', 2, 1, true, true),
+    deleteRecovery('ROLLBACK', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_INTENT', 'ROLLED_BACK', 2, 1, true, true),
+    deleteRecovery('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'DELETE_INTENT', 'ROLLED_BACK', 2, 0, true, true),
+    deleteRecovery('FINALIZE_COMMIT', 'DELETE_COMMITTED_CLEANUP_OBSERVED', 'CLEANUP_STARTED', 'CLEANED', 1, 0, false, true),
+    deleteRecovery('CLEANUP_ONLY', 'DELETE_COMMITTED_CLEANUP_OBSERVED', 'CLEANED', 'CLEANED', 0, 0, false, true),
+    deleteRecovery('CONFLICT', 'CONFLICT', 'DELETE_QUARANTINED', 'CONFLICT', 1, 0, false, false),
+    deleteRecovery('CONFLICT', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_QUARANTINED', 'CONFLICT', 1, 0, false, false),
+    deleteRecovery('MANUAL_RECOVERY_REQUIRED', 'UNKNOWN_FAIL_SAFE', 'DELETE_QUARANTINED', 'DELETE_QUARANTINED', 0, 0, false, false),
+  ];
+  for (const value of accepted) {
+    const decoded = validateWindowsKnownDeleteRecovery(run, value, transactionId);
+    assert.equal(decoded.projectPublished, false);
+    assert.throws(() => { decoded.decision = 'PUBLISHED'; }, TypeError);
+  }
+});
+
+test('fresh DELETE controller decoder rejects fabricated publication, unsafe rollback and omitted proof', () => {
+  const valid = deleteRecovery('ROLLBACK', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_QUARANTINED', 'ROLLED_BACK', 2, 1, true, true);
+  for (const change of [
+    { projectPublished: true }, { rootIdentityVerified: false }, { projectMutations: 0 }, { journalMutations: 0 },
+    { baseDigestVerified: false }, { verifiedDraftDigestMatched: false }, { phaseAfter: 'CLEANED' },
+    { processKills: 1 }, { externalRequests: 1 }, { transactionId: 'd'.repeat(32) },
+    { actionPerformed: false }, { decision: 'RESUME' }, { rawContent: 'secret' },
+  ]) assert.throws(() => validateWindowsKnownDeleteRecovery(run, { ...valid, ...change }, transactionId), /RECOVERY_UNCONFIRMED/u);
+  assert.throws(() => validateWindowsKnownDeleteRecovery({ ...run, status: 70 }, valid, transactionId), /RECOVERY_UNCONFIRMED/u);
+  const final = deleteRecovery('FINALIZE_COMMIT', 'DELETE_COMMITTED_CLEANUP_OBSERVED', 'CLEANUP_STARTED', 'CLEANED', 1, 0, false, true);
+  assert.throws(() => validateWindowsKnownDeleteRecovery(run, { ...final, baseDigestVerified: true }, transactionId), /RECOVERY_UNCONFIRMED/u);
 });

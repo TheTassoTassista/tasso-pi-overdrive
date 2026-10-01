@@ -148,6 +148,60 @@ export function recoverKnownWindowsRename({ cwd, transactionId }) {
   return validateWindowsKnownRecovery(run, value, transactionId);
 }
 
+export function validateWindowsKnownDeleteRecovery(run, value, transactionId) {
+  if (run?.error || run?.status !== 0 || run?.signal || !Number.isSafeInteger(run?.pid) || run.pid < 1 ||
+      !exactKeys(value, recoveryKeys) || value.version !== 1 || value.status !== 'PASS_BOUNDED_DELETE_RECOVERY' ||
+      value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
+      value.rootIdentityVerified !== true || !/^[A-Z_]{3,32}$/u.test(value.phaseBefore ?? '') ||
+      !/^[A-Z_]{3,32}$/u.test(value.phaseAfter ?? '') ||
+      !['OLD_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_COMMITTED_CLEANUP_OBSERVED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE'].includes(value.observedStatus) ||
+      !['ROLLBACK', 'FINALIZE_COMMIT', 'CLEANUP_ONLY', 'CONFLICT', 'MANUAL_RECOVERY_REQUIRED'].includes(value.decision) ||
+      !Number.isInteger(value.projectMutations) || value.projectMutations < 0 || value.projectMutations > 1 ||
+      !Number.isInteger(value.journalMutations) || value.journalMutations < 0 || value.journalMutations > 2 ||
+      typeof value.baseDigestVerified !== 'boolean' || typeof value.verifiedDraftDigestMatched !== 'boolean' ||
+      value.processKills !== 0 || value.projectPublished !== false || value.externalRequests !== 0) fail('RECOVERY_UNCONFIRMED');
+  const before = value.phaseBefore;
+  if (value.decision === 'ROLLBACK') {
+    const old = value.observedStatus === 'OLD_COMPLETE_OBSERVED';
+    if (!['PREPARED', 'DELETE_INTENT', 'DELETE_QUARANTINED', 'ROLLBACK_REQUIRED'].includes(before) ||
+        !['OLD_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED'].includes(value.observedStatus) ||
+        value.phaseAfter !== 'ROLLED_BACK' || value.actionPerformed !== true ||
+        value.journalMutations !== (before === 'ROLLBACK_REQUIRED' ? 1 : 2) ||
+        value.projectMutations !== (old ? 0 : 1) || !value.baseDigestVerified || !value.verifiedDraftDigestMatched) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.decision === 'FINALIZE_COMMIT') {
+    if (value.observedStatus !== 'DELETE_COMMITTED_CLEANUP_OBSERVED' || !['CLEANUP_STARTED', 'RECOVERY_REQUIRED'].includes(before) ||
+        value.phaseAfter !== 'CLEANED' || value.actionPerformed !== true || value.journalMutations !== 1 ||
+        value.projectMutations !== 0 || value.baseDigestVerified || !value.verifiedDraftDigestMatched) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.decision === 'CLEANUP_ONLY') {
+    const old = value.observedStatus === 'OLD_COMPLETE_OBSERVED';
+    if (value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 ||
+        value.phaseAfter !== before || (old ? before !== 'ROLLED_BACK' || !value.baseDigestVerified || !value.verifiedDraftDigestMatched :
+          value.observedStatus !== 'DELETE_COMMITTED_CLEANUP_OBSERVED' || before !== 'CLEANED' || value.baseDigestVerified || !value.verifiedDraftDigestMatched)) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.decision === 'CONFLICT') {
+    const terminal = ['CONFLICT', 'CLEANED', 'ROLLED_BACK', 'FAILED'].includes(before);
+    if (value.projectMutations !== 0 || value.baseDigestVerified || value.verifiedDraftDigestMatched ||
+        !['CONFLICT', 'OLD_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED', 'DELETE_COMMITTED_CLEANUP_OBSERVED'].includes(value.observedStatus) ||
+        value.actionPerformed !== !terminal || value.journalMutations !== (terminal ? 0 : 1) ||
+        value.phaseAfter !== (terminal ? before : 'CONFLICT')) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 ||
+      value.phaseAfter !== before || value.baseDigestVerified || value.verifiedDraftDigestMatched ||
+      value.observedStatus !== 'UNKNOWN_FAIL_SAFE') fail('RECOVERY_UNCONFIRMED');
+  return freeze({ ...value });
+}
+
+// The same native trusted recovery endpoint branches on the validated journal
+// version. This adapter grants no model-selected action or new publication.
+export function recoverKnownWindowsDelete({ cwd, transactionId }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0') || !/^[0-9a-f]{32}$/u.test(transactionId ?? '')) fail('RECOVERY_REQUEST_INVALID');
+  const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('RECOVERY_REQUEST_INVALID');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-recover-known'], { shell: false, windowsHide: true, encoding: 'utf8',
+    input: JSON.stringify({ version: 1, root, transactionId, guardianPid: process.pid, timeoutMs: 10000 }) + '\n', timeout: 11000, maxBuffer: 8192 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('RECOVERY_UNCONFIRMED'); }
+  return validateWindowsKnownDeleteRecovery(run, value, transactionId);
+}
+
 // Pure bounded failure decoder, not an execution endpoint or publication proof.
 // Production calls it ONLY with the result of the fixed attested native spawn.
 // Tests may decode metadata, but no Error/JSON can mint the private certificate.

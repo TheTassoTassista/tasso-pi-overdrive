@@ -211,6 +211,18 @@ namespace Phi.Native {
       // Keep the same exclusively held object's ownership for later unlink.
       deletionFiles.Add(file, HandleIdentity(file));
     }
+    internal void RestoreOwnedQuarantine(IntPtr file, string quarantine, string destination, string expectedIdentity, string expectedDigest) {
+      // Recovery only: the caller has validated the private journal, exact
+      // transaction-derived quarantine name and complete pre-delete project.
+      // This held object is never exposed as an ordinary rename source.
+      if (!Regex.IsMatch(quarantine, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.CultureInvariant) ||
+          AnchoredFile.Segments(destination).Length != 1 || HandleIdentity(file) != expectedIdentity ||
+          RenameSourceDigest(file) != expectedDigest) throw new InvalidDataException();
+      string registered;
+      if (!deletionFiles.TryGetValue(file, out registered) || registered != expectedIdentity) throw new InvalidDataException();
+      RenameRegisteredFile(file, destination, deletionFiles); // kernel no-replace
+      if (HandleIdentity(file) != expectedIdentity || RenameSourceDigest(file) != expectedDigest) throw new InvalidDataException();
+    }
     internal void UnlinkQuarantinedFile(IntPtr file, string expectedIdentity) {
       string registered;
       if (!deletionFiles.TryGetValue(file, out registered) || registered != expectedIdentity || HandleIdentity(file) != registered) throw new InvalidDataException();
@@ -249,7 +261,10 @@ namespace Phi.Native {
     // Read-only controller extraction. Every component is opened from a held
     // directory; all source handles remain pinned until the snapshot completes.
     // No host grants, pathname reads, recursive copies or publication authority.
-    internal object ReadProjectSnapshot(bool strictDraft = false) {
+    internal object ReadProjectSnapshot(bool strictDraft = false, string ownedQuarantine = null) {
+      if (ownedQuarantine != null && (strictDraft || !Regex.IsMatch(ownedQuarantine,
+          "\\A(?:[A-Za-z0-9_.-]+/)*phi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.CultureInvariant) ||
+          ownedQuarantine.Split('/').Any(part => part == "." || part == ".."))) throw new InvalidDataException();
       var handles = new List<IntPtr>();
       var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
       var identities = new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -260,13 +275,13 @@ namespace Phi.Native {
         IntPtr root = OpenRelative(parents[parents.Count - 2], Path.GetFileName(directoryPath), 0x81, 1, 1, 1, IntPtr.Zero, out info);
         handles.Add(root);
         if (HandleIdentity(root) != HandleIdentity(parents[parents.Count - 1])) throw new InvalidDataException();
-        SnapshotDirectory(root, "", 0, handles, files, identities, ref remaining, ref bytes, deadline, strictDraft);
+        SnapshotDirectory(root, "", 0, handles, files, identities, ref remaining, ref bytes, deadline, strictDraft, ownedQuarantine);
         return new { version = 1, rootIdentity = HandleIdentity(root), files, identities };
       } finally { for (int i = handles.Count - 1; i >= 0; i--) CloseHandle(handles[i]); }
     }
     static void SnapshotDirectory(IntPtr directory, string prefix, int depth, List<IntPtr> handles,
         SortedDictionary<string, string> files, SortedDictionary<string, string> identities,
-        ref int remaining, ref int totalBytes, Stopwatch deadline, bool strictDraft) {
+        ref int remaining, ref int totalBytes, Stopwatch deadline, bool strictDraft, string ownedQuarantine) {
       if (depth > 12 || deadline.ElapsedMilliseconds >= 5000) throw new InvalidDataException();
       const int Size = 32768;
       IntPtr buffer = Marshal.AllocHGlobal(Size);
@@ -294,7 +309,10 @@ namespace Phi.Native {
               // Reserved transaction evidence is not ordinary Worker input.
               // Until trusted discovery resolves it, fail closed rather than
               // silently omitting it or granting a new draft access to it.
-              if (Regex.IsMatch(name, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
+              bool omitOwnedQuarantine = ownedQuarantine == prefix + name;
+              if (Regex.IsMatch(name, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) &&
+                  !omitOwnedQuarantine) throw new InvalidDataException();
+              if (!omitOwnedQuarantine) {
               // Names only: protected entries are never opened/read.
               bool protectedName = Regex.IsMatch(name, "\\A(?:\\.git|node_modules|\\.phi-cache|\\.env(?:\\..*)?|\\.ssh|\\.aws|\\.gnupg|\\.password-store|browser-data|keyrings|auth\\.json|credentials(?:\\.json)?|id_(?:rsa|dsa|ecdsa|ed25519)|known_hosts|netrc)\\z|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase);
               if (protectedName && strictDraft) throw new InvalidDataException();
@@ -310,7 +328,7 @@ namespace Phi.Native {
                 if ((info.Attributes & 0x400) != 0) throw new InvalidDataException();
                 if (isDirectory) {
                   if ((info.Attributes & 0x10) == 0) throw new InvalidDataException();
-                  SnapshotDirectory(child, relative + "/", depth + 1, handles, files, identities, ref remaining, ref totalBytes, deadline, strictDraft);
+                  SnapshotDirectory(child, relative + "/", depth + 1, handles, files, identities, ref remaining, ref totalBytes, deadline, strictDraft, ownedQuarantine);
                 } else {
                   if ((info.Attributes & 0x10) != 0 || info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 512 * 1024 || files.Count >= 256) throw new InvalidDataException();
                   byte[] value;
@@ -327,6 +345,7 @@ namespace Phi.Native {
                   if (text.IndexOf('\0') >= 0) throw new InvalidDataException();
                   files.Add(relative, text); identities.Add(relative, HandleIdentity(child));
                 }
+              }
               }
             }
             if (next == 0) break;

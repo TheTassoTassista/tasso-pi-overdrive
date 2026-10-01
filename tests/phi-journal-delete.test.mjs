@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { windowsPublicationFailure, consumeWindowsPublicationProof } from '../platform/windows/publication.mjs';
-import { publicationBase } from '../lib/phi-publication-plan.mjs';
+import { windowsPublicationFailure, consumeWindowsPublicationProof, validateWindowsKnownDeleteRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
+import { publicationBase, draftContentDigest } from '../lib/phi-publication-plan.mjs';
 
 test('DELETE extends the same journal with exclusive identity-checked quarantine, never TxF or bare production unlink', () => {
   const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8').split('// Fixed fixtures only.')[0];
@@ -77,3 +77,48 @@ for (const name of cases) test('native same-journal recoverable DELETE: ' + name
   assert.equal(windowsRecoveryStatus().status, 'PASS');
   console.log(JSON.stringify({ control: 'NATIVE_JOURNAL_DELETE_ONLY', ...receipt }));
 });
+
+for (const name of ['rollback', 'rollback-intent', 'metadata-rollback', 'finalize', 'cleanup-only', 'conflict', 'unrelated-change',
+  'quarantine-replaced', 'quarantine-content-changed', 'manual', 'invalid-locator']) {
+  test('native killed-publisher fresh-controller bounded DELETE recovery: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-delete-controller-recovery-selftest', name], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 22000, maxBuffer: 10000,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.caseName, name);
+    for (const key of ['passed', 'fixtureCleanup', 'actualProcessKilled', 'childGone', 'restartedControllerGone']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.scope, 'NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false); assert.equal(receipt.externalRequests, 0);
+    const base = publicationBase({ rootIdentity: receipt.rootIdentity,
+      files: { 'input.txt': 'old-delete-complete', 'unrelated.txt': 'unrelated-delete-user' },
+      identities: { 'input.txt': receipt.sourceIdentity, 'unrelated.txt': receipt.unrelatedIdentity } });
+    assert.equal(receipt.baseDigest, base.digest);
+    assert.equal(receipt.verifiedDigest, draftContentDigest({ 'unrelated.txt': 'unrelated-delete-user' }));
+    assert.match(receipt.expectedFileDigest, /^[0-9a-f]{64}$/u);
+    const quarantinedAtDeath = !['metadata-rollback', 'invalid-locator', 'finalize', 'cleanup-only'].includes(name);
+    assert.equal(receipt.quarantineIdentityAtDeath, quarantinedAtDeath ? receipt.sourceIdentity : null);
+    if (name === 'quarantine-replaced') {
+      assert.notEqual(receipt.quarantineIdentityAtRecovery, receipt.sourceIdentity);
+      assert.equal(receipt.quarantineDigestAtRecovery, receipt.expectedFileDigest);
+    } else if (name === 'quarantine-content-changed') {
+      assert.equal(receipt.quarantineIdentityAtRecovery, receipt.sourceIdentity);
+      assert.notEqual(receipt.quarantineDigestAtRecovery, receipt.expectedFileDigest);
+    } else if (name === 'manual' || !quarantinedAtDeath) assert.equal(receipt.quarantineIdentityAtRecovery, null);
+    else {
+      assert.equal(receipt.quarantineIdentityAtRecovery, receipt.sourceIdentity);
+      assert.equal(receipt.quarantineDigestAtRecovery, receipt.expectedFileDigest);
+    }
+    assert.equal(typeof receipt.gitDiff, 'string');
+    if (name === 'invalid-locator') assert.equal(receipt.controllerExit, 70);
+    else assert.deepEqual(validateWindowsKnownDeleteRecovery({ status: 0, signal: null, pid: 1 }, receipt.evidence, receipt.evidence.transactionId), receipt.evidence);
+    if (['rollback', 'conflict', 'manual'].includes(name)) {
+      assert.deepEqual(validateWindowsTransactionDiscovery({ status: 0, signal: null, pid: 1 }, receipt.discoveryEvidence), receipt.discoveryEvidence);
+      assert.equal(receipt.discoveryEvidence.entries.length, 1);
+      assert.equal(receipt.discoveryEvidence.entries[0].transactionId, receipt.evidence.transactionId);
+    } else assert.equal(receipt.discoveryEvidence, null);
+    assert.doesNotMatch(JSON.stringify(receipt), /old-delete-complete|new-delete-user|unrelated-delete-user|new-unrelated-user/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    console.log(JSON.stringify({ control: 'NATIVE_BOUNDED_DELETE_RECOVERY', ...receipt }));
+  });
+}
