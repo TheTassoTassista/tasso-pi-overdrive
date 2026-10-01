@@ -65,6 +65,7 @@ test('V2 dead-controller decoder permits proved base rollback and terminal obser
     modifyRecovery('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'COMMIT_STARTED', 'ROLLED_BACK', 2, true, false),
     modifyRecovery('CLEANUP_ONLY', 'OLD_COMPLETE_OBSERVED', 'ROLLED_BACK', 'ROLLED_BACK', 0, true, false),
     modifyRecovery('CLEANUP_ONLY', 'NEW_COMPLETE_OBSERVED', 'CLEANED', 'CLEANED', 0, false, true),
+    modifyRecovery('MANUAL_RECOVERY_REQUIRED', 'NEW_COMPLETE_OBSERVED', 'COMMIT_STARTED', 'COMMIT_STARTED', 0, false, true),
     modifyRecovery('MANUAL_RECOVERY_REQUIRED', 'NEW_COMPLETE_OBSERVED', 'COMMITTED', 'COMMITTED', 0, false, true),
     modifyRecovery('CONFLICT', 'OLD_COMPLETE_OBSERVED', 'READY_TO_COMMIT', 'READY_TO_COMMIT', 0, false, false),
     modifyRecovery('CONFLICT', 'CONFLICT', 'READY_TO_COMMIT', 'READY_TO_COMMIT', 0, false, false),

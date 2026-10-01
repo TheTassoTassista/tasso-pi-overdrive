@@ -288,7 +288,7 @@ namespace Phi.Native {
       try { acquired = Acquire(lease); if (!acquired) throw new InvalidDataException(); pins = new RecoveryFilesystem(project); }
       catch { Dispose(); throw; }
     }
-    internal static PublicationJournal Begin(string project, Dictionary<string, object> metadata) {
+    internal static PublicationJournal Begin(string project, Dictionary<string, object> metadata, Action fixtureAfterReclaim = null) {
       // Freeze through a serialization copy; callers cannot mutate the header.
       Dictionary<string, object> value = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(metadata));
       string transactionId = value["transactionId"] as string; ValidateHeader(value, transactionId);
@@ -309,6 +309,9 @@ namespace Phi.Native {
           if (root.GetSubKeyNames().Length >= MaxTransactions)
             ReclaimForAdmission(root, project, (string)value["projectIdentity"], transactionId, MaxTransactions, out result.reclamation);
           if (root.GetSubKeyNames().Length >= MaxTransactions) throw new InvalidOperationException("PHI_PUBLICATION_CAPACITY_BLOCKED");
+          // Only the native crash fixture supplies this in-process callback.
+          // Production endpoints never accept a callback or a pause parameter.
+          if (result.reclamation != null && fixtureAfterReclaim != null) fixtureAfterReclaim();
           using (RegistryKey existing = root.OpenSubKey(transactionId)) if (existing != null) throw new InvalidDataException();
           using (RegistryKey key = root.CreateSubKey(transactionId, RegistryKeyPermissionCheck.ReadWriteSubTree, RegistryOptions.None, ScopeRecovery.PrivateRegistryAcl())) {
             result.header = value; result.Append(key, "PREPARED", 0, null, null);
@@ -2426,8 +2429,155 @@ namespace Phi.Native {
         processKillsByRetention = 0, projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
+    static Dictionary<string, object> RetentionAdmissionHeader(string project, string transactionId) {
+      string rootId = RecoveryFilesystem.DirectoryIdentity(project);
+      Dictionary<string, object> snapshot = Snapshot(project, rootId);
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"];
+      Dictionary<string, object> draft = new Dictionary<string, object>(files); draft.Add("new.txt", "new-fixture");
+      bool alive; int pid = Process.GetCurrentProcess().Id;
+      string generation = ScopeRecovery.ProcessCreation(pid, out alive); if (!alive) throw new InvalidDataException();
+      return new Dictionary<string, object> {
+        { "version", 1 }, { "transactionId", transactionId }, { "projectIdentity", rootId }, { "draftId", Guid.NewGuid().ToString("N") },
+        { "draftVersion", 1 }, { "verifiedDigest", ProjectDraftDigest(draft) },
+        { "baseDigest", ProjectBaseDigest(rootId, files, (Dictionary<string, object>)snapshot["identities"]) },
+        { "creatorPid", pid }, { "creatorGeneration", generation },
+        { "operations", new object[] { new Dictionary<string, object> { { "path", "new.txt" }, { "kind", "CREATE" },
+          { "baseIdentity", null }, { "baseDigest", null }, { "newDigest", Hash(Encoding.UTF8.GetBytes("new-fixture")) }, { "newBytes", 11 } } } }
+      };
+    }
+    internal static int RetentionAdmissionCrashChild() {
+      try {
+        Dictionary<string, object> request = FixtureRequest();
+        string project = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]);
+        if (RecoveryFilesystem.DirectoryIdentity(project) != (string)request["rootIdentity"]) throw new InvalidDataException();
+        string incoming = (string)request["transactionId"];
+        using (PublicationJournal journal = Begin(project, RetentionAdmissionHeader(project, incoming), delegate() {
+          // The parent kills this real process while both admission and the
+          // incoming transaction leases remain held, after the old leaf and
+          // parent registry flush but before any new PREPARED key exists.
+          using (RegistryKey root = OpenBase(false)) using (RegistryKey absent = root.OpenSubKey(incoming, false)) {
+            if (root.GetSubKeyNames().Length != MaxTransactions - 1 || absent != null) throw new InvalidDataException();
+          }
+          Console.WriteLine(Serializer().Serialize(new { ready = true, transactionId = incoming,
+            oldKeyDurablyReclaimed = true, incomingJournalAbsent = true }));
+          Console.Out.Flush(); Thread.Sleep(12000);
+          throw new IOException("PHI_RETENTION_CRASH_FIXTURE_NOT_TERMINATED");
+        })) { }
+      } catch { Console.Error.WriteLine("PHI_RETENTION_ADMISSION_CRASH_CHILD_FAILED"); }
+      return 70;
+    }
+    internal static int RetentionAdmissionCrashSelfTest() {
+      ScopeRecovery terminal = null, filler = null; Process publisher = null, admission = null, reader = null;
+      List<string> owned = new List<string>(); string[] initialNames = null;
+      string terminalId = Guid.NewGuid().ToString("N"), incoming = Guid.NewGuid().ToString("N"), next = Guid.NewGuid().ToString("N");
+      string stage = "BEGIN", beforeDigest = null, afterDigest = null;
+      bool passed = false, clean = false, publisherGone = false, admissionKilled = false, admissionGone = false, readerGone = false;
+      bool terminalRemoved = false, incomingAbsent = false, projectUnchanged = false, freshAdmission = false;
+      int capacityBefore = -1, capacityAfterCrash = -1, capacityAfterFresh = -1;
+      object discovery = null;
+      try {
+        using (RegistryKey root = OpenBase(true)) initialNames = root.GetSubKeyNames().OrderBy(x => x, StringComparer.Ordinal).ToArray();
+        if (initialNames.Length >= MaxTransactions) throw new InvalidDataException();
+        terminal = ScopeRecovery.Begin(); terminal.CreateRoot(); terminal.Ready();
+        filler = ScopeRecovery.Begin(); filler.CreateRoot(); filler.Ready();
+        File.WriteAllText(Path.Combine(terminal.Root, "input.txt"), "old-delete-complete", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(terminal.Root, "unrelated.txt"), "unrelated-delete-user", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(filler.Root, "input.txt"), "old-complete", new UTF8Encoding(false));
+        string rootId = RecoveryFilesystem.DirectoryIdentity(terminal.Root);
+        stage = "TERMINAL_PUBLISHER"; owned.Add(terminalId);
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-delete-fixture-child cleaned", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = terminal.Id, rootIdentity = rootId, transactionId = terminalId }));
+        publisher.StandardInput.Close();
+        string ready = null; Thread waiting = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } });
+        waiting.IsBackground = true; waiting.Start();
+        if (!waiting.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> terminalReady = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)terminalReady["ready"] || (string)terminalReady["phase"] != "CLEANED") throw new InvalidDataException();
+        publisher.Kill(); if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException();
+        publisherGone = true;
+        stage = "FILL_REAL_CAPACITY";
+        for (int i = 0; i < MaxTransactions - initialNames.Length - 1; i++) {
+          string id = Guid.NewGuid().ToString("N"); owned.Add(id);
+          using (PublicationJournal entry = Begin(filler.Root, FixtureHeader(filler.Root, id))) { }
+        }
+        using (RegistryKey root = OpenBase(false)) capacityBefore = root.GetSubKeyNames().Length;
+        if (capacityBefore != MaxTransactions) throw new InvalidDataException();
+        Dictionary<string, object> snapshot = Snapshot(terminal.Root, rootId);
+        beforeDigest = ProjectBaseDigest(rootId, (Dictionary<string, object>)snapshot["files"],
+          (Dictionary<string, object>)snapshot["identities"]);
+        stage = "CRASH_AFTER_RECLAIM"; owned.Add(incoming);
+        admission = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-retention-admission-crash-child", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        admission.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = terminal.Id, rootIdentity = rootId, transactionId = incoming }));
+        admission.StandardInput.Close();
+        string pause = null; Thread pauseReader = new Thread(delegate() { try { pause = admission.StandardOutput.ReadLine(); } catch { } });
+        pauseReader.IsBackground = true; pauseReader.Start();
+        if (!pauseReader.Join(7000) || pause == null || pause.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> marker = Serializer().Deserialize<Dictionary<string, object>>(pause);
+        if (!(bool)marker["ready"] || (string)marker["transactionId"] != incoming ||
+            !(bool)marker["oldKeyDurablyReclaimed"] || !(bool)marker["incomingJournalAbsent"]) throw new InvalidDataException();
+        admission.Kill(); admissionKilled = true;
+        if (!admission.WaitForExit(3000) || !admission.HasExited || admission.ExitCode == 0) throw new InvalidDataException();
+        admissionGone = true;
+        stage = "FRESH_INDEX_AND_PROJECT";
+        using (RegistryKey root = OpenBase(false)) using (RegistryKey old = root.OpenSubKey(terminalId, false))
+        using (RegistryKey newKey = root.OpenSubKey(incoming, false)) {
+          terminalRemoved = old == null; incomingAbsent = newKey == null; capacityAfterCrash = root.GetSubKeyNames().Length;
+        }
+        Dictionary<string, object> after = Snapshot(terminal.Root, rootId);
+        afterDigest = ProjectBaseDigest(rootId, (Dictionary<string, object>)after["files"],
+          (Dictionary<string, object>)after["identities"]);
+        projectUnchanged = beforeDigest == afterDigest && !File.Exists(Path.Combine(terminal.Root, "new.txt"));
+        if (!terminalRemoved || !incomingAbsent || capacityAfterCrash != MaxTransactions - 1 || !projectUnchanged) throw new InvalidDataException();
+        reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-discover", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        reader.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = terminal.Root })); reader.StandardInput.Close();
+        if (!reader.WaitForExit(5000) || reader.ExitCode != 0) throw new InvalidDataException(); readerGone = reader.HasExited;
+        string output = reader.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+        Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(output); discovery = observed;
+        IList entries = observed["entries"] as IList;
+        if ((string)observed["status"] != "PASS_READ_ONLY_DISCOVERY" || (string)observed["rootIdentity"] != rootId ||
+            entries == null || entries.Count != 0 || (int)observed["scannedTransactions"] != MaxTransactions - 1 ||
+            (int)observed["projectTransactions"] != 0 ||
+            (bool)observed["actionPerformed"] || (int)observed["journalMutations"] != 0 ||
+            (int)observed["projectMutations"] != 0 || (bool)observed["projectPublished"]) throw new InvalidDataException();
+        stage = "FRESH_ADMISSION"; owned.Add(next);
+        using (PublicationJournal resumed = Begin(terminal.Root, RetentionAdmissionHeader(terminal.Root, next)))
+          freshAdmission = (string)resumed.last["phase"] == "PREPARED" && resumed.ReclamationMetadata == null;
+        using (RegistryKey root = OpenBase(false)) capacityAfterFresh = root.GetSubKeyNames().Length;
+        if (!freshAdmission || capacityAfterFresh != MaxTransactions || File.Exists(Path.Combine(terminal.Root, "new.txt"))) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_RETENTION_ADMISSION_CRASH_FAILED:" + stage + ":" +
+        unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally {
+        foreach (Process process in new Process[] { reader, admission, publisher }) if (process != null) {
+          try { if (!process.HasExited) { process.Kill(); process.WaitForExit(3000); } } finally { process.Dispose(); }
+        }
+        try {
+          using (RegistryKey root = OpenBase(true)) {
+            foreach (string id in owned) if (root.GetSubKeyNames().Contains(id)) root.DeleteSubKeyTree(id);
+            if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0 ||
+                !root.GetSubKeyNames().OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(initialNames ?? new string[0])) throw new InvalidDataException();
+          }
+          if (filler != null) { filler.CleanupFiles(); bool removed = !Directory.Exists(filler.Root); filler.Complete(removed); if (!removed) throw new InvalidDataException(); }
+          if (terminal != null) { terminal.CleanupFiles(); bool removed = !Directory.Exists(terminal.Root); terminal.Complete(removed); if (!removed) throw new InvalidDataException(); }
+          clean = true;
+        } catch { clean = false; if (terminal != null) terminal.Dispose(); if (filler != null) filler.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { version = 1, status = passed && clean ? "PASS" : "FAIL",
+        scope = "NATIVE_RECLAIM_BEFORE_PREPARED_PROCESS_CRASH_NOT_POWER_LOSS", passed, fixtureCleanup = clean,
+        publisherGone, admissionKilled, admissionGone, freshReaderGone = readerGone, terminalRemoved, incomingAbsent,
+        projectUnchanged, freshAdmission, capacityBefore, capacityAfterCrash, capacityAfterFresh,
+        beforeProjectDigest = beforeDigest, afterProjectDigest = afterDigest, discovery,
+        projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
+    }
     internal static int ModifyControllerRecoverySelfTest(string name) {
-      string[] cases = { "rollback", "rollback-late", "manual-commit", "cleanup-only", "unrelated-conflict", "target-conflict" };
+      string[] cases = { "rollback", "rollback-late", "manual-post-physical", "manual-commit", "cleanup-only", "unrelated-conflict", "target-conflict" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; Process publisher = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
@@ -2447,7 +2597,8 @@ namespace Phi.Native {
         FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
         if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
         Dictionary<string, object> expectedHeader = ModifyRecoveryFixtureHeader(scope.Root, tx);
-        string point = name == "rollback" ? "temp" : name == "manual-commit" ? "committed" :
+        string point = name == "rollback" ? "temp" : name == "manual-post-physical" ? "before-journal-committed" :
+          name == "manual-commit" ? "committed" :
           name == "cleanup-only" ? "cleanup" : "before-commit";
         stage = "START_PUBLISHER";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
@@ -2482,7 +2633,7 @@ namespace Phi.Native {
             Dictionary<string, object> entry = entries[0] as Dictionary<string, object>;
             if (entry == null || (string)entry["transactionId"] != tx || (int)entry["journalVersion"] != 2 ||
                 (string)entry["classification"] != (name == "target-conflict" ? "CONFLICT" :
-                  new string[] { "rollback", "rollback-late", "manual-commit", "unrelated-conflict" }.Contains(name) ? "RECOVERY_REQUIRED" : "TERMINAL_RETAINED")) throw new InvalidDataException();
+                  new string[] { "rollback", "rollback-late", "manual-post-physical", "manual-commit", "unrelated-conflict" }.Contains(name) ? "RECOVERY_REQUIRED" : "TERMINAL_RETAINED")) throw new InvalidDataException();
             discoveryEvidence = inventory;
           } finally { if (!discovery.HasExited) { discovery.Kill(); discovery.WaitForExit(3000); } }
         }
@@ -2504,7 +2655,7 @@ namespace Phi.Native {
         stage = "NEW_CONTROLLER";
         Dictionary<string, object> first = recover(); evidence = first;
         string decision = name == "rollback" || name == "rollback-late" ? "ROLLBACK" :
-          name == "cleanup-only" ? "CLEANUP_ONLY" : name == "manual-commit" ? "MANUAL_RECOVERY_REQUIRED" : "CONFLICT";
+          name == "cleanup-only" ? "CLEANUP_ONLY" : new string[] { "manual-post-physical", "manual-commit" }.Contains(name) ? "MANUAL_RECOVERY_REQUIRED" : "CONFLICT";
         string finalPhase = decision == "ROLLBACK" ? "ROLLED_BACK" : phaseAtDeath;
         if ((string)first["status"] != "PASS_BOUNDED_MODIFY_RECOVERY" || (string)first["decision"] != decision ||
             (string)first["transactionId"] != tx || (string)first["rootIdentity"] != rootId || !(bool)first["rootIdentityVerified"] ||
@@ -2514,7 +2665,7 @@ namespace Phi.Native {
             (int)first["projectMutations"] != 0 || (int)first["processKills"] != 0 ||
             (bool)first["projectPublished"] || (int)first["externalRequests"] != 0 ||
             (bool)first["baseDigestVerified"] != (decision == "ROLLBACK") ||
-            (bool)first["verifiedDraftDigestMatched"] != (name == "manual-commit" || name == "cleanup-only")) throw new InvalidDataException();
+            (bool)first["verifiedDraftDigestMatched"] != (name == "manual-post-physical" || name == "manual-commit" || name == "cleanup-only")) throw new InvalidDataException();
         if (decision == "ROLLBACK" || decision == "CLEANUP_ONLY") {
           stage = "IDEMPOTENT_CONTROLLER";
           Dictionary<string, object> second = recover(); secondEvidence = second;
@@ -2526,14 +2677,14 @@ namespace Phi.Native {
         stage = "VERIFY_PROJECT_AND_JOURNAL";
         string actualTarget = File.ReadAllText(target), actualUnrelated = File.ReadAllText(unrelated);
         if (actualTarget != (name == "target-conflict" ? "new-target-user" :
-              name == "manual-commit" || name == "cleanup-only" ? "new-complete" : "old-complete") ||
+              name == "manual-post-physical" || name == "manual-commit" || name == "cleanup-only" ? "new-complete" : "old-complete") ||
             actualUnrelated != (name == "unrelated-conflict" ? "new-unrelated-user" : "unrelated-user")) throw new InvalidDataException();
         gitDiff = FixtureGit(scope.Root, "diff --name-only");
         if (gitDiff != (name == "unrelated-conflict" ? "unrelated.txt" :
-            new string[] { "manual-commit", "cleanup-only", "target-conflict" }.Contains(name) ? "input.txt" : "")) throw new InvalidDataException();
+            new string[] { "manual-post-physical", "manual-commit", "cleanup-only", "target-conflict" }.Contains(name) ? "input.txt" : "")) throw new InvalidDataException();
         Dictionary<string, object> finalSnapshot = Snapshot(scope.Root, rootId);
         finalDigest = ProjectDraftDigest((Dictionary<string, object>)finalSnapshot["files"]);
-        if (new string[] { "manual-commit", "cleanup-only" }.Contains(name) && finalDigest != (string)expectedHeader["verifiedDigest"]) throw new InvalidDataException();
+        if (new string[] { "manual-post-physical", "manual-commit", "cleanup-only" }.Contains(name) && finalDigest != (string)expectedHeader["verifiedDigest"]) throw new InvalidDataException();
         using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false))
         using (RegistryKey key = root.OpenSubKey(tx, false)) {
           if (key == null) throw new InvalidDataException(); journal.ReadChain(key);

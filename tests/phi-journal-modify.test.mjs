@@ -17,7 +17,7 @@ test('single-file MODIFY extends the existing journal; native observations alone
   assert.equal(fs.readFileSync(new URL('../platform/windows/index.mjs', import.meta.url), 'utf8').includes('autonomousReady: true'), false);
 });
 const points = ['before-transaction', 'temp', 'write', 'flush', 'validation', 'staged', 'before-commit', 'before-journal-committed', 'committed', 'postverify', 'cleanup'];
-for (const name of ['rollback', 'rollback-late', 'manual-commit', 'cleanup-only', 'unrelated-conflict', 'target-conflict']) {
+for (const name of ['rollback', 'rollback-late', 'manual-post-physical', 'manual-commit', 'cleanup-only', 'unrelated-conflict', 'target-conflict']) {
   test('native V2 dead-controller continuity: ' + name, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--publication-modify-controller-recovery-selftest', name],
       { shell: false, encoding: 'utf8', windowsHide: true, timeout: 22000, maxBuffer: 16384 });
@@ -34,7 +34,7 @@ for (const name of ['rollback', 'rollback-late', 'manual-commit', 'cleanup-only'
     assert.equal(value.projectMutations, 0);
     if (['rollback', 'rollback-late', 'cleanup-only'].includes(name)) assert.equal(receipt.idempotent, true);
     assert.equal(receipt.gitDiff, name === 'unrelated-conflict' ? 'unrelated.txt' :
-      ['manual-commit', 'cleanup-only', 'target-conflict'].includes(name) ? 'input.txt' : '');
+      ['manual-post-physical', 'manual-commit', 'cleanup-only', 'target-conflict'].includes(name) ? 'input.txt' : '');
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'NATIVE_BOUNDED_MODIFY_RECOVERY', ...receipt }));
   });
