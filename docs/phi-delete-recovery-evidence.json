@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "scope": "BOUNDED_SINGLE_DELETE_FRESH_CONTROLLER_RECOVERY_NOT_FULL_D6",
+  "status": "PASS_BOUNDED_DELETE_RECOVERY",
+  "functionalHead": "410c040aa6369391fb8aba45c8039b75fccd390b",
+  "runId": 36863079074,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36863079074",
+  "windowsDedicatedDelete": { "total": 39, "passed": 39, "failed": 0, "cancelled": 0, "skipped": 0 },
+  "newActualDeathFreshControllerCases": [
+    { "case": "rollback", "decision": "ROLLBACK", "phaseAfter": "ROLLED_BACK", "projectMutations": 1, "journalMutations": 2 },
+    { "case": "rollback-intent", "decision": "ROLLBACK", "phaseAfter": "ROLLED_BACK", "projectMutations": 1, "journalMutations": 2 },
+    { "case": "metadata-rollback", "decision": "ROLLBACK", "phaseAfter": "ROLLED_BACK", "projectMutations": 0, "journalMutations": 2 },
+    { "case": "finalize", "decision": "FINALIZE_COMMIT", "phaseAfter": "CLEANED", "projectMutations": 0, "journalMutations": 1 },
+    { "case": "cleanup-only", "decision": "CLEANUP_ONLY", "phaseAfter": "CLEANED", "projectMutations": 0, "journalMutations": 0 },
+    { "case": "conflict", "decision": "CONFLICT", "phaseAfter": "CONFLICT", "projectMutations": 0, "journalMutations": 1 },
+    { "case": "unrelated-change", "decision": "CONFLICT", "phaseAfter": "CONFLICT", "projectMutations": 0, "journalMutations": 1 },
+    { "case": "quarantine-replaced", "decision": "CONFLICT", "phaseAfter": "CONFLICT", "projectMutations": 0, "journalMutations": 1 },
+    { "case": "quarantine-content-changed", "decision": "CONFLICT", "phaseAfter": "CONFLICT", "projectMutations": 0, "journalMutations": 1 },
+    { "case": "manual", "decision": "MANUAL_RECOVERY_REQUIRED", "phaseAfter": "DELETE_QUARANTINED", "projectMutations": 0, "journalMutations": 0 },
+    { "case": "invalid-locator", "decision": "MANUAL_RECOVERY_REQUIRED", "projectMutations": 0 }
+  ],
+  "everyNewCase": { "passed": true, "publisherActuallyKilled": true, "freshControllerExited": true, "gitMetadataClean": true, "fixtureCleanup": true, "externalRequests": 0 },
+  "aggregate": {
+    "windows": { "total": 432, "passed": 421, "failed": 0, "cancelled": 0, "skipped": 11 },
+    "ubuntu": { "total": 432, "passed": 147, "failed": 0, "cancelled": 0, "skipped": 285 }
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 21532,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "directoryRemoved": true,
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "brokerCleanup": "PASS", "externalProviderCalls": 0 },
+  "limitations": [
+    "No bounded retention/reclamation certificate",
+    "No complete all-operation fresh-controller continuity certificate",
+    "No general power-loss or multi-file crash-recovery certificate",
+    "No D-wide E2E or E1-E3 Windows autonomy certificate"
+  ]
+}
