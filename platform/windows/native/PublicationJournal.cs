@@ -1718,7 +1718,7 @@ namespace Phi.Native {
           Thread holder = new Thread(delegate() {
             try { using (PublicationJournal occupied = new PublicationJournal(tx, scope.Root)) {
               heldReady.Set(); releaseHeld.WaitOne();
-            } } catch (Exception error) { holderFailure = error; heldReady.Set(); }
+            } } catch (Exception holderException) { holderFailure = holderException; heldReady.Set(); }
           });
           holder.IsBackground = true; holder.Start();
           try {
@@ -2288,7 +2288,7 @@ namespace Phi.Native {
         // private admission mutex must grant precisely one reused slot.
         ManualResetEvent startGate = new ManualResetEvent(false);
         Dictionary<string, object>[] requests = { header, competing };
-        bool[] admitted = new bool[2]; Exception[] rejected = new Exception[2];
+        bool[] admitted = new bool[2]; Exception[] admissionErrors = new Exception[2];
         Dictionary<string, object>[] receipts = new Dictionary<string, object>[2];
         Thread[] contenders = new Thread[2];
         for (int i = 0; i < contenders.Length; i++) {
@@ -2296,11 +2296,11 @@ namespace Phi.Native {
           contenders[i] = new Thread(delegate() {
             try {
               startGate.WaitOne();
-              using (PublicationJournal journal = Begin(terminal.Root, requests[index])) {
-                admitted[index] = (string)journal.last["phase"] == "PREPARED";
-                receipts[index] = journal.ReclamationMetadata as Dictionary<string, object>;
+              using (PublicationJournal contenderJournal = Begin(terminal.Root, requests[index])) {
+                admitted[index] = (string)contenderJournal.last["phase"] == "PREPARED";
+                receipts[index] = contenderJournal.ReclamationMetadata as Dictionary<string, object>;
               }
-            } catch (Exception error) { rejected[index] = error; }
+            } catch (Exception admissionException) { admissionErrors[index] = admissionException; }
           });
           contenders[i].IsBackground = true; contenders[i].Start();
         }
@@ -2311,8 +2311,8 @@ namespace Phi.Native {
         int winner = admitted[0] ? 0 : 1, loser = 1 - winner;
         string admittedId = (string)requests[winner]["transactionId"];
         admittedAfterReclaim = true; reclaimReceipt = receipts[winner];
-        concurrentAdmissionSerialized = rejected[loser] is InvalidOperationException &&
-          rejected[loser].Message == "PHI_PUBLICATION_CAPACITY_BLOCKED" && receipts[loser] == null;
+        concurrentAdmissionSerialized = admissionErrors[loser] is InvalidOperationException &&
+          admissionErrors[loser].Message == "PHI_PUBLICATION_CAPACITY_BLOCKED" && receipts[loser] == null;
         if (!concurrentAdmissionSerialized) throw new InvalidDataException();
         using (RegistryKey registry = OpenBase(false)) {
           using (RegistryKey gone = registry.OpenSubKey(terminalId, false)) terminalRemoved = gone == null;
