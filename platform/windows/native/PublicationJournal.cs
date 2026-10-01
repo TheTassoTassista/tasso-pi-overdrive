@@ -1568,7 +1568,7 @@ namespace Phi.Native {
       string rootIdEvidence = null, sourceIdEvidence = null, unrelatedIdEvidence = null, baseDigestEvidence = null, verifiedDigestEvidence = null;
       string expectedFileDigestEvidence = null, quarantineIdentityAtDeath = null, quarantineIdentityAtRecovery = null, quarantineDigestAtRecovery = null;
       string gitDiffEvidence = null, retentionDecision = null;
-      bool activeRetentionBlocked = false, pendingRetentionBlocked = false, retentionKeyRemoved = false;
+      bool activeRetentionBlocked = false, pendingRetentionBlocked = false, heldCandidateBlocked = false, retentionKeyRemoved = false;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
@@ -1710,6 +1710,29 @@ namespace Phi.Native {
         }
         stage = "RETENTION_PRESSURE";
         bool safeTerminal = new string[] { "rollback", "rollback-intent", "metadata-rollback", "finalize", "cleanup-only" }.Contains(name);
+        if (name == "rollback") {
+          // A second controller holds the exact candidate lease. Admission
+          // must skip it even though its terminal filesystem proof is valid.
+          ManualResetEvent heldReady = new ManualResetEvent(false), releaseHeld = new ManualResetEvent(false);
+          Exception holderFailure = null;
+          Thread holder = new Thread(delegate() {
+            try { using (PublicationJournal occupied = new PublicationJournal(tx, scope.Root)) {
+              heldReady.Set(); releaseHeld.WaitOne();
+            } } catch (Exception error) { holderFailure = error; heldReady.Set(); }
+          });
+          holder.IsBackground = true; holder.Start();
+          try {
+            if (!heldReady.WaitOne(5000) || holderFailure != null) throw new InvalidDataException();
+            try { RetentionFixturePressure(scope.Root, rootId, Guid.NewGuid().ToString("N")); }
+            catch (InvalidOperationException error) { heldCandidateBlocked = error.Message == "PHI_PUBLICATION_CAPACITY_BLOCKED"; }
+            using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false))
+              if (!heldCandidateBlocked || key == null) throw new InvalidDataException();
+          } finally {
+            releaseHeld.Set();
+            if (!holder.Join(5000)) throw new InvalidDataException();
+            heldReady.Dispose(); releaseHeld.Dispose();
+          }
+        }
         try { retentionDecision = RetentionFixturePressure(scope.Root, rootId, Guid.NewGuid().ToString("N")); }
         catch (InvalidOperationException error) {
           if (error.Message != "PHI_PUBLICATION_CAPACITY_BLOCKED") throw;
@@ -1734,7 +1757,7 @@ namespace Phi.Native {
         rootIdentity = rootIdEvidence, sourceIdentity = sourceIdEvidence, unrelatedIdentity = unrelatedIdEvidence,
         baseDigest = baseDigestEvidence, verifiedDigest = verifiedDigestEvidence, expectedFileDigest = expectedFileDigestEvidence,
         quarantineIdentityAtDeath, quarantineIdentityAtRecovery, quarantineDigestAtRecovery, gitDiff = gitDiffEvidence,
-        retentionDecision, retentionKeyRemoved, activeRetentionBlocked, pendingRetentionBlocked,
+        retentionDecision, retentionKeyRemoved, activeRetentionBlocked, pendingRetentionBlocked, heldCandidateBlocked,
         scope = "NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
       return passed && clean && gitMetadataClean ? 0 : 70;
     }
@@ -2162,7 +2185,7 @@ namespace Phi.Native {
       List<string> owned = new List<string>(); string stage = "BEGIN", terminalId = Guid.NewGuid().ToString("N");
       string[] initialNames = null; bool passed = false, clean = false, killed = false, publisherGone = false, readerGone = false;
       bool noSafeBlocked = false, corruptBlocked = false, secondPassBlocked = false, terminalRemoved = false, admittedAfterReclaim = false;
-      bool normal63To64 = false, otherEntriesPreserved = false, projectUnchanged = false;
+      bool normal63To64 = false, otherEntriesPreserved = false, projectUnchanged = false, concurrentAdmissionSerialized = false;
       int filled = 0, beforeReclaim = -1, afterReclaim = -1;
       string lastFillerId = null;
       string beforeProjectDigest = null, afterProjectDigest = null, selectedTransactionId = null, terminalPhase = null;
@@ -2248,10 +2271,10 @@ namespace Phi.Native {
         Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"];
         Dictionary<string, object> draft = new Dictionary<string, object>(files); draft.Add("new.txt", "new-fixture");
         bool alive; int pid = Process.GetCurrentProcess().Id;
-        string admittedId = Guid.NewGuid().ToString("N");
-        owned.Add(admittedId);
+        string firstId = Guid.NewGuid().ToString("N"), secondId = Guid.NewGuid().ToString("N");
+        owned.Add(firstId); owned.Add(secondId);
         Dictionary<string, object> header = new Dictionary<string, object> {
-          { "version", 1 }, { "transactionId", admittedId }, { "projectIdentity", terminalRootId }, { "draftId", Guid.NewGuid().ToString("N") },
+          { "version", 1 }, { "transactionId", firstId }, { "projectIdentity", terminalRootId }, { "draftId", Guid.NewGuid().ToString("N") },
           { "draftVersion", 1 }, { "verifiedDigest", ProjectDraftDigest(draft) },
           { "baseDigest", ProjectBaseDigest(terminalRootId, files, (Dictionary<string, object>)snapshot["identities"]) },
           { "creatorPid", pid }, { "creatorGeneration", ScopeRecovery.ProcessCreation(pid, out alive) },
@@ -2259,10 +2282,38 @@ namespace Phi.Native {
             { "baseIdentity", null }, { "baseDigest", null }, { "newDigest", Hash(Encoding.UTF8.GetBytes("new-fixture")) }, { "newBytes", 11 } } } }
         };
         if (!alive) throw new InvalidDataException();
-        using (PublicationJournal admitted = Begin(terminal.Root, header)) {
-          admittedAfterReclaim = (string)admitted.last["phase"] == "PREPARED";
-          reclaimReceipt = admitted.ReclamationMetadata as Dictionary<string, object>;
+        Dictionary<string, object> competing = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(header));
+        competing["transactionId"] = secondId;
+        // Both real admissions start at the same 64-entry boundary. The
+        // private admission mutex must grant precisely one reused slot.
+        ManualResetEvent startGate = new ManualResetEvent(false);
+        Dictionary<string, object>[] requests = { header, competing };
+        bool[] admitted = new bool[2]; Exception[] rejected = new Exception[2];
+        Dictionary<string, object>[] receipts = new Dictionary<string, object>[2];
+        Thread[] contenders = new Thread[2];
+        for (int i = 0; i < contenders.Length; i++) {
+          int index = i;
+          contenders[i] = new Thread(delegate() {
+            try {
+              startGate.WaitOne();
+              using (PublicationJournal journal = Begin(terminal.Root, requests[index])) {
+                admitted[index] = (string)journal.last["phase"] == "PREPARED";
+                receipts[index] = journal.ReclamationMetadata as Dictionary<string, object>;
+              }
+            } catch (Exception error) { rejected[index] = error; }
+          });
+          contenders[i].IsBackground = true; contenders[i].Start();
         }
+        startGate.Set();
+        bool firstDone = contenders[0].Join(10000), secondDone = contenders[1].Join(10000);
+        startGate.Dispose();
+        if (!firstDone || !secondDone || admitted[0] == admitted[1]) throw new InvalidDataException();
+        int winner = admitted[0] ? 0 : 1, loser = 1 - winner;
+        string admittedId = (string)requests[winner]["transactionId"];
+        admittedAfterReclaim = true; reclaimReceipt = receipts[winner];
+        concurrentAdmissionSerialized = rejected[loser] is InvalidOperationException &&
+          rejected[loser].Message == "PHI_PUBLICATION_CAPACITY_BLOCKED" && receipts[loser] == null;
+        if (!concurrentAdmissionSerialized) throw new InvalidDataException();
         using (RegistryKey registry = OpenBase(false)) {
           using (RegistryKey gone = registry.OpenSubKey(terminalId, false)) terminalRemoved = gone == null;
           using (RegistryKey added = registry.OpenSubKey(admittedId, false)) if (added == null) throw new InvalidDataException();
@@ -2318,7 +2369,7 @@ namespace Phi.Native {
       Console.WriteLine(Serializer().Serialize(new { version = 1, status = passed && clean ? "PASS" : "FAIL", scope = "NATIVE_TERMINAL_RETENTION_AT_REAL_64_ENTRY_CAPACITY",
         passed, fixtureCleanup = clean, publisherKilled = killed, publisherGone, freshReaderGone = readerGone,
         originalEntries = initialNames == null ? (object)"UNKNOWN" : initialNames.Length, filledEntries = filled,
-        normal63To64, beforeReclaim, noSafeBlocked, corruptBlocked, oneTerminalRemoved = terminalRemoved,
+        normal63To64, beforeReclaim, noSafeBlocked, corruptBlocked, concurrentAdmissionSerialized, oneTerminalRemoved = terminalRemoved,
         selectedTransactionId, terminalPhase, reclaimReceipt,
         otherEntriesPreserved, admittedAfterReclaim, afterReclaim, secondPassBlocked,
         projectUnchanged, beforeProjectDigest, afterProjectDigest,

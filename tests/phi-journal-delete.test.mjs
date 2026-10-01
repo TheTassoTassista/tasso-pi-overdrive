@@ -120,6 +120,7 @@ for (const name of ['rollback', 'rollback-intent', 'metadata-rollback', 'finaliz
     assert.equal(receipt.retentionKeyRemoved, safeTerminal);
     assert.equal(receipt.activeRetentionBlocked, name === 'rollback');
     assert.equal(receipt.pendingRetentionBlocked, name === 'rollback');
+    assert.equal(receipt.heldCandidateBlocked, name === 'rollback');
     assert.equal(receipt.scope, 'NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION');
     assert.equal(receipt.projectPublished, false); assert.equal(receipt.externalRequests, 0);
     const base = publicationBase({ rootIdentity: receipt.rootIdentity,

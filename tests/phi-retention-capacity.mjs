@@ -14,7 +14,7 @@ test('real 64-entry Windows journal pressure reclaims only one proved terminal D
   assert.equal(receipt.status, 'PASS');
   assert.equal(receipt.scope, 'NATIVE_TERMINAL_RETENTION_AT_REAL_64_ENTRY_CAPACITY');
   for (const key of ['passed', 'fixtureCleanup', 'publisherKilled', 'publisherGone', 'freshReaderGone',
-    'normal63To64', 'noSafeBlocked', 'corruptBlocked', 'oneTerminalRemoved', 'otherEntriesPreserved',
+    'normal63To64', 'noSafeBlocked', 'corruptBlocked', 'concurrentAdmissionSerialized', 'oneTerminalRemoved', 'otherEntriesPreserved',
     'admittedAfterReclaim', 'secondPassBlocked', 'projectUnchanged']) assert.equal(receipt[key], true, key);
   assert.equal(receipt.beforeReclaim, 64);
   assert.equal(receipt.afterReclaim, 64);
