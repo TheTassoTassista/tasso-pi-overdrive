@@ -2164,6 +2164,7 @@ namespace Phi.Native {
       bool noSafeBlocked = false, corruptBlocked = false, secondPassBlocked = false, terminalRemoved = false, admittedAfterReclaim = false;
       bool normal63To64 = false, otherEntriesPreserved = false, projectUnchanged = false;
       int filled = 0, beforeReclaim = -1, afterReclaim = -1;
+      string lastFillerId = null;
       string beforeProjectDigest = null, afterProjectDigest = null, selectedTransactionId = null, terminalPhase = null;
       Dictionary<string, object> reclaimReceipt = null;
       try {
@@ -2197,6 +2198,7 @@ namespace Phi.Native {
         for (int i = 0; i < needed; i++) {
           string id = Guid.NewGuid().ToString("N");
           owned.Add(id);
+          lastFillerId = id;
           if (i == needed - 1) using (RegistryKey registry = OpenBase(false)) normal63To64 = registry.GetSubKeyNames().Length == 63;
           using (PublicationJournal filler = Begin(active.Root, FixtureHeader(active.Root, id))) { }
           filled++;
@@ -2218,7 +2220,8 @@ namespace Phi.Native {
           if (!noSafeBlocked || !registry.GetSubKeyNames().OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(fullNames)) throw new InvalidDataException();
 
         stage = "CORRUPT_CANDIDATE_FAIL_CLOSED";
-        string corruptId = owned.Last(); byte[] originalEnvelope;
+        if (lastFillerId == null) throw new InvalidDataException();
+        string corruptId = lastFillerId; byte[] originalEnvelope;
         using (RegistryKey registry = OpenBase(true)) using (RegistryKey key = registry.OpenSubKey(corruptId, true)) {
           if (key == null) throw new InvalidDataException();
           originalEnvelope = ReadValue(key, "E00000000");
