@@ -264,7 +264,7 @@ namespace Phi.Native {
     internal object ReadProjectSnapshot(bool strictDraft = false, string ownedQuarantine = null) {
       if (ownedQuarantine != null && (strictDraft || !Regex.IsMatch(ownedQuarantine,
           "\\A(?:[A-Za-z0-9_.-]+/)*phi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.CultureInvariant) ||
-          ownedQuarantine.Split('/').Any(part => part == "." || part == ".."))) throw new InvalidDataException();
+          Array.Exists(ownedQuarantine.Split('/'), part => part == "." || part == ".."))) throw new InvalidDataException();
       var handles = new List<IntPtr>();
       var files = new SortedDictionary<string, string>(StringComparer.Ordinal);
       var identities = new SortedDictionary<string, string>(StringComparer.Ordinal);
