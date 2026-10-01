@@ -3,8 +3,34 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { windowsPublicationFailure, consumeWindowsPublicationProof, validateWindowsKnownDeleteRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
+import { windowsPublicationFailure, consumeWindowsPublicationProof, validateWindowsKnownDeleteRecovery, validateWindowsTransactionDiscovery, validWindowsRetention } from '../platform/windows/publication.mjs';
 import { publicationBase, draftContentDigest } from '../lib/phi-publication-plan.mjs';
+
+test('retention admission stays capped at 64 and only reclaims a verified terminal registry leaf', () => {
+  const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
+  assert.match(journal, /MaxTransactions = 64/u);
+  assert.match(journal, /root\.GetSubKeyNames\(\)\.Length >= MaxTransactions\)\s*ReclaimForAdmission\(root, project, \(string\)value\["projectIdentity"\], transactionId, MaxTransactions, out result\.reclamation\)/u);
+  const reclaimer = journal.slice(journal.indexOf('bool TerminalReclaimProof'), journal.indexOf('PublicationJournal(string transactionId'));
+  for (const required of ['SAFE_TO_RECLAIM', 'RECOVERY_PENDING', 'CONFLICT', 'MANUAL_RECOVERY_REQUIRED', 'QUARANTINED_FOR_INSPECTION', 'RegDeleteKeyW', 'RegFlushKey', 'ReadChain(key)', 'TerminalReclaimProof']) assert.ok(reclaimer.includes(required), required);
+  assert.doesNotMatch(reclaimer, /File\.Delete|Directory\.Delete|DeleteSubKeyTree|UnlinkQuarantinedFile/u);
+  const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /Native Windows terminal journal retention at actual 64-entry capacity[\s\S]*?run: node tests\/phi-retention-capacity\.mjs/u);
+  const dispatch = fs.readFileSync(new URL('../platform/windows/native/OwnedProcess.cs', import.meta.url), 'utf8');
+  assert.match(dispatch, /--publication-retention-capacity-selftest/u);
+});
+
+test('retention receipt decoder fails closed on forged eligibility, state, capacity and raw content', () => {
+  const good = { version: 1, selectedTransactionId: 'a'.repeat(32), journalVersion: 3, terminalPhase: 'CLEANED',
+    journalDigest: 'b'.repeat(64), eligibility: 'SAFE_TO_RECLAIM', reason: 'TERMINAL_CHAIN_AND_FILESYSTEM_VERIFIED',
+    filesystemVerified: true, result: 'RECLAIMED_TERMINAL', capacityBefore: 64, capacityAfterReclaim: 63, capacityAfterAdmission: 64 };
+  assert.equal(validWindowsRetention(null), true);
+  assert.equal(validWindowsRetention(good), true);
+  for (const change of [x => { x.terminalPhase = 'DELETE_QUARANTINED'; }, x => { x.eligibility = 'UNKNOWN'; },
+    x => { x.filesystemVerified = false; }, x => { x.capacityAfterReclaim = 64; }, x => { x.rawContent = 'secret'; }]) {
+    const bad = structuredClone(good); change(bad); assert.equal(validWindowsRetention(bad), false);
+  }
+  assert.equal(validWindowsRetention(undefined), false);
+});
 
 test('DELETE extends the same journal with exclusive identity-checked quarantine, never TxF or bare production unlink', () => {
   const journal = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8').split('// Fixed fixtures only.')[0];
@@ -89,6 +115,11 @@ for (const name of ['rollback', 'rollback-intent', 'metadata-rollback', 'finaliz
     assert.equal(receipt.caseName, name);
     for (const key of ['passed', 'fixtureCleanup', 'actualProcessKilled', 'childGone', 'restartedControllerGone']) assert.equal(receipt[key], true, key);
     assert.equal(receipt.gitMetadataClean, true);
+    const safeTerminal = ['rollback', 'rollback-intent', 'metadata-rollback', 'finalize', 'cleanup-only'].includes(name);
+    assert.equal(receipt.retentionDecision, safeTerminal ? 'RECLAIMED_TERMINAL' : 'CAPACITY_BLOCKED');
+    assert.equal(receipt.retentionKeyRemoved, safeTerminal);
+    assert.equal(receipt.activeRetentionBlocked, name === 'rollback');
+    assert.equal(receipt.pendingRetentionBlocked, name === 'rollback');
     assert.equal(receipt.scope, 'NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION');
     assert.equal(receipt.projectPublished, false); assert.equal(receipt.externalRequests, 0);
     const base = publicationBase({ rootIdentity: receipt.rootIdentity,

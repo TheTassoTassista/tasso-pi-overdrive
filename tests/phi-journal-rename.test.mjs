@@ -105,6 +105,8 @@ for (const name of ['empty', 'foreign', 'active', 'corrupt']) {
     const receipt = JSON.parse(run.stdout);
     assert.equal(receipt.caseName, name);
     for (const key of ['passed', 'fixtureCleanup', 'readerGone']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.retentionBlocked, name === 'active' || name === 'corrupt');
+    assert.equal(receipt.ownedKeyPreserved, name === 'active' || name === 'corrupt');
     assert.equal(receipt.scope, 'NATIVE_READ_ONLY_PHI_INDEX_DISCOVERY_NOT_RECOVERY_AUTHORITY');
     assert.equal(receipt.projectPublished, false);
     assert.equal(receipt.externalRequests, 0);

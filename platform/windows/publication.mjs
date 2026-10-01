@@ -17,6 +17,14 @@ const journalKeys = ['version', 'scope', 'transactionId', 'projectIdentity', 'dr
   'sequence', 'operationIndex', 'operations', 'tempIdentity', 'committedIdentity', 'filesCommitted', 'pendingOperations', 'recoveryState', 'cleanup', 'projectPublished'];
 const admissionKeys = ['version', 'scope', 'phase', 'transactionId', 'projectIdentity', 'draftId', 'draftVersion', 'verifiedDigest', 'baseDigest', 'operations',
   'journalCreated', 'mutationStarted', 'filesCommitted', 'pendingOperations', 'commitState', 'recoveryState', 'cleanup', 'projectPublished'];
+const retentionKeys = ['version', 'selectedTransactionId', 'journalVersion', 'terminalPhase', 'journalDigest', 'eligibility', 'reason',
+  'filesystemVerified', 'result', 'capacityBefore', 'capacityAfterReclaim', 'capacityAfterAdmission'];
+export const validWindowsRetention = value => value === null || (Boolean(exactKeys(value, retentionKeys)) && value.version === 1 &&
+  /^[0-9a-f]{32}$/u.test(value.selectedTransactionId ?? '') && [3, 4].includes(value.journalVersion) &&
+  ['CLEANED', 'ROLLED_BACK'].includes(value.terminalPhase) && /^[0-9a-f]{64}$/u.test(value.journalDigest ?? '') &&
+  value.eligibility === 'SAFE_TO_RECLAIM' && value.reason === 'TERMINAL_CHAIN_AND_FILESYSTEM_VERIFIED' &&
+  value.filesystemVerified === true && value.result === 'RECLAIMED_TERMINAL' &&
+  value.capacityBefore === 64 && value.capacityAfterReclaim === 63 && value.capacityAfterAdmission === 64);
 const reconstructionKeys = ['version', 'status', 'transactionId', 'rootIdentity', 'rootIdentityVerified', 'observedStatus', 'decision', 'phase',
   'journalVersion', 'actionPerformed', 'journalMutations', 'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];
 const reconstructionStates = new Set(['OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED',
@@ -251,7 +259,7 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
     throw windowsPublicationFailure(run, value, header);
   }
   const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
-  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_MODIFY' || value.projectPublished !== false || value.externalRequests !== 0 ||
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_MODIFY' || value.projectPublished !== false || value.externalRequests !== 0 || !validWindowsRetention(value.retention) ||
       journal?.version !== 2 || journal.scope !== 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION' || journal.phase !== 'CLEANED' ||
       journal.cleanup !== 'PASS' || journal.projectPublished !== false || journal.pendingOperations !== 0 || !same(journal.operations, operations) ||
       !same(journal.filesCommitted, [op.path]) || Object.keys(header).filter(k => k !== 'operations').some(k => journal[k] !== header[k]) ||
@@ -263,7 +271,7 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
   if (final.rootIdentity !== base.rootIdentity || draftContentDigest(final.files) !== binding.digest || !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) ||
       Object.entries(base.files).some(([name, file]) => final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
   const proof = Object.freeze({});
-  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'MODIFY', native, journal, publisherPid: run.pid,
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'MODIFY', native, journal, retention: value.retention, publisherPid: run.pid,
     publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true, backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_MODIFY' }));
   return proof;
 }
@@ -296,7 +304,7 @@ function publishWindowsSingleRename({ cwd, base, snapshot, binding, metadata, re
   const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof, primitive = native?.primitive;
   const nativeKeys = ['backend', 'primitive', 'sourceIdentity', 'destinationIdentity', 'digest', 'sameDirectory', 'noClobber', 'committed', 'txfUsed', 'projectPublished'];
   const primitiveKeys = ['backend', 'sourceIdentity', 'destinationIdentity', 'digest', 'sameDirectory', 'noClobber', 'sourceAuthorityConsumed', 'txfUsed', 'journalUsed', 'projectPublished'];
-  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_RENAME' || value.projectPublished !== false || value.externalRequests !== 0 ||
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_RENAME' || value.projectPublished !== false || value.externalRequests !== 0 || !validWindowsRetention(value.retention) ||
       !exactKeys(journal, journalKeys) || journal.version !== 4 || journal.scope !== 'SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION' ||
       journal.phase !== 'CLEANED' || journal.cleanup !== 'PASS' || journal.projectPublished !== false || journal.pendingOperations !== 0 ||
       !same(journal.filesCommitted, [op.path]) || !same(journal.operations, operations) || Object.keys(header).some(k => !same(journal[k], header[k])) ||
@@ -313,7 +321,7 @@ function publishWindowsSingleRename({ cwd, base, snapshot, binding, metadata, re
       !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) || Object.hasOwn(final.files, op.sourcePath) ||
       final.identities[op.path] !== op.baseIdentity || Object.entries(base.files).some(([name, file]) => name !== op.sourcePath && final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
   const proof = Object.freeze({});
-  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'RENAME', native, journal, publisherPid: run.pid,
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'RENAME', native, journal, retention: value.retention, publisherPid: run.pid,
     publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true, backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_RENAME' }));
   return proof;
 }
@@ -335,7 +343,7 @@ function publishWindowsSingleDelete({ cwd, base, snapshot, binding, metadata, re
   if (run.error || run.status !== 0 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1) throw windowsPublicationFailure(run, value, header);
   const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
   const nativeKeys = ['backend', 'sourceIdentity', 'oldDigest', 'quarantineIdentity', 'sameDirectory', 'noClobber', 'committed', 'destinationAbsent', 'quarantineAbsent', 'txfUsed'];
-  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_DELETE' || value.projectPublished !== false || value.externalRequests !== 0 ||
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_DELETE' || value.projectPublished !== false || value.externalRequests !== 0 || !validWindowsRetention(value.retention) ||
       !exactKeys(journal, journalKeys) || journal.version !== 3 || journal.scope !== 'SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION' ||
       journal.phase !== 'CLEANED' || journal.cleanup !== 'PASS' || journal.projectPublished !== false || journal.pendingOperations !== 0 ||
       !same(journal.filesCommitted, [op.path]) || !same(journal.operations, operations) || Object.keys(header).some(k => !same(journal[k], header[k])) ||
@@ -347,7 +355,7 @@ function publishWindowsSingleDelete({ cwd, base, snapshot, binding, metadata, re
   if (final.rootIdentity !== base.rootIdentity || draftContentDigest(final.files) !== binding.digest || !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) ||
       Object.hasOwn(final.files, op.path) || Object.entries(base.files).some(([name, file]) => name !== op.path && final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
   const proof = Object.freeze({});
-  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'DELETE', native, journal, publisherPid: run.pid,
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'DELETE', native, journal, retention: value.retention, publisherPid: run.pid,
     publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true, backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_DELETE' }));
   return proof;
 }
