@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "scope": "PROCESS_CRASH_AFTER_TERMINAL_RECLAIM_BEFORE_PREPARED_NOT_POWER_LOSS",
+  "status": "PASS_BOUNDED_ADMISSION_CRASH_SAFETY",
+  "functionalHead": "6f3578e24fbd6328b2cd7819fdc277003e162d90",
+  "runId": 36934481548,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36934481548",
+  "nativeCrashFixture": {
+    "dedicatedAndAggregate": "PASS_TWICE",
+    "publisherGone": true,
+    "admissionProcessKilledAndGone": true,
+    "freshReaderGone": true,
+    "fixtureCleanup": true,
+    "terminalRemoved": true,
+    "incomingJournalAbsent": true,
+    "projectDigestUnchanged": true,
+    "freshDiscoveryStatus": "PASS_READ_ONLY_DISCOVERY",
+    "freshDiscoveryScannedTransactions": 63,
+    "freshDiscoveryProjectTransactions": 0,
+    "freshAdmission": true,
+    "capacityBefore": 64,
+    "capacityAfterCrash": 63,
+    "capacityAfterFreshAdmission": 64
+  },
+  "aggregate": {
+    "windows": { "total": 445, "passed": 434, "failed": 0, "skipped": 11 },
+    "ubuntu": { "total": 445, "passed": 152, "failed": 0, "skipped": 293 }
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "tests": { "total": 445, "passed": 434, "failed": 0 },
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 19909,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "directoryRemoved": true,
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": {
+    "required": 3,
+    "passed": 3,
+    "externalProviderCalls": 0,
+    "brokerCleanup": "PASS"
+  },
+  "limitations": [
+    "This proves actual process termination at the exact post-reclaim/pre-PREPARED point, not power-loss durability.",
+    "No new transaction exists at the crash point, so no publication authority or project mutation can be inferred from the reclaimed key. The safe terminal record is gone; a later independent admission can use the free slot.",
+    "There is still no separate durable outbox or audit receipt for the aborted admission. V1/V2 and uncertain records remain non-reclaimable.",
+    "No multi-file recovery, D6 completion, D-wide E2E or Windows-autonomy certificate is implied."
+  ]
+}

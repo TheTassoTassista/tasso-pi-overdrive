@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "scope": "BOUNDED_V2_MODIFY_FRESH_CONTROLLER_RECOVERY_NOT_FULL_D6",
+  "status": "PASS_BOUNDED_MODIFY_RECOVERY",
+  "functionalHead": "37fec56ff79b3f94400ad38d82635ad6a6624c86",
+  "runId": 36931668907,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/36931668907",
+  "windowsDedicatedModify": { "total": 40, "passed": 40, "failed": 0, "skipped": 0 },
+  "actualDeathFreshControllerCases": [
+    { "case": "rollback", "decision": "ROLLBACK", "phaseBefore": "TEMP_CREATED", "phaseAfter": "ROLLED_BACK", "journalMutations": 2, "projectMutations": 0, "gitDiff": "", "secondRecoveryIdempotent": true },
+    { "case": "rollback-late", "decision": "ROLLBACK", "phaseBefore": "COMMIT_STARTED", "phaseAfter": "ROLLED_BACK", "journalMutations": 2, "projectMutations": 0, "gitDiff": "", "secondRecoveryIdempotent": true },
+    { "case": "manual-commit", "decision": "MANUAL_RECOVERY_REQUIRED", "phaseBefore": "COMMITTED", "phaseAfter": "COMMITTED", "journalMutations": 0, "projectMutations": 0, "gitDiff": "input.txt" },
+    { "case": "cleanup-only", "decision": "CLEANUP_ONLY", "phaseBefore": "CLEANED", "phaseAfter": "CLEANED", "journalMutations": 0, "projectMutations": 0, "gitDiff": "input.txt", "secondRecoveryIdempotent": true },
+    { "case": "unrelated-conflict", "decision": "CONFLICT", "phaseBefore": "COMMIT_STARTED", "phaseAfter": "COMMIT_STARTED", "journalMutations": 0, "projectMutations": 0, "gitDiff": "unrelated.txt" },
+    { "case": "target-conflict", "decision": "CONFLICT", "phaseBefore": "COMMIT_STARTED", "phaseAfter": "COMMIT_STARTED", "journalMutations": 0, "projectMutations": 0, "gitDiff": "input.txt" }
+  ],
+  "everyNewCase": { "passed": true, "publisherActuallyKilled": true, "freshControllerExited": true, "fixtureCleanup": true, "externalRequests": 0 },
+  "aggregate": {
+    "windows": { "total": 442, "passed": 431, "failed": 0, "skipped": 11 },
+    "ubuntu": { "total": 442, "passed": 151, "failed": 0, "skipped": 291 }
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 22958,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "externalProviderCalls": 0 },
+  "limitations": [
+    "A dead V2 publisher can close a fully verified old base as rolled back without changing project files; a previously CLEANED verified draft is only observed idempotently.",
+    "A partial V2 commit remains MANUAL_RECOVERY_REQUIRED even if the complete draft bytes match; native ACL and creation-time proof and the private publication grant cannot be reconstructed from V2 metadata.",
+    "No RESUME or FINALIZE_COMMIT is claimed for V2, and no V1, mixed multi-file, D-wide or Windows-autonomy certificate is implied."
+  ]
+}
