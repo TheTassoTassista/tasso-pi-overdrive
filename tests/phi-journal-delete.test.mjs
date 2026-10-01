@@ -88,6 +88,7 @@ for (const name of ['rollback', 'rollback-intent', 'metadata-rollback', 'finaliz
     const receipt = JSON.parse(run.stdout);
     assert.equal(receipt.caseName, name);
     for (const key of ['passed', 'fixtureCleanup', 'actualProcessKilled', 'childGone', 'restartedControllerGone']) assert.equal(receipt[key], true, key);
+    assert.equal(receipt.gitMetadataClean, true);
     assert.equal(receipt.scope, 'NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION');
     assert.equal(receipt.projectPublished, false); assert.equal(receipt.externalRequests, 0);
     const base = publicationBase({ rootIdentity: receipt.rootIdentity,

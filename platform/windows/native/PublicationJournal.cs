@@ -1419,13 +1419,35 @@ namespace Phi.Native {
         } finally { if (!git.HasExited) { git.Kill(); git.WaitForExit(3000); } }
       }
     }
+    static void CleanupFixtureGit(string gitDirectory, string transactionId) {
+      string expected = Path.Combine(Path.GetTempPath(), "phi-git-" + transactionId);
+      if (!Id.IsMatch(transactionId) || !String.Equals(Path.GetFullPath(gitDirectory), Path.GetFullPath(expected), StringComparison.OrdinalIgnoreCase))
+        throw new InvalidDataException();
+      if (!Directory.Exists(gitDirectory)) return;
+      int remaining = 256;
+      Action<string, int> normalize = null;
+      normalize = delegate(string current, int depth) {
+        if (depth > 12) throw new InvalidDataException();
+        foreach (string child in Directory.GetFileSystemEntries(current)) {
+          if (--remaining < 0) throw new InvalidDataException();
+          FileAttributes attributes = File.GetAttributes(child);
+          if ((attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
+          if ((attributes & FileAttributes.Directory) != 0) normalize(child, depth + 1);
+          else File.SetAttributes(child, FileAttributes.Normal);
+        }
+      };
+      normalize(gitDirectory, 0);
+      Directory.Delete(gitDirectory, true);
+      if (Directory.Exists(gitDirectory)) throw new InvalidDataException();
+    }
     internal static int DeleteControllerRecoverySelfTest(string name) {
       string[] cases = { "rollback", "rollback-intent", "metadata-rollback", "finalize", "cleanup-only", "conflict", "unrelated-change",
         "quarantine-replaced", "quarantine-content-changed", "manual", "invalid-locator" };
       if (!cases.Contains(name)) return 70;
       ScopeRecovery scope = null; Process publisher = null;
       string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
-      bool passed = false, clean = false, killed = false, childGone = false, controllerGone = false;
+      string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
+      bool passed = false, clean = false, gitMetadataClean = false, killed = false, childGone = false, controllerGone = false;
       object evidence = null, discoveryEvidence = null; int controllerExit = -1;
       string rootIdEvidence = null, sourceIdEvidence = null, unrelatedIdEvidence = null, baseDigestEvidence = null, verifiedDigestEvidence = null;
       string expectedFileDigestEvidence = null, quarantineIdentityAtDeath = null, quarantineIdentityAtRecovery = null, quarantineDigestAtRecovery = null;
@@ -1436,7 +1458,9 @@ namespace Phi.Native {
         string source = Path.Combine(scope.Root, "input.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt"), quarantine = Path.Combine(scope.Root, DeleteLeaf(tx));
         File.WriteAllText(source, "old-delete-complete", new UTF8Encoding(false));
         File.WriteAllText(unrelated, "unrelated-delete-user", new UTF8Encoding(false));
-        FixtureGit(scope.Root, "init -q"); FixtureGit(scope.Root, "add -- input.txt unrelated.txt");
+        if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory)) throw new InvalidDataException();
+        FixtureGit(scope.Root, "init -q --separate-git-dir \"" + gitDirectory + "\"");
+        FixtureGit(scope.Root, "add -- input.txt unrelated.txt");
         FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
         if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
         Dictionary<string, object> expectedHeader = DeleteFixtureHeader(scope.Root, tx);
@@ -1561,17 +1585,19 @@ namespace Phi.Native {
       } catch (Exception error) { Console.Error.WriteLine("PHI_DELETE_CONTROLLER_RECOVERY_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":controllerExit=" + controllerExit); }
       finally {
         if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { CleanupFixtureGit(gitDirectory, tx); gitMetadataClean = true; } catch { gitMetadataClean = false; }
         try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
           if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
-      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean, actualProcessKilled = killed, childGone,
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean && gitMetadataClean, gitMetadataClean,
+        actualProcessKilled = killed, childGone,
         restartedControllerGone = controllerGone, controllerExit, journalPhaseAtInterruption = phaseAtDeath, evidence, discoveryEvidence,
         rootIdentity = rootIdEvidence, sourceIdentity = sourceIdEvidence, unrelatedIdentity = unrelatedIdEvidence,
         baseDigest = baseDigestEvidence, verifiedDigest = verifiedDigestEvidence, expectedFileDigest = expectedFileDigestEvidence,
         quarantineIdentityAtDeath, quarantineIdentityAtRecovery, quarantineDigestAtRecovery, gitDiff = gitDiffEvidence,
         scope = "NATIVE_BOUNDED_DELETE_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
-      return passed && clean ? 0 : 70;
+      return passed && clean && gitMetadataClean ? 0 : 70;
     }
     static readonly string[] RenameCheckpoints = { "before-rename", "intent", "renamed", "journal-renamed", "committed", "verified", "cleaned" };
     static Dictionary<string, object> RenameFixtureHeader(string project, string transactionId) {
