@@ -1415,7 +1415,7 @@ namespace Phi.Native {
           if (!git.WaitForExit(5000) || git.ExitCode != 0) throw new InvalidDataException();
           string output = git.StandardOutput.ReadToEnd();
           if (output.Length > 4096) throw new InvalidDataException();
-          return output.Trim();
+          return output.Replace("\r\n", "\n").Trim();
         } finally { if (!git.HasExited) { git.Kill(); git.WaitForExit(3000); } }
       }
     }
@@ -1570,7 +1570,7 @@ namespace Phi.Native {
               File.ReadAllText(quarantine) != "old-delete-complete") ||
             name == "quarantine-content-changed" && File.ReadAllText(quarantine) != "changed-delete-user") throw new InvalidDataException();
         string gitDiff = FixtureGit(scope.Root, "diff --name-only"); gitDiffEvidence = gitDiff;
-        string expectedDiff = restored ? "" : name == "conflict" ? "input.txt" : name == "unrelated-change" ? "unrelated.txt" :
+        string expectedDiff = restored ? "" : name == "conflict" ? "input.txt" : name == "unrelated-change" ? "input.txt\nunrelated.txt" :
           new string[] { "finalize", "cleanup-only", "quarantine-replaced", "quarantine-content-changed", "manual" }.Contains(name) ? "input.txt" : "";
         if (FixtureGit(scope.Root, "rev-parse --is-inside-work-tree") != "true" || gitDiff != expectedDiff ||
             restored && FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
