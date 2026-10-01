@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { discoverWindowsTransactions, inspectKnownWindowsTransaction, recoverKnownWindowsRename, recoverKnownWindowsDelete, validateWindowsKnownReconstruction,
-  validateWindowsKnownRecovery, validateWindowsKnownDeleteRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
+import { discoverWindowsTransactions, inspectKnownWindowsTransaction, recoverKnownWindowsRename, recoverKnownWindowsDelete,
+  recoverKnownWindowsModify, validateWindowsKnownReconstruction, validateWindowsKnownRecovery, validateWindowsKnownDeleteRecovery,
+  validateWindowsKnownModifyRecovery, validateWindowsTransactionDiscovery } from '../platform/windows/publication.mjs';
 
 const transactionId = 'a'.repeat(32);
 const rootIdentity = 'b'.repeat(16) + ':' + 'c'.repeat(32);
@@ -46,7 +47,46 @@ test('new-controller inspection is unavailable off Windows rather than a portabl
   assert.throws(() => inspectKnownWindowsTransaction({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => recoverKnownWindowsRename({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => recoverKnownWindowsDelete({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
+  assert.throws(() => recoverKnownWindowsModify({ cwd: '.', transactionId }), /BACKEND_UNAVAILABLE/u);
   assert.throws(() => discoverWindowsTransactions({ cwd: '.' }), /BACKEND_UNAVAILABLE/u);
+});
+
+const modifyRecovery = (decision, observedStatus, phaseBefore, phaseAfter, journalMutations,
+  baseDigestVerified, verifiedDraftDigestMatched) => ({
+  version: 1, status: 'PASS_BOUNDED_MODIFY_RECOVERY', transactionId, rootIdentity, rootIdentityVerified: true,
+  observedStatus, decision, phaseBefore, phaseAfter, baseDigestVerified, verifiedDraftDigestMatched,
+  actionPerformed: journalMutations > 0, journalMutations, projectMutations: 0, processKills: 0,
+  projectPublished: false, externalRequests: 0,
+});
+
+test('V2 dead-controller decoder permits proved base rollback and terminal observation only', () => {
+  for (const value of [
+    modifyRecovery('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'TEMP_CREATED', 'ROLLED_BACK', 2, true, false),
+    modifyRecovery('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'COMMIT_STARTED', 'ROLLED_BACK', 2, true, false),
+    modifyRecovery('CLEANUP_ONLY', 'OLD_COMPLETE_OBSERVED', 'ROLLED_BACK', 'ROLLED_BACK', 0, true, false),
+    modifyRecovery('CLEANUP_ONLY', 'NEW_COMPLETE_OBSERVED', 'CLEANED', 'CLEANED', 0, false, true),
+    modifyRecovery('MANUAL_RECOVERY_REQUIRED', 'NEW_COMPLETE_OBSERVED', 'COMMITTED', 'COMMITTED', 0, false, true),
+    modifyRecovery('CONFLICT', 'OLD_COMPLETE_OBSERVED', 'READY_TO_COMMIT', 'READY_TO_COMMIT', 0, false, false),
+    modifyRecovery('CONFLICT', 'CONFLICT', 'READY_TO_COMMIT', 'READY_TO_COMMIT', 0, false, false),
+  ]) {
+    const decoded = validateWindowsKnownModifyRecovery(run, value, transactionId);
+    assert.equal(decoded.projectPublished, false);
+    assert.equal(decoded.projectMutations, 0);
+    assert.throws(() => { decoded.decision = 'PUBLISHED'; }, TypeError);
+  }
+});
+
+test('V2 decoder rejects forged finalization, project writes and incomplete aggregate proof', () => {
+  const valid = modifyRecovery('ROLLBACK', 'OLD_COMPLETE_OBSERVED', 'TEMP_CREATED', 'ROLLED_BACK', 2, true, false);
+  for (const change of [
+    { decision: 'RESUME' }, { decision: 'FINALIZE_COMMIT' }, { projectMutations: 1 }, { projectPublished: true },
+    { baseDigestVerified: false }, { verifiedDraftDigestMatched: true }, { phaseAfter: 'CLEANED' },
+    { journalMutations: 0 }, { actionPerformed: false }, { processKills: 1 }, { externalRequests: 1 },
+    { rootIdentity: 'wrong' }, { transactionId: 'd'.repeat(32) }, { rawContent: 'secret' },
+  ]) assert.throws(() => validateWindowsKnownModifyRecovery(run, { ...valid, ...change }, transactionId), /RECOVERY_UNCONFIRMED/u);
+  assert.throws(() => validateWindowsKnownModifyRecovery({ ...run, status: 70 }, valid, transactionId), /RECOVERY_UNCONFIRMED/u);
+  const incomplete = modifyRecovery('MANUAL_RECOVERY_REQUIRED', 'NEW_COMPLETE_OBSERVED', 'COMMITTED', 'COMMITTED', 0, false, true);
+  assert.throws(() => validateWindowsKnownModifyRecovery(run, { ...incomplete, decision: 'CLEANUP_ONLY' }, transactionId), /RECOVERY_UNCONFIRMED/u);
 });
 
 const discoveryReceipt = (entries = []) => ({

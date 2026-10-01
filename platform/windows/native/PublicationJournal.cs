@@ -1032,6 +1032,44 @@ namespace Phi.Native {
         ProjectBaseDigestWithRestoredDelete(expectedRootIdentity, files, identities, (string)op["path"], quarantine) == (string)header["baseDigest"] &&
         ProjectDraftDigest(files) == (string)header["verifiedDigest"];
     }
+    object RecoverKnownModify(string expectedRootIdentity, Action live) {
+      // A dead V2 publisher's private proof is gone. The complete base tree
+      // can justify only a journal rollback before a recorded commit. A
+      // complete new tree cannot reconstruct its ACL/creation-time proof, so
+      // an incomplete commit remains manual even if its bytes match the draft.
+      string before = (string)last["phase"];
+      int sequence = (int)last["sequence"];
+      Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(InspectSingleModify(false)));
+      string status = observed["status"] as string;
+      bool baseVerified = false, draftVerified = false;
+      string decision = status == "CONFLICT" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED";
+      if (status == "OLD_COMPLETE_OBSERVED" || status == "NEW_COMPLETE_OBSERVED") {
+        Dictionary<string, object> snapshot = Snapshot(project, expectedRootIdentity);
+        Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"];
+        if (status == "OLD_COMPLETE_OBSERVED") {
+          baseVerified = ProjectBaseDigest(expectedRootIdentity, files,
+            (Dictionary<string, object>)snapshot["identities"]) == (string)header["baseDigest"];
+          if (!baseVerified) decision = "CONFLICT";
+          else if (before == "ROLLED_BACK") decision = "CLEANUP_ONLY";
+          else if (new string[] { "PREPARED", "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "ROLLBACK_REQUIRED" }.Contains(before)) {
+            decision = "ROLLBACK";
+            live();
+            if (before != "ROLLBACK_REQUIRED") Observe("ROLLBACK_REQUIRED", last["tempIdentity"] as string, null);
+            live();
+            Observe("ROLLED_BACK", last["tempIdentity"] as string, null);
+          }
+        } else {
+          draftVerified = ProjectDraftDigest(files) == (string)header["verifiedDigest"];
+          if (!draftVerified) decision = "CONFLICT";
+          else if (before == "CLEANED") decision = "CLEANUP_ONLY";
+        }
+      }
+      return new { version = 1, status = "PASS_BOUNDED_MODIFY_RECOVERY", transactionId = id, rootIdentity = expectedRootIdentity,
+        rootIdentityVerified = true, observedStatus = status, decision, phaseBefore = before, phaseAfter = last["phase"],
+        baseDigestVerified = baseVerified, verifiedDraftDigestMatched = draftVerified,
+        actionPerformed = (int)last["sequence"] != sequence, journalMutations = (int)last["sequence"] - sequence,
+        projectMutations = 0, processKills = 0, projectPublished = false, externalRequests = 0 };
+    }
     object RecoverKnownDelete(string expectedRootIdentity, Action live) {
       string before = (string)last["phase"]; int sequence = (int)last["sequence"];
       Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(InspectSingleDelete(false)));
@@ -1191,13 +1229,15 @@ namespace Phi.Native {
           bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
           if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
           int journalVersion = (int)journal.header["version"];
-          if (journalVersion != 3 && journalVersion != 4) throw new InvalidDataException();
-          live(); result = journalVersion == 3 ? journal.RecoverKnownDelete(rootIdentity, live) : journal.RecoverKnownRename(rootIdentity, live);
+          if (journalVersion < 2 || journalVersion > 4) throw new InvalidDataException();
+          live(); result = journalVersion == 2 ? journal.RecoverKnownModify(rootIdentity, live) :
+            journalVersion == 3 ? journal.RecoverKnownDelete(rootIdentity, live) : journal.RecoverKnownRename(rootIdentity, live);
         });
         Console.WriteLine(Serializer().Serialize(result)); return 0;
       } catch {
-        Console.WriteLine(Serializer().Serialize(new { version = 1, status = journal != null && journal.header != null && (int)journal.header["version"] == 3 ?
-            "FAIL_BOUNDED_DELETE_RECOVERY" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
+        int version = journal != null && journal.header != null ? (int)journal.header["version"] : 0;
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = version == 2 ? "FAIL_BOUNDED_MODIFY_RECOVERY" :
+            version == 3 ? "FAIL_BOUNDED_DELETE_RECOVERY" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
           actionPerformed = journal != null && (journal.recoveryMutationUncertain || journal.recoveryProjectMutations != 0),
           projectMutations = journal == null ? (object)0 : journal.recoveryMutationUncertain ? (object)"UNKNOWN" : journal.recoveryProjectMutations,
           processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
@@ -1383,6 +1423,16 @@ namespace Phi.Native {
       Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"], ids = (Dictionary<string, object>)snapshot["identities"];
       Dictionary<string, object> desired = new Dictionary<string, object>(files); desired.Remove((string)op["path"]);
       header["baseDigest"] = ProjectBaseDigest((string)header["projectIdentity"], files, ids);
+      header["verifiedDigest"] = ProjectDraftDigest(desired);
+      return header;
+    }
+    static Dictionary<string, object> ModifyRecoveryFixtureHeader(string project, string transactionId) {
+      Dictionary<string, object> header = FixtureHeader(project, transactionId); header["version"] = 2;
+      Dictionary<string, object> snapshot = Snapshot(project, (string)header["projectIdentity"]);
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"];
+      Dictionary<string, object> desired = new Dictionary<string, object>(files); desired["input.txt"] = "new-complete";
+      header["baseDigest"] = ProjectBaseDigest((string)header["projectIdentity"], files,
+        (Dictionary<string, object>)snapshot["identities"]);
       header["verifiedDigest"] = ProjectDraftDigest(desired);
       return header;
     }
@@ -2376,12 +2426,144 @@ namespace Phi.Native {
         processKillsByRetention = 0, projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
+    internal static int ModifyControllerRecoverySelfTest(string name) {
+      string[] cases = { "rollback", "rollback-late", "manual-commit", "cleanup-only", "unrelated-conflict", "target-conflict" };
+      if (!cases.Contains(name)) return 70;
+      ScopeRecovery scope = null; Process publisher = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", phaseAtDeath = null;
+      string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
+      bool passed = false, clean = false, gitMetadataClean = false, killed = false, childGone = false, controllerGone = false, idempotent = false;
+      object evidence = null, secondEvidence = null, discoveryEvidence = null;
+      string gitDiff = null, finalDigest = null; int controllerExit = -1;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string target = Path.Combine(scope.Root, "input.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt");
+        File.WriteAllText(target, "old-complete", new UTF8Encoding(false));
+        File.WriteAllText(unrelated, "unrelated-user", new UTF8Encoding(false));
+        if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory)) throw new InvalidDataException();
+        FixtureGit(scope.Root, "init -q --separate-git-dir \"" + gitDirectory + "\"");
+        FixtureGit(scope.Root, "add -- input.txt unrelated.txt");
+        FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
+        if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
+        Dictionary<string, object> expectedHeader = ModifyRecoveryFixtureHeader(scope.Root, tx);
+        string point = name == "rollback" ? "temp" : name == "manual-commit" ? "committed" :
+          name == "cleanup-only" ? "cleanup" : "before-commit";
+        stage = "START_PUBLISHER";
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-modify-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx }));
+        publisher.StandardInput.Close();
+        string ready = null; Thread reader = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } });
+        reader.IsBackground = true; reader.Start();
+        if (!reader.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announcement["ready"] || (string)announcement["checkpoint"] != point || (string)announcement["transactionId"] != tx) throw new InvalidDataException();
+        phaseAtDeath = (string)announcement["phase"];
+        stage = "KILL_PUBLISHER"; publisher.Kill(); killed = true;
+        if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+        if (name == "unrelated-conflict") File.WriteAllText(unrelated, "new-unrelated-user", new UTF8Encoding(false));
+        if (name == "target-conflict") File.WriteAllText(target, "new-target-user", new UTF8Encoding(false));
+        stage = "FRESH_DISCOVERY";
+        using (Process discovery = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-discover", UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+          try {
+            discovery.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root })); discovery.StandardInput.Close();
+            if (!discovery.WaitForExit(5000) || discovery.ExitCode != 0) throw new InvalidDataException();
+            string output = discovery.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+            Dictionary<string, object> inventory = Serializer().Deserialize<Dictionary<string, object>>(output);
+            IList entries = inventory["entries"] as IList;
+            if ((string)inventory["status"] != "PASS_READ_ONLY_DISCOVERY" || (string)inventory["rootIdentity"] != rootId ||
+                entries == null || entries.Count != 1 || (int)inventory["projectTransactions"] != 1 ||
+                (bool)inventory["actionPerformed"] || (int)inventory["journalMutations"] != 0 ||
+                (int)inventory["projectMutations"] != 0 || (bool)inventory["projectPublished"]) throw new InvalidDataException();
+            Dictionary<string, object> entry = entries[0] as Dictionary<string, object>;
+            if (entry == null || (string)entry["transactionId"] != tx || (int)entry["journalVersion"] != 2 ||
+                (string)entry["classification"] != (name == "target-conflict" ? "CONFLICT" :
+                  new string[] { "rollback", "rollback-late", "manual-commit", "unrelated-conflict" }.Contains(name) ? "RECOVERY_REQUIRED" : "TERMINAL_RETAINED")) throw new InvalidDataException();
+            discoveryEvidence = inventory;
+          } finally { if (!discovery.HasExited) { discovery.Kill(); discovery.WaitForExit(3000); } }
+        }
+        Func<Dictionary<string, object>> recover = delegate() {
+          using (Process controller = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+            Arguments = "--publication-recover-known", UseShellExecute = false, RedirectStandardInput = true,
+            RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+            try {
+              controller.StandardInput.WriteLine(Serializer().Serialize(new { version = 1, root = scope.Root, transactionId = tx,
+                guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 })); controller.StandardInput.Close();
+              if (!controller.WaitForExit(5000)) throw new InvalidDataException();
+              controllerGone = controller.HasExited; controllerExit = controller.ExitCode;
+              if (controllerExit != 0) throw new InvalidDataException();
+              string output = controller.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+              return Serializer().Deserialize<Dictionary<string, object>>(output);
+            } finally { if (!controller.HasExited) { controller.Kill(); controller.WaitForExit(3000); } }
+          }
+        };
+        stage = "NEW_CONTROLLER";
+        Dictionary<string, object> first = recover(); evidence = first;
+        string decision = name == "rollback" || name == "rollback-late" ? "ROLLBACK" :
+          name == "cleanup-only" ? "CLEANUP_ONLY" : name == "manual-commit" ? "MANUAL_RECOVERY_REQUIRED" : "CONFLICT";
+        string finalPhase = decision == "ROLLBACK" ? "ROLLED_BACK" : phaseAtDeath;
+        if ((string)first["status"] != "PASS_BOUNDED_MODIFY_RECOVERY" || (string)first["decision"] != decision ||
+            (string)first["transactionId"] != tx || (string)first["rootIdentity"] != rootId || !(bool)first["rootIdentityVerified"] ||
+            (string)first["phaseBefore"] != phaseAtDeath || (string)first["phaseAfter"] != finalPhase ||
+            (int)first["journalMutations"] != (decision == "ROLLBACK" ? 2 : 0) ||
+            (bool)first["actionPerformed"] != (decision == "ROLLBACK") ||
+            (int)first["projectMutations"] != 0 || (int)first["processKills"] != 0 ||
+            (bool)first["projectPublished"] || (int)first["externalRequests"] != 0 ||
+            (bool)first["baseDigestVerified"] != (decision == "ROLLBACK") ||
+            (bool)first["verifiedDraftDigestMatched"] != (name == "manual-commit" || name == "cleanup-only")) throw new InvalidDataException();
+        if (decision == "ROLLBACK" || decision == "CLEANUP_ONLY") {
+          stage = "IDEMPOTENT_CONTROLLER";
+          Dictionary<string, object> second = recover(); secondEvidence = second;
+          idempotent = (string)second["decision"] == "CLEANUP_ONLY" &&
+            (string)second["phaseAfter"] == finalPhase && (int)second["journalMutations"] == 0 &&
+            (int)second["projectMutations"] == 0 && !(bool)second["actionPerformed"] && !(bool)second["projectPublished"];
+          if (!idempotent) throw new InvalidDataException();
+        }
+        stage = "VERIFY_PROJECT_AND_JOURNAL";
+        string actualTarget = File.ReadAllText(target), actualUnrelated = File.ReadAllText(unrelated);
+        if (actualTarget != (name == "target-conflict" ? "new-target-user" :
+              name == "manual-commit" || name == "cleanup-only" ? "new-complete" : "old-complete") ||
+            actualUnrelated != (name == "unrelated-conflict" ? "new-unrelated-user" : "unrelated-user")) throw new InvalidDataException();
+        gitDiff = FixtureGit(scope.Root, "diff --name-only");
+        if (gitDiff != (name == "unrelated-conflict" ? "unrelated.txt" :
+            new string[] { "manual-commit", "cleanup-only", "target-conflict" }.Contains(name) ? "input.txt" : "")) throw new InvalidDataException();
+        Dictionary<string, object> finalSnapshot = Snapshot(scope.Root, rootId);
+        finalDigest = ProjectDraftDigest((Dictionary<string, object>)finalSnapshot["files"]);
+        if (new string[] { "manual-commit", "cleanup-only" }.Contains(name) && finalDigest != (string)expectedHeader["verifiedDigest"]) throw new InvalidDataException();
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false))
+        using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          if ((string)journal.header["baseDigest"] != (string)expectedHeader["baseDigest"] ||
+              (string)journal.header["verifiedDigest"] != (string)expectedHeader["verifiedDigest"] ||
+              (string)journal.last["phase"] != finalPhase) throw new InvalidDataException();
+        }
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_MODIFY_CONTROLLER_RECOVERY_FAILED:" + stage + ":" +
+        unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":controllerExit=" + controllerExit); }
+      finally {
+        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { CleanupFixtureGit(gitDirectory, tx); gitMetadataClean = true; } catch { gitMetadataClean = false; }
+        try {
+          using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean && gitMetadataClean, gitMetadataClean, actualProcessKilled = killed,
+        childGone, restartedControllerGone = controllerGone, controllerExit, idempotent, journalPhaseAtInterruption = phaseAtDeath,
+        discoveryEvidence, evidence, secondEvidence, gitDiff, finalDigest,
+        scope = "NATIVE_BOUNDED_MODIFY_RECOVERY_NOT_RESTORED_PUBLICATION", projectPublished = false, externalRequests = 0 }));
+      return passed && clean && gitMetadataClean ? 0 : 70;
+    }
     internal static int ModifyFixtureChild(string phase) {
       if (!ModifyCheckpoints.Contains(phase) || phase == "before-transaction") return 70;
       try {
         Dictionary<string, object> request = FixtureRequest();
         string root = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]);
-        Dictionary<string, object> header = FixtureHeader(root, (string)request["transactionId"]); header["version"] = 2;
+        Dictionary<string, object> header = ModifyRecoveryFixtureHeader(root, (string)request["transactionId"]);
         using (PublicationJournal journal = Begin(root, header)) {
           journal.PublishSingleModify(Encoding.UTF8.GetBytes("new-complete"), delegate(string observed) {
             if (observed != phase) return;

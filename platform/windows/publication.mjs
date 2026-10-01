@@ -105,6 +105,46 @@ export function discoverWindowsTransactions({ cwd }) {
 const recoveryKeys = ['version', 'status', 'transactionId', 'rootIdentity', 'rootIdentityVerified', 'observedStatus', 'decision',
   'phaseBefore', 'phaseAfter', 'baseDigestVerified', 'verifiedDraftDigestMatched', 'actionPerformed', 'journalMutations',
   'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];
+export function validateWindowsKnownModifyRecovery(run, value, transactionId) {
+  if (run?.error || run?.status !== 0 || run?.signal || !Number.isSafeInteger(run?.pid) || run.pid < 1 ||
+      !exactKeys(value, recoveryKeys) || value.version !== 1 || value.status !== 'PASS_BOUNDED_MODIFY_RECOVERY' ||
+      value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
+      value.rootIdentityVerified !== true || !/^[A-Z_]{3,32}$/u.test(value.phaseBefore ?? '') ||
+      !/^[A-Z_]{3,32}$/u.test(value.phaseAfter ?? '') ||
+      !['OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'CONFLICT'].includes(value.observedStatus) ||
+      !['ROLLBACK', 'CLEANUP_ONLY', 'CONFLICT', 'MANUAL_RECOVERY_REQUIRED'].includes(value.decision) ||
+      typeof value.baseDigestVerified !== 'boolean' || typeof value.verifiedDraftDigestMatched !== 'boolean' ||
+      !Number.isInteger(value.journalMutations) || value.journalMutations < 0 || value.journalMutations > 2 ||
+      value.projectMutations !== 0 || value.processKills !== 0 || value.projectPublished !== false || value.externalRequests !== 0) fail('RECOVERY_UNCONFIRMED');
+  const before = value.phaseBefore;
+  if (value.decision === 'ROLLBACK') {
+    if (value.observedStatus !== 'OLD_COMPLETE_OBSERVED' ||
+        !['PREPARED', 'TEMP_CREATED', 'TEMP_WRITTEN', 'TEMP_FLUSHED', 'READY_TO_COMMIT', 'COMMIT_STARTED', 'ROLLBACK_REQUIRED'].includes(before) ||
+        !value.baseDigestVerified || value.verifiedDraftDigestMatched || value.phaseAfter !== 'ROLLED_BACK' ||
+        value.actionPerformed !== true || value.journalMutations !== (before === 'ROLLBACK_REQUIRED' ? 1 : 2)) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.decision === 'CLEANUP_ONLY') {
+    if (value.actionPerformed !== false || value.journalMutations !== 0 || value.phaseAfter !== before ||
+        !(before === 'ROLLED_BACK' && value.observedStatus === 'OLD_COMPLETE_OBSERVED' && value.baseDigestVerified && !value.verifiedDraftDigestMatched ||
+          before === 'CLEANED' && value.observedStatus === 'NEW_COMPLETE_OBSERVED' && !value.baseDigestVerified && value.verifiedDraftDigestMatched)) fail('RECOVERY_UNCONFIRMED');
+  } else if (value.actionPerformed !== false || value.journalMutations !== 0 || value.phaseAfter !== before ||
+      (value.decision === 'CONFLICT' ? value.baseDigestVerified || value.verifiedDraftDigestMatched :
+        !(value.observedStatus === 'OLD_COMPLETE_OBSERVED' && value.baseDigestVerified && !value.verifiedDraftDigestMatched ||
+          value.observedStatus === 'NEW_COMPLETE_OBSERVED' && !value.baseDigestVerified && value.verifiedDraftDigestMatched))) fail('RECOVERY_UNCONFIRMED');
+  return freeze({ ...value });
+}
+
+// V2 recovery has no project-write authority. A proven old tree can close the
+// journal as rolled back; a partial new commit remains manual, never PUBLISHED.
+export function recoverKnownWindowsModify({ cwd, transactionId }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0') || !/^[0-9a-f]{32}$/u.test(transactionId ?? '')) fail('RECOVERY_REQUEST_INVALID');
+  const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('RECOVERY_REQUEST_INVALID');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-recover-known'], { shell: false, windowsHide: true, encoding: 'utf8',
+    input: JSON.stringify({ version: 1, root, transactionId, guardianPid: process.pid, timeoutMs: 10000 }) + '\n', timeout: 11000, maxBuffer: 8192 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('RECOVERY_UNCONFIRMED'); }
+  return validateWindowsKnownModifyRecovery(run, value, transactionId);
+}
 export function validateWindowsKnownRecovery(run, value, transactionId) {
   const action = new Set(['ROLLBACK', 'RESUME', 'FINALIZE_COMMIT']);
   const terminal = value?.decision === 'ROLLBACK' ? 'ROLLED_BACK' : 'CLEANED';

@@ -117,6 +117,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--publication-journal-fixture-child") return PublicationJournal.FixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-journal-fixture-inspect") return PublicationJournal.FixtureInspect();
       if (args.Length == 2 && args[0] == "--publication-modify-selftest") return PublicationJournal.ModifySelfTest(args[1]);
+      if (args.Length == 2 && args[0] == "--publication-modify-controller-recovery-selftest") return PublicationJournal.ModifyControllerRecoverySelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-modify-fixture-child") return PublicationJournal.ModifyFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-modify-fixture-recover") return PublicationJournal.ModifyFixtureRecover();
       if (args.Length == 1 && args[0] == "--publication-modify" && IntPtr.Size == 8) return PublicationJournal.RunSingleModify(Console.OpenStandardInput());
