@@ -39,7 +39,7 @@ export function validateWindowsKnownReconstruction(run, value, transactionId) {
       value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
       !reconstructionStates.has(value.observedStatus) || value.rootIdentityVerified !== true ||
       value.decision !== (value.observedStatus === 'OLD_COMPLETE_OBSERVED' ? 'ROLLBACK' : value.observedStatus === 'CONFLICT' ? 'CONFLICT' : 'MANUAL_RECOVERY_REQUIRED') ||
-      typeof value.phase !== 'string' || !/^[A-Z_]{3,32}$/u.test(value.phase) || !Number.isInteger(value.journalVersion) || value.journalVersion < 1 || value.journalVersion > 4 ||
+      typeof value.phase !== 'string' || !/^[A-Z_]{3,32}$/u.test(value.phase) || !Number.isInteger(value.journalVersion) || value.journalVersion < 1 || value.journalVersion > 5 ||
       value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 || value.processKills !== 0 ||
       value.projectPublished !== false || value.externalRequests !== 0) fail('RECONSTRUCTION_UNCONFIRMED');
   return freeze({ ...value });
@@ -74,7 +74,7 @@ export function validateWindowsTransactionDiscovery(run, value) {
   let previous = '';
   for (const entry of value.entries) {
     if (!exactKeys(entry, discoveryEntryKeys) || !/^[0-9a-f]{32}$/u.test(entry.transactionId ?? '') ||
-        entry.transactionId <= previous || !Number.isInteger(entry.journalVersion) || entry.journalVersion < 1 || entry.journalVersion > 4 ||
+        entry.transactionId <= previous || !Number.isInteger(entry.journalVersion) || entry.journalVersion < 1 || entry.journalVersion > 5 ||
         !/^[A-Z_]{3,32}$/u.test(entry.phase ?? '') ||
         !['ACTIVE', 'OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED',
           'DELETE_COMMITTED_CLEANUP_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE',

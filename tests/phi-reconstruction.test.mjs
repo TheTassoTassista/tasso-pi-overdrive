@@ -103,7 +103,8 @@ test('private-index discovery accepts only bounded advisory metadata, not an act
   for (const entries of [[], [discovered], [
     { ...discovered, transactionId: '1'.repeat(32), phase: 'RENAMED', observedStatus: 'CONFLICT', classification: 'CONFLICT' },
     discovered,
-  ]]) {
+  ], [{ ...discovered, journalVersion: 5, phase: 'PREPARED', observedStatus: 'UNKNOWN_FAIL_SAFE',
+    classification: 'MANUAL_RECOVERY_REQUIRED' }]]) {
     const value = validateWindowsTransactionDiscovery(run, discoveryReceipt(entries));
     assert.equal(value.projectTransactions, entries.length);
     assert.equal(value.projectPublished, false);

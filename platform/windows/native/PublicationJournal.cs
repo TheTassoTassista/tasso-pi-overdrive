@@ -23,7 +23,7 @@ namespace Phi.Native {
   internal sealed class PublicationJournal : IDisposable {
     internal const string RegistryBase = "Software\\Phi\\PublicationJournalV1";
     const int MaxTransactions = 64, MaxEvents = 512, MaxBytes = 65536;
-    internal static readonly string[] Phases = { "PREPARED", "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "DELETE_INTENT", "DELETE_QUARANTINED", "RENAME_INTENT", "RENAMED", "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "CLEANUP_STARTED", "CLEANED", "CONFLICT", "ROLLBACK_REQUIRED", "ROLLED_BACK", "RECOVERY_REQUIRED", "FAILED" };
+    internal static readonly string[] Phases = { "PREPARED", "TEMP_CREATED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "DELETE_INTENT", "DELETE_QUARANTINED", "RENAME_INTENT", "RENAMED", "MUTATION_STARTED", "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "FINALIZED", "CLEANUP_STARTED", "CLEANED", "CONFLICT", "MANUAL_RECOVERY_REQUIRED", "ROLLBACK_REQUIRED", "ROLLED_BACK", "RECOVERY_REQUIRED", "FAILED" };
     static readonly Regex Id = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Identity = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Digest = new Regex("\\A[0-9a-f]{64}\\z", RegexOptions.CultureInvariant);
@@ -36,6 +36,7 @@ namespace Phi.Native {
     Dictionary<string, object> header, last, reclamation;
     string lastDigest;
     bool acquired, poisoned, disposed, deleteCleanupIntent, recoveryMutationUncertain;
+    string[] mixedPhases, mixedTempIdentities, mixedCommittedIdentities;
     int recoveryProjectMutations;
     sealed class AdmissionConflict : InvalidOperationException {
       internal readonly object Evidence;
@@ -107,35 +108,50 @@ namespace Phi.Native {
     }
     static void ValidateHeader(Dictionary<string, object> value, string transactionId) {
       Keys(value, "version", "transactionId", "projectIdentity", "draftId", "draftVersion", "verifiedDigest", "baseDigest", "creatorPid", "creatorGeneration", "operations");
-      int version = Number(value, "version", 1, 4); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
+      int version = Number(value, "version", 1, 5); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
       StringField(value, "projectIdentity", Identity); StringField(value, "draftId", Id); Number(value, "draftVersion", 0, Int32.MaxValue);
       StringField(value, "verifiedDigest", Digest); StringField(value, "baseDigest", Digest); Number(value, "creatorPid", 1, Int32.MaxValue);
       StringField(value, "creatorGeneration", new Regex("\\A[0-9a-f]{16}\\z"));
       HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase), ids = new HashSet<string>(StringComparer.Ordinal);
-      foreach (object entry in Operations(value)) {
+      IList operations = Operations(value);
+      if (version == 5 && (operations.Count != 4 ||
+          !operations.Cast<object>().Select(item => (item as Dictionary<string, object>) == null ? null : ((Dictionary<string, object>)item)["kind"] as string)
+            .SequenceEqual(new string[] { "REPLACE", "CREATE", "DELETE", "RENAME" }))) throw new InvalidDataException();
+      foreach (object entry in operations) {
         Dictionary<string, object> op = entry as Dictionary<string, object>;
-        if (version == 4) Keys(op, "sourcePath", "path", "kind", "baseIdentity", "baseDigest", "newDigest", "newBytes");
+        if ((version == 4 || version == 5) && op != null && (op["kind"] as string) == "RENAME") Keys(op, "sourcePath", "path", "kind", "baseIdentity", "baseDigest", "newDigest", "newBytes");
         else Keys(op, "path", "kind", "baseIdentity", "baseDigest", "newDigest", "newBytes");
         string relative = op["path"] as string; AnchoredFile.Segments(relative);
         if (relative.Length > 240 || !Regex.IsMatch(relative, "\\A[A-Za-z0-9_./-]+\\z") || !names.Add(relative)) throw new InvalidDataException();
         string kind = op["kind"] as string; if (kind != "CREATE" && kind != "REPLACE" && kind != "DELETE" && kind != "RENAME") throw new InvalidDataException();
-        if (kind == "RENAME" && version != 4) throw new InvalidDataException();
+        if (kind == "RENAME" && version != 4 && version != 5) throw new InvalidDataException();
         if (kind == "CREATE") { if (op["baseIdentity"] != null || op["baseDigest"] != null) throw new InvalidDataException(); }
         else { if (!ids.Add(StringField(op, "baseIdentity", Identity))) throw new InvalidDataException(); StringField(op, "baseDigest", Digest); }
         if (kind == "DELETE") { if (op["newDigest"] != null || op["newBytes"] != null) throw new InvalidDataException(); }
         else { StringField(op, "newDigest", Digest); Number(op, "newBytes", 0, 1024 * 1024); }
         if (version == 2 && (Operations(value).Count != 1 || kind != "REPLACE" || Object.Equals(op["baseDigest"], op["newDigest"]))) throw new InvalidDataException();
         if (version == 3 && (Operations(value).Count != 1 || kind != "DELETE" || relative.Split('/').Last() == DeleteLeaf(transactionId))) throw new InvalidDataException();
-        if (version == 4) {
+        if (version == 5 && (kind == "REPLACE" && Object.Equals(op["baseDigest"], op["newDigest"]) ||
+            kind == "DELETE" && relative.Split('/').Last() == DeleteLeaf(transactionId))) throw new InvalidDataException();
+        if (version == 4 || version == 5 && kind == "RENAME") {
           string source = op["sourcePath"] as string; string[] sourceParts = AnchoredFile.Segments(source), targetParts = AnchoredFile.Segments(relative);
-          if (Operations(value).Count != 1 || kind != "RENAME" || source.Length > 240 ||
+          if (version == 4 && (operations.Count != 1 || kind != "RENAME") || source.Length > 240 ||
               !Regex.IsMatch(source, "\\A[A-Za-z0-9_./-]+\\z") || sourceParts.Length != targetParts.Length ||
               !sourceParts.Take(sourceParts.Length - 1).SequenceEqual(targetParts.Take(targetParts.Length - 1), StringComparer.OrdinalIgnoreCase) ||
-              String.Equals(source, relative, StringComparison.OrdinalIgnoreCase) || !Object.Equals(op["baseDigest"], op["newDigest"])) throw new InvalidDataException();
+              String.Equals(source, relative, StringComparison.OrdinalIgnoreCase) || !Object.Equals(op["baseDigest"], op["newDigest"]) ||
+              version == 5 && !names.Add(source)) throw new InvalidDataException();
         }
       }
     }
     static bool Transition(string from, string to, int previousOp, int nextOp, int count, int version) {
+      if (version == 5) {
+        if (from == "CLEANED" || from == "CONFLICT" || from == "MANUAL_RECOVERY_REQUIRED" || from == "ROLLED_BACK") return false;
+        if (previousOp != nextOp) return from == "FINALIZED" && to == "PREPARED" && nextOp == previousOp + 1 && nextOp < count;
+        if (to == "CONFLICT" || to == "MANUAL_RECOVERY_REQUIRED" || to == "RECOVERY_REQUIRED") return from != "FINALIZED";
+        return from == "PREPARED" && to == "MUTATION_STARTED" || from == "MUTATION_STARTED" && to == "COMMITTED" ||
+          from == "COMMITTED" && to == "POST_COMMIT_VERIFIED" || from == "POST_COMMIT_VERIFIED" && to == "FINALIZED" ||
+          from == "FINALIZED" && previousOp == count - 1 && to == "CLEANED";
+      }
       if (!Phases.Contains(to) || from == "CLEANED" || from == "ROLLED_BACK" || from == "FAILED" || from == "CONFLICT") return false;
       if (to == "CONFLICT" || to == "FAILED" || to == "RECOVERY_REQUIRED" || to == "ROLLBACK_REQUIRED") return previousOp == nextOp;
       if (from == "ROLLBACK_REQUIRED") return to == "ROLLED_BACK" && previousOp == nextOp;
@@ -151,6 +167,22 @@ namespace Phi.Native {
         : new string[] { "PREPARED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED", "COMMITTED", "VERIFIED", "CLEANED" };
       int index = Array.IndexOf(normal, from);
       return index >= 0 && index < normal.Length - 1 && normal[index + 1] == to && (to != "CLEANED" || nextOp == count - 1);
+    }
+    static void ValidateMixedEvent(Dictionary<string, object> original, Dictionary<string, object> body,
+        string[] phases, string[] temps, string[] commits) {
+      int index = (int)body["operationIndex"];
+      string phase = (string)body["phase"], temp = body["tempIdentity"] as string, committed = body["committedIdentity"] as string;
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(original)[index];
+      string kind = (string)op["kind"], expected = op["baseIdentity"] as string;
+      if (phase == "PREPARED" && (phases[index] != "NOT_STARTED" || temp != null || committed != null) ||
+          phase != "PREPARED" && phases[index] == "NOT_STARTED" ||
+          phase == "MUTATION_STARTED" && (temp == null || committed != null) ||
+          new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "FINALIZED", "CLEANED" }.Contains(phase) &&
+            (temp == null || committed == null) ||
+          new string[] { "DELETE", "RENAME", "REPLACE" }.Contains(kind) && committed != null && committed != expected ||
+          new string[] { "DELETE", "RENAME" }.Contains(kind) && temp != null && temp != expected ||
+          kind == "CREATE" && committed != null && committed != temp ||
+          temps[index] != null && temp != temps[index] || commits[index] != null && committed != commits[index]) throw new InvalidDataException();
     }
     static Dictionary<string, object> Snapshot(string project, string expected, string ownedQuarantine = null) {
       using (RecoveryFilesystem pins = new RecoveryFilesystem(project)) {
@@ -341,6 +373,10 @@ namespace Phi.Native {
         { "sequence", sequence }, { "previousDigest", lastDigest ?? new string('0', 64) }, { "phase", phase }, { "operationIndex", operationIndex },
         { "tempIdentity", tempIdentity }, { "committedIdentity", committedIdentity }, { "header", sequence == 0 ? header : null }
       };
+      if ((int)header["version"] == 5) {
+        string[] phases = mixedPhases ?? Enumerable.Repeat("NOT_STARTED", Operations(header).Count).ToArray();
+        ValidateMixedEvent(header, body, phases, mixedTempIdentities ?? new string[phases.Length], mixedCommittedIdentities ?? new string[phases.Length]);
+      }
       string name = "E" + sequence.ToString("D8");
       if (key.GetValueNames().Contains(name)) throw new InvalidDataException();
       byte[] bytes = Envelope(body);
@@ -352,6 +388,13 @@ namespace Phi.Native {
       } catch { poisoned = true; throw; }
       last = body; lastDigest = Hash(bytes);
       if ((int)header["version"] == 3 && phase == "CLEANUP_STARTED") deleteCleanupIntent = true;
+      if ((int)header["version"] == 5) {
+        if (mixedPhases == null) {
+          mixedPhases = Enumerable.Repeat("NOT_STARTED", Operations(header).Count).ToArray();
+          mixedTempIdentities = new string[mixedPhases.Length]; mixedCommittedIdentities = new string[mixedPhases.Length];
+        }
+        mixedPhases[operationIndex] = phase; mixedTempIdentities[operationIndex] = tempIdentity; mixedCommittedIdentities[operationIndex] = committedIdentity;
+      }
     }
     internal void Advance(string phase, string tempIdentity) {
       if ((int)header["version"] >= 2) throw new InvalidOperationException("PHI_PUBLICATION_NATIVE_OBSERVATION_REQUIRED");
@@ -739,12 +782,20 @@ namespace Phi.Native {
       string[] names = key.GetValueNames().OrderBy(x => x, StringComparer.Ordinal).ToArray();
       if (names.Length < 1 || names.Length > MaxEvents) throw new InvalidDataException();
       string previous = new string('0', 64); Dictionary<string, object> prior = null, original = null; bool cleanupIntent = false;
+      string[] operationPhases = null, operationTemps = null, operationCommits = null;
       for (int i = 0; i < names.Length; i++) {
         if (names[i] != "E" + i.ToString("D8")) throw new InvalidDataException();
         byte[] bytes = ReadValue(key, names[i]); Dictionary<string, object> body = Decode(bytes);
         Keys(body, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header");
         if (Number(body, "sequence", 0, MaxEvents - 1) != i || StringField(body, "previousDigest", Digest) != previous || !(body["phase"] is string) || !Phases.Contains((string)body["phase"])) throw new InvalidDataException();
-        if (i == 0) { original = body["header"] as Dictionary<string, object>; ValidateHeader(original, id); if ((string)body["phase"] != "PREPARED" || Number(body, "operationIndex", 0, 0) != 0) throw new InvalidDataException(); }
+        if (i == 0) {
+          original = body["header"] as Dictionary<string, object>; ValidateHeader(original, id);
+          if ((string)body["phase"] != "PREPARED" || Number(body, "operationIndex", 0, 0) != 0) throw new InvalidDataException();
+          if ((int)original["version"] == 5) {
+            operationPhases = Enumerable.Repeat("NOT_STARTED", Operations(original).Count).ToArray();
+            operationTemps = new string[operationPhases.Length]; operationCommits = new string[operationPhases.Length];
+          }
+        }
         else if (body["header"] != null || !Transition((string)prior["phase"], (string)body["phase"], (int)prior["operationIndex"], Number(body, "operationIndex", 0, Operations(original).Count - 1), Operations(original).Count, (int)original["version"])) throw new InvalidDataException();
         foreach (string field in new string[] { "tempIdentity", "committedIdentity" }) if (body[field] != null) StringField(body, field, Identity);
         if (prior != null && prior["tempIdentity"] != null && (int)prior["operationIndex"] == (int)body["operationIndex"] && !Object.Equals(prior["tempIdentity"], body["tempIdentity"])) throw new InvalidDataException();
@@ -777,13 +828,42 @@ namespace Phi.Native {
           if (new string[] { "PREPARED", "RENAME_INTENT", "RENAMED", "ROLLBACK_REQUIRED", "ROLLED_BACK" }.Contains(phase) && committed != null) throw new InvalidDataException();
           if (prior != null && prior["committedIdentity"] != null && !Object.Equals(prior["committedIdentity"], committed)) throw new InvalidDataException();
         }
+        if ((int)original["version"] == 5) {
+          int index = (int)body["operationIndex"];
+          ValidateMixedEvent(original, body, operationPhases, operationTemps, operationCommits);
+          operationPhases[index] = (string)body["phase"];
+          operationTemps[index] = body["tempIdentity"] as string;
+          operationCommits[index] = body["committedIdentity"] as string;
+        }
         previous = Hash(bytes); prior = body;
       }
       if (lastDigest != null && previous != lastDigest) throw new InvalidDataException();
       header = original; last = prior; lastDigest = previous; deleteCleanupIntent = cleanupIntent;
+      mixedPhases = operationPhases; mixedTempIdentities = operationTemps; mixedCommittedIdentities = operationCommits;
     }
     internal object ReclamationMetadata { get { return reclamation; } }
     internal object Metadata(string recovery) {
+      if ((int)header["version"] == 5) {
+        if (mixedPhases == null || mixedPhases.Length != Operations(header).Count) throw new InvalidDataException();
+        var states = Operations(header).Cast<Dictionary<string, object>>().Select((op, index) => new {
+          operationIndex = index, kind = op["kind"], sourcePath = op.ContainsKey("sourcePath") ? op["sourcePath"] : null,
+          destinationPath = op["path"], baseIdentity = op["baseIdentity"], baseDigest = op["baseDigest"],
+          expectedResultDigest = op["newDigest"], expectedResultBytes = op["newBytes"],
+          durablePhase = mixedPhases[index], recordedTempIdentity = mixedTempIdentities[index], recordedCommittedIdentity = mixedCommittedIdentities[index]
+        }).ToArray();
+        int committed = mixedPhases.Count(phase => new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "FINALIZED", "CLEANED" }.Contains(phase));
+        string journalState = mixedPhases.Contains("CONFLICT") ? "CONFLICT" : mixedPhases.Contains("MANUAL_RECOVERY_REQUIRED") ? "MANUAL_RECOVERY_REQUIRED" :
+          (string)last["phase"] == "CLEANED" ? "FINALIZED" : committed == 0 ? "NONE_COMMITTED" :
+          committed == mixedPhases.Length ? "ALL_FILESYSTEM_OPERATIONS_COMMITTED_NOT_FINALIZED" : "PARTIAL_PROGRESS";
+        return new { version = 5, scope = "MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION", transactionId = id,
+          projectIdentity = header["projectIdentity"], draftId = header["draftId"], draftVersion = header["draftVersion"],
+          verifiedDigest = header["verifiedDigest"], baseDigest = header["baseDigest"], phase = last["phase"], sequence = last["sequence"],
+          operationIndex = last["operationIndex"], operations = header["operations"], operationStates = states,
+          journalRecordedCommits = states.Where(state => new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "FINALIZED", "CLEANED" }.Contains(state.durablePhase))
+            .Select(state => state.destinationPath).ToArray(), journalPendingOperations = states.Length - committed,
+          journalState, filesystemState = "UNVERIFIED", recoveryState = recovery, cleanup = "NOT_PROVEN",
+          projectPublished = false };
+      }
       if ((int)header["version"] >= 2) return new { version = (int)header["version"], scope = (int)header["version"] == 4 ? "SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION" : (int)header["version"] == 3 ? "SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION" : "SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION", transactionId = id,
         projectIdentity = header["projectIdentity"], draftId = header["draftId"], draftVersion = header["draftVersion"], verifiedDigest = header["verifiedDigest"], baseDigest = header["baseDigest"],
         phase = last["phase"], sequence = last["sequence"], operationIndex = last["operationIndex"], operations = header["operations"], tempIdentity = last["tempIdentity"], committedIdentity = last["committedIdentity"],
@@ -812,6 +892,14 @@ namespace Phi.Native {
               if ((int)parsed.header["version"] == 2) return parsed.InspectSingleModify(recover);
               if ((int)parsed.header["version"] == 3) return parsed.InspectSingleDelete(recover);
               if ((int)parsed.header["version"] == 4) return parsed.InspectSingleRename(recover);
+              if ((int)parsed.header["version"] == 5) {
+                if (recover) throw new InvalidDataException();
+                // The journal schema alone is not filesystem recovery proof.
+                // Until a per-operation physical inspector exists, a fresh
+                // controller must retain the transaction for manual review.
+                return new { status = "UNKNOWN_FAIL_SAFE", metadata = parsed.Metadata("MANUAL_RECOVERY_REQUIRED"),
+                  ownerGenerationAlive = false, projectMutations = 0, journalMutations = 0, processKills = 0, projectPublished = false };
+              }
               if (recover) throw new InvalidDataException();
               bool unchanged = MatchesBase(project, parsed.header);
               return new { status = unchanged ? "RECOVERY_REQUIRED" : "CONFLICT", metadata = parsed.Metadata(unchanged ? "RECOVERY_REQUIRED" : "CONFLICT"), ownerGenerationAlive = false, baseMatches = unchanged,
@@ -1390,6 +1478,130 @@ namespace Phi.Native {
         { "verifiedDigest", Hash(Encoding.UTF8.GetBytes("fixed-draft-digest-fixture")) }, { "baseDigest", Hash(Encoding.UTF8.GetBytes("fixed-base-digest-fixture")) }, { "creatorPid", pid }, { "creatorGeneration", ScopeRecovery.ProcessCreation(pid, out alive) },
         { "operations", new object[] { new Dictionary<string, object> { { "path", "input.txt" }, { "kind", "REPLACE" }, { "baseIdentity", identities["input.txt"] }, { "baseDigest", Hash(Encoding.UTF8.GetBytes((string)files["input.txt"])) }, { "newDigest", Hash(Encoding.UTF8.GetBytes("new-complete")) }, { "newBytes", 12 } } } }
       };
+    }
+    static Dictionary<string, object> MixedFixtureHeader(string project, string transactionId) {
+      Dictionary<string, object> snapshot = Snapshot(project, RecoveryFilesystem.DirectoryIdentity(project));
+      Dictionary<string, object> files = (Dictionary<string, object>)snapshot["files"], identities = (Dictionary<string, object>)snapshot["identities"];
+      bool alive; int pid = Process.GetCurrentProcess().Id;
+      Func<string, string> digest = name => Hash(Encoding.UTF8.GetBytes((string)files[name]));
+      return new Dictionary<string, object> {
+        { "version", 5 }, { "transactionId", transactionId }, { "projectIdentity", snapshot["rootIdentity"] },
+        { "draftId", Guid.NewGuid().ToString("N") }, { "draftVersion", 1 },
+        { "verifiedDigest", Hash(Encoding.UTF8.GetBytes("fixed-mixed-verified-fixture")) },
+        { "baseDigest", Hash(Encoding.UTF8.GetBytes("fixed-mixed-base-fixture")) },
+        { "creatorPid", pid }, { "creatorGeneration", ScopeRecovery.ProcessCreation(pid, out alive) },
+        { "operations", new object[] {
+          new Dictionary<string, object> { { "path", "a.txt" }, { "kind", "REPLACE" }, { "baseIdentity", identities["a.txt"] },
+            { "baseDigest", digest("a.txt") }, { "newDigest", Hash(Encoding.UTF8.GetBytes("a-new")) }, { "newBytes", 5 } },
+          new Dictionary<string, object> { { "path", "b.txt" }, { "kind", "CREATE" }, { "baseIdentity", null },
+            { "baseDigest", null }, { "newDigest", Hash(Encoding.UTF8.GetBytes("b-new")) }, { "newBytes", 5 } },
+          new Dictionary<string, object> { { "path", "c.txt" }, { "kind", "DELETE" }, { "baseIdentity", identities["c.txt"] },
+            { "baseDigest", digest("c.txt") }, { "newDigest", null }, { "newBytes", null } },
+          new Dictionary<string, object> { { "sourcePath", "d.txt" }, { "path", "e.txt" }, { "kind", "RENAME" },
+            { "baseIdentity", identities["d.txt"] }, { "baseDigest", digest("d.txt") }, { "newDigest", digest("d.txt") },
+            { "newBytes", Encoding.UTF8.GetByteCount((string)files["d.txt"]) } }
+        } }
+      };
+    }
+    internal static int MixedJournalFixtureChild() {
+      try {
+        Dictionary<string, object> request = FixtureRequest();
+        string root = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), tx = (string)request["transactionId"];
+        using (PublicationJournal journal = Begin(root, MixedFixtureHeader(root, tx)))
+        using (RegistryKey registry = OpenBase(true)) using (RegistryKey key = registry.OpenSubKey(tx, true)) {
+          if (key == null) throw new InvalidDataException();
+          journal.ReadChain(key);
+          string original = (string)((Dictionary<string, object>)Operations(journal.header)[0])["baseIdentity"];
+          bool earlyNextDenied = false, earlyCleanDenied = false;
+          try { journal.Append(key, "PREPARED", 1, null, null, true); }
+          catch (InvalidDataException) { earlyNextDenied = true; }
+          if (!earlyNextDenied) throw new InvalidDataException();
+          foreach (string phase in new string[] { "MUTATION_STARTED", "COMMITTED", "POST_COMMIT_VERIFIED", "FINALIZED" })
+            journal.Append(key, phase, 0, original, phase == "MUTATION_STARTED" ? null : original, true);
+          journal.Append(key, "PREPARED", 1, null, null, true);
+          try { journal.Append(key, "CLEANED", 1, null, null, true); }
+          catch (InvalidDataException) { earlyCleanDenied = true; }
+          if (!earlyCleanDenied) throw new InvalidDataException();
+          journal.ReadChain(key);
+          Console.WriteLine(Serializer().Serialize(new { ready = true, phase = journal.last["phase"], transactionId = tx,
+            sequence = journal.last["sequence"], earlyNextDenied, earlyCleanDenied })); Console.Out.Flush();
+          Thread.Sleep(12000); return 70;
+        }
+      } catch { Console.Error.WriteLine("PHI_MIXED_JOURNAL_FIXTURE_CHILD_FAILED"); return 70; }
+    }
+    internal static int MixedJournalFixtureRead() {
+      try {
+        Dictionary<string, object> request = FixtureRequest();
+        object observed = Inspect((string)request["transactionId"], Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]),
+          (string)request["rootIdentity"]);
+        Console.WriteLine(Serializer().Serialize(observed)); return 0;
+      } catch { Console.Error.WriteLine("PHI_MIXED_JOURNAL_FIXTURE_READ_FAILED"); return 70; }
+    }
+    internal static int MixedJournalSelfTest(string name) {
+      if (name != "partial-after-modify-journal-only") return 70;
+      ScopeRecovery scope = null; Process child = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
+      bool passed = false, clean = false, killed = false, childGone = false, readerGone = false, snapshotUnchanged = false;
+      object evidence = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        File.WriteAllText(Path.Combine(scope.Root, "a.txt"), "a-old", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(scope.Root, "d.txt"), "d-old", new UTF8Encoding(false));
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string before = Serializer().Serialize(Snapshot(scope.Root, rootId));
+        string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
+        stage = "PUBLISHER";
+        child = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-mixed-journal-fixture-child", UseShellExecute = false,
+          RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        child.StandardInput.WriteLine(input); child.StandardInput.Close();
+        string ready = null; Thread line = new Thread(delegate() { try { ready = child.StandardOutput.ReadLine(); } catch { } }); line.IsBackground = true; line.Start();
+        if (!line.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announcement["ready"] || (string)announcement["transactionId"] != tx ||
+            (string)announcement["phase"] != "PREPARED" || (int)announcement["sequence"] != 5 ||
+            !(bool)announcement["earlyNextDenied"] || !(bool)announcement["earlyCleanDenied"]) throw new InvalidDataException();
+        stage = "KILL"; child.Kill(); killed = true;
+        if (!child.WaitForExit(3000) || !child.HasExited || child.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+        stage = "FRESH_READER";
+        using (Process reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-mixed-journal-fixture-read", UseShellExecute = false,
+          RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+          reader.StandardInput.WriteLine(input); reader.StandardInput.Close();
+          if (!reader.WaitForExit(7000)) { reader.Kill(); reader.WaitForExit(3000); throw new InvalidDataException(); }
+          readerGone = reader.HasExited;
+          if (reader.ExitCode != 0) throw new InvalidDataException();
+          string output = reader.StandardOutput.ReadToEnd(); if (output.Length > 8192) throw new InvalidDataException();
+          Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(output);
+          if ((string)observed["status"] != "UNKNOWN_FAIL_SAFE" || (int)observed["projectMutations"] != 0 ||
+              (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"]) throw new InvalidDataException();
+          Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
+          IList states = metadata["operationStates"] as IList;
+          if (states == null || states.Count != 4 || (string)metadata["journalState"] != "PARTIAL_PROGRESS" ||
+              (int)metadata["journalPendingOperations"] != 3 || (string)metadata["filesystemState"] != "UNVERIFIED" ||
+              (string)metadata["scope"] != "MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION" ||
+              (string)((Dictionary<string, object>)states[0])["durablePhase"] != "FINALIZED" ||
+              (string)((Dictionary<string, object>)states[1])["durablePhase"] != "PREPARED" ||
+              (string)((Dictionary<string, object>)states[2])["durablePhase"] != "NOT_STARTED" ||
+              (string)((Dictionary<string, object>)states[3])["durablePhase"] != "NOT_STARTED") throw new InvalidDataException();
+          evidence = new { status = observed["status"], journalState = metadata["journalState"],
+            journalPendingOperations = metadata["journalPendingOperations"], filesystemState = metadata["filesystemState"],
+            operationPhases = states.Cast<object>().Select(item => ((Dictionary<string, object>)item)["durablePhase"]).ToArray(),
+            sequence = metadata["sequence"], projectMutations = observed["projectMutations"], journalMutations = observed["journalMutations"] };
+        }
+        snapshotUnchanged = Serializer().Serialize(Snapshot(scope.Root, rootId)) == before;
+        if (!snapshotUnchanged) throw new InvalidDataException(); passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_JOURNAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally {
+        if (child != null) { try { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } } finally { child.Dispose(); } }
+        try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, actualPublisherKilled = killed, publisherGone = childGone,
+        freshReaderGone = readerGone, fixtureCleanup = clean, snapshotUnchanged, evidence,
+        scope = "MIXED_JOURNAL_DURABILITY_ONLY_NO_PHYSICAL_PUBLICATION", projectPublished = false, externalRequests = 0 }));
+      return passed && clean ? 0 : 70;
     }
     internal static int FixtureChild(string phase) {
       if (!new string[] { "PREPARED", "TEMP_WRITTEN", "TEMP_FLUSHED", "READY_TO_COMMIT", "COMMIT_STARTED" }.Contains(phase)) return 70;

@@ -22,6 +22,7 @@ test('startup selection ignores only terminal journals and never treats an advis
   assert.equal(planWindowsStartupRecovery(inventory(entry('DELETE_INTENT', 'RECOVERY_REQUIRED', 3))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('COMMIT_STARTED', 'RECOVERY_REQUIRED', 2))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'RECOVERY_REQUIRED', 1))).kind, 'BLOCKED_UNSUPPORTED_VERSION');
+  assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'MANUAL_RECOVERY_REQUIRED', 5))).kind, 'BLOCKED_MANUAL_RECOVERY_REQUIRED');
   assert.equal(planWindowsStartupRecovery(inventory(entry('UNKNOWN_ACTIVE', 'ACTIVE_UNVERIFIED'))).kind, 'BLOCKED_ACTIVE_UNVERIFIED');
   assert.equal(planWindowsStartupRecovery(inventory(entry('RENAME_INTENT', 'CONFLICT'))).kind, 'BLOCKED_CONFLICT');
   assert.equal(planWindowsStartupRecovery(inventory(entry('RENAME_INTENT'), { ...entry('DELETE_INTENT'), transactionId: 'b'.repeat(32) })).kind,

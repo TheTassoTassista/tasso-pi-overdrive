@@ -136,6 +136,9 @@ jobs:
       - name: Normal Phi startup recovery after real publisher death (autonomy remains blocked; no model calls)
         if: runner.os == 'Windows'
         run: node --test tests/phi-startup-recovery.test.mjs
+      - name: Mixed journal per-operation durability after real publisher death (journal only; no publication)
+        if: runner.os == 'Windows'
+        run: node --test tests/phi-mixed-journal.test.mjs
       - name: Native platform, filesystem, themes, CLI, backup policy and bootstrap tests
         run: npm run check:phi
       - name: Non-interactive brand smoke (no model calls)
