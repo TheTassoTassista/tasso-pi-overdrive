@@ -310,7 +310,7 @@ namespace Phi.Native {
               // Until trusted discovery resolves it, fail closed rather than
               // silently omitting it or granting a new draft access to it.
               bool omitOwnedQuarantine = ownedQuarantine == prefix + name;
-              if (Regex.IsMatch(name, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) &&
+              if (Regex.IsMatch(name, "\\Aphi-(?:delete-[0-9a-f]{32}\\.quarantine|publish-[0-9a-f]{32}\\.tmp)\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) &&
                   !omitOwnedQuarantine) throw new InvalidDataException();
               if (!omitOwnedQuarantine) {
               // Names only: protected entries are never opened/read.

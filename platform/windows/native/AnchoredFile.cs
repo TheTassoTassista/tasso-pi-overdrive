@@ -31,7 +31,7 @@ namespace Phi.Native {
       string[] parts = relative.Split('/');
       string[] blocked = { ".git", "node_modules", ".aws", ".gnupg", ".password-store", ".ssh", "browser-data", "keyrings", ".env", "auth.json", "credentials", "credentials.json", "id_dsa", "id_ed25519", "id_ecdsa", "id_rsa", "known_hosts", "netrc" };
       foreach (string part in parts) {
-        if (part.Length == 0 || part == "." || part == ".." || part.Any(c => c < 32) || part.EndsWith(".") || part.EndsWith(" ") || blocked.Contains(part.ToLowerInvariant()) || part.StartsWith(".env.", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(part, "\\Aphi-delete-[0-9a-f]{32}\\.quarantine\\z|\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
+        if (part.Length == 0 || part == "." || part == ".." || part.Any(c => c < 32) || part.EndsWith(".") || part.EndsWith(" ") || blocked.Contains(part.ToLowerInvariant()) || part.StartsWith(".env.", StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(part, "\\Aphi-(?:delete-[0-9a-f]{32}\\.quarantine|publish-[0-9a-f]{32}\\.tmp)\\z|\\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|\\z)|\\.(?:pem|p12|pfx|key)\\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) throw new InvalidDataException();
       }
       return parts;
     }
@@ -77,26 +77,35 @@ namespace Phi.Native {
     // Bounded CREATE primitive only, NOT production publication or a replace
     // implementation. No existing destination is opened, deleted or replaced.
     internal static void CreateNoReplace(string root, string rootIdentity, string relative, byte[] value, Action<string> checkpoint) {
+      CreateNoReplace(root, rootIdentity, relative, value, "phi-publish-" + Guid.NewGuid().ToString("N") + ".tmp",
+        delegate(string phase, string identity) { checkpoint(phase); });
+    }
+    // The mixed journal supplies its transaction-derived temp leaf so a fresh
+    // controller can inspect the exact owned object after publisher death.
+    // Observation only: this callback does not grant write or cleanup rights.
+    internal static void CreateNoReplace(string root, string rootIdentity, string relative, byte[] value,
+        string tempLeaf, Action<string, string> checkpoint) {
       string[] segments = Segments(relative);
-      if (value == null || value.Length > MaxBytes) throw new InvalidDataException();
+      if (value == null || value.Length > MaxBytes || checkpoint == null || tempLeaf == null ||
+          !Regex.IsMatch(tempLeaf, "\\Aphi-publish-[0-9a-f]{32}\\.tmp\\z", RegexOptions.CultureInvariant)) throw new InvalidDataException();
       using (RecoveryFilesystem rootPins = new RecoveryFilesystem(root)) {
         if (RecoveryFilesystem.DirectoryIdentity(root) != rootIdentity) throw new InvalidDataException();
         string target = segments.Aggregate(root, (current, part) => Path.Combine(current, part));
         using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(target))) {
-          checkpoint("before-temp"); RecoveryFilesystem.Info info;
-          IntPtr owned = parent.CreateExclusiveFile("phi-publish-" + Guid.NewGuid().ToString("N") + ".tmp", out info);
+          checkpoint("before-temp", null); RecoveryFilesystem.Info info;
+          IntPtr owned = parent.CreateExclusiveFile(tempLeaf, out info);
           using (AnchoredFile temp = new AnchoredFile(owned)) {
-            Validate(info); string id = temp.Identity; checkpoint("temp");
+            Validate(info); string id = temp.Identity; checkpoint("temp", id);
             uint written; temp.Rewind();
             Check(WriteFile(owned, value, (uint)value.Length, out written, IntPtr.Zero));
             if (written != value.Length) throw new InvalidDataException();
-            Check(SetEndOfFile(owned)); checkpoint("write");
-            Check(FlushFileBuffers(owned)); checkpoint("flush");
+            Check(SetEndOfFile(owned)); checkpoint("write", id);
+            Check(FlushFileBuffers(owned)); checkpoint("flush", id);
             if (temp.Identity != id || temp.Digest != Hash(value)) throw new InvalidDataException();
-            checkpoint("validation"); checkpoint("precommit");
-            parent.RenameNewFile(owned, segments[segments.Length - 1]); checkpoint("rename");
+            checkpoint("validation", id); checkpoint("precommit", id);
+            parent.RenameNewFile(owned, segments[segments.Length - 1]); checkpoint("rename", id);
             if (temp.Identity != id || temp.Digest != Hash(value)) throw new InvalidDataException();
-            checkpoint("postverify");
+            checkpoint("postverify", id);
           }
         }
       }

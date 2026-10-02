@@ -11,7 +11,7 @@ import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublicat
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { consumeWindowsPublicationProof, windowsPublicationFailure } from '../platform/windows/publication.mjs';
+import { consumeWindowsPublicationProof, publishWindowsSingleOperation, windowsPublicationFailure } from '../platform/windows/publication.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 60000 };
 const rootIdentity = 'a'.repeat(16) + ':' + '1'.repeat(32);
@@ -36,6 +36,7 @@ test('publication stores immutable original native IDs/hashes, never raw payload
 });
 test('native manifest rejects missing/aliased IDs, traversal, protected names, case aliases and ADS', () => {
   for (const bad of [snapshot({ '../escape': 'x' }), snapshot({ '.env': 'x' }), snapshot({ 'name.txt:ads': 'x' }), snapshot({ 'a.txt': 'x', 'A.txt': 'y' }),
+    snapshot({ 'phi-publish-0123456789abcdef0123456789abcdef.tmp': 'owned temp' }),
     { ...snapshot(), identities: {} }, { ...snapshot(), rootIdentity: 'path-only' },
     { ...snapshot({ 'a.txt': 'x', 'b.txt': 'y' }), identities: { 'a.txt': fileIdentity(2), 'b.txt': fileIdentity(2) } }]) assert.throws(() => publicationBase(bad));
 });
@@ -66,6 +67,24 @@ test('explicit RENAME intent requires exactly one same-directory, byte-identical
   assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'modified bytes', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
   assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'unchanged bytes', 'keep.txt': 'changed' }, 10), intent), /RENAME_INTENT_INVALID/u);
   assert.throws(() => publicationOperations(base, snapshot({ 'new.txt': 'unchanged bytes', 'old.txt': 'unchanged bytes', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
+});
+test('V5 representative mixed manifest folds only an explicit rename pair and preserves operation order', () => {
+  const base = publicationBase(snapshot({ 'a.txt': 'old a', 'c.txt': 'old c', 'd.txt': 'old d', 'keep.txt': 'same' }));
+  const next = snapshot({ 'a.txt': 'new a', 'b.txt': 'new b', 'e.txt': 'old d', 'keep.txt': 'same' }, 10);
+  const intent = { sourcePath: 'd.txt', destinationPath: 'e.txt' };
+  assert.deepEqual(publicationOperations(base, next).map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'DELETE', 'CREATE']);
+  const operations = publicationOperations(base, next, intent);
+  assert.deepEqual(operations.map(op => [op.kind, op.path]), [
+    ['REPLACE', 'a.txt'], ['CREATE', 'b.txt'], ['DELETE', 'c.txt'], ['RENAME', 'e.txt'],
+  ]);
+  assert.equal(operations[3].sourcePath, 'd.txt');
+  assert.equal(operations[3].baseIdentity, base.files['d.txt'].identity);
+  assert.throws(() => { operations[1].newBytes = 0; }, TypeError);
+  assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'e.txt': 'changed d' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'c.txt': 'retained' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'extra.txt': 'extra' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publicationOperations(base, snapshot({ 'a.txt': 'old a', 'b.txt': 'new b', 'e.txt': 'old d', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
+  assert.throws(() => publishWindowsSingleOperation({ metadata: { operations } }), /MIXED_NOT_IMPLEMENTED/u);
 });
 test('baseline conflicts detect root/file identity, identical-text delete/recreate, edit, removal and new user file', () => {
   const original = snapshot(), base = publicationBase(original);

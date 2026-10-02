@@ -53,9 +53,9 @@ test('transaction quarantine cannot become ordinary source/draft/publication inp
     assert.throws(() => publicationBase({ rootIdentity: id, files: { [path]: 'fixture' }, identities: { [path]: id } }), /RESERVED_TRANSACTION_EVIDENCE/u);
   }
   const native = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
-  assert.ok(native.includes('phi-delete-[0-9a-f]{32}\\\\.quarantine\\\\z'));
+  assert.ok(native.includes('phi-(?:delete-[0-9a-f]{32}'));
   const anchored = fs.readFileSync(new URL('../platform/windows/native/AnchoredFile.cs', import.meta.url), 'utf8');
-  assert.ok(anchored.includes('phi-delete-[0-9a-f]{32}\\\\.quarantine\\\\z'));
+  assert.ok(anchored.includes('phi-(?:delete-[0-9a-f]{32}'));
 });
 
 test('DELETE failure metadata cannot claim unstarted conflict after recorded commit or mint a private certificate', () => {

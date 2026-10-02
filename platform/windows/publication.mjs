@@ -319,6 +319,7 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
 // Same opaque trusted-controller grant, journal, source-attested helper and
 // one-use private certificate. No extra role/model execution authority.
 export function publishWindowsSingleOperation(options) {
+  if (options?.metadata?.operations?.length !== 1) fail('MIXED_NOT_IMPLEMENTED');
   if (options?.metadata?.operations?.length === 1 && options.metadata.operations[0].kind === 'RENAME') return publishWindowsSingleRename(options);
   const operations = publicationOperations(options.base, options.snapshot);
   if (operations.length === 1 && operations[0].kind === 'DELETE') return publishWindowsSingleDelete(options);

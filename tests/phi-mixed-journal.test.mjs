@@ -10,9 +10,10 @@ test('V5 mixed journal reconstructs per-operation physical evidence without enab
   assert.match(source, /version == 5/u);
   assert.match(source, /operationPhases = Enumerable\.Repeat\("NOT_STARTED"/u);
   assert.match(source, /MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION/u);
-  assert.match(source, /return parsed\.InspectMixedPhysical\(\)/u);
+  assert.match(source, /return parsed\.InspectMixedPhysical\(trace\)/u);
   assert.match(source, /AtomicModify\.ReplaceDefaultStream\(root/u);
   assert.match(source, /observedQuarantineIdentity/u);
+  assert.match(source, /observedCreateTempIdentity/u);
   assert.match(source, /new string\[\] \{ "REPLACE", "CREATE", "DELETE", "RENAME" \}/u);
   assert.equal(planWindowsStartupRecovery({ status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
     projectPublished: false, actionPerformed: false, projectTransactions: 1,
@@ -103,4 +104,31 @@ test('fresh V5 physical reconstruction preserves a user-created rename destinati
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old|user-e/u);
     console.log(JSON.stringify({ control: 'MIXED_V5_PARTIAL_USER_DESTINATION_CONFLICT', ...receipt }));
+  });
+
+test('fresh V5 reconstruction identifies the exact staged CREATE temp and remains manual/fail-closed',
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-journal-selftest', 'partial-after-real-modify-create-staged'], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.actualPublisherKilled, true);
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.scope, 'MIXED_V5_STAGED_CREATE_NOT_MIXED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(receipt.evidence.status, 'UNKNOWN_FAIL_SAFE');
+    assert.equal(receipt.evidence.filesystemState, 'MANUAL_RECOVERY_REQUIRED');
+    assert.deepEqual(receipt.evidence.operationPhases, ['FINALIZED', 'MUTATION_STARTED', 'NOT_STARTED', 'NOT_STARTED']);
+    assert.deepEqual(receipt.evidence.operationPhysicalStates,
+      ['NEW_COMPLETE_OBSERVED', 'STAGED_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED']);
+    assert.equal(receipt.evidence.projectMutations, 0);
+    assert.equal(receipt.evidence.journalMutations, 0);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
+    console.log(JSON.stringify({ control: 'MIXED_V5_STAGED_CREATE_FAIL_CLOSED', ...receipt }));
   });
