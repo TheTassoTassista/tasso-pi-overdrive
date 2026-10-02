@@ -5,12 +5,14 @@ import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { planWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
 
-test('V5 mixed journal records per-operation progress without enabling publication or recovery', () => {
+test('V5 mixed journal reconstructs per-operation physical evidence without enabling publication or recovery', () => {
   const source = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
   assert.match(source, /version == 5/u);
   assert.match(source, /operationPhases = Enumerable\.Repeat\("NOT_STARTED"/u);
   assert.match(source, /MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION/u);
-  assert.match(source, /status = "UNKNOWN_FAIL_SAFE", metadata = parsed\.Metadata\("MANUAL_RECOVERY_REQUIRED"\)/u);
+  assert.match(source, /return parsed\.InspectMixedPhysical\(\)/u);
+  assert.match(source, /AtomicModify\.ReplaceDefaultStream\(root/u);
+  assert.match(source, /observedQuarantineIdentity/u);
   assert.match(source, /new string\[\] \{ "REPLACE", "CREATE", "DELETE", "RENAME" \}/u);
   assert.equal(planWindowsStartupRecovery({ status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
     projectPublished: false, actionPerformed: false, projectTransactions: 1,
@@ -35,14 +37,70 @@ test('real publisher death retains a four-operation V5 journal for a fresh proce
     assert.equal(receipt.projectPublished, false);
     assert.equal(receipt.externalRequests, 0);
     assert.deepEqual(receipt.evidence.operationPhases, ['FINALIZED', 'PREPARED', 'NOT_STARTED', 'NOT_STARTED']);
-    assert.equal(receipt.evidence.status, 'UNKNOWN_FAIL_SAFE');
+    assert.equal(receipt.evidence.status, 'CONFLICT');
     assert.equal(receipt.evidence.journalState, 'PARTIAL_PROGRESS');
     assert.equal(receipt.evidence.journalPendingOperations, 3);
-    assert.equal(receipt.evidence.filesystemState, 'UNVERIFIED');
+    assert.equal(receipt.evidence.filesystemState, 'CONFLICT');
+    assert.deepEqual(receipt.evidence.operationPhysicalStates,
+      ['CONFLICT', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED']);
     assert.equal(receipt.evidence.sequence, 5);
     assert.equal(receipt.evidence.projectMutations, 0);
     assert.equal(receipt.evidence.journalMutations, 0);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
     console.log(JSON.stringify({ control: 'MIXED_JOURNAL_DURABILITY_ONLY', ...receipt }));
+  });
+
+test('real atomic MODIFY in V5 is detected by fresh physical reconstruction after publisher death',
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-journal-selftest', 'partial-after-real-modify'], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.actualPublisherKilled, true);
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.snapshotUnchanged, false);
+    assert.equal(receipt.scope, 'MIXED_V5_SINGLE_PHYSICAL_MODIFY_NOT_MIXED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(receipt.evidence.status, 'UNKNOWN_FAIL_SAFE');
+    assert.equal(receipt.evidence.filesystemState, 'PARTIALLY_COMMITTED');
+    assert.deepEqual(receipt.evidence.operationPhysicalStates,
+      ['NEW_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED']);
+    assert.equal(receipt.evidence.projectMutations, 0);
+    assert.equal(receipt.evidence.journalMutations, 0);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
+    console.log(JSON.stringify({ control: 'MIXED_V5_SINGLE_PHYSICAL_MODIFY', ...receipt }));
+  });
+
+test('fresh V5 physical reconstruction preserves a user-created rename destination after partial progress',
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-journal-selftest', 'partial-after-real-modify-user-e'], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.actualPublisherKilled, true);
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.snapshotUnchanged, false);
+    assert.equal(receipt.scope, 'MIXED_V5_SINGLE_PHYSICAL_MODIFY_NOT_MIXED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(receipt.evidence.status, 'CONFLICT');
+    assert.equal(receipt.evidence.filesystemState, 'CONFLICT');
+    assert.deepEqual(receipt.evidence.operationPhysicalStates,
+      ['NEW_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED', 'CONFLICT']);
+    assert.equal(receipt.evidence.projectMutations, 0);
+    assert.equal(receipt.evidence.journalMutations, 0);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old|user-e/u);
+    console.log(JSON.stringify({ control: 'MIXED_V5_PARTIAL_USER_DESTINATION_CONFLICT', ...receipt }));
   });
