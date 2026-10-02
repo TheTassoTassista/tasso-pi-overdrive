@@ -1673,16 +1673,16 @@ namespace Phi.Native {
           if (!reader.WaitForExit(7000)) {
             reader.Kill(); reader.WaitForExit(3000);
             outputPipe.Join(2000); errorPipe.Join(2000);
-            foreach (string marker in (readerErrors ?? "").Split('\n').Where(line =>
-                line.StartsWith("PHI_MIXED_STAGE:", StringComparison.Ordinal))) Console.Error.WriteLine(marker.Trim());
+            foreach (string marker in (readerErrors ?? "").Split('\n').Where(entry =>
+                entry.StartsWith("PHI_MIXED_STAGE:", StringComparison.Ordinal))) Console.Error.WriteLine(marker.Trim());
             throw new InvalidDataException();
           }
           if (!outputPipe.Join(2000) || !errorPipe.Join(2000)) throw new InvalidDataException();
           readerGone = reader.HasExited;
           stage = "READER_EXIT";
           if (reader.ExitCode != 0) {
-            string marker = (readerErrors ?? "").Split('\n').FirstOrDefault(line =>
-              line.StartsWith("PHI_MIXED_JOURNAL_FIXTURE_READ_FAILED:", StringComparison.Ordinal));
+            string marker = (readerErrors ?? "").Split('\n').FirstOrDefault(entry =>
+              entry.StartsWith("PHI_MIXED_JOURNAL_FIXTURE_READ_FAILED:", StringComparison.Ordinal));
             Console.Error.WriteLine(marker ?? "PHI_MIXED_JOURNAL_FIXTURE_READ_FAILED:NO_MARKER"); throw new InvalidDataException();
           }
           stage = "READER_OUTPUT";
