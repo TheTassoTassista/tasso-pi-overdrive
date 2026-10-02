@@ -54,7 +54,11 @@ export function buildWindowsProcess() {
   const args = ['/nologo', '/noconfig', '/nostdlib+', '/target:exe', '/platform:x64', '/optimize+', ...references.map((file) => `/reference:${file}`), `/out:${binary}`, source, confinementSource, recoverySource, recoveryFilesystemSource, anchoredFileSource, brokerSource, publicationJournalSource, atomicModifySource];
   const compile = spawnSync(compiler, args, { cwd: root, shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000, maxBuffer: 65536 });
   if (compile.status !== 0) {
-    const codes = [...new Set(`${compile.stdout}\n${compile.stderr}`.match(/\bCS\d{4}\b/gu) ?? [])].slice(0, 8);
+    const diagnosticText = `${compile.stdout}\n${compile.stderr}`;
+    const locations = [...diagnosticText.matchAll(/([A-Za-z0-9_.-]+\.cs)\((\d+),(\d+)\):\s*error\s*(CS\d{4})/gu)]
+      .slice(0, 8).map(([, file, line, column, code]) => `${file}:${line}:${column}:${code}`);
+    if (locations.length) process.stderr.write(`${locations.join('\n')}\n`);
+    const codes = [...new Set(diagnosticText.match(/\bCS\d{4}\b/gu) ?? [])].slice(0, 8);
     if (codes.length) process.stderr.write(`${codes.join(' ')}\n`);
     fail('COMPILE_FAILED');
   }
