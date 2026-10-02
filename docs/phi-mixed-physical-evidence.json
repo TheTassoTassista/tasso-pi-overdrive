@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "scope": "V5_PHYSICAL_MODIFY_CREATE_PARTIAL_NOT_PRODUCTION_PUBLICATION",
+  "status": "PASS_BOUNDED_D6_CHECKPOINT",
+  "functionalHead": "ddf6beebd8d2bc93ecf36e76c238225a51d417cf",
+  "runId": 37076944075,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37076944075",
+  "v5Native": {
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "publisherDeathAndFreshReader": true,
+    "cases": [
+      { "name": "journal-only-false-commit", "physical": ["CONFLICT", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED"], "filesystemState": "CONFLICT", "readerOutputBytes": 5600 },
+      { "name": "real-modify", "physical": ["NEW_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED"], "filesystemState": "PARTIALLY_COMMITTED", "readerOutputBytes": 5660 },
+      { "name": "real-modify-user-rename-destination", "physical": ["NEW_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "CONFLICT"], "filesystemState": "CONFLICT", "readerOutputBytes": 5709 },
+      { "name": "real-modify-staged-create", "physical": ["NEW_COMPLETE_OBSERVED", "STAGED_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED"], "filesystemState": "MANUAL_RECOVERY_REQUIRED", "readerOutputBytes": 5900 },
+      { "name": "real-modify-create-committed", "physical": ["NEW_COMPLETE_OBSERVED", "NEW_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED"], "filesystemState": "PARTIALLY_COMMITTED", "readerOutputBytes": 5962 },
+      { "name": "real-modify-create-user-replacement", "physical": ["NEW_COMPLETE_OBSERVED", "CONFLICT", "OLD_COMPLETE_OBSERVED", "OLD_COMPLETE_OBSERVED"], "filesystemState": "CONFLICT", "readerOutputBytes": 5902 }
+    ],
+    "freshReaderProjectMutations": 0,
+    "freshReaderJournalMutations": 0,
+    "projectPublished": false,
+    "fixtureCleanup": "PASS",
+    "externalProviderCalls": 0
+  },
+  "aggregate": {
+    "windows": { "total": 459, "passed": 447, "failed": 0, "cancelled": 0, "skipped": 12 },
+    "ubuntu": { "total": 459, "passed": 157, "failed": 0, "cancelled": 0, "skipped": 302 },
+    "local": { "total": 992, "passed": 690, "failed": 0, "cancelled": 0, "skipped": 302, "npmRunCheck": "PASS", "typeScript": "PASS", "packageValidation": "PASS" }
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "total": 459,
+    "passed": 447,
+    "failed": 0,
+    "skipped": 12,
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 17147,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "directoryRemoved": true,
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "brokerCleanup": "PASS", "externalProviderCalls": 0 },
+  "protectedAuditSha256": "f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba",
+  "historicalFailedRuns": [
+    { "runId": 37074284110, "reason": "V5 reader fixture waited for child exit before draining a receipt exceeding the Windows pipe buffer" },
+    { "runId": 37075623952, "reason": "C# CS0136 fixture compilation error; native tests not run" },
+    { "runId": 37075928533, "reason": "C# CS0136 localized to fixture lambda parameters; native tests not run" },
+    { "runId": 37076064545, "reason": "V5 redaction assertion matched the public case name rather than private fixture content; physical cases passed but whole gate stopped" }
+  ],
+  "limitations": [
+    "Physical V5 coverage is MODIFY and CREATE only. DELETE and RENAME remain logical journal entries in these fixtures.",
+    "This is not the original verified Worker/controller production mixed-publication path, nor a four-operation Git E2E.",
+    "V5 inspection remains read-only and fail-closed. It does not RESUME, FINALIZE_COMMIT, ROLLBACK or mint PUBLISHED.",
+    "Normal phi V5 crash/restart and D-wide E2Es have not been run. Windows autonomy remains blocked.",
+    "Owned-process cleanup does not prove a whole-runner process census or power-loss durability."
+  ]
+}
