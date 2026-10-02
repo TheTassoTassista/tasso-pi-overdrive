@@ -2,7 +2,15 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Current D6 bounded production-startup integration — native gate PASS
+## Current D6 mixed-journal foundation — full native gate PASS, physical mixed recovery open
+
+Functional `884645fbe42e287d81dc1df19adf90384b9b0bcb` / [CI37053866202](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37053866202) **SUCCESS** adds bounded V5 per-operation journal progress for ordered MODIFY/CREATE/DELETE/RENAME. Actual Windows writer death and a fresh process proved durable reconstruction of four independent phases and rejection of premature next-operation/global-cleanup transitions. The project snapshot remained unchanged: this is intentionally **journal-only**. The fresh reader reports `UNKNOWN_FAIL_SAFE`, `filesystemState=UNVERIFIED`, manual recovery, zero project mutations and no publication grant. The startup selector rejects this V5 manual classification in a portable regression; a normal-`phi` V5 startup fixture is still pending.
+
+Dedicated native V5 **2/2 PASS**; Windows aggregate **453/441 PASS/0 FAIL/12 skips**, Ubuntu **453/156 PASS/0 FAIL/297 native skips**. Independent Windows clone `PASS_FOUNDATION_ONLY`, repeated 453/441/0/12, pinned LSP exit0 in **15145ms** (< unchanged120000ms), cleanup PASS/directory removed/owned residual0. Three isolated deterministic Pi smokes PASS, broker cleanup PASS, external provider calls0. Local full check/syntax/TypeScript/package validation PASS. [Bounded metadata-only evidence](phi-mixed-journal-evidence.json).
+
+**D6 PARTIAL; D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; PHI PORTABILITY IN PROGRESS.** Next: real verified-controller mixed publication with per-op physical evidence, actual kill matrix and fresh normal-startup recovery, followed by D-wide E2Es. No physical multi-file mutation/recovery, all-files atomicity, power-loss certificate or Windows autonomy is claimed. Protected user audit remains byte-identical/unstaged. No active Pi/auth/provider/routing, LPAC/Job, retry or internal timeout change.
+
+## Preceding D6 bounded production-startup integration — native gate PASS
 
 Functional `4043ad36b224515df164a00ee709c207139cc1be` / [CI37036126519](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37036126519) **SUCCESS** wires advisory private-index discovery and version-specific native recovery-only endpoints into the actual normal Windows `phi` launch, before its unchanged autonomous-backend block. Selection is limited to one nonterminal owned transaction; native action independently revalidates under its lease; ambiguous/conflicting state stops startup without project mutation; successful action is confirmed by a second discovery and emitted as metadata only. A terminal phase with conflicting filesystem classification is not silently ignored.
 

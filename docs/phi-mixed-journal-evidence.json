@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "scope": "MIXED_JOURNAL_DURABILITY_ONLY_NO_PHYSICAL_PUBLICATION",
+  "status": "PASS_BOUNDED_JOURNAL_FOUNDATION",
+  "functionalHead": "884645fbe42e287d81dc1df19adf90384b9b0bcb",
+  "runId": 37053866202,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37053866202",
+  "nativeCase": {
+    "name": "partial-after-modify-journal-only",
+    "publisherActuallyKilled": true,
+    "publisherGone": true,
+    "freshReaderGone": true,
+    "fixtureCleanup": true,
+    "snapshotUnchanged": true,
+    "observedStatus": "UNKNOWN_FAIL_SAFE",
+    "journalState": "PARTIAL_PROGRESS",
+    "journalPendingOperations": 3,
+    "filesystemState": "UNVERIFIED",
+    "operationPhases": ["FINALIZED", "PREPARED", "NOT_STARTED", "NOT_STARTED"],
+    "journalSequence": 5,
+    "projectMutations": 0,
+    "journalMutationsByFreshReader": 0,
+    "projectPublished": false,
+    "externalRequests": 0
+  },
+  "dedicatedWindowsTests": { "total": 2, "passed": 2, "failed": 0, "skipped": 0 },
+  "aggregate": {
+    "windows": { "total": 453, "passed": 441, "failed": 0, "skipped": 12 },
+    "ubuntu": { "total": 453, "passed": 156, "failed": 0, "skipped": 297 }
+  },
+  "independentWindowsClone": {
+    "status": "PASS_FOUNDATION_ONLY",
+    "tests": { "total": 453, "passed": 441, "failed": 0, "skipped": 12 },
+    "pinnedLspInstallExitCode": 0,
+    "pinnedLspInstallElapsedMs": 15145,
+    "pinnedLspInstallTimeoutMs": 120000,
+    "cleanup": "PASS",
+    "directoryRemoved": true,
+    "residualOwnedProcesses": 0
+  },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "brokerCleanup": "PASS", "externalProviderCalls": 0 },
+  "limitations": [
+    "V5 is a journal-only foundation. The fixture records state transitions without changing project files; the fresh reader reports filesystemState UNVERIFIED and never mints a publication grant.",
+    "No production mixed publisher, per-operation filesystem inspector, fresh-controller mixed recovery, real mixed crash matrix, D-wide E2E or Windows autonomy has been certified.",
+    "Owned-process cleanup is scoped to Phi-owned fixtures/jobs, not a whole-runner process census."
+  ]
+}
