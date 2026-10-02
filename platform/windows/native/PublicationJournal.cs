@@ -1565,7 +1565,8 @@ namespace Phi.Native {
     }
     internal static int MixedJournalFixtureChild(string name) {
       if (name != "partial-after-modify-journal-only" && name != "partial-after-real-modify" &&
-          name != "partial-after-real-modify-user-e" && name != "partial-after-real-modify-create-staged") return 70;
+          name != "partial-after-real-modify-user-e" && name != "partial-after-real-modify-create-staged" &&
+          name != "partial-after-real-modify-create-committed" && name != "partial-after-real-modify-create-committed-user-b") return 70;
       try {
         Dictionary<string, object> request = FixtureRequest();
         string root = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), tx = (string)request["transactionId"];
@@ -1601,8 +1602,20 @@ namespace Phi.Native {
                 });
               throw new InvalidDataException();
             } catch (IOException error) { if (error.Message != "PHI_MIXED_STAGED_CREATE_FIXTURE") throw; }
+          } else if (name == "partial-after-real-modify-create-committed" || name == "partial-after-real-modify-create-committed-user-b") {
+            string createdIdentity = null;
+            AnchoredFile.CreateNoReplace(root, (string)journal.header["projectIdentity"], "b.txt", Encoding.UTF8.GetBytes("b-new"),
+              "phi-publish-" + tx + ".tmp", delegate(string phase, string identity) {
+                if (phase == "temp") journal.Append(key, "MUTATION_STARTED", 1, identity, null, true);
+                else if (phase == "rename") journal.Append(key, "COMMITTED", 1, identity, identity, true);
+                else if (phase == "postverify") { journal.Append(key, "POST_COMMIT_VERIFIED", 1, identity, identity, true); createdIdentity = identity; }
+              });
+            if (createdIdentity == null) throw new InvalidDataException();
+            journal.Append(key, "FINALIZED", 1, createdIdentity, createdIdentity, true);
+            journal.Append(key, "PREPARED", 2, null, null, true);
           }
-          try { journal.Append(key, "CLEANED", 1, null, null, true); }
+          int activeIndex = (name == "partial-after-real-modify-create-committed" || name == "partial-after-real-modify-create-committed-user-b") ? 2 : 1;
+          try { journal.Append(key, "CLEANED", activeIndex, null, null, true); }
           catch (InvalidDataException) { earlyCleanDenied = true; }
           if (!earlyCleanDenied) throw new InvalidDataException();
           journal.ReadChain(key);
@@ -1628,9 +1641,12 @@ namespace Phi.Native {
     }
     internal static int MixedJournalSelfTest(string name) {
       if (name != "partial-after-modify-journal-only" && name != "partial-after-real-modify" &&
-          name != "partial-after-real-modify-user-e" && name != "partial-after-real-modify-create-staged") return 70;
+          name != "partial-after-real-modify-user-e" && name != "partial-after-real-modify-create-staged" &&
+          name != "partial-after-real-modify-create-committed" && name != "partial-after-real-modify-create-committed-user-b") return 70;
       ScopeRecovery scope = null; Process child = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
       bool stagedCreate = name == "partial-after-real-modify-create-staged";
+      bool committedCreate = name == "partial-after-real-modify-create-committed" || name == "partial-after-real-modify-create-committed-user-b";
+      bool userChangedB = name == "partial-after-real-modify-create-committed-user-b";
       bool passed = false, clean = false, killed = false, childGone = false, readerGone = false, snapshotUnchanged = false;
       int readerOutputBytes = 0;
       object evidence = null;
@@ -1652,11 +1668,12 @@ namespace Phi.Native {
         Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
         if (!(bool)announcement["ready"] || (string)announcement["transactionId"] != tx ||
             (string)announcement["phase"] != (stagedCreate ? "MUTATION_STARTED" : "PREPARED") ||
-            (int)announcement["sequence"] != (stagedCreate ? 6 : 5) ||
+            (int)announcement["sequence"] != (stagedCreate ? 6 : committedCreate ? 10 : 5) ||
             !(bool)announcement["earlyNextDenied"] || !(bool)announcement["earlyCleanDenied"]) throw new InvalidDataException();
         stage = "KILL"; child.Kill(); killed = true;
         if (!child.WaitForExit(3000) || !child.HasExited || child.ExitCode == 0) throw new InvalidDataException(); childGone = true;
-        if (name == "partial-after-real-modify-user-e") File.WriteAllText(Path.Combine(scope.Root, "e.txt"), "user-e", new UTF8Encoding(false));
+        if (name == "partial-after-real-modify-user-e") File.WriteAllText(Path.Combine(scope.Root, "e.txt"), "private-user-e-content", new UTF8Encoding(false));
+        if (userChangedB) File.WriteAllText(Path.Combine(scope.Root, "b.txt"), "private-user-b-content", new UTF8Encoding(false));
         stage = "FRESH_READER";
         using (Process reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-mixed-journal-fixture-read", UseShellExecute = false,
@@ -1690,26 +1707,26 @@ namespace Phi.Native {
           readerOutputBytes = Encoding.UTF8.GetByteCount(output);
           Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(output);
           stage = "READER_STATUS";
-          string expectedStatus = name == "partial-after-real-modify" ? "UNKNOWN_FAIL_SAFE" : "CONFLICT";
-          string expectedPhysical = stagedCreate ? "MANUAL_RECOVERY_REQUIRED" : name == "partial-after-real-modify" ? "PARTIALLY_COMMITTED" : "CONFLICT";
-          if (stagedCreate) expectedStatus = "UNKNOWN_FAIL_SAFE";
+          string expectedStatus = name == "partial-after-real-modify" || stagedCreate || committedCreate && !userChangedB ? "UNKNOWN_FAIL_SAFE" : "CONFLICT";
+          string expectedPhysical = stagedCreate ? "MANUAL_RECOVERY_REQUIRED" :
+            name == "partial-after-real-modify" || committedCreate && !userChangedB ? "PARTIALLY_COMMITTED" : "CONFLICT";
           if ((string)observed["status"] != expectedStatus || (int)observed["projectMutations"] != 0 ||
               (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"]) throw new InvalidDataException();
           Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
           IList states = metadata["operationStates"] as IList;
           stage = "READER_METADATA";
           if (states == null || states.Count != 4 || (string)metadata["journalState"] != "PARTIAL_PROGRESS" ||
-              (int)metadata["journalPendingOperations"] != 3 || (string)metadata["filesystemState"] != expectedPhysical ||
+              (int)metadata["journalPendingOperations"] != (committedCreate ? 2 : 3) || (string)metadata["filesystemState"] != expectedPhysical ||
               (string)metadata["scope"] != "MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION" ||
               (string)((Dictionary<string, object>)states[0])["durablePhase"] != "FINALIZED" ||
-              (string)((Dictionary<string, object>)states[1])["durablePhase"] != (stagedCreate ? "MUTATION_STARTED" : "PREPARED") ||
-              (string)((Dictionary<string, object>)states[2])["durablePhase"] != "NOT_STARTED" ||
+              (string)((Dictionary<string, object>)states[1])["durablePhase"] != (stagedCreate ? "MUTATION_STARTED" : committedCreate ? "FINALIZED" : "PREPARED") ||
+              (string)((Dictionary<string, object>)states[2])["durablePhase"] != (committedCreate ? "PREPARED" : "NOT_STARTED") ||
               (string)((Dictionary<string, object>)states[3])["durablePhase"] != "NOT_STARTED") throw new InvalidDataException();
           IList physical = observed["operationEvidence"] as IList;
           stage = "READER_PHYSICAL";
           if (physical == null || physical.Count != 4 ||
               (string)((Dictionary<string, object>)physical[0])["physicalState"] != (name == "partial-after-modify-journal-only" ? "CONFLICT" : "NEW_COMPLETE_OBSERVED") ||
-              (string)((Dictionary<string, object>)physical[1])["physicalState"] != (stagedCreate ? "STAGED_COMPLETE_OBSERVED" : "OLD_COMPLETE_OBSERVED") ||
+              (string)((Dictionary<string, object>)physical[1])["physicalState"] != (stagedCreate ? "STAGED_COMPLETE_OBSERVED" : committedCreate ? userChangedB ? "CONFLICT" : "NEW_COMPLETE_OBSERVED" : "OLD_COMPLETE_OBSERVED") ||
               (string)((Dictionary<string, object>)physical[2])["physicalState"] != "OLD_COMPLETE_OBSERVED" ||
               (string)((Dictionary<string, object>)physical[3])["physicalState"] != (name == "partial-after-real-modify-user-e" ? "CONFLICT" : "OLD_COMPLETE_OBSERVED")) throw new InvalidDataException();
           evidence = new { status = observed["status"], journalState = metadata["journalState"],
@@ -1721,8 +1738,8 @@ namespace Phi.Native {
         snapshotUnchanged = !stagedCreate && Serializer().Serialize(Snapshot(scope.Root, rootId)) == before;
         if (snapshotUnchanged != (name == "partial-after-modify-journal-only") ||
             name != "partial-after-modify-journal-only" && (File.ReadAllText(Path.Combine(scope.Root, "a.txt")) != "a-new" ||
-              File.Exists(Path.Combine(scope.Root, "b.txt")) ||
-              (name == "partial-after-real-modify-user-e" ? File.ReadAllText(Path.Combine(scope.Root, "e.txt")) != "user-e" : File.Exists(Path.Combine(scope.Root, "e.txt"))) ||
+              (committedCreate ? File.ReadAllText(Path.Combine(scope.Root, "b.txt")) != (userChangedB ? "private-user-b-content" : "b-new") : File.Exists(Path.Combine(scope.Root, "b.txt"))) ||
+              (name == "partial-after-real-modify-user-e" ? File.ReadAllText(Path.Combine(scope.Root, "e.txt")) != "private-user-e-content" : File.Exists(Path.Combine(scope.Root, "e.txt"))) ||
               stagedCreate && File.ReadAllText(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp")) != "b-new")) throw new InvalidDataException();
         passed = true;
       } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_JOURNAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
@@ -1735,7 +1752,8 @@ namespace Phi.Native {
       Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, actualPublisherKilled = killed, publisherGone = childGone,
         freshReaderGone = readerGone, fixtureCleanup = clean, snapshotUnchanged, readerOutputBytes, evidence,
         scope = name == "partial-after-modify-journal-only" ? "MIXED_JOURNAL_DURABILITY_ONLY_NO_PHYSICAL_PUBLICATION" :
-          stagedCreate ? "MIXED_V5_STAGED_CREATE_NOT_MIXED_PUBLICATION" : "MIXED_V5_SINGLE_PHYSICAL_MODIFY_NOT_MIXED_PUBLICATION",
+          stagedCreate ? "MIXED_V5_STAGED_CREATE_NOT_MIXED_PUBLICATION" : committedCreate ?
+          "MIXED_V5_PHYSICAL_MODIFY_CREATE_NOT_MIXED_PUBLICATION" : "MIXED_V5_SINGLE_PHYSICAL_MODIFY_NOT_MIXED_PUBLICATION",
         projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }

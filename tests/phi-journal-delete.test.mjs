@@ -47,15 +47,18 @@ test('DELETE extends the same journal with exclusive identity-checked quarantine
   assert.match(native, /RenameNewFile[\s\S]*?RenameRegisteredFile\(file, destination, publicationFiles\)/u);
 });
 
-test('transaction quarantine cannot become ordinary source/draft/publication input, including case aliases and nested paths', () => {
-  const id = 'a'.repeat(16) + ':' + 'b'.repeat(32), reserved = 'phi-delete-' + 'c'.repeat(32) + '.quarantine';
-  for (const path of [reserved, reserved.toUpperCase(), 'nested/' + reserved]) {
+test('transaction quarantine and mixed CREATE temp cannot become ordinary source/draft/publication input', () => {
+  const id = 'a'.repeat(16) + ':' + 'b'.repeat(32);
+  const reservedNames = ['phi-delete-' + 'c'.repeat(32) + '.quarantine', 'phi-publish-' + 'd'.repeat(32) + '.tmp'];
+  for (const reserved of reservedNames) for (const path of [reserved, reserved.toUpperCase(), 'nested/' + reserved]) {
     assert.throws(() => publicationBase({ rootIdentity: id, files: { [path]: 'fixture' }, identities: { [path]: id } }), /RESERVED_TRANSACTION_EVIDENCE/u);
   }
   const native = fs.readFileSync(new URL('../platform/windows/native/RecoveryFilesystem.cs', import.meta.url), 'utf8');
   assert.ok(native.includes('phi-(?:delete-[0-9a-f]{32}'));
+  assert.ok(native.includes('publish-[0-9a-f]{32}'));
   const anchored = fs.readFileSync(new URL('../platform/windows/native/AnchoredFile.cs', import.meta.url), 'utf8');
   assert.ok(anchored.includes('phi-(?:delete-[0-9a-f]{32}'));
+  assert.ok(anchored.includes('publish-[0-9a-f]{32}'));
 });
 
 test('DELETE failure metadata cannot claim unstarted conflict after recorded commit or mint a private certificate', () => {

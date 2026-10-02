@@ -102,7 +102,7 @@ test('fresh V5 physical reconstruction preserves a user-created rename destinati
     assert.equal(receipt.evidence.projectMutations, 0);
     assert.equal(receipt.evidence.journalMutations, 0);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
-    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old|user-e/u);
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old|private-user-e-content/u);
     console.log(JSON.stringify({ control: 'MIXED_V5_PARTIAL_USER_DESTINATION_CONFLICT', ...receipt }));
   });
 
@@ -131,4 +131,35 @@ test('fresh V5 reconstruction identifies the exact staged CREATE temp and remain
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
     console.log(JSON.stringify({ control: 'MIXED_V5_STAGED_CREATE_FAIL_CLOSED', ...receipt }));
+  });
+
+for (const [caseName, expectedStatus, expectedFilesystem, expectedCreate] of [
+  ['partial-after-real-modify-create-committed', 'UNKNOWN_FAIL_SAFE', 'PARTIALLY_COMMITTED', 'NEW_COMPLETE_OBSERVED'],
+  ['partial-after-real-modify-create-committed-user-b', 'CONFLICT', 'CONFLICT', 'CONFLICT'],
+]) test(`fresh V5 reconstruction observes real no-clobber CREATE and preserves replacement: ${caseName}`,
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-journal-selftest', caseName], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.actualPublisherKilled, true);
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.scope, 'MIXED_V5_PHYSICAL_MODIFY_CREATE_NOT_MIXED_PUBLICATION');
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(receipt.evidence.status, expectedStatus);
+    assert.equal(receipt.evidence.filesystemState, expectedFilesystem);
+    assert.equal(receipt.evidence.journalPendingOperations, 2);
+    assert.deepEqual(receipt.evidence.operationPhases, ['FINALIZED', 'FINALIZED', 'PREPARED', 'NOT_STARTED']);
+    assert.deepEqual(receipt.evidence.operationPhysicalStates,
+      ['NEW_COMPLETE_OBSERVED', expectedCreate, 'OLD_COMPLETE_OBSERVED', 'OLD_COMPLETE_OBSERVED']);
+    assert.equal(receipt.evidence.projectMutations, 0);
+    assert.equal(receipt.evidence.journalMutations, 0);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old|private-user-b-content/u);
+    console.log(JSON.stringify({ control: 'MIXED_V5_PHYSICAL_MODIFY_CREATE', ...receipt }));
   });
