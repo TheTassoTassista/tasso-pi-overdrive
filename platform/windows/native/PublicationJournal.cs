@@ -2027,6 +2027,110 @@ namespace Phi.Native {
         scope = "NATIVE_JOURNAL_RENAME_NOT_VERIFIED_WORKER_PUBLICATION", txfUsed = false, projectPublished = false, externalRequests = 0 }));
       return passed && clean ? 0 : 70;
     }
+    static Dictionary<string, object> RunNormalPhiStartup(string project, out bool exited, out int exitCode, out string terminalError) {
+      // Fixed native fixture calls the ordinary user-facing CLI. Its cwd is
+      // the owned Git project; no test-only recovery endpoint is substituted.
+      string entry = Path.Combine(Environment.CurrentDirectory, "bin", "phi.mjs");
+      if (!File.Exists(entry)) throw new InvalidDataException();
+      using (Process startup = Process.Start(new ProcessStartInfo { FileName = "node", Arguments = "\"" + entry + "\"",
+        WorkingDirectory = project, UseShellExecute = false, RedirectStandardOutput = true,
+        RedirectStandardError = true, CreateNoWindow = true })) {
+        try {
+          if (!startup.WaitForExit(45000)) throw new InvalidDataException();
+          exited = startup.HasExited; exitCode = startup.ExitCode;
+          string stdout = startup.StandardOutput.ReadToEnd(), stderr = startup.StandardError.ReadToEnd();
+          if (stdout.Length != 0 || stderr.Length > 8192 || exitCode != 1) throw new InvalidDataException();
+          string[] lines = stderr.Replace("\r\n", "\n").Trim().Split('\n');
+          if (lines.Length != 2 || !lines[0].StartsWith("PHI_STARTUP_RECOVERY ", StringComparison.Ordinal)) throw new InvalidDataException();
+          terminalError = lines[1];
+          Dictionary<string, object> receipt = Serializer().Deserialize<Dictionary<string, object>>(lines[0].Substring("PHI_STARTUP_RECOVERY ".Length));
+          if ((int)receipt["version"] != 1 || (string)receipt["scope"] != "PHI_WINDOWS_STARTUP_RECOVERY_ONLY_NOT_PUBLICATION" ||
+              (bool)receipt["projectPublished"] || (int)receipt["externalRequests"] != 0) throw new InvalidDataException();
+          return receipt;
+        } finally { if (!startup.HasExited) { startup.Kill(); startup.WaitForExit(3000); } }
+      }
+    }
+    internal static int StartupRecoverySelfTest(string name) {
+      if (!new string[] { "resume", "conflict", "manual" }.Contains(name)) return 70;
+      ScopeRecovery scope = null; Process publisher = null;
+      string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN", gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
+      bool passed = false, clean = false, gitClean = false, killed = false, childGone = false, firstGone = false, secondGone = false, idempotent = false;
+      int firstExit = -1, secondExit = -1; object firstReceipt = null, secondReceipt = null;
+      string phaseAtDeath = null, gitDiff = null, rootIdEvidence = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root); rootIdEvidence = rootId;
+        string source = Path.Combine(scope.Root, "input.txt"), target = Path.Combine(scope.Root, "renamed.txt"), unrelated = Path.Combine(scope.Root, "unrelated.txt");
+        File.WriteAllText(source, "old-rename-complete", new UTF8Encoding(false));
+        File.WriteAllText(unrelated, "unrelated-rename-user", new UTF8Encoding(false));
+        if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory)) throw new InvalidDataException();
+        FixtureGit(scope.Root, "init -q --separate-git-dir \"" + gitDirectory + "\"");
+        FixtureGit(scope.Root, "add -- input.txt unrelated.txt");
+        FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
+        if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
+        string point = name == "resume" ? "intent" : "renamed";
+        stage = "START_PUBLISHER";
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-rename-fixture-child " + point, UseShellExecute = false, RedirectStandardInput = true,
+          RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx })); publisher.StandardInput.Close();
+        string ready = null; Thread reader = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } }); reader.IsBackground = true; reader.Start();
+        if (!reader.Join(7000) || ready == null || ready.Length > 4096) throw new InvalidDataException();
+        Dictionary<string, object> announcement = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announcement["ready"] || (string)announcement["checkpoint"] != point || (string)announcement["transactionId"] != tx) throw new InvalidDataException();
+        phaseAtDeath = announcement["phase"] as string;
+        stage = "KILL_PUBLISHER"; publisher.Kill(); killed = true;
+        if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException(); childGone = true;
+        if (name == "conflict") File.WriteAllText(source, "new-rename-user", new UTF8Encoding(false));
+        if (name == "manual") File.Move(target, target + ".user-owned");
+        stage = "NORMAL_PHI_STARTUP";
+        string firstError, secondError;
+        Dictionary<string, object> first = RunNormalPhiStartup(scope.Root, out firstGone, out firstExit, out firstError); firstReceipt = first;
+        string expectedStatus = name == "resume" ? "PASS_RECOVERED" : "BLOCKED";
+        string expectedReason = name == "resume" ? "RESUME" : name == "conflict" ? "BLOCKED_CONFLICT" : "BLOCKED_MANUAL_RECOVERY_REQUIRED";
+        if (!firstGone || (string)first["status"] != expectedStatus || (string)first["reason"] != expectedReason ||
+            (string)first["rootIdentity"] != rootId || (string)first["transactionId"] != tx ||
+            (int)first["journalVersion"] != 4 || (int)first["projectMutations"] != (name == "resume" ? 1 : 0) ||
+            (int)first["journalMutations"] != (name == "resume" ? 4 : 0) ||
+            firstError != (name == "resume" ? "PHI_SANDBOX_UNAVAILABLE: native Windows isolation is not yet verified; engine execution is blocked" :
+              "PHI_STARTUP_RECOVERY_BLOCKED")) throw new InvalidDataException();
+        int sequence;
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          if ((string)journal.last["phase"] != (name == "resume" ? "CLEANED" : phaseAtDeath)) throw new InvalidDataException();
+          sequence = (int)journal.last["sequence"];
+        }
+        string firstProject = Serializer().Serialize(Snapshot(scope.Root, rootId));
+        stage = "SECOND_NORMAL_PHI_STARTUP";
+        Dictionary<string, object> second = RunNormalPhiStartup(scope.Root, out secondGone, out secondExit, out secondError); secondReceipt = second;
+        if (!secondGone || (string)second["status"] != (name == "resume" ? "PASS_NO_PENDING" : "BLOCKED") ||
+            (int)second["projectMutations"] != 0 || (int)second["journalMutations"] != 0 ||
+            secondError != (name == "resume" ? "PHI_SANDBOX_UNAVAILABLE: native Windows isolation is not yet verified; engine execution is blocked" :
+              "PHI_STARTUP_RECOVERY_BLOCKED") || Serializer().Serialize(Snapshot(scope.Root, rootId)) != firstProject) throw new InvalidDataException();
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root)) using (RegistryKey root = OpenBase(false)) using (RegistryKey key = root.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          idempotent = (int)journal.last["sequence"] == sequence;
+        }
+        gitDiff = FixtureGit(scope.Root, "diff --name-only --no-renames");
+        if (!idempotent || FixtureGit(scope.Root, "diff --check") != "" || gitDiff != "input.txt" ||
+            File.Exists(source) != (name == "conflict") || File.Exists(target) != (name != "manual") ||
+            name == "conflict" && File.ReadAllText(source) != "new-rename-user" ||
+            name == "manual" && File.ReadAllText(target + ".user-owned") != "old-rename-complete") throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_STARTUP_RECOVERY_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8") + ":firstExit=" + firstExit + ":secondExit=" + secondExit); }
+      finally {
+        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { CleanupFixtureGit(gitDirectory, tx); gitClean = true; } catch { gitClean = false; }
+        try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, passed, fixtureCleanup = clean && gitClean, gitMetadataClean = gitClean,
+        actualProcessKilled = killed, childGone, firstStartupGone = firstGone, secondStartupGone = secondGone,
+        firstExit, secondExit, phaseAtDeath, firstReceipt, secondReceipt, idempotent, gitDiff, rootIdentity = rootIdEvidence,
+        scope = "NORMAL_PHI_WINDOWS_STARTUP_RECOVERY_NOT_AUTONOMY", projectPublished = false, externalRequests = 0 }));
+      return passed && clean && gitClean ? 0 : 70;
+    }
     internal static int RenameControllerRecoverySelfTest(string name) {
       string[] cases = { "rollback", "resume", "resume-journal", "finalize", "cleanup-only", "conflict", "unrelated-change", "source-replaced", "manual", "invalid-locator" };
       if (!cases.Contains(name)) return 70;

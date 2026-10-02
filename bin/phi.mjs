@@ -6,6 +6,7 @@ import { launchEngine, runOwnedEngine } from '../platform/shared/process.mjs';
 import { readPhiConfig, setPhiTheme } from '../lib/phi-config.mjs';
 import { phiDoctor } from '../lib/phi-doctor.mjs';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
+import { runWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
 
 async function main(args) {
   if (args[0] === '--version') { console.log(`Phi ${PRODUCT.version} (Pi ${PRODUCT.piVersion})`); return; }
@@ -42,6 +43,16 @@ async function main(args) {
     if (rest.some((item) => item !== '--compact')) throw new Error('PHI_USAGE: phi splash [--compact] [--theme NAME]');
     process.stdout.write(renderSplash({ theme, compact: rest.includes('--compact') }));
     return;
+  }
+  if (process.platform === 'win32') {
+    let recovery;
+    try { recovery = runWindowsStartupRecovery({ cwd: process.cwd() }); }
+    catch {
+      process.stderr.write('PHI_STARTUP_RECOVERY {"version":1,"scope":"PHI_WINDOWS_STARTUP_RECOVERY_ONLY_NOT_PUBLICATION","status":"UNKNOWN_FAIL_SAFE","reason":"DISCOVERY_OR_RECOVERY_UNCONFIRMED","journalMutations":null,"projectMutations":null,"projectPublished":false,"externalRequests":0}\n');
+      throw new Error('PHI_STARTUP_RECOVERY_UNCONFIRMED');
+    }
+    process.stderr.write(`PHI_STARTUP_RECOVERY ${JSON.stringify(recovery)}\n`);
+    if (recovery.status === 'BLOCKED') throw new Error('PHI_STARTUP_RECOVERY_BLOCKED');
   }
   requireAutonomousBackend();
   const report = await phiDoctor({ probeServices: false });
