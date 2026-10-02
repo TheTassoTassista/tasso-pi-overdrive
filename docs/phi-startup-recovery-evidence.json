@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "scope": "NORMAL_PHI_WINDOWS_STARTUP_BOUNDED_RECOVERY_NOT_D6_OR_AUTONOMY",
+  "status": "PASS_BOUNDED_STARTUP_RECOVERY",
+  "functionalHead": "4043ad36b224515df164a00ee709c207139cc1be",
+  "runId": 37036126519,
+  "runUrl": "https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37036126519",
+  "actualNormalStartupAfterPublisherDeath": [
+    { "case": "resume", "firstStatus": "PASS_RECOVERED", "decision": "RESUME", "phaseBefore": "RENAME_INTENT", "phaseAfter": "CLEANED", "journalMutations": 4, "projectMutations": 1, "secondStatus": "PASS_NO_PENDING", "secondProjectMutations": 0 },
+    { "case": "conflict", "firstStatus": "BLOCKED", "reason": "BLOCKED_CONFLICT", "journalMutations": 0, "projectMutations": 0, "secondStatus": "BLOCKED", "secondProjectMutations": 0 },
+    { "case": "manual", "firstStatus": "BLOCKED", "reason": "BLOCKED_MANUAL_RECOVERY_REQUIRED", "journalMutations": 0, "projectMutations": 0, "secondStatus": "BLOCKED", "secondProjectMutations": 0 }
+  ],
+  "everyCase": { "publisherActuallyKilled": true, "originalPublisherGone": true, "firstNormalPhiStartupExited": true, "secondNormalPhiStartupExited": true, "idempotent": true, "fixtureCleanup": true, "gitMetadataCleanup": true, "projectPublished": false, "externalRequests": 0 },
+  "dedicatedWindowsStartupTests": { "total": 6, "passed": 5, "failed": 0, "skipped": 1 },
+  "aggregate": {
+    "windows": { "total": 451, "passed": 439, "failed": 0, "skipped": 12 },
+    "ubuntu": { "total": 451, "passed": 155, "failed": 0, "skipped": 296 }
+  },
+  "independentWindowsClone": { "status": "PASS_FOUNDATION_ONLY", "tests": { "total": 451, "passed": 439, "failed": 0, "skipped": 12 }, "pinnedLspInstallExitCode": 0, "pinnedLspInstallElapsedMs": 20620, "pinnedLspInstallTimeoutMs": 120000, "cleanup": "PASS", "directoryRemoved": true, "residualOwnedProcesses": 0 },
+  "isolatedPiSmokes": { "required": 3, "passed": 3, "brokerCleanup": "PASS", "externalProviderCalls": 0 },
+  "limitations": [
+    "Normal Windows Phi startup performs bounded private-index discovery and at most one native recovery-only action before the unchanged autonomous-backend gate. It does not restore a publication grant or start the Windows autonomous engine.",
+    "This native startup fixture proves V4 safe RESUME, preserved conflict/manual state, and second-launch idempotence. Existing V2/V3 recovery adapters are wired, but their normal-startup death/restart paths were not separately proved by this fixture.",
+    "Mixed multi-file durable recovery, D-wide production and crash/restart E2Es, and Windows autonomy remain unverified. Owned-scope residual-process evidence is not a whole-runner process census."
+  ]
+}
