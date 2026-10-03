@@ -272,10 +272,19 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
   test(`native recovery ${name}: actual ownership and unrelated-resource preservation`, { skip: process.platform !== 'win32', timeout: 30000 }, () => {
     const result = spawnSync(ownedWindowsHelper(), ['--recovery-selftest', name], { shell: false, encoding: 'utf8', windowsHide: true, timeout: 16000, maxBuffer: 8192 });
     if (['open-sharing-control', 'delete-pending-control', 'pending-directory-control'].includes(name)) for (const failure of validationFailureEvidence('foundation-tests', result).filesystemFailures ?? []) console.log(`PHI_FILESYSTEM_FAILURE:${JSON.stringify(failure)}`);
+    if (name === 'pending-directory-control' && result.status !== 0) console.log('PHI_RECOVERY_PENDING_CONTROL_NATIVE_FAILED');
     assert.equal(result.status, 0, JSON.stringify(validationFailureEvidence('foundation-tests', result)));
-    assert.deepEqual(JSON.parse(result.stdout), { caseName: name, passed: true, fixtureCleanup: true, processKills: 0 });
+    let receipt;
+    try { receipt = JSON.parse(result.stdout); }
+    catch (error) { if (name === 'pending-directory-control') console.log('PHI_RECOVERY_PENDING_CONTROL_RECEIPT_INVALID'); throw error; }
+    if (name === 'pending-directory-control' &&
+        (receipt?.caseName !== name || receipt.passed !== true || receipt.fixtureCleanup !== true || receipt.processKills !== 0))
+      console.log('PHI_RECOVERY_PENDING_CONTROL_RECEIPT_INVALID');
+    assert.deepEqual(receipt, { caseName: name, passed: true, fixtureCleanup: true, processKills: 0 });
     if (name === 'pending-directory-control') {
       const [failure] = validationFailureEvidence('foundation-tests', result).filesystemFailures ?? [];
+      if (failure?.operation !== 'DISPOSITION' || failure?.nativeError !== 145 || failure?.access !== '00010000')
+        console.log('PHI_RECOVERY_PENDING_CONTROL_NATIVE_DIAGNOSTIC_INVALID');
       assert.equal(failure?.operation, 'DISPOSITION'); assert.equal(failure?.nativeError, 145); assert.equal(failure?.access, '00010000');
     }
     if (name === 'open-sharing-control' || name === 'delete-pending-control') {
@@ -286,7 +295,11 @@ for (const name of ['clean', 'pid-reuse', 'corrupt', 'unknown-field', 'oversized
       assert.equal(failure?.nativeStatus, name === 'open-sharing-control' ? 'c0000043' : 'c0000056');
       assert.equal(failure?.nativeError, name === 'open-sharing-control' ? 32 : 5);
     }
-    assert.equal(recover().quarantined, 0);
+    let after;
+    try { after = recover(); }
+    catch (error) { if (name === 'pending-directory-control') console.log('PHI_RECOVERY_PENDING_CONTROL_STATUS_FAILED'); throw error; }
+    if (name === 'pending-directory-control' && after.quarantined !== 0) console.log('PHI_RECOVERY_PENDING_CONTROL_RESIDUAL_QUARANTINE');
+    assert.equal(after.quarantined, 0);
   });
 }
 test('cleanup acquisition retries only proven native sharing/delete-pending statuses within its original budget', () => {

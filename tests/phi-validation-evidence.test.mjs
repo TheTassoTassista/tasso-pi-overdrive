@@ -52,6 +52,13 @@ test('clone timeout failure stage survives redaction as a fixed code only', () =
   assert.doesNotMatch(JSON.stringify(row), /private-path/u);
   assert.deepEqual(validationFailureEvidence('foundation-tests', { stdout: '# PHI_CLONE_TIMEOUT_PRIVATE' }).diagnosticCodes, []);
 });
+test('sequential recovery control failure retains only fixed diagnostic stages', () => {
+  const row = validationFailureEvidence('foundation-tests', { status: 1, stdout:
+    '# PHI_RECOVERY_PENDING_CONTROL_NATIVE_DIAGNOSTIC_INVALID private-path\nnot ok 1 - private-case\n# tests 13\n# pass 12\n# fail 1' });
+  assert.deepEqual(row.diagnosticCodes, ['PHI_RECOVERY_PENDING_CONTROL_NATIVE_DIAGNOSTIC_INVALID']);
+  assert.deepEqual(row.failedTestNumbers, [1]);
+  assert.doesNotMatch(JSON.stringify(row), /private-path|private-case/u);
+});
 test('failure metadata fails closed for unknown stages and records timeout without private errors', () => {
   const evidence = validationFailureEvidence('user-private-stage', { status: null, error: { code: 'ETIMEDOUT', message: 'private' } });
   assert.equal(evidence.failureStage, 'UNKNOWN'); assert.equal(evidence.exitCode, null); assert.equal(evidence.timedOut, true);
