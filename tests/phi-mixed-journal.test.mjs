@@ -40,6 +40,7 @@ test('production native V5 endpoint physically applies all four operations and r
     assert.equal(receipt.publisherGone, true);
     assert.equal(receipt.readerNoMutation, true);
     assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.gitMetadataClean, true);
     assert.equal(receipt.projectPublished, false);
     assert.equal(receipt.externalRequests, 0);
     assert.equal(receipt.evidence.phase, 'CLEANED');

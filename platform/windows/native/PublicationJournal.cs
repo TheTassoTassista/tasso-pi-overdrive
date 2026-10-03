@@ -1779,27 +1779,10 @@ namespace Phi.Native {
         } }
       };
     }
-    static string MixedFixtureGit(string project, string arguments) {
-      // Fixed fixture arguments only; never a production publication command.
-      if (!new string[] { "init -q", "add -- a.txt c.txt d.txt",
-          "-c user.name=PhiFixture -c user.email=fixture@example.invalid commit -q -m baseline",
-          "status --porcelain -uall", "diff --check" }.Contains(arguments)) throw new InvalidDataException();
-      using (Process child = Process.Start(new ProcessStartInfo { FileName = "git", Arguments = arguments,
-        WorkingDirectory = project, UseShellExecute = false, RedirectStandardOutput = true,
-        RedirectStandardError = true, CreateNoWindow = true })) {
-        string output = null, errors = null;
-        Thread stdout = new Thread(delegate() { try { output = child.StandardOutput.ReadToEnd(); } catch { } });
-        Thread stderr = new Thread(delegate() { try { errors = child.StandardError.ReadToEnd(); } catch { } });
-        stdout.IsBackground = true; stderr.IsBackground = true; stdout.Start(); stderr.Start();
-        if (!child.WaitForExit(10000)) { child.Kill(); child.WaitForExit(3000); throw new InvalidDataException(); }
-        if (!stdout.Join(2000) || !stderr.Join(2000) || child.ExitCode != 0 || output == null || output.Length > 16384 ||
-            errors == null || errors.Length > 16384) throw new InvalidDataException();
-        return output;
-      }
-    }
     internal static int MixedPhysicalSuccessSelfTest() {
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
-      bool passed = false, clean = false, publisherGone = false, readerNoMutation = false;
+      string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
+      bool passed = false, clean = false, gitClean = false, publisherGone = false, readerNoMutation = false;
       object evidence = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
@@ -1807,10 +1790,11 @@ namespace Phi.Native {
         File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(scope.Root, "d.txt"), "d-old", new UTF8Encoding(false));
         stage = "GIT_BASELINE";
-        MixedFixtureGit(scope.Root, "init -q");
-        MixedFixtureGit(scope.Root, "add -- a.txt c.txt d.txt");
-        MixedFixtureGit(scope.Root, "-c user.name=PhiFixture -c user.email=fixture@example.invalid commit -q -m baseline");
-        if (MixedFixtureGit(scope.Root, "status --porcelain -uall").Trim().Length != 0) throw new InvalidDataException();
+        if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory)) throw new InvalidDataException();
+        FixtureGit(scope.Root, "init -q --separate-git-dir \"" + gitDirectory + "\"");
+        FixtureGit(scope.Root, "add -- a.txt c.txt d.txt");
+        FixtureGit(scope.Root, "-c user.name=PhiFixture -c user.email=fixture@example.invalid commit -q -m baseline");
+        if (FixtureGit(scope.Root, "status --porcelain -uall") != "") throw new InvalidDataException();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
         Dictionary<string, object> original = Snapshot(scope.Root, rootId);
         Dictionary<string, object> oldIdentities = (Dictionary<string, object>)original["identities"];
@@ -1843,15 +1827,11 @@ namespace Phi.Native {
             File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx))) || File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp")))
           throw new InvalidDataException();
         stage = "GIT_DIFF";
-        Dictionary<string, string> changed = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in MixedFixtureGit(scope.Root, "status --porcelain -uall").Split('\n')) {
-          string item = line.TrimEnd('\r'); if (item.Length == 0) continue;
-          if (item.Length < 4 || changed.ContainsKey(item.Substring(3))) throw new InvalidDataException();
-          changed.Add(item.Substring(3), item.Substring(0, 2));
-        }
-        if (changed.Count != 5 || changed["a.txt"] != " M" || changed["b.txt"] != "??" || changed["c.txt"] != " D" ||
-            changed["d.txt"] != " D" || changed["e.txt"] != "??") throw new InvalidDataException();
-        MixedFixtureGit(scope.Root, "diff --check");
+        string trackedDiff = FixtureGit(scope.Root, "diff --name-status --no-renames");
+        string newFiles = FixtureGit(scope.Root, "ls-files --others --exclude-standard");
+        if (!trackedDiff.Split('\n').SequenceEqual(new string[] { "M\ta.txt", "D\tc.txt", "D\td.txt" }) ||
+            !newFiles.Split('\n').SequenceEqual(new string[] { "b.txt", "e.txt" })) throw new InvalidDataException();
+        if (FixtureGit(scope.Root, "diff --check") != "") throw new InvalidDataException();
         stage = "FRESH_INSPECT";
         string before = Serializer().Serialize(final);
         Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(
@@ -1876,13 +1856,15 @@ namespace Phi.Native {
       } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_PHYSICAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
       finally {
         if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { CleanupFixtureGit(gitDirectory, tx); gitClean = true; } catch { gitClean = false; }
         try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
           if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
       Console.WriteLine(Serializer().Serialize(new { passed, scope = "V5_NATIVE_MIXED_NO_CRASH_PHYSICAL_ONLY", publisherGone,
-        readerNoMutation, fixtureCleanup = clean, evidence, projectPublished = false, externalRequests = 0 }));
-      return passed && clean && publisherGone ? 0 : 70;
+        readerNoMutation, fixtureCleanup = clean && gitClean, gitMetadataClean = gitClean, evidence,
+        projectPublished = false, externalRequests = 0 }));
+      return passed && clean && gitClean && publisherGone ? 0 : 70;
     }
     static string MixedCrashCheckpoint(string name) {
       if (name == "before-first") return "before-first";
