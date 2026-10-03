@@ -319,7 +319,10 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
 // Same opaque trusted-controller grant, journal, source-attested helper and
 // one-use private certificate. No extra role/model execution authority.
 export function publishWindowsSingleOperation(options) {
-  if (options?.metadata?.operations?.length === 4) return publishWindowsMixed(options);
+  // V5 has a native no-crash path, but its restart/recovery authority is not
+  // certified. Keep the live one-use controller grant fail-closed until D6's
+  // death matrix and normal-phi recovery are actually proven.
+  if (options?.metadata?.operations?.length === 4) fail('MIXED_RECOVERY_NOT_READY');
   if (options?.metadata?.operations?.length !== 1) fail('MIXED_NOT_IMPLEMENTED');
   if (options?.metadata?.operations?.length === 1 && options.metadata.operations[0].kind === 'RENAME') return publishWindowsSingleRename(options);
   const operations = publicationOperations(options.base, options.snapshot);

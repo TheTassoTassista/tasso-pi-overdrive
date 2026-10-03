@@ -55,6 +55,32 @@ test('production native V5 endpoint physically applies all four operations and r
     console.log(JSON.stringify({ control: 'V5_NATIVE_MIXED_NO_CRASH_PHYSICAL_ONLY', ...receipt }));
   });
 
+for (const caseName of [
+  'before-first', 'after-modify', 'after-create', 'after-delete',
+  'after-rename-moved', 'after-all-mutations', 'after-cleanup-intent', 'after-cleanup-unlinked',
+]) test(`V5 physical publisher death is reconstructed by a fresh read-only process: ${caseName}`,
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-crash-selftest', caseName], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.caseName, caseName);
+    assert.equal(receipt.scope, 'V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY');
+    assert.equal(receipt.actualPublisherKilled, true);
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.evidence.journalMutationsByReader, 0);
+    assert.equal(receipt.evidence.projectMutationsByReader, 0);
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
+    console.log(JSON.stringify({ control: 'V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY', ...receipt }));
+  });
+
 test('real publisher death retains a four-operation V5 journal for a fresh process without mutating project',
   { skip: process.platform !== 'win32', timeout: 45000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-journal-selftest', 'partial-after-modify-journal-only'], {

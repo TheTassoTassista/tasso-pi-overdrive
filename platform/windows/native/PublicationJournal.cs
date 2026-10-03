@@ -1850,6 +1850,117 @@ namespace Phi.Native {
         readerNoMutation, fixtureCleanup = clean, evidence, projectPublished = false, externalRequests = 0 }));
       return passed && clean && publisherGone ? 0 : 70;
     }
+    static string MixedCrashCheckpoint(string name) {
+      if (name == "before-first") return "before-first";
+      if (name == "after-modify") return "modify-cleanup";
+      if (name == "after-create") return "create-finalized";
+      if (name == "after-delete") return "delete-finalized-retained";
+      if (name == "after-rename-moved") return "rename-moved";
+      if (name == "after-all-mutations") return "rename-finalized";
+      if (name == "after-cleanup-intent") return "cleanup-intent";
+      if (name == "after-cleanup-unlinked") return "cleanup-unlinked";
+      throw new InvalidDataException();
+    }
+    internal static int MixedPhysicalCrashChild(string name) {
+      try {
+        string stop = MixedCrashCheckpoint(name);
+        Dictionary<string, object> request = FixtureRequest();
+        string project = Path.Combine(ScopeRecovery.RootBase, (string)request["scopeId"]), tx = (string)request["transactionId"];
+        if (RecoveryFilesystem.DirectoryIdentity(project) != (string)request["rootIdentity"]) throw new InvalidDataException();
+        using (PublicationJournal journal = Begin(project, MixedFixtureHeader(project, tx))) {
+          Action<string> checkpoint = delegate(string observed) {
+            if (observed != stop) return;
+            Console.WriteLine(Serializer().Serialize(new { ready = true, phase = journal.last["phase"], transactionId = tx }));
+            Console.Out.Flush(); Thread.Sleep(12000);
+          };
+          if (stop == "before-first") checkpoint(stop);
+          journal.PublishMixed(Encoding.UTF8.GetBytes("a-new"), Encoding.UTF8.GetBytes("b-new"), checkpoint);
+          throw new InvalidDataException(); // The parent must kill at the selected boundary.
+        }
+      } catch { Console.Error.WriteLine("PHI_MIXED_CRASH_CHILD_FAILED"); return 70; }
+    }
+    internal static int MixedPhysicalCrashSelfTest(string name) {
+      string stop;
+      try { stop = MixedCrashCheckpoint(name); } catch { return 70; }
+      ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
+      bool passed = false, clean = false, killed = false, publisherGone = false, readerGone = false;
+      object evidence = null;
+      try {
+        scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
+        File.WriteAllText(Path.Combine(scope.Root, "a.txt"), "a-old", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(scope.Root, "d.txt"), "d-old", new UTF8Encoding(false));
+        string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
+        stage = "PUBLISHER";
+        publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-mixed-physical-crash-child " + name, UseShellExecute = false,
+          RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        publisher.StandardInput.WriteLine(input); publisher.StandardInput.Close();
+        string ready = null;
+        Thread readyPipe = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } });
+        readyPipe.IsBackground = true; readyPipe.Start();
+        if (!readyPipe.Join(7000) || ready == null || ready.Length > 1024) throw new InvalidDataException();
+        Dictionary<string, object> announced = Serializer().Deserialize<Dictionary<string, object>>(ready);
+        if (!(bool)announced["ready"] || (string)announced["transactionId"] != tx) throw new InvalidDataException();
+        stage = "KILL"; publisher.Kill(); killed = true;
+        if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException();
+        publisherGone = true;
+        stage = "FRESH_READER";
+        using (Process reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
+          Arguments = "--publication-mixed-journal-fixture-read", UseShellExecute = false,
+          RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+          reader.StandardInput.WriteLine(input); reader.StandardInput.Close();
+          string output = null, errors = null;
+          Thread stdout = new Thread(delegate() { try { output = reader.StandardOutput.ReadToEnd(); } catch { } });
+          Thread stderr = new Thread(delegate() { try { errors = reader.StandardError.ReadToEnd(); } catch { } });
+          stdout.IsBackground = true; stderr.IsBackground = true; stdout.Start(); stderr.Start();
+          if (!reader.WaitForExit(7000)) { reader.Kill(); reader.WaitForExit(3000); throw new InvalidDataException(); }
+          if (!stdout.Join(2000) || !stderr.Join(2000) || reader.ExitCode != 0 || output == null || output.Length > 8192)
+            throw new InvalidDataException();
+          readerGone = reader.HasExited;
+          Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(output);
+          Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
+          IList operations = observed["operationEvidence"] as IList;
+          IList states = metadata["operationStates"] as IList;
+          int committed = name == "before-first" ? 0 : name == "after-modify" ? 1 : name == "after-create" ? 2 :
+            name == "after-delete" ? 3 : 4;
+          string[] expectedPhysical = Enumerable.Range(0, 4).Select(index => index < committed ? "NEW_COMPLETE_OBSERVED" : "OLD_COMPLETE_OBSERVED").ToArray();
+          string expectedFilesystem = committed == 0 ? "NONE_COMMITTED" : committed == 4 ? "ALL_MUTATIONS_COMMITTED" : "PARTIALLY_COMMITTED";
+          if ((string)observed["status"] != "UNKNOWN_FAIL_SAFE" || (string)observed["filesystemState"] != expectedFilesystem ||
+              (int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"] ||
+              operations == null || operations.Count != 4 || states == null || states.Count != 4 ||
+              !operations.Cast<object>().Select(item => (string)((Dictionary<string, object>)item)["physicalState"]).SequenceEqual(expectedPhysical))
+            throw new InvalidDataException();
+          evidence = new { durablePhase = metadata["phase"], journalState = metadata["journalState"], filesystemState = observed["filesystemState"],
+            operationPhysicalStates = expectedPhysical, journalMutationsByReader = observed["journalMutations"], projectMutationsByReader = observed["projectMutations"] };
+        }
+        stage = "PHYSICAL";
+        bool quarantine = File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx)));
+        bool temp = File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp"));
+        if (temp || quarantine != (MixedDeleteCommitted(name) && name != "after-cleanup-unlinked") ||
+            File.ReadAllText(Path.Combine(scope.Root, "a.txt")) != (name == "before-first" ? "a-old" : "a-new") ||
+            File.Exists(Path.Combine(scope.Root, "b.txt")) != (name != "before-first" && name != "after-modify") ||
+            File.Exists(Path.Combine(scope.Root, "c.txt")) == MixedDeleteCommitted(name) ||
+            File.Exists(Path.Combine(scope.Root, "e.txt")) != (name == "after-rename-moved" || name == "after-all-mutations" ||
+              name == "after-cleanup-intent" || name == "after-cleanup-unlinked")) throw new InvalidDataException();
+        passed = true;
+      } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+      finally {
+        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
+          if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
+        } catch { clean = false; if (scope != null) scope.Dispose(); }
+      }
+      Console.WriteLine(Serializer().Serialize(new { caseName = name, checkpoint = stop, passed, actualPublisherKilled = killed,
+        publisherGone, freshReaderGone = readerGone, fixtureCleanup = clean, evidence,
+        scope = "V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY", projectPublished = false, externalRequests = 0 }));
+      return passed && clean && publisherGone && readerGone ? 0 : 70;
+    }
+    static bool MixedDeleteCommitted(string name) {
+      return name == "after-delete" || name == "after-rename-moved" || name == "after-all-mutations" ||
+        name == "after-cleanup-intent" || name == "after-cleanup-unlinked";
+    }
     internal static int MixedJournalFixtureChild(string name) {
       if (name != "partial-after-modify-journal-only" && name != "partial-after-real-modify" &&
           name != "partial-after-real-modify-user-e" && name != "partial-after-real-modify-create-staged" &&
