@@ -1,7 +1,9 @@
-import { discoverWindowsTransactions, recoverKnownWindowsModify, recoverKnownWindowsDelete, recoverKnownWindowsRename } from './publication.mjs';
+import { discoverWindowsTransactions, recoverKnownWindowsModify, recoverKnownWindowsDelete, recoverKnownWindowsRename,
+  recoverKnownWindowsMixedObservation } from './publication.mjs';
 
 const terminal = new Set(['CLEANED', 'ROLLED_BACK']);
-const recover = Object.freeze({ 2: recoverKnownWindowsModify, 3: recoverKnownWindowsDelete, 4: recoverKnownWindowsRename });
+const recover = Object.freeze({ 2: recoverKnownWindowsModify, 3: recoverKnownWindowsDelete, 4: recoverKnownWindowsRename,
+  5: recoverKnownWindowsMixedObservation });
 const fail = () => { throw new Error('PHI_STARTUP_RECOVERY_UNCONFIRMED'); };
 
 // Selection is advisory only. The native known-transaction endpoint must
@@ -19,6 +21,8 @@ export function planWindowsStartupRecovery(inventory) {
   if (pending.length !== 1) return Object.freeze({ kind: 'BLOCKED_MULTIPLE_PENDING', entry: null });
   const entry = pending[0];
   if (entry.classification !== 'RECOVERY_REQUIRED') return Object.freeze({ kind: 'BLOCKED_' + entry.classification, entry });
+  if (entry.journalVersion === 5 && entry.phase !== 'CLEANUP_STARTED')
+    return Object.freeze({ kind: 'BLOCKED_V5_INELIGIBLE_PHASE', entry });
   if (!Object.hasOwn(recover, entry.journalVersion)) return Object.freeze({ kind: 'BLOCKED_UNSUPPORTED_VERSION', entry });
   return Object.freeze({ kind: 'RECOVER', entry });
 }
@@ -53,7 +57,7 @@ export function runWindowsStartupRecovery({ cwd }) {
   const updated = after.entries.find(item => item.transactionId === entry.transactionId);
   if (!updated || updated.journalVersion !== entry.journalVersion || updated.phase !== action.phaseAfter) fail();
   const cleared = planWindowsStartupRecovery(after).kind === 'NO_PENDING';
-  const successful = ['ROLLBACK', 'RESUME', 'FINALIZE_COMMIT', 'CLEANUP_ONLY'].includes(action.decision) &&
+  const successful = ['ROLLBACK', 'RESUME', 'FINALIZE_COMMIT', 'CLEANUP_ONLY', 'RECORD_TERMINAL_OBSERVATION'].includes(action.decision) &&
     terminal.has(action.phaseAfter) && cleared;
   return receipt(after, successful ? 'PASS_RECOVERED' : 'BLOCKED', successful ? action.decision : action.decision === 'CONFLICT' ||
     action.decision === 'MANUAL_RECOVERY_REQUIRED' ? action.decision : 'PENDING_AFTER_RECOVERY', entry, action);

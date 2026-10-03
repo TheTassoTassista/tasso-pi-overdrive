@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { planWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
 
-test('V5 mixed journal reconstructs per-operation physical evidence without enabling publication or recovery', () => {
+test('V5 mixed journal reconstructs per-operation physical evidence without enabling publication', () => {
   const source = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
   assert.match(source, /version == 5/u);
   assert.match(source, /operationPhases = Enumerable\.Repeat\("NOT_STARTED"/u);
@@ -60,7 +60,8 @@ test('production native V5 endpoint physically applies all four operations and r
 for (const caseName of [
   'before-first', 'after-modify', 'after-create', 'after-delete',
   'after-rename-moved', 'after-all-mutations', 'after-cleanup-intent', 'after-cleanup-unlinked',
-]) test(`V5 publisher death blocks ordinary Phi startup without mutation: ${caseName}`,
+  'race-after-observation', 'quarantine-returned', 'corrupt-journal', 'concurrent-terminal',
+]) test(`V5 publisher death gives bounded ordinary Phi startup disposition: ${caseName}`,
   { skip: process.platform !== 'win32', timeout: 120000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-crash-selftest', caseName], {
       shell: false, windowsHide: true, encoding: 'utf8', timeout: 105000, maxBuffer: 8192,
@@ -69,7 +70,7 @@ for (const caseName of [
     const receipt = JSON.parse(run.stdout);
     assert.equal(receipt.passed, true);
     assert.equal(receipt.caseName, caseName);
-    assert.equal(receipt.scope, 'V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY');
+    assert.equal(receipt.scope, 'V5_PHYSICAL_DEATH_FRESH_READER_TERMINAL_OBSERVATION_ONLY');
     assert.equal(receipt.actualPublisherKilled, true);
     assert.equal(receipt.publisherGone, true);
     assert.equal(receipt.freshReaderGone, true);
@@ -77,7 +78,17 @@ for (const caseName of [
     assert.equal(receipt.secondStartupGone, true);
     assert.equal(receipt.firstStartupExit, 1);
     assert.equal(receipt.secondStartupExit, 1);
-    assert.equal(receipt.normalPhiStartupsBlocked, true);
+    assert.equal(receipt.normalPhiStartupsBlocked, !['after-cleanup-unlinked', 'concurrent-terminal'].includes(caseName));
+    if (caseName === 'after-cleanup-unlinked') {
+      assert.equal(receipt.liveOwnerDenied, true);
+      assert.equal(receipt.duplicateTerminalDenied, true);
+    }
+    if (caseName === 'race-after-observation') {
+      assert.equal(receipt.externalChangedAfterObservation, true);
+      assert.equal(receipt.laterClassificationSawChange, true);
+    }
+    if (caseName === 'corrupt-journal') assert.equal(receipt.corruptJournalRejected, true);
+    if (caseName === 'concurrent-terminal') assert.equal(receipt.concurrentSingleTerminal, true);
     assert.equal(receipt.startupIdempotent, true);
     assert.equal(receipt.gitMetadataClean, true);
     assert.equal(receipt.fixtureCleanup, true);

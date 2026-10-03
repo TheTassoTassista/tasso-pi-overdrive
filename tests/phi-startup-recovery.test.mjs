@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { planWindowsStartupRecovery, runWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
+import { validateWindowsKnownMixedObservation } from '../platform/windows/publication.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 
 const id = 'a'.repeat(32);
@@ -23,12 +24,29 @@ test('startup selection ignores only terminal journals and never treats an advis
   assert.equal(planWindowsStartupRecovery(inventory(entry('COMMIT_STARTED', 'RECOVERY_REQUIRED', 2))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'RECOVERY_REQUIRED', 1))).kind, 'BLOCKED_UNSUPPORTED_VERSION');
   assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'MANUAL_RECOVERY_REQUIRED', 5))).kind, 'BLOCKED_MANUAL_RECOVERY_REQUIRED');
+  assert.equal(planWindowsStartupRecovery(inventory(entry('CLEANUP_STARTED', 'RECOVERY_REQUIRED', 5))).kind, 'RECOVER');
+  assert.equal(planWindowsStartupRecovery(inventory(entry('FINALIZED', 'RECOVERY_REQUIRED', 5))).kind, 'BLOCKED_V5_INELIGIBLE_PHASE');
   assert.equal(planWindowsStartupRecovery(inventory(entry('UNKNOWN_ACTIVE', 'ACTIVE_UNVERIFIED'))).kind, 'BLOCKED_ACTIVE_UNVERIFIED');
   assert.equal(planWindowsStartupRecovery(inventory(entry('RENAME_INTENT', 'CONFLICT'))).kind, 'BLOCKED_CONFLICT');
   assert.equal(planWindowsStartupRecovery(inventory(entry('RENAME_INTENT'), { ...entry('DELETE_INTENT'), transactionId: 'b'.repeat(32) })).kind,
     'BLOCKED_MULTIPLE_PENDING');
   assert.throws(() => planWindowsStartupRecovery({ ...inventory(), projectTransactions: 1 }), /RECOVERY_UNCONFIRMED/u);
   assert.throws(() => planWindowsStartupRecovery({ ...inventory(), projectPublished: true }), /RECOVERY_UNCONFIRMED/u);
+});
+
+test('V5 recovery receipt certifies an observation without cleanup provenance or publication authority', () => {
+  const run = { status: 0, pid: 1, signal: null };
+  const value = { version: 1, status: 'PASS_BOUNDED_MIXED_TERMINAL_OBSERVATION', transactionId: id,
+    rootIdentity: 'a'.repeat(16) + ':' + id, rootIdentityVerified: true, observedStatus: 'NEW_COMPLETE_OBSERVED',
+    decision: 'RECORD_TERMINAL_OBSERVATION', phaseBefore: 'CLEANUP_STARTED', phaseAfter: 'CLEANED',
+    terminalObservation: 'RECOVERY_NATIVE_TERMINAL_OBSERVED', quarantineAbsent: true, verifiedDraftDigestMatched: true,
+    cleanup: 'NOT_PROVEN', actionPerformed: true, journalMutations: 1, projectMutations: 0, processKills: 0,
+    projectPublished: false, externalRequests: 0 };
+  assert.equal(validateWindowsKnownMixedObservation(run, value, id).projectPublished, false);
+  for (const changed of [{ cleanup: 'PASS' }, { projectPublished: true }, { terminalObservation: null },
+    { journalMutations: 2 }, { projectMutations: 1 }, { phaseBefore: 'FINALIZED' }, { quarantineAbsent: false }])
+    assert.throws(() => validateWindowsKnownMixedObservation(run, { ...value, ...changed }, id), /RECOVERY_UNCONFIRMED/u);
+  assert.equal(planWindowsStartupRecovery(inventory(entry('CLEANED', 'CONFLICT', 5))).kind, 'BLOCKED_CONFLICT');
 });
 
 test('ordinary Phi launch invokes recovery before unchanged autonomous-backend gate, not help/doctor/splash', () => {

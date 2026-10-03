@@ -250,6 +250,35 @@ export function recoverKnownWindowsDelete({ cwd, transactionId }) {
   return validateWindowsKnownDeleteRecovery(run, value, transactionId);
 }
 
+const mixedObservationKeys = ['version', 'status', 'transactionId', 'rootIdentity', 'rootIdentityVerified', 'observedStatus',
+  'decision', 'phaseBefore', 'phaseAfter', 'terminalObservation', 'quarantineAbsent', 'verifiedDraftDigestMatched',
+  'cleanup', 'actionPerformed', 'journalMutations', 'projectMutations', 'processKills', 'projectPublished', 'externalRequests'];
+export function validateWindowsKnownMixedObservation(run, value, transactionId) {
+  if (run?.error || run?.status !== 0 || run?.signal || !Number.isSafeInteger(run?.pid) || run.pid < 1 ||
+      !exactKeys(value, mixedObservationKeys) || value.version !== 1 || value.status !== 'PASS_BOUNDED_MIXED_TERMINAL_OBSERVATION' ||
+      value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
+      value.rootIdentityVerified !== true || value.observedStatus !== 'NEW_COMPLETE_OBSERVED' ||
+      value.decision !== 'RECORD_TERMINAL_OBSERVATION' || value.phaseBefore !== 'CLEANUP_STARTED' || value.phaseAfter !== 'CLEANED' ||
+      value.terminalObservation !== 'RECOVERY_NATIVE_TERMINAL_OBSERVED' || value.quarantineAbsent !== true ||
+      value.verifiedDraftDigestMatched !== true || value.cleanup !== 'NOT_PROVEN' || value.actionPerformed !== true ||
+      value.journalMutations !== 1 || value.projectMutations !== 0 || value.processKills !== 0 ||
+      value.projectPublished !== false || value.externalRequests !== 0) fail('RECOVERY_UNCONFIRMED');
+  return freeze({ ...value });
+}
+
+// Startup only. The helper re-reads the journal and the physical V5 state
+// while holding the transaction lease. This bridge cannot request cleanup.
+export function recoverKnownWindowsMixedObservation({ cwd, transactionId }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  if (typeof cwd !== 'string' || cwd.length > 1024 || cwd.includes('\0') || !/^[0-9a-f]{32}$/u.test(transactionId ?? '')) fail('RECOVERY_REQUEST_INVALID');
+  const root = fs.realpathSync(cwd), stat = fs.lstatSync(cwd);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('RECOVERY_REQUEST_INVALID');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-recover-known'], { shell: false, windowsHide: true, encoding: 'utf8',
+    input: JSON.stringify({ version: 1, root, transactionId, guardianPid: process.pid, timeoutMs: 10000 }) + '\n', timeout: 11000, maxBuffer: 8192 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('RECOVERY_UNCONFIRMED'); }
+  return validateWindowsKnownMixedObservation(run, value, transactionId);
+}
+
 // Pure bounded failure decoder, not an execution endpoint or publication proof.
 // Production calls it ONLY with the result of the fixed attested native spawn.
 // Tests may decode metadata, but no Error/JSON can mint the private certificate.

@@ -27,6 +27,7 @@ namespace Phi.Native {
     static readonly Regex Id = new Regex("\\A[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Identity = new Regex("\\A[0-9a-f]{16}:[0-9a-f]{32}\\z", RegexOptions.CultureInvariant);
     static readonly Regex Digest = new Regex("\\A[0-9a-f]{64}\\z", RegexOptions.CultureInvariant);
+    const string RecoveryTerminalObservation = "RECOVERY_NATIVE_TERMINAL_OBSERVED";
     [DllImport("advapi32.dll")] static extern int RegFlushKey(IntPtr key);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)] static extern int RegDeleteKeyW(IntPtr key, string name);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegQueryValueExW(IntPtr key, string name, IntPtr reserved, out uint type, byte[] bytes, ref uint size);
@@ -361,7 +362,7 @@ namespace Phi.Native {
         return result;
       } catch { result.Dispose(); throw; } // incomplete/unknown key retained, never guessed away
     }
-    void Append(RegistryKey key, string phase, int operationIndex, string tempIdentity, string committedIdentity, bool nativeObservation = false) {
+    void Append(RegistryKey key, string phase, int operationIndex, string tempIdentity, string committedIdentity, bool nativeObservation = false, string terminalObservation = null) {
       if (poisoned || disposed || !acquired) throw new InvalidDataException();
       int sequence = last == null ? 0 : (int)last["sequence"] + 1;
       if (sequence >= MaxEvents || !Phases.Contains(phase) || operationIndex < 0 || operationIndex >= Operations(header).Count ||
@@ -376,6 +377,11 @@ namespace Phi.Native {
         { "sequence", sequence }, { "previousDigest", lastDigest ?? new string('0', 64) }, { "phase", phase }, { "operationIndex", operationIndex },
         { "tempIdentity", tempIdentity }, { "committedIdentity", committedIdentity }, { "header", sequence == 0 ? header : null }
       };
+      if (terminalObservation != null) {
+        if ((int)header["version"] != 5 || phase != "CLEANED" || operationIndex != 3 ||
+            terminalObservation != RecoveryTerminalObservation || !nativeObservation) throw new InvalidDataException();
+        body.Add("terminalObservation", terminalObservation);
+      }
       if ((int)header["version"] == 5) {
         string[] phases = mixedPhases ?? Enumerable.Repeat("NOT_STARTED", Operations(header).Count).ToArray();
         ValidateMixedEvent(header, body, phases, mixedTempIdentities ?? new string[phases.Length], mixedCommittedIdentities ?? new string[phases.Length]);
@@ -424,14 +430,14 @@ namespace Phi.Native {
       }
     }
     // V5 operations use the same native mutation primitives as their single-
-    // operation counterparts. Only this publisher may append observations;
-    // the fixture and any future controller endpoint cannot supply a phase.
-    void ObserveMixed(int index, string phase, string tempIdentity, string committedIdentity) {
+    // operation counterparts. The publisher records its phases; the bounded
+    // known-transaction recovery path may record only a terminal observation.
+    void ObserveMixed(int index, string phase, string tempIdentity, string committedIdentity, string terminalObservation = null) {
       if ((int)header["version"] != 5 || index < 0 || index >= Operations(header).Count) throw new InvalidDataException();
       using (RegistryKey root = OpenBase(true)) using (RegistryKey key = root.OpenSubKey(id, true)) {
         if (key == null) throw new InvalidDataException();
         ReadChain(key);
-        Append(key, phase, index, tempIdentity, committedIdentity, true);
+        Append(key, phase, index, tempIdentity, committedIdentity, true, terminalObservation);
       }
     }
     void PublishMixedModify(byte[] bytes, Action<string> checkpoint) {
@@ -981,7 +987,9 @@ namespace Phi.Native {
       for (int i = 0; i < names.Length; i++) {
         if (names[i] != "E" + i.ToString("D8")) throw new InvalidDataException();
         byte[] bytes = ReadValue(key, names[i]); Dictionary<string, object> body = Decode(bytes);
-        Keys(body, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header");
+        if (body.ContainsKey("terminalObservation"))
+          Keys(body, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header", "terminalObservation");
+        else Keys(body, "sequence", "previousDigest", "phase", "operationIndex", "tempIdentity", "committedIdentity", "header");
         if (Number(body, "sequence", 0, MaxEvents - 1) != i || StringField(body, "previousDigest", Digest) != previous || !(body["phase"] is string) || !Phases.Contains((string)body["phase"])) throw new InvalidDataException();
         if (i == 0) {
           original = body["header"] as Dictionary<string, object>; ValidateHeader(original, id);
@@ -992,6 +1000,9 @@ namespace Phi.Native {
           }
         }
         else if (body["header"] != null || !Transition((string)prior["phase"], (string)body["phase"], (int)prior["operationIndex"], Number(body, "operationIndex", 0, Operations(original).Count - 1), Operations(original).Count, (int)original["version"])) throw new InvalidDataException();
+        if (body.ContainsKey("terminalObservation") && ((int)original["version"] != 5 ||
+            (string)body["phase"] != "CLEANED" || (int)body["operationIndex"] != 3 ||
+            body["terminalObservation"] as string != RecoveryTerminalObservation)) throw new InvalidDataException();
         foreach (string field in new string[] { "tempIdentity", "committedIdentity" }) if (body[field] != null) StringField(body, field, Identity);
         if (prior != null && prior["tempIdentity"] != null && (int)prior["operationIndex"] == (int)body["operationIndex"] && !Object.Equals(prior["tempIdentity"], body["tempIdentity"])) throw new InvalidDataException();
         if ((int)original["version"] == 1 && new string[] { "TEMP_CREATED", "COMMITTED", "VERIFIED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains((string)body["phase"])) throw new InvalidDataException();
@@ -1056,7 +1067,8 @@ namespace Phi.Native {
           operationIndex = last["operationIndex"], operations = header["operations"], operationStates = states,
           journalRecordedCommits = states.Where(state => new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "FINALIZED", "CLEANUP_STARTED", "CLEANED" }.Contains(state.durablePhase))
             .Select(state => state.destinationPath).ToArray(), journalPendingOperations = states.Length - committed,
-          journalState, filesystemState = observedFilesystemState, recoveryState = recovery, cleanup = "NOT_PROVEN",
+          journalState, filesystemState = observedFilesystemState, recoveryState = recovery,
+          terminalObservation = last.ContainsKey("terminalObservation") ? last["terminalObservation"] : null, cleanup = "NOT_PROVEN",
           projectPublished = false };
       }
       if ((int)header["version"] >= 2) return new { version = (int)header["version"], scope = (int)header["version"] == 4 ? "SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION" : (int)header["version"] == 3 ? "SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION" : "SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION", transactionId = id,
@@ -1071,6 +1083,7 @@ namespace Phi.Native {
     object InspectMixedPhysical(Action<string> trace = null) {
       if ((int)header["version"] != 5 || mixedPhases == null || mixedPhases.Length != 4) throw new InvalidDataException();
       var evidence = new List<object>(); int newCount = 0; bool conflict = false, uncertain = false;
+      bool quarantineAbsent = false, verifiedDraftDigestMatched = false;
       for (int index = 0; index < mixedPhases.Length; index++) {
         if (trace != null) trace("OP" + index.ToString() + "_START");
         Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[index];
@@ -1081,7 +1094,7 @@ namespace Phi.Native {
         using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(destinationPath))) {
           destination = ReadDeleteLeaf(parent, destinationParts.Last());
           if (kind == "RENAME") source = ReadDeleteLeaf(parent, AnchoredFile.Segments((string)op["sourcePath"]).Last());
-          if (kind == "DELETE") quarantine = ReadDeleteLeaf(parent, DeleteLeaf(id));
+        if (kind == "DELETE") { quarantine = ReadDeleteLeaf(parent, DeleteLeaf(id)); quarantineAbsent = quarantine == null; }
           if (kind == "CREATE") createTemp = ReadDeleteLeaf(parent, "phi-publish-" + id + ".tmp");
         }
         bool baseAtDestination = DeleteBaseMatches(destination, op);
@@ -1138,14 +1151,20 @@ namespace Phi.Native {
           string quarantinePath = String.Join("/", parts.Take(parts.Length - 1).Concat(new string[] { DeleteLeaf(id) }));
           string expected = (string)last["phase"] == "CLEANED" ? null : quarantinePath;
           Dictionary<string, object> snapshot = Snapshot(project, (string)header["projectIdentity"], expected);
-          if (ProjectDraftDigest((Dictionary<string, object>)snapshot["files"]) != (string)header["verifiedDigest"]) conflict = true;
+          verifiedDraftDigestMatched = ProjectDraftDigest((Dictionary<string, object>)snapshot["files"]) == (string)header["verifiedDigest"];
+          if (!verifiedDraftDigestMatched) conflict = true;
         } catch { uncertain = true; }
       }
       string filesystemState = conflict ? "CONFLICT" : uncertain ? "MANUAL_RECOVERY_REQUIRED" : newCount == 0 ? "NONE_COMMITTED" :
         newCount == mixedPhases.Length ? "ALL_MUTATIONS_COMMITTED" : "PARTIALLY_COMMITTED";
-      string status = conflict ? "CONFLICT" : "UNKNOWN_FAIL_SAFE";
-      return new { status, metadata = Metadata(status == "CONFLICT" ? "CONFLICT" : "MANUAL_RECOVERY_REQUIRED", filesystemState),
-        operationEvidence = evidence, filesystemState, ownerGenerationAlive = false, projectMutations = 0,
+      bool terminalObserved = !conflict && !uncertain && newCount == mixedPhases.Length &&
+        quarantineAbsent && verifiedDraftDigestMatched &&
+        new string[] { "CLEANUP_STARTED", "CLEANED" }.Contains((string)last["phase"]);
+      string status = conflict ? "CONFLICT" : terminalObserved ? "NEW_COMPLETE_OBSERVED" : "UNKNOWN_FAIL_SAFE";
+      return new { status, metadata = Metadata(status == "CONFLICT" ? "CONFLICT" : terminalObserved ?
+          (string)last["phase"] == "CLEANED" ? "TERMINAL_RETAINED" : "RECOVERY_REQUIRED" : "MANUAL_RECOVERY_REQUIRED", filesystemState),
+        operationEvidence = evidence, filesystemState, quarantineAbsent, verifiedDraftDigestMatched,
+        ownerGenerationAlive = false, projectMutations = 0,
         journalMutations = 0, processKills = 0, projectPublished = false };
     }
     internal static object Inspect(string transactionId, string project, string expectedProjectIdentity, bool recover = false, Action<string> trace = null) {
@@ -1568,6 +1587,31 @@ namespace Phi.Native {
         actionPerformed = (int)last["sequence"] != sequence || recoveryProjectMutations != 0, journalMutations = (int)last["sequence"] - sequence,
         projectMutations = recoveryProjectMutations, processKills = 0, projectPublished = false, externalRequests = 0 };
     }
+    object RecoverKnownMixed(string expectedRootIdentity, Action live, Action afterObservation = null) {
+      if ((int)header["version"] != 5 || (string)header["projectIdentity"] != expectedRootIdentity ||
+          (string)last["phase"] != "CLEANUP_STARTED" || (int)last["operationIndex"] != 3 ||
+          mixedPhases == null || !mixedPhases.SequenceEqual(new string[] { "FINALIZED", "FINALIZED", "FINALIZED", "CLEANUP_STARTED" }))
+        throw new InvalidDataException();
+      live();
+      Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(Serializer().Serialize(InspectMixedPhysical()));
+      IList physical = observed["operationEvidence"] as IList;
+      if ((string)observed["status"] != "NEW_COMPLETE_OBSERVED" ||
+          (string)observed["filesystemState"] != "ALL_MUTATIONS_COMMITTED" ||
+          !(bool)observed["quarantineAbsent"] || !(bool)observed["verifiedDraftDigestMatched"] ||
+          physical == null || physical.Count != 4 || physical.Cast<Dictionary<string, object>>().Any(item =>
+            (string)item["physicalState"] != "NEW_COMPLETE_OBSERVED")) throw new InvalidDataException();
+      // The fixture callback may change the filesystem here. The record
+      // attests only the completed observation, never continuous exclusion.
+      if (afterObservation != null) afterObservation();
+      live();
+      ObserveMixed(3, "CLEANED", mixedTempIdentities[3], mixedCommittedIdentities[3], RecoveryTerminalObservation);
+      return new { version = 1, status = "PASS_BOUNDED_MIXED_TERMINAL_OBSERVATION", transactionId = id,
+        rootIdentity = expectedRootIdentity, rootIdentityVerified = true, observedStatus = "NEW_COMPLETE_OBSERVED",
+        decision = "RECORD_TERMINAL_OBSERVATION", phaseBefore = "CLEANUP_STARTED", phaseAfter = "CLEANED",
+        terminalObservation = RecoveryTerminalObservation, quarantineAbsent = true, verifiedDraftDigestMatched = true,
+        cleanup = "NOT_PROVEN", actionPerformed = true, journalMutations = 1, projectMutations = 0,
+        processKills = 0, projectPublished = false, externalRequests = 0 };
+    }
     internal static int RecoverKnownTransaction(Stream input) {
       PublicationJournal journal = null;
       try {
@@ -1593,15 +1637,16 @@ namespace Phi.Native {
           bool alive; string generation = ScopeRecovery.ProcessCreation((int)journal.header["creatorPid"], out alive);
           if (alive && generation == (string)journal.header["creatorGeneration"]) throw new InvalidDataException();
           int journalVersion = (int)journal.header["version"];
-          if (journalVersion < 2 || journalVersion > 4) throw new InvalidDataException();
+          if (journalVersion < 2 || journalVersion > 5) throw new InvalidDataException();
           live(); result = journalVersion == 2 ? journal.RecoverKnownModify(rootIdentity, live) :
-            journalVersion == 3 ? journal.RecoverKnownDelete(rootIdentity, live) : journal.RecoverKnownRename(rootIdentity, live);
+            journalVersion == 3 ? journal.RecoverKnownDelete(rootIdentity, live) :
+            journalVersion == 4 ? journal.RecoverKnownRename(rootIdentity, live) : journal.RecoverKnownMixed(rootIdentity, live);
         });
         Console.WriteLine(Serializer().Serialize(result)); return 0;
       } catch {
         int version = journal != null && journal.header != null ? (int)journal.header["version"] : 0;
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = version == 2 ? "FAIL_BOUNDED_MODIFY_RECOVERY" :
-            version == 3 ? "FAIL_BOUNDED_DELETE_RECOVERY" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
+            version == 3 ? "FAIL_BOUNDED_DELETE_RECOVERY" : version == 5 ? "FAIL_BOUNDED_MIXED_TERMINAL_OBSERVATION" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
           actionPerformed = journal != null && (journal.recoveryMutationUncertain || journal.recoveryProjectMutations != 0),
           projectMutations = journal == null ? (object)0 : journal.recoveryMutationUncertain ? (object)"UNKNOWN" : journal.recoveryProjectMutations,
           processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
@@ -1838,7 +1883,7 @@ namespace Phi.Native {
           Serializer().Serialize(Inspect(tx, scope.Root, rootId)));
         Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
         IList physical = observed["operationEvidence"] as IList;
-        if ((string)observed["status"] != "UNKNOWN_FAIL_SAFE" || (string)observed["filesystemState"] != "ALL_MUTATIONS_COMMITTED" ||
+        if ((string)observed["status"] != "NEW_COMPLETE_OBSERVED" || (string)observed["filesystemState"] != "ALL_MUTATIONS_COMMITTED" ||
             (int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"] ||
             (string)metadata["phase"] != "CLEANED" || (string)metadata["journalState"] != "FINALIZED" ||
             (int)metadata["journalPendingOperations"] != 0 || physical == null || physical.Count != 4 ||
@@ -1896,12 +1941,16 @@ namespace Phi.Native {
       } catch { Console.Error.WriteLine("PHI_MIXED_CRASH_CHILD_FAILED"); return 70; }
     }
     internal static int MixedPhysicalCrashSelfTest(string name) {
-      string stop;
-      try { stop = MixedCrashCheckpoint(name); } catch { return 70; }
+      string stop, childCaseName = new string[] { "race-after-observation", "quarantine-returned", "corrupt-journal", "concurrent-terminal" }.Contains(name) ?
+        "after-cleanup-unlinked" : name;
+      try { stop = MixedCrashCheckpoint(childCaseName); } catch { return 70; }
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
       string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
       bool passed = false, clean = false, gitClean = false, killed = false, publisherGone = false, readerGone = false;
       bool firstStartupGone = false, secondStartupGone = false, startupIdempotent = false;
+      bool externalChangedAfterObservation = false, laterClassificationSawChange = false;
+      bool liveOwnerDenied = false, duplicateTerminalDenied = false;
+      bool corruptJournalRejected = false, concurrentSingleTerminal = false;
       int firstStartupExit = -1, secondStartupExit = -1;
       object evidence = null;
       try {
@@ -1918,7 +1967,7 @@ namespace Phi.Native {
         string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
         stage = "PUBLISHER_START";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
-          Arguments = "--publication-mixed-physical-crash-child " + name, UseShellExecute = false,
+          Arguments = "--publication-mixed-physical-crash-child " + childCaseName, UseShellExecute = false,
           RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
         stage = "PUBLISHER_INPUT";
         publisher.StandardInput.WriteLine(input); publisher.StandardInput.Close();
@@ -1932,6 +1981,13 @@ namespace Phi.Native {
         stage = "PUBLISHER_READY_PARSE";
         Dictionary<string, object> announced = Serializer().Deserialize<Dictionary<string, object>>(ready);
         if (!(bool)announced["ready"] || (string)announced["transactionId"] != tx) throw new InvalidDataException();
+        if (name == "after-cleanup-unlinked") {
+          Dictionary<string, object> active = Serializer().Deserialize<Dictionary<string, object>>(
+            Serializer().Serialize(Inspect(tx, scope.Root, rootId)));
+          liveOwnerDenied = (string)active["status"] == "ACTIVE" && (int)active["journalMutations"] == 0 &&
+            (int)active["projectMutations"] == 0 && !(bool)active["projectPublished"];
+          if (!liveOwnerDenied) throw new InvalidDataException();
+        }
         stage = "KILL"; publisher.Kill(); killed = true;
         if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException();
         publisherGone = true;
@@ -1956,7 +2012,8 @@ namespace Phi.Native {
             name == "after-delete" ? 3 : 4;
           string[] expectedPhysical = Enumerable.Range(0, 4).Select(index => index < committed ? "NEW_COMPLETE_OBSERVED" : "OLD_COMPLETE_OBSERVED").ToArray();
           string expectedFilesystem = committed == 0 ? "NONE_COMMITTED" : committed == 4 ? "ALL_MUTATIONS_COMMITTED" : "PARTIALLY_COMMITTED";
-          if ((string)observed["status"] != "UNKNOWN_FAIL_SAFE" || (string)observed["filesystemState"] != expectedFilesystem ||
+          if ((string)observed["status"] != (childCaseName == "after-cleanup-unlinked" ? "NEW_COMPLETE_OBSERVED" : "UNKNOWN_FAIL_SAFE") ||
+              (string)observed["filesystemState"] != expectedFilesystem ||
               (int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"] ||
               operations == null || operations.Count != 4 || states == null || states.Count != 4 ||
               !operations.Cast<object>().Select(item => (string)((Dictionary<string, object>)item)["physicalState"]).SequenceEqual(expectedPhysical))
@@ -1967,12 +2024,39 @@ namespace Phi.Native {
         stage = "PHYSICAL";
         bool quarantine = File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx)));
         bool temp = File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp"));
-        if (temp || quarantine != (MixedDeleteCommitted(name) && name != "after-cleanup-unlinked") ||
+        if (temp || quarantine != (MixedDeleteCommitted(name) && childCaseName != "after-cleanup-unlinked") ||
             File.ReadAllText(Path.Combine(scope.Root, "a.txt")) != (name == "before-first" ? "a-old" : "a-new") ||
             File.Exists(Path.Combine(scope.Root, "b.txt")) != (name != "before-first" && name != "after-modify") ||
             File.Exists(Path.Combine(scope.Root, "c.txt")) == MixedDeleteCommitted(name) ||
             File.Exists(Path.Combine(scope.Root, "e.txt")) != (name == "after-rename-moved" || name == "after-all-mutations" ||
-              name == "after-cleanup-intent" || name == "after-cleanup-unlinked")) throw new InvalidDataException();
+              name == "after-cleanup-intent" || childCaseName == "after-cleanup-unlinked")) throw new InvalidDataException();
+        if (name == "race-after-observation") {
+          stage = "EXTERNAL_RACE_AFTER_NATIVE_OBSERVATION";
+          using (PublicationJournal recovery = new PublicationJournal(tx, scope.Root))
+          using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException(); recovery.ReadChain(key);
+            bool alive; string generation = ScopeRecovery.ProcessCreation((int)recovery.header["creatorPid"], out alive);
+            if (alive && generation == (string)recovery.header["creatorGeneration"]) throw new InvalidDataException();
+            recovery.RecoverKnownMixed(rootId, delegate() { }, delegate() {
+              using (Process actor = Process.Start(new ProcessStartInfo { FileName = "node",
+                Arguments = "-e \"require('fs').writeFileSync('a.txt','external-edit')\"", WorkingDirectory = scope.Root,
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
+                if (!actor.WaitForExit(5000) || actor.ExitCode != 0) throw new InvalidDataException();
+              }
+              externalChangedAfterObservation = File.ReadAllText(Path.Combine(scope.Root, "a.txt")) == "external-edit";
+              if (!externalChangedAfterObservation) throw new InvalidDataException();
+            });
+          }
+          Dictionary<string, object> changed = Serializer().Deserialize<Dictionary<string, object>>(
+            Serializer().Serialize(Inspect(tx, scope.Root, rootId)));
+          laterClassificationSawChange = (string)changed["status"] == "CONFLICT" &&
+            (int)changed["projectMutations"] == 0 && (bool)changed["projectPublished"] == false;
+          if (!laterClassificationSawChange) throw new InvalidDataException();
+        }
+        if (name == "quarantine-returned") {
+          stage = "EXTERNAL_QUARANTINE_RETURN";
+          File.WriteAllText(Path.Combine(scope.Root, DeleteLeaf(tx)), "external-quarantine", new UTF8Encoding(false));
+        }
         // The ordinary user-facing Phi path must discover this dead V5 journal
         // and fail closed twice. The read-only inspector above is not a
         // substitute for normal startup, and a startup attempt must not alter
@@ -1992,32 +2076,104 @@ namespace Phi.Native {
           if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
           sequenceBefore = (int)journal.last["sequence"]; phaseBefore = (string)journal.last["phase"];
         }
+        byte[] corruptEvent = null;
+        if (name == "corrupt-journal") {
+          stage = "CORRUPT_LAST_EVENT";
+          using (RegistryKey registry = OpenBase(true)) using (RegistryKey key = registry.OpenSubKey(tx, true)) {
+            if (key == null) throw new InvalidDataException();
+            string eventName = "E" + sequenceBefore.ToString("D8");
+            corruptEvent = ReadValue(key, eventName); corruptEvent[8] ^= 1;
+            key.SetValue(eventName, corruptEvent, RegistryValueKind.Binary);
+            if (RegFlushKey(key.Handle.DangerousGetHandle()) != 0 || !ReadValue(key, eventName).SequenceEqual(corruptEvent)) throw new InvalidDataException();
+          }
+        }
+        if (name == "concurrent-terminal") {
+          stage = "CONCURRENT_TERMINAL_APPENDS";
+          Process[] contenders = new Process[2]; int succeeded = 0, failed = 0;
+          try {
+            for (int i = 0; i < contenders.Length; i++) contenders[i] = Process.Start(new ProcessStartInfo {
+              FileName = Process.GetCurrentProcess().MainModule.FileName, Arguments = "--publication-recover-known",
+              UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
+              RedirectStandardError = true, CreateNoWindow = true });
+            string request = Serializer().Serialize(new { version = 1, root = scope.Root, transactionId = tx,
+              guardianPid = Process.GetCurrentProcess().Id, timeoutMs = 10000 });
+            foreach (Process contender in contenders) { contender.StandardInput.WriteLine(request); contender.StandardInput.Close(); }
+            foreach (Process contender in contenders) {
+              if (!contender.WaitForExit(15000)) throw new InvalidDataException();
+              string output = contender.StandardOutput.ReadToEnd();
+              if (output.Length > 8192) throw new InvalidDataException();
+              Dictionary<string, object> result = Serializer().Deserialize<Dictionary<string, object>>(output);
+              if (contender.ExitCode == 0 && (string)result["status"] == "PASS_BOUNDED_MIXED_TERMINAL_OBSERVATION" &&
+                  (int)result["projectMutations"] == 0 && !(bool)result["projectPublished"]) succeeded++;
+              else if (contender.ExitCode == 70 && ((string)result["status"]).StartsWith("FAIL_BOUNDED_", StringComparison.Ordinal) &&
+                  !(bool)result["projectPublished"]) failed++;
+              else throw new InvalidDataException();
+            }
+          } finally { foreach (Process contender in contenders) if (contender != null) {
+            if (!contender.HasExited) { contender.Kill(); contender.WaitForExit(3000); } contender.Dispose(); } }
+          concurrentSingleTerminal = succeeded == 1 && failed == 1;
+          if (!concurrentSingleTerminal) throw new InvalidDataException();
+        }
         string firstError, secondError;
         Dictionary<string, object> first = RunNormalPhiStartup(scope.Root, out firstStartupGone, out firstStartupExit, out firstError);
         stage = "SECOND_NORMAL_PHI_STARTUP";
         Dictionary<string, object> second = RunNormalPhiStartup(scope.Root, out secondStartupGone, out secondStartupExit, out secondError);
+        bool eligible = name == "after-cleanup-unlinked", alreadyTerminal = name == "concurrent-terminal";
         foreach (Dictionary<string, object> startup in new Dictionary<string, object>[] { first, second }) {
-          if ((string)startup["status"] != "BLOCKED" || (string)startup["reason"] != "BLOCKED_MANUAL_RECOVERY_REQUIRED" ||
-              (string)startup["rootIdentity"] != rootId || (string)startup["transactionId"] != tx ||
-              (int)startup["journalVersion"] != 5 || (int)startup["projectMutations"] != 0 ||
-              (int)startup["journalMutations"] != 0 || (bool)startup["projectPublished"] ||
+          if (name == "corrupt-journal") {
+            if ((string)startup["status"] != "UNKNOWN_FAIL_SAFE" || startup["journalMutations"] != null ||
+                startup["projectMutations"] != null || (bool)startup["projectPublished"] ||
+                (int)startup["externalRequests"] != 0) throw new InvalidDataException();
+            continue;
+          }
+          bool initial = Object.ReferenceEquals(startup, first);
+          if ((string)startup["status"] != (eligible ? initial ? "PASS_RECOVERED" : "PASS_NO_PENDING" :
+                alreadyTerminal ? "PASS_NO_PENDING" : "BLOCKED") ||
+              (string)startup["reason"] != (eligible ? initial ? "RECORD_TERMINAL_OBSERVATION" : "NO_NONTERMINAL_TRANSACTION" :
+                alreadyTerminal ? "NO_NONTERMINAL_TRANSACTION" : name == "race-after-observation" || name == "quarantine-returned" ?
+                  "BLOCKED_CONFLICT" : "BLOCKED_MANUAL_RECOVERY_REQUIRED") ||
+              (string)startup["rootIdentity"] != rootId ||
+              !alreadyTerminal && (initial || !eligible) && ((string)startup["transactionId"] != tx || (int)startup["journalVersion"] != 5) ||
+              (int)startup["projectMutations"] != 0 ||
+              (int)startup["journalMutations"] != (eligible && initial ? 1 : 0) || (bool)startup["projectPublished"] ||
               (int)startup["externalRequests"] != 0) throw new InvalidDataException();
         }
         if (!firstStartupGone || !secondStartupGone || firstStartupExit != 1 || secondStartupExit != 1 ||
-            firstError != "PHI_STARTUP_RECOVERY_BLOCKED" || secondError != "PHI_STARTUP_RECOVERY_BLOCKED" ||
+            firstError != (eligible || alreadyTerminal ? "PHI_SANDBOX_UNAVAILABLE: native Windows isolation is not yet verified; engine execution is blocked" :
+              name == "corrupt-journal" ? "PHI_STARTUP_RECOVERY_UNCONFIRMED" : "PHI_STARTUP_RECOVERY_BLOCKED") ||
+            secondError != (eligible || alreadyTerminal ? "PHI_SANDBOX_UNAVAILABLE: native Windows isolation is not yet verified; engine execution is blocked" :
+              name == "corrupt-journal" ? "PHI_STARTUP_RECOVERY_UNCONFIRMED" : "PHI_STARTUP_RECOVERY_BLOCKED") ||
             Serializer().Serialize(Snapshot(scope.Root, rootId, quarantineLeaf)) != projectBefore ||
             FixtureGit(scope.Root, "diff --name-only --no-renames") != gitDiffBefore ||
             FixtureGit(scope.Root, "diff --check") != "") throw new InvalidDataException();
+        if (eligible) {
+          using (PublicationJournal duplicate = new PublicationJournal(tx, scope.Root))
+          using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException(); duplicate.ReadChain(key);
+            try { duplicate.RecoverKnownMixed(rootId, delegate() { }); }
+            catch (InvalidDataException) { duplicateTerminalDenied = true; }
+          }
+          if (!duplicateTerminalDenied) throw new InvalidDataException();
+        }
         using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
           DeleteObject held = ReadDeleteLeaf(parent, quarantineLeaf);
           if ((held == null ? null : held.Identity) != quarantineIdentity ||
               (held == null ? null : held.Digest) != quarantineDigest) throw new InvalidDataException();
         }
-        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root))
-        using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
-          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
-          startupIdempotent = (int)journal.last["sequence"] == sequenceBefore && (string)journal.last["phase"] == phaseBefore;
-        }
+        if (name == "corrupt-journal") {
+          using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException();
+            corruptJournalRejected = ReadValue(key, "E" + sequenceBefore.ToString("D8")).SequenceEqual(corruptEvent);
+            startupIdempotent = corruptJournalRejected && key.GetValueNames().Length == sequenceBefore + 1;
+          }
+        } else using (PublicationJournal journal = new PublicationJournal(tx, scope.Root))
+          using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+            startupIdempotent = (int)journal.last["sequence"] == sequenceBefore + (eligible || alreadyTerminal ? 1 : 0) &&
+              (string)journal.last["phase"] == (eligible || alreadyTerminal ? "CLEANED" : phaseBefore) &&
+              (!(eligible || alreadyTerminal) || journal.last.ContainsKey("terminalObservation") &&
+                (string)journal.last["terminalObservation"] == RecoveryTerminalObservation);
+          }
         if (!startupIdempotent) throw new InvalidDataException();
         passed = true;
       } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
@@ -2030,13 +2186,17 @@ namespace Phi.Native {
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, checkpoint = stop, passed, actualPublisherKilled = killed,
         publisherGone, freshReaderGone = readerGone, firstStartupGone, secondStartupGone, firstStartupExit, secondStartupExit,
-        normalPhiStartupsBlocked = passed, startupIdempotent, fixtureCleanup = clean && gitClean, gitMetadataClean = gitClean, evidence,
-        scope = "V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY", projectPublished = false, externalRequests = 0 }));
+        normalPhiStartupsBlocked = passed && name != "after-cleanup-unlinked" && name != "concurrent-terminal", startupIdempotent, fixtureCleanup = clean && gitClean,
+        gitMetadataClean = gitClean, externalChangedAfterObservation, laterClassificationSawChange,
+        liveOwnerDenied, duplicateTerminalDenied, corruptJournalRejected, concurrentSingleTerminal, evidence,
+        scope = "V5_PHYSICAL_DEATH_FRESH_READER_TERMINAL_OBSERVATION_ONLY",
+        projectPublished = false, externalRequests = 0 }));
       return passed && clean && gitClean && publisherGone && readerGone && firstStartupGone && secondStartupGone && startupIdempotent ? 0 : 70;
     }
     static bool MixedDeleteCommitted(string name) {
       return name == "after-delete" || name == "after-rename-moved" || name == "after-all-mutations" ||
-        name == "after-cleanup-intent" || name == "after-cleanup-unlinked";
+        name == "after-cleanup-intent" || name == "after-cleanup-unlinked" || name == "race-after-observation" ||
+        name == "quarantine-returned" || name == "corrupt-journal" || name == "concurrent-terminal";
     }
     internal static int MixedJournalFixtureChild(string name) {
       if (name != "partial-after-modify-journal-only" && name != "partial-after-real-modify" &&
