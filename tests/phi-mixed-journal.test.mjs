@@ -50,6 +50,7 @@ test('production native V5 endpoint physically applies all four operations and r
     assert.equal(receipt.evidence.deleteDestinationAbsent, true);
     assert.equal(receipt.evidence.quarantineAbsent, true);
     assert.equal(receipt.evidence.draftDigestMatched, true);
+    assert.equal(receipt.evidence.gitDiffOnlyIntendedFiveFiles, true);
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
     console.log(JSON.stringify({ control: 'V5_NATIVE_MIXED_NO_CRASH_PHYSICAL_ONLY', ...receipt }));

@@ -1779,6 +1779,24 @@ namespace Phi.Native {
         } }
       };
     }
+    static string MixedFixtureGit(string project, string arguments) {
+      // Fixed fixture arguments only; never a production publication command.
+      if (!new string[] { "init -q", "add -- a.txt c.txt d.txt",
+          "-c user.name=PhiFixture -c user.email=fixture@example.invalid commit -q -m baseline",
+          "status --porcelain -uall", "diff --check" }.Contains(arguments)) throw new InvalidDataException();
+      using (Process child = Process.Start(new ProcessStartInfo { FileName = "git", Arguments = arguments,
+        WorkingDirectory = project, UseShellExecute = false, RedirectStandardOutput = true,
+        RedirectStandardError = true, CreateNoWindow = true })) {
+        string output = null, errors = null;
+        Thread stdout = new Thread(delegate() { try { output = child.StandardOutput.ReadToEnd(); } catch { } });
+        Thread stderr = new Thread(delegate() { try { errors = child.StandardError.ReadToEnd(); } catch { } });
+        stdout.IsBackground = true; stderr.IsBackground = true; stdout.Start(); stderr.Start();
+        if (!child.WaitForExit(10000)) { child.Kill(); child.WaitForExit(3000); throw new InvalidDataException(); }
+        if (!stdout.Join(2000) || !stderr.Join(2000) || child.ExitCode != 0 || output == null || output.Length > 16384 ||
+            errors == null || errors.Length > 16384) throw new InvalidDataException();
+        return output;
+      }
+    }
     internal static int MixedPhysicalSuccessSelfTest() {
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
       bool passed = false, clean = false, publisherGone = false, readerNoMutation = false;
@@ -1788,6 +1806,11 @@ namespace Phi.Native {
         File.WriteAllText(Path.Combine(scope.Root, "a.txt"), "a-old", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(scope.Root, "d.txt"), "d-old", new UTF8Encoding(false));
+        stage = "GIT_BASELINE";
+        MixedFixtureGit(scope.Root, "init -q");
+        MixedFixtureGit(scope.Root, "add -- a.txt c.txt d.txt");
+        MixedFixtureGit(scope.Root, "-c user.name=PhiFixture -c user.email=fixture@example.invalid commit -q -m baseline");
+        if (MixedFixtureGit(scope.Root, "status --porcelain -uall").Trim().Length != 0) throw new InvalidDataException();
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
         Dictionary<string, object> original = Snapshot(scope.Root, rootId);
         Dictionary<string, object> oldIdentities = (Dictionary<string, object>)original["identities"];
@@ -1819,6 +1842,16 @@ namespace Phi.Native {
             (string)identities["e.txt"] != (string)oldIdentities["d.txt"] || (string)identities["b.txt"] == (string)oldIdentities["a.txt"] ||
             File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx))) || File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp")))
           throw new InvalidDataException();
+        stage = "GIT_DIFF";
+        Dictionary<string, string> changed = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string line in MixedFixtureGit(scope.Root, "status --porcelain -uall").Split('\n')) {
+          string item = line.TrimEnd('\r'); if (item.Length == 0) continue;
+          if (item.Length < 4 || changed.ContainsKey(item.Substring(3))) throw new InvalidDataException();
+          changed.Add(item.Substring(3), item.Substring(0, 2));
+        }
+        if (changed.Count != 5 || changed["a.txt"] != " M" || changed["b.txt"] != "??" || changed["c.txt"] != " D" ||
+            changed["d.txt"] != " D" || changed["e.txt"] != "??") throw new InvalidDataException();
+        MixedFixtureGit(scope.Root, "diff --check");
         stage = "FRESH_INSPECT";
         string before = Serializer().Serialize(final);
         Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(
@@ -1837,7 +1870,8 @@ namespace Phi.Native {
           operationStates = physical.Cast<object>().Select(item => ((Dictionary<string, object>)item)["physicalState"]).ToArray(),
           createIdentityPreserved = (string)identities["b.txt"] == (string)((Dictionary<string, object>)physical[1])["observedDestinationIdentity"],
           renameIdentityPreserved = (string)identities["e.txt"] == (string)oldIdentities["d.txt"],
-          deleteDestinationAbsent = !files.ContainsKey("c.txt"), quarantineAbsent = true, draftDigestMatched = true };
+          deleteDestinationAbsent = !files.ContainsKey("c.txt"), quarantineAbsent = true, draftDigestMatched = true,
+          gitDiffOnlyIntendedFiveFiles = true };
         passed = true;
       } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_PHYSICAL_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
       finally {
