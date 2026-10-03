@@ -1166,9 +1166,16 @@ namespace Phi.Native {
         quarantineAbsent && verifiedDraftDigestMatched &&
         new string[] { "CLEANUP_STARTED", "CLEANED" }.Contains((string)last["phase"]);
       string status = conflict ? "CONFLICT" : terminalObserved ? "NEW_COMPLETE_OBSERVED" : "UNKNOWN_FAIL_SAFE";
+      // No individual V5 operation authorizes recovery by itself. The only
+      // automatic cell is the full, fresh, quarantine-absent terminal physical
+      // observation after durable cleanup intent (R1); all other combinations
+      // deliberately remain manual. A prior CLEANED is retained, not replayed.
+      string recoveryDisposition = terminalObserved ?
+        (string)last["phase"] == "CLEANUP_STARTED" ? "OBSERVE_FINALIZE_METADATA_ONLY" : "TERMINAL_RETAINED" :
+        "FAIL_CLOSED_MANUAL";
       return new { status, metadata = Metadata(status == "CONFLICT" ? "CONFLICT" : terminalObserved ?
           (string)last["phase"] == "CLEANED" ? "TERMINAL_RETAINED" : "RECOVERY_REQUIRED" : "MANUAL_RECOVERY_REQUIRED", filesystemState),
-        operationEvidence = evidence, filesystemState, quarantineAbsent, verifiedDraftDigestMatched,
+        operationEvidence = evidence, filesystemState, quarantineAbsent, verifiedDraftDigestMatched, recoveryDisposition,
         ownerGenerationAlive = false, projectMutations = 0,
         journalMutations = 0, processKills = 0, projectPublished = false };
     }
@@ -1602,6 +1609,7 @@ namespace Phi.Native {
       IList physical = observed["operationEvidence"] as IList;
       if ((string)observed["status"] != "NEW_COMPLETE_OBSERVED" ||
           (string)observed["filesystemState"] != "ALL_MUTATIONS_COMMITTED" ||
+          (string)observed["recoveryDisposition"] != "OBSERVE_FINALIZE_METADATA_ONLY" ||
           !(bool)observed["quarantineAbsent"] || !(bool)observed["verifiedDraftDigestMatched"] ||
           physical == null || physical.Count != 4 || physical.Cast<Dictionary<string, object>>().Any(item =>
             (string)item["physicalState"] != "NEW_COMPLETE_OBSERVED")) throw new InvalidDataException();
@@ -1896,6 +1904,7 @@ namespace Phi.Native {
         Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
         IList physical = observed["operationEvidence"] as IList;
         if ((string)observed["status"] != "NEW_COMPLETE_OBSERVED" || (string)observed["filesystemState"] != "ALL_MUTATIONS_COMMITTED" ||
+            (string)observed["recoveryDisposition"] != "TERMINAL_RETAINED" ||
             (int)observed["projectMutations"] != 0 || (int)observed["journalMutations"] != 0 || (bool)observed["projectPublished"] ||
             (string)metadata["phase"] != "CLEANED" || (string)metadata["journalState"] != "FINALIZED" ||
             (int)metadata["journalPendingOperations"] != 0 || physical == null || physical.Count != 4 ||
@@ -1903,7 +1912,7 @@ namespace Phi.Native {
           throw new InvalidDataException();
         readerNoMutation = before == Serializer().Serialize(Snapshot(scope.Root, rootId));
         if (!readerNoMutation) throw new InvalidDataException();
-        evidence = new { phase = metadata["phase"], journalState = metadata["journalState"],
+        evidence = new { phase = metadata["phase"], journalState = metadata["journalState"], recoveryDisposition = observed["recoveryDisposition"],
           operationStates = physical.Cast<object>().Select(item => ((Dictionary<string, object>)item)["physicalState"]).ToArray(),
           createIdentityPreserved = (string)identities["b.txt"] == (string)((Dictionary<string, object>)physical[1])["observedDestinationIdentity"],
           renameIdentityPreserved = (string)identities["e.txt"] == (string)oldIdentities["d.txt"],
@@ -2032,6 +2041,7 @@ namespace Phi.Native {
               !operations.Cast<object>().Select(item => (string)((Dictionary<string, object>)item)["physicalState"]).SequenceEqual(expectedPhysical))
             throw new InvalidDataException();
           evidence = new { durablePhase = metadata["phase"], journalState = metadata["journalState"], filesystemState = observed["filesystemState"],
+            recoveryDisposition = observed["recoveryDisposition"],
             operationPhysicalStates = expectedPhysical, journalMutationsByReader = observed["journalMutations"], projectMutationsByReader = observed["projectMutations"] };
         }
         stage = "PHYSICAL";

@@ -28,6 +28,23 @@ test('V5 mixed journal reconstructs per-operation physical evidence without enab
   'BLOCKED_MANUAL_RECOVERY_REQUIRED');
 });
 
+test('V5 startup disposition is explicit and fail-closed for every durable phase and classification', () => {
+  const entry = (phase, classification) => ({ transactionId: 'a'.repeat(32), journalVersion: 5, phase, classification });
+  const plan = (phase, classification) => planWindowsStartupRecovery({ status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
+    projectPublished: false, actionPerformed: false, projectTransactions: 1, entries: [entry(phase, classification)] });
+  for (const phase of ['NOT_STARTED', 'PREPARED', 'MUTATION_STARTED', 'COMMITTED', 'POST_COMMIT_VERIFIED', 'FINALIZED']) {
+    assert.equal(plan(phase, 'RECOVERY_REQUIRED').kind, 'BLOCKED_V5_INELIGIBLE_PHASE', phase);
+    for (const classification of ['MANUAL_RECOVERY_REQUIRED', 'CONFLICT', 'ACTIVE_UNVERIFIED'])
+      assert.equal(plan(phase, classification).kind, `BLOCKED_${classification}`, `${phase}/${classification}`);
+  }
+  assert.equal(plan('CLEANUP_STARTED', 'RECOVERY_REQUIRED').kind, 'RECOVER');
+  for (const classification of ['MANUAL_RECOVERY_REQUIRED', 'CONFLICT', 'ACTIVE_UNVERIFIED'])
+    assert.equal(plan('CLEANUP_STARTED', classification).kind, `BLOCKED_${classification}`);
+  assert.equal(plan('CLEANED', 'TERMINAL_RETAINED').kind, 'NO_PENDING');
+  for (const classification of ['MANUAL_RECOVERY_REQUIRED', 'CONFLICT'])
+    assert.equal(plan('CLEANED', classification).kind, `BLOCKED_${classification}`);
+});
+
 test('production native V5 endpoint physically applies all four operations and retains no temp or quarantine',
   { skip: process.platform !== 'win32', timeout: 45000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-selftest'], {
@@ -45,6 +62,7 @@ test('production native V5 endpoint physically applies all four operations and r
     assert.equal(receipt.externalRequests, 0);
     assert.equal(receipt.evidence.phase, 'CLEANED');
     assert.equal(receipt.evidence.journalState, 'FINALIZED');
+    assert.equal(receipt.evidence.recoveryDisposition, 'TERMINAL_RETAINED');
     assert.deepEqual(receipt.evidence.operationStates, Array(4).fill('NEW_COMPLETE_OBSERVED'));
     assert.equal(receipt.evidence.createIdentityPreserved, true);
     assert.equal(receipt.evidence.renameIdentityPreserved, true);
@@ -96,6 +114,9 @@ for (const caseName of [
     assert.equal(receipt.fixtureCleanup, true);
     assert.equal(receipt.evidence.journalMutationsByReader, 0);
     assert.equal(receipt.evidence.projectMutationsByReader, 0);
+    assert.equal(receipt.evidence.recoveryDisposition,
+      ['after-cleanup-unlinked', 'race-after-observation', 'quarantine-returned', 'corrupt-journal',
+        'concurrent-terminal', 'append-interrupted'].includes(caseName) ? 'OBSERVE_FINALIZE_METADATA_ONLY' : 'FAIL_CLOSED_MANUAL');
     assert.equal(receipt.projectPublished, false);
     assert.equal(receipt.externalRequests, 0);
     assert.equal(windowsRecoveryStatus().status, 'PASS');

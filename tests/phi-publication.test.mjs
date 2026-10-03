@@ -7,8 +7,9 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { WorkerDraft, draftContentDigest } from '../lib/phi-worker-draft.mjs';
 import { PublicationPreflight, publicationBase, publicationConflicts, publicationOperations, PUBLICATION_STATES } from '../lib/phi-publication-plan.mjs';
-import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublication } from '../lib/phi-worker-authority.mjs';
+import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
+import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { consumeWindowsPublicationProof, publishWindowsSingleOperation, windowsPublicationFailure } from '../platform/windows/publication.mjs';
@@ -85,9 +86,9 @@ test('V5 representative mixed manifest folds only an explicit rename pair and pr
   assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'extra.txt': 'extra' }, 10), intent), /RENAME_INTENT_INVALID/u);
   assert.throws(() => publicationOperations(base, snapshot({ 'a.txt': 'old a', 'b.txt': 'new b', 'e.txt': 'old d', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
   const publisher = fs.readFileSync(new URL('../platform/windows/publication.mjs', import.meta.url), 'utf8');
-  assert.match(publisher, /operations\?\.length === 4\) fail\('MIXED_RECOVERY_NOT_READY'\)/u);
+  assert.match(publisher, /operations\?\.length === 4\) return publishWindowsMixed\(options\)/u);
   assert.match(publisher, /\['--publication-mixed'\]/u);
-  assert.throws(() => publishWindowsSingleOperation({ metadata: { operations } }), /MIXED_RECOVERY_NOT_READY/u);
+  if (process.platform !== 'win32') assert.throws(() => publishWindowsSingleOperation({ metadata: { operations } }), /BACKEND_UNAVAILABLE/u);
 });
 test('baseline conflicts detect root/file identity, identical-text delete/recreate, edit, removal and new user file', () => {
   const original = snapshot(), base = publicationBase(original);
@@ -269,6 +270,12 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
     // native expected-ID, no-clobber RENAME after the full verification gate.
     files['edit.cjs'] = "try{const f=require('node:fs');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log(process.pid)}catch(e){process.stderr.write('PHI_MOVE_DRAFT:'+e.code+':'+e.syscall);process.exitCode=1}";
     files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'unchanged-rename-fixture');a.throws(()=>f.writeFileSync('moved.txt','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
+  }
+  if (operation === 'mixed') {
+    files['remove.txt'] = 'obsolete-mixed-fixture';
+    files['move.txt'] = 'unchanged-mixed-rename-fixture';
+    files['edit.cjs'] = "const f=require('node:fs');f.writeFileSync('config.json','{\"changed\":true}');f.writeFileSync('created.txt','created-mixed-fixture',{flag:'wx'});f.unlinkSync('remove.txt');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log(process.pid)";
+    files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(JSON.parse(f.readFileSync('config.json','utf8')).changed,true);a.equal(f.readFileSync('created.txt','utf8'),'created-mixed-fixture');a.equal(f.existsSync('remove.txt'),false);a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'unchanged-mixed-rename-fixture');a.throws(()=>f.writeFileSync('config.json','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
   }
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
@@ -476,6 +483,95 @@ test('native user change after READY RENAME is CONFLICT; user destination and ve
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_RENAME_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
+});
+test('native V5 governed Worker to controller handoff publishes exact four-operation Git diff once', native, async () => {
+  const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
+  const item = nativeFixture(task, 'mixed');
+  const hooks = new Map(); registerWindowsWorkerBoundary({ on: (event, hook) => hooks.set(event, hook) });
+  const ctx = { cwd: item.project, sessionManager: { getSessionId: () => item.sessionId } };
+  try {
+    for (const name of ['config.json', 'package.json', 'edit.cjs', 'test.cjs', 'remove.txt', 'move.txt'])
+      assert.equal(fs.existsSync(path.join(item.project, name)), true);
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', '.'], { shell: false }).status, 0);
+    assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'V5 fixture baseline'], { shell: false }).status, 0);
+    // The actual Worker extension hooks and registered safe_exec handler use
+    // the same package-scoped foreground reservation as production Pi.
+    hooks.get('before_agent_start')({ prompt: `Task: ${task}` }, ctx);
+    assert.equal(hooks.get('tool_call')({ toolName: 'safe_exec' }, ctx), undefined);
+    assert.equal(hooks.get('tool_call')({ toolName: 'write' }, ctx).block, true);
+    const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'], timeoutMs: 8000 }, ctx);
+    assert.equal(edit.details.receipt.profile, 'EDIT'); assert.equal(edit.details.receipt.cleanup, 'PASS');
+    assert.equal(edit.details.receipt.projectPublished, false);
+    const lsp = await executeCodingLsp(item.project, { operation: 'diagnostics', path: 'config.json' }, item.context);
+    assert.equal(lsp.status, 'PASS'); assert.equal(lsp.count, 0);
+    const verified = await verifyCodingProject({ cwd: item.project, workerAuthority: item.token, sessionId: item.sessionId });
+    assert.equal(verified.status, 'PASS');
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{}');
+    assert.equal(fs.existsSync(path.join(item.project, 'created.txt')), false);
+    const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    assert.deepEqual(ready.receipt.operations.map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'RENAME']);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), /AUTHORITY_UNAVAILABLE/u);
+    assert.throws(() => executePreparedWindowsPublication(item.token), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'], timeoutMs: 8000 }, ctx), /PUBLISH_HANDOFF_CLOSED/u);
+    const publication = executePreparedWindowsPublication(ready.authority);
+    assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
+    assert.deepEqual(publication.filesCommitted, ['config.json', 'created.txt', 'remove.txt', 'moved.txt']);
+    assert.equal(publication.publicationProof.scope, 'VERIFIED_WORKER_MIXED');
+    assert.equal(publication.publicationProof.journal.version, 5);
+    assert.equal(publication.publicationProof.journal.phase, 'CLEANED');
+    assert.equal(publication.publicationProof.native.quarantineAbsent, true);
+    assert.equal(publication.publicationProof.verifiedDigest, verified.draft.contentDigest);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"changed":true}');
+    assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'created-mixed-fixture');
+    assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), false);
+    assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), false);
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'unchanged-mixed-rename-fixture');
+    assert.equal(spawnSync('git', ['-C', item.project, 'add', '-N', 'created.txt', 'moved.txt'], { shell: false }).status, 0);
+    const diff = spawnSync('git', ['-C', item.project, 'diff', '--name-status', '--no-renames'], { shell: false, encoding: 'utf8' });
+    assert.equal(diff.status, 0);
+    assert.deepEqual(diff.stdout.trim().split('\n').sort(), ['M\tconfig.json', 'A\tcreated.txt', 'D\tmove.txt', 'A\tmoved.txt', 'D\tremove.txt'].sort());
+    assert.equal(spawnSync('git', ['-C', item.project, 'diff', '--check'], { shell: false }).status, 0);
+    assert.equal(fs.readdirSync(item.project).some(name => /^phi-(?:publish|delete)-/u.test(name)), false);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    hooks.get('session_shutdown')();
+    assert.equal(item.reservation.status().draft.payloadCleared, true);
+    console.log(JSON.stringify({ control: 'VERIFIED_WORKER_MIXED', edit: edit.details.receipt, lsp: lsp.receipt,
+      verification: verified.status, publication, exactGitDiff: true, oneUseHandoff: true, workerAuthorityRevoked: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native V5 stale handoff and concurrent user destination never grant publication or replay', native, async () => {
+  const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
+  const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+  const stale = nativeFixture(task, 'mixed');
+  try {
+    await nativeVerified(stale);
+    const ready = stale.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    assert.equal(ready.receipt.operations.length, 4);
+    stale.reservation.revoke();
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.readFileSync(path.join(stale.project, 'config.json'), 'utf8'), '{}');
+    assert.equal(fs.existsSync(path.join(stale.project, 'created.txt')), false);
+  } finally { stale.close(); }
+  const conflict = nativeFixture(task, 'mixed');
+  try {
+    await nativeVerified(conflict);
+    const ready = conflict.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    fs.writeFileSync(path.join(conflict.project, 'moved.txt'), 'concurrent-user-destination');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(conflict.reservation.publicationStatus().state, 'CONFLICT');
+    assert.equal(conflict.reservation.publicationStatus().projectPublished, false);
+    assert.equal(fs.readFileSync(path.join(conflict.project, 'moved.txt'), 'utf8'), 'concurrent-user-destination');
+    assert.equal(fs.readFileSync(path.join(conflict.project, 'config.json'), 'utf8'), '{}');
+    assert.equal(fs.existsSync(path.join(conflict.project, 'created.txt')), false);
+    assert.equal(fs.existsSync(path.join(conflict.project, 'remove.txt')), true);
+    assert.equal(fs.existsSync(path.join(conflict.project, 'move.txt')), true);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+  } finally { conflict.close(); }
 });
 test('native controller approval cannot override read-only Task/Tool Governor policy', native, () => {
   const item = nativeFixture('Read a note');
