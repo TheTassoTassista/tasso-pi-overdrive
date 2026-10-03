@@ -1899,7 +1899,10 @@ namespace Phi.Native {
       string stop;
       try { stop = MixedCrashCheckpoint(name); } catch { return 70; }
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
-      bool passed = false, clean = false, killed = false, publisherGone = false, readerGone = false;
+      string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
+      bool passed = false, clean = false, gitClean = false, killed = false, publisherGone = false, readerGone = false;
+      bool firstStartupGone = false, secondStartupGone = false, startupIdempotent = false;
+      int firstStartupExit = -1, secondStartupExit = -1;
       object evidence = null;
       try {
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
@@ -1907,6 +1910,11 @@ namespace Phi.Native {
         File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(scope.Root, "d.txt"), "d-old", new UTF8Encoding(false));
         string rootId = RecoveryFilesystem.DirectoryIdentity(scope.Root);
+        if (Directory.Exists(gitDirectory) || File.Exists(gitDirectory)) throw new InvalidDataException();
+        FixtureGit(scope.Root, "init -q --separate-git-dir \"" + gitDirectory + "\"");
+        FixtureGit(scope.Root, "add -- a.txt c.txt d.txt");
+        FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
+        if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
         string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
         stage = "PUBLISHER";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
@@ -1960,18 +1968,66 @@ namespace Phi.Native {
             File.Exists(Path.Combine(scope.Root, "c.txt")) == MixedDeleteCommitted(name) ||
             File.Exists(Path.Combine(scope.Root, "e.txt")) != (name == "after-rename-moved" || name == "after-all-mutations" ||
               name == "after-cleanup-intent" || name == "after-cleanup-unlinked")) throw new InvalidDataException();
+        // The ordinary user-facing Phi path must discover this dead V5 journal
+        // and fail closed twice. The read-only inspector above is not a
+        // substitute for normal startup, and a startup attempt must not alter
+        // even a retained transaction quarantine or the private journal.
+        stage = "NORMAL_PHI_STARTUP";
+        string quarantineLeaf = DeleteLeaf(tx), quarantineIdentity = null, quarantineDigest = null;
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
+          DeleteObject held = ReadDeleteLeaf(parent, quarantineLeaf);
+          if (held != null) { quarantineIdentity = held.Identity; quarantineDigest = held.Digest; }
+        }
+        string projectBefore = Serializer().Serialize(Snapshot(scope.Root, rootId, quarantineLeaf));
+        string gitDiffBefore = FixtureGit(scope.Root, "diff --name-only --no-renames");
+        int sequenceBefore;
+        string phaseBefore;
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root))
+        using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          sequenceBefore = (int)journal.last["sequence"]; phaseBefore = (string)journal.last["phase"];
+        }
+        string firstError, secondError;
+        Dictionary<string, object> first = RunNormalPhiStartup(scope.Root, out firstStartupGone, out firstStartupExit, out firstError);
+        stage = "SECOND_NORMAL_PHI_STARTUP";
+        Dictionary<string, object> second = RunNormalPhiStartup(scope.Root, out secondStartupGone, out secondStartupExit, out secondError);
+        foreach (Dictionary<string, object> startup in new Dictionary<string, object>[] { first, second }) {
+          if ((string)startup["status"] != "BLOCKED" || (string)startup["reason"] != "BLOCKED_MANUAL_RECOVERY_REQUIRED" ||
+              (string)startup["rootIdentity"] != rootId || (string)startup["transactionId"] != tx ||
+              (int)startup["journalVersion"] != 5 || (int)startup["projectMutations"] != 0 ||
+              (int)startup["journalMutations"] != 0 || (bool)startup["projectPublished"] ||
+              (int)startup["externalRequests"] != 0) throw new InvalidDataException();
+        }
+        if (!firstStartupGone || !secondStartupGone || firstStartupExit != 1 || secondStartupExit != 1 ||
+            firstError != "PHI_STARTUP_RECOVERY_BLOCKED" || secondError != "PHI_STARTUP_RECOVERY_BLOCKED" ||
+            Serializer().Serialize(Snapshot(scope.Root, rootId, quarantineLeaf)) != projectBefore ||
+            FixtureGit(scope.Root, "diff --name-only --no-renames") != gitDiffBefore ||
+            FixtureGit(scope.Root, "diff --check") != "") throw new InvalidDataException();
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
+          DeleteObject held = ReadDeleteLeaf(parent, quarantineLeaf);
+          if ((held == null ? null : held.Identity) != quarantineIdentity ||
+              (held == null ? null : held.Digest) != quarantineDigest) throw new InvalidDataException();
+        }
+        using (PublicationJournal journal = new PublicationJournal(tx, scope.Root))
+        using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+          if (key == null) throw new InvalidDataException(); journal.ReadChain(key);
+          startupIdempotent = (int)journal.last["sequence"] == sequenceBefore && (string)journal.last["phase"] == phaseBefore;
+        }
+        if (!startupIdempotent) throw new InvalidDataException();
         passed = true;
       } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
       finally {
         if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        try { CleanupFixtureGit(gitDirectory, tx); gitClean = true; } catch { gitClean = false; }
         try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
           if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
         } catch { clean = false; if (scope != null) scope.Dispose(); }
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, checkpoint = stop, passed, actualPublisherKilled = killed,
-        publisherGone, freshReaderGone = readerGone, fixtureCleanup = clean, evidence,
+        publisherGone, freshReaderGone = readerGone, firstStartupGone, secondStartupGone, firstStartupExit, secondStartupExit,
+        normalPhiStartupsBlocked = passed, startupIdempotent, fixtureCleanup = clean && gitClean, gitMetadataClean = gitClean, evidence,
         scope = "V5_PHYSICAL_DEATH_FRESH_READER_NO_RECOVERY", projectPublished = false, externalRequests = 0 }));
-      return passed && clean && publisherGone && readerGone ? 0 : 70;
+      return passed && clean && gitClean && publisherGone && readerGone && firstStartupGone && secondStartupGone && startupIdempotent ? 0 : 70;
     }
     static bool MixedDeleteCommitted(string name) {
       return name == "after-delete" || name == "after-rename-moved" || name == "after-all-mutations" ||

@@ -60,10 +60,10 @@ test('production native V5 endpoint physically applies all four operations and r
 for (const caseName of [
   'before-first', 'after-modify', 'after-create', 'after-delete',
   'after-rename-moved', 'after-all-mutations', 'after-cleanup-intent', 'after-cleanup-unlinked',
-]) test(`V5 physical publisher death is reconstructed by a fresh read-only process: ${caseName}`,
-  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+]) test(`V5 publisher death blocks ordinary Phi startup without mutation: ${caseName}`,
+  { skip: process.platform !== 'win32', timeout: 120000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-crash-selftest', caseName], {
-      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 105000, maxBuffer: 8192,
     });
     assert.equal(run.status, 0, run.stderr);
     const receipt = JSON.parse(run.stdout);
@@ -73,6 +73,13 @@ for (const caseName of [
     assert.equal(receipt.actualPublisherKilled, true);
     assert.equal(receipt.publisherGone, true);
     assert.equal(receipt.freshReaderGone, true);
+    assert.equal(receipt.firstStartupGone, true);
+    assert.equal(receipt.secondStartupGone, true);
+    assert.equal(receipt.firstStartupExit, 1);
+    assert.equal(receipt.secondStartupExit, 1);
+    assert.equal(receipt.normalPhiStartupsBlocked, true);
+    assert.equal(receipt.startupIdempotent, true);
+    assert.equal(receipt.gitMetadataClean, true);
     assert.equal(receipt.fixtureCleanup, true);
     assert.equal(receipt.evidence.journalMutationsByReader, 0);
     assert.equal(receipt.evidence.projectMutationsByReader, 0);
