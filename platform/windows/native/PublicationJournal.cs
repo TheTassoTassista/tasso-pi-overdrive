@@ -1817,7 +1817,7 @@ namespace Phi.Native {
         if (files.Count != 3 || (string)files["a.txt"] != "a-new" || (string)files["b.txt"] != "b-new" || (string)files["e.txt"] != "d-old" ||
             files.ContainsKey("c.txt") || files.ContainsKey("d.txt") || (string)identities["a.txt"] != (string)oldIdentities["a.txt"] ||
             (string)identities["e.txt"] != (string)oldIdentities["d.txt"] || (string)identities["b.txt"] == (string)oldIdentities["a.txt"] ||
-            File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx))) || File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp"))
+            File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx))) || File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp")))
           throw new InvalidDataException();
         stage = "FRESH_INSPECT";
         string before = Serializer().Serialize(final);
