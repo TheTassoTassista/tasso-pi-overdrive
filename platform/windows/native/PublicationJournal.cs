@@ -1916,15 +1916,20 @@ namespace Phi.Native {
         FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
         if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
         string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
-        stage = "PUBLISHER";
+        stage = "PUBLISHER_START";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-mixed-physical-crash-child " + name, UseShellExecute = false,
           RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        stage = "PUBLISHER_INPUT";
         publisher.StandardInput.WriteLine(input); publisher.StandardInput.Close();
         string ready = null;
         Thread readyPipe = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } });
         readyPipe.IsBackground = true; readyPipe.Start();
-        if (!readyPipe.Join(7000) || ready == null || ready.Length > 1024) throw new InvalidDataException();
+        stage = "PUBLISHER_READY_WAIT";
+        if (!readyPipe.Join(7000)) { stage = "PUBLISHER_READY_TIMEOUT"; throw new InvalidDataException(); }
+        if (ready == null) { stage = "PUBLISHER_READY_MISSING"; throw new InvalidDataException(); }
+        if (ready.Length > 1024) { stage = "PUBLISHER_READY_OVERSIZE"; throw new InvalidDataException(); }
+        stage = "PUBLISHER_READY_PARSE";
         Dictionary<string, object> announced = Serializer().Deserialize<Dictionary<string, object>>(ready);
         if (!(bool)announced["ready"] || (string)announced["transactionId"] != tx) throw new InvalidDataException();
         stage = "KILL"; publisher.Kill(); killed = true;
