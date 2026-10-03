@@ -119,18 +119,30 @@ test('native child cwd and timeout: primary124 survives, real Job drained before
   const root = fixture(), identity = cloneIdentity(root);
   const program = "require('node:fs').writeFileSync('ready',process.cwd());require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{cwd:process.cwd(),stdio:'ignore'});setInterval(()=>{},1000);";
   const running = runValidationCommand(process.execPath, ['-e', program], { cwd: root, timeoutMs: 1500 });
+  let failureStage = 'WAIT_READY';
   try {
-    await ready(root, running); assert.equal(fs.readFileSync(path.join(root, 'ready'), 'utf8').toLowerCase(), root.toLowerCase());
+    await ready(root, running);
+    failureStage = 'READY_CONTENT';
+    assert.equal(fs.readFileSync(path.join(root, 'ready'), 'utf8').toLowerCase(), root.toLowerCase());
+    failureStage = 'DELETE_DENIAL';
     let denial;
     try { fs.rmSync(root, { recursive: true, force: true }); } catch (error) { denial = cleanupErrorMetadata(error, root); }
     assert.ok(denial);
+    failureStage = 'JOB_RECEIPT';
     const command = await running; assert.equal(command.status, 124); assert.equal(command.receipt.primaryExitCode, 124); assert.equal(command.receipt.timedOut, true);
     assert.equal(command.receipt.jobAttested, true); assert.match(command.receipt.childGeneration, /^\d+$/u);
+    failureStage = 'OWNED_CLEANUP';
     const cleanup = await cleanupClone(root, identity, { receipts: [command.receipt] });
     assert.equal(cleanup.status, 'PASS'); assert.equal(cleanup.residualOwnedProcesses, 0); assert.equal(cleanup.childCwdInsideAfter, false);
+    failureStage = 'AGGREGATION';
     const result = combineValidationResults({ status: 'TIMEOUT', receipt: command.receipt }, cleanup);
     assert.equal(result.status, 'FAIL'); assert.equal(result.primary.receipt.primaryExitCode, 124);
     console.log(JSON.stringify({ control: 'CHILD_CWD_TIMEOUT', denial, ...result }));
+  } catch (error) {
+    // Fixed enum only: the clean-clone controller intentionally redacts test names,
+    // paths, stacks and arbitrary assertion text from its CI failure receipt.
+    console.log(`PHI_CLONE_TIMEOUT_${failureStage}`);
+    throw error;
   } finally { await running.catch(() => {}); releaseFixture(root); }
 });
 test('native already-exited parent with surviving descendant is drained and cannot hold clone cwd', native, async () => {

@@ -46,6 +46,12 @@ test('clean-room failure receipt identifies its stage/codes/counts without leaki
   assert.deepEqual(evidence, { failureStage: 'foundation-tests', exitCode: 1, timedOut: false, diagnosticCodes: ['CS1234', 'PHI_NATIVE_PROCESS_FAILED'], testCounts: { total: 47, passed: 39, failed: 1 }, failedTestNumbers: [12] });
   assert.doesNotMatch(JSON.stringify(evidence), /private|secret-fixture-value|PRIVATE_SECRET/u);
 });
+test('clone timeout failure stage survives redaction as a fixed code only', () => {
+  const row = validationFailureEvidence('foundation-tests', { status: 1, stdout: '# PHI_CLONE_TIMEOUT_DELETE_DENIAL private-path\n# fail 1' });
+  assert.deepEqual(row.diagnosticCodes, ['PHI_CLONE_TIMEOUT_DELETE_DENIAL']);
+  assert.doesNotMatch(JSON.stringify(row), /private-path/u);
+  assert.deepEqual(validationFailureEvidence('foundation-tests', { stdout: '# PHI_CLONE_TIMEOUT_PRIVATE' }).diagnosticCodes, []);
+});
 test('failure metadata fails closed for unknown stages and records timeout without private errors', () => {
   const evidence = validationFailureEvidence('user-private-stage', { status: null, error: { code: 'ETIMEDOUT', message: 'private' } });
   assert.equal(evidence.failureStage, 'UNKNOWN'); assert.equal(evidence.exitCode, null); assert.equal(evidence.timedOut, true);
