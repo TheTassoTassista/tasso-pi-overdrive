@@ -1,0 +1,38 @@
+# Phi — Current Project State
+
+Last verified: 2026-10-03 (live Git and GitHub Actions evidence)
+
+## Git
+
+- Branch: `feature/routing-presets-quality`
+- R1 implementation HEAD before this documentation checkpoint: `0a186919fff0c3a1677a1fdfc143b69538ec1efe`
+- Remote branch HEAD before this documentation checkpoint: `0a186919fff0c3a1677a1fdfc143b69538ec1efe` (live `git ls-remote`)
+- Staged state at the pre-documentation snapshot: empty.
+- Pre-documentation working tree: modified `docs/final-adversarial-audit.md` (protected user content), `docs/phi-progress.md`, `docs/phi-portability-report.md`; untracked `AGENTS.md`, `docs/phi-mixed-native-evidence.json`, and `harness/`. This is a historical snapshot before the documentation commit.
+- Protected audit SHA-256: `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`, matching the recorded user-state baseline. Never modify or stage it without explicit authorization.
+
+## Product and phase
+
+- User-facing name/CLI/symbol: Phi / `phi` / Φ.
+- D6: **PARTIAL**. D: **IN_PROGRESS**. Windows autonomy: **BLOCKED**. Portability: **IN PROGRESS**.
+- V5 now has a bounded normal-`phi` recovery terminal **observation** only: a dead publisher with valid `CLEANUP_STARTED`, known identity/ownership, complete fresh native physical proof and absent owned quarantine can append one recovery-marked `CLEANED` under its transaction lease. Other V5 states stay blocked/manual. The live controller grant still rejects V5. There is no recovered publication certificate, RESUME/replay, original Worker mixed publication, whole-transaction atomicity, D-wide E2E or power-loss proof.
+
+## Verified latest checkpoint
+
+- Functional `0a186919fff0c3a1677a1fdfc143b69538ec1efe` / [CI 37144185054](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37144185054) **SUCCESS** on real Windows and Ubuntu. Dedicated native V5 **21/21 PASS**: 13 killed-publisher ordinary-startup dispositions include one terminal-observation append, repeat-start idempotence, seven earlier/manual states, quarantine return, corrupt journal, two concurrent terminal attempts, external filesystem change after classification, and interrupted append. Windows main and independent source clone each **476/464 PASS/0 FAIL/12 skips**; Ubuntu main **476/160 PASS/0 FAIL/316 native-Windows skips**, Ubuntu clone `PASS_FOUNDATION_ONLY`. Windows clone cleanup PASS, directory removed, residual owned processes 0; three isolated Pi controls PASS, zero external requests. This is narrow V5 terminal bookkeeping, not V5 publication or autonomy.
+- Prior `cd8c71612b7f2561fe33ae8c7c7df545ebfa4378` / [CI 37143402124](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37143402124) **FAILURE overall**: dedicated V5 passed, but aggregate Windows test `after-cleanup-unlinked` failed at `PUBLISHER_READY_TIMEOUT` before recovery assertions. Exact cause **UNKNOWN**; it did not recur at `0a186919fff0c3a1677a1fdfc143b69538ec1efe` and was not fixed by extending a timeout.
+- Functional `ddf0a14ec4c481269b51e3ae54229c50d1306a6d` / [CI 37126156313](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37126156313) **SUCCESS** on real Windows and Ubuntu. Windows main and independent Git-source clone each 470 total / 458 PASS / 0 FAIL / 12 Linux-only skips; Ubuntu main 470 / 159 PASS / 0 FAIL / 311 native-Windows skips, Ubuntu clone PASS_FOUNDATION_ONLY. Dedicated native V5 step 16/16 PASS; all eight killed-publisher cases launched ordinary `phi` twice and proved blocked/manual, unchanged project/Git diff/quarantine/journal, and owned cleanup. Windows clone cleanup PASS, directory removed, residual owned processes 0; three isolated deterministic Pi controls PASS, each zero external requests. This is fail-closed startup evidence, not V5 recovery action or Worker publication.
+- Previous `7beff1f87b614beb960b4cd2546e8b1e1ab024a3` / [CI 37125550867](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37125550867) **FAILURE overall** before the V5 step. The native recovery focus passed all 13 cases individually; sequential replay passed 12/13 and failed test 1 (`pending-directory-control`), with its assertion redacted. The fixed V5 publisher marker was not exercised by this run. Exact failure cause **UNKNOWN**. It did not recur at `ddf0a14`; diagnostic-only changes are not a cleanup fix.
+- Previous `b5a3c7ec145938fb147509203aaeac785723b14c` / [CI 37124518318](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37124518318) **FAILURE overall**. Dedicated mixed V5 Windows step passed 16/16, including all eight ordinary `phi` startup checks. Later aggregate Windows suite had 469 total / 456 PASS / 1 FAIL / 12 skips. The sole failure was `after-rename-moved` at broad fixture stage `PUBLISHER` before the kill/read/startup assertions; its exact cause is **UNKNOWN**. Ubuntu main passed 469/158/0/311 and foundation clone passed. Windows independent clone and Pi smokes were not reached. Do not credit a full gate or claim a product defect from this fixture stage alone.
+- Functional `bba78e1875346c6f18c184278d078f428c1a6311`: [CI 37122496570](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37122496570) **SUCCESS** on real Windows and Ubuntu. Windows main and independent Git-source clone each 469 total / 457 PASS / 0 FAIL / 12 Linux-only skips; Ubuntu main 469 / 158 PASS / 0 FAIL / 311 native-Windows skips, Ubuntu clone `PASS_FOUNDATION_ONLY`. Windows owned clone cleanup PASS, directory removed, residual owned processes 0. Three isolated deterministic Pi controls PASS, external requests 0. V5 exact five-file Git-diff fixture PASS in the main checkout and independent clone.
+- Previous `65b80965be31b52e216a1baf5fa6e20dca4bfc06` / [CI 37108528590](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37108528590) **FAILURE** at independent Windows clone test 51; main suite passed. The failure did not recur at `bba78e1875346c6f18c184278d078f428c1a6311`. Its original assertion/root cause remains **UNKNOWN**, not retrospectively repaired by the diagnostic-only change.
+- Diagnostic change adds fixed privacy-safe failure-stage codes if test 51 fails again. It does not change native cleanup, security limits or product behavior. Local direct validation-evidence tests 14/14 PASS; clone-cleanup portable tests 7/7 PASS with seven native Windows skips; syntax/targeted whitespace checks PASS.
+
+## Exact unfinished work
+
+1. Keep all earlier, partial, conflicting or ambiguous V5 states manual. The new `CLEANED` certifies the physical observation at T only; it proves neither unlink provenance nor uninterrupted state to append A. Every later physical action requires fresh native proof.
+2. Prove original Worker/controller mixed publication and any additional V5 RESUME/FINALIZE disposition separately, then D-wide E2Es. Preserve D6 PARTIAL, D IN_PROGRESS and Windows autonomy BLOCKED.
+3. Native Linux V5 recovery is not implemented or claimed; Ubuntu proves portable rejection/no fallback and the rest of the supported foundation. Power-loss and noncooperative registry tampering remain outside this certificate.
+4. Preserve UNKNOWN for the prior clone test-51, V5 readiness timeout and sequential recovery failures until evidence identifies a cause.
+
+Authoritative detail: `docs/phi-progress.md`, `docs/phi-portability-report.md`, `harness/CONTINUATION.md`, `harness/TEST_BASELINE.md`.
