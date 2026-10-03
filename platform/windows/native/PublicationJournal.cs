@@ -36,7 +36,8 @@ namespace Phi.Native {
     readonly RecoveryFilesystem pins;
     Dictionary<string, object> header, last, reclamation;
     string lastDigest;
-    bool acquired, poisoned, disposed, deleteCleanupIntent, recoveryMutationUncertain;
+    bool acquired, poisoned, disposed, deleteCleanupIntent, recoveryMutationUncertain, recoveryJournalAppendAttempted;
+    Action fixtureAfterRecoveryTerminalSetValue;
     string[] mixedPhases, mixedTempIdentities, mixedCommittedIdentities;
     int recoveryProjectMutations;
     sealed class AdmissionConflict : InvalidOperationException {
@@ -390,7 +391,11 @@ namespace Phi.Native {
       if (key.GetValueNames().Contains(name)) throw new InvalidDataException();
       byte[] bytes = Envelope(body);
       try {
-        ScopeRecovery.ValidateRegistry(key); key.SetValue(name, bytes, RegistryValueKind.Binary);
+        ScopeRecovery.ValidateRegistry(key);
+        if (terminalObservation == RecoveryTerminalObservation) recoveryJournalAppendAttempted = true;
+        key.SetValue(name, bytes, RegistryValueKind.Binary);
+        if (terminalObservation == RecoveryTerminalObservation && fixtureAfterRecoveryTerminalSetValue != null)
+          fixtureAfterRecoveryTerminalSetValue(); // Fixed native interruption fixture only.
         if (RegFlushKey(key.Handle.DangerousGetHandle()) != 0 || !ReadValue(key, name).SequenceEqual(bytes)) throw new InvalidDataException();
         // Flush both the transaction and its parent key before claiming PREPARED.
         if (sequence == 0) using (RegistryKey root = OpenBase(true)) if (RegFlushKey(root.Handle.DangerousGetHandle()) != 0) throw new InvalidDataException();
@@ -1645,8 +1650,15 @@ namespace Phi.Native {
         Console.WriteLine(Serializer().Serialize(result)); return 0;
       } catch {
         int version = journal != null && journal.header != null ? (int)journal.header["version"] : 0;
+        if (version == 5) {
+          bool attempted = journal.recoveryJournalAppendAttempted;
+          Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_BOUNDED_MIXED_TERMINAL_OBSERVATION",
+            decision = "MANUAL_RECOVERY_REQUIRED", actionPerformed = attempted,
+            journalMutations = attempted ? (object)"UNKNOWN" : 0, projectMutations = 0, processKills = 0,
+            projectPublished = false, externalRequests = 0 })); return 70;
+        }
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = version == 2 ? "FAIL_BOUNDED_MODIFY_RECOVERY" :
-            version == 3 ? "FAIL_BOUNDED_DELETE_RECOVERY" : version == 5 ? "FAIL_BOUNDED_MIXED_TERMINAL_OBSERVATION" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
+            version == 3 ? "FAIL_BOUNDED_DELETE_RECOVERY" : "FAIL_BOUNDED_RENAME_RECOVERY", decision = "MANUAL_RECOVERY_REQUIRED",
           actionPerformed = journal != null && (journal.recoveryMutationUncertain || journal.recoveryProjectMutations != 0),
           projectMutations = journal == null ? (object)0 : journal.recoveryMutationUncertain ? (object)"UNKNOWN" : journal.recoveryProjectMutations,
           processKills = 0, projectPublished = false, externalRequests = 0 })); return 70;
@@ -1941,7 +1953,8 @@ namespace Phi.Native {
       } catch { Console.Error.WriteLine("PHI_MIXED_CRASH_CHILD_FAILED"); return 70; }
     }
     internal static int MixedPhysicalCrashSelfTest(string name) {
-      string stop, childCaseName = new string[] { "race-after-observation", "quarantine-returned", "corrupt-journal", "concurrent-terminal" }.Contains(name) ?
+      string stop, childCaseName = new string[] { "race-after-observation", "quarantine-returned", "corrupt-journal",
+        "concurrent-terminal", "append-interrupted" }.Contains(name) ?
         "after-cleanup-unlinked" : name;
       try { stop = MixedCrashCheckpoint(childCaseName); } catch { return 70; }
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
@@ -1950,7 +1963,7 @@ namespace Phi.Native {
       bool firstStartupGone = false, secondStartupGone = false, startupIdempotent = false;
       bool externalChangedAfterObservation = false, laterClassificationSawChange = false;
       bool liveOwnerDenied = false, duplicateTerminalDenied = false;
-      bool corruptJournalRejected = false, concurrentSingleTerminal = false;
+      bool corruptJournalRejected = false, concurrentSingleTerminal = false, appendInterruptionFailClosed = false;
       int firstStartupExit = -1, secondStartupExit = -1;
       object evidence = null;
       try {
@@ -2114,11 +2127,24 @@ namespace Phi.Native {
           concurrentSingleTerminal = succeeded == 1 && failed == 1;
           if (!concurrentSingleTerminal) throw new InvalidDataException();
         }
+        if (name == "append-interrupted") {
+          stage = "INTERRUPT_TERMINAL_APPEND_BEFORE_FLUSH";
+          using (PublicationJournal interrupted = new PublicationJournal(tx, scope.Root))
+          using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
+            if (key == null) throw new InvalidDataException(); interrupted.ReadChain(key);
+            interrupted.fixtureAfterRecoveryTerminalSetValue = delegate() { throw new InvalidDataException(); };
+            try { interrupted.RecoverKnownMixed(rootId, delegate() { }); }
+            catch (InvalidDataException) { appendInterruptionFailClosed = interrupted.recoveryJournalAppendAttempted && interrupted.poisoned; }
+          }
+          if (!appendInterruptionFailClosed || Serializer().Serialize(Snapshot(scope.Root, rootId, quarantineLeaf)) != projectBefore)
+            throw new InvalidDataException();
+        }
         string firstError, secondError;
         Dictionary<string, object> first = RunNormalPhiStartup(scope.Root, out firstStartupGone, out firstStartupExit, out firstError);
         stage = "SECOND_NORMAL_PHI_STARTUP";
         Dictionary<string, object> second = RunNormalPhiStartup(scope.Root, out secondStartupGone, out secondStartupExit, out secondError);
-        bool eligible = name == "after-cleanup-unlinked", alreadyTerminal = name == "concurrent-terminal";
+        bool eligible = name == "after-cleanup-unlinked",
+          alreadyTerminal = name == "concurrent-terminal" || name == "append-interrupted";
         foreach (Dictionary<string, object> startup in new Dictionary<string, object>[] { first, second }) {
           if (name == "corrupt-journal") {
             if ((string)startup["status"] != "UNKNOWN_FAIL_SAFE" || startup["journalMutations"] != null ||
@@ -2186,9 +2212,10 @@ namespace Phi.Native {
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, checkpoint = stop, passed, actualPublisherKilled = killed,
         publisherGone, freshReaderGone = readerGone, firstStartupGone, secondStartupGone, firstStartupExit, secondStartupExit,
-        normalPhiStartupsBlocked = passed && name != "after-cleanup-unlinked" && name != "concurrent-terminal", startupIdempotent, fixtureCleanup = clean && gitClean,
+        normalPhiStartupsBlocked = passed && name != "after-cleanup-unlinked" && name != "concurrent-terminal" &&
+          name != "append-interrupted", startupIdempotent, fixtureCleanup = clean && gitClean,
         gitMetadataClean = gitClean, externalChangedAfterObservation, laterClassificationSawChange,
-        liveOwnerDenied, duplicateTerminalDenied, corruptJournalRejected, concurrentSingleTerminal, evidence,
+        liveOwnerDenied, duplicateTerminalDenied, corruptJournalRejected, concurrentSingleTerminal, appendInterruptionFailClosed, evidence,
         scope = "V5_PHYSICAL_DEATH_FRESH_READER_TERMINAL_OBSERVATION_ONLY",
         projectPublished = false, externalRequests = 0 }));
       return passed && clean && gitClean && publisherGone && readerGone && firstStartupGone && secondStartupGone && startupIdempotent ? 0 : 70;
@@ -2196,7 +2223,7 @@ namespace Phi.Native {
     static bool MixedDeleteCommitted(string name) {
       return name == "after-delete" || name == "after-rename-moved" || name == "after-all-mutations" ||
         name == "after-cleanup-intent" || name == "after-cleanup-unlinked" || name == "race-after-observation" ||
-        name == "quarantine-returned" || name == "corrupt-journal" || name == "concurrent-terminal";
+        name == "quarantine-returned" || name == "corrupt-journal" || name == "concurrent-terminal" || name == "append-interrupted";
     }
     internal static int MixedJournalFixtureChild(string name) {
       if (name != "partial-after-modify-journal-only" && name != "partial-after-real-modify" &&

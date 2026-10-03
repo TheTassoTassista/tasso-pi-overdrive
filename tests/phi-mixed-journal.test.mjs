@@ -60,7 +60,7 @@ test('production native V5 endpoint physically applies all four operations and r
 for (const caseName of [
   'before-first', 'after-modify', 'after-create', 'after-delete',
   'after-rename-moved', 'after-all-mutations', 'after-cleanup-intent', 'after-cleanup-unlinked',
-  'race-after-observation', 'quarantine-returned', 'corrupt-journal', 'concurrent-terminal',
+  'race-after-observation', 'quarantine-returned', 'corrupt-journal', 'concurrent-terminal', 'append-interrupted',
 ]) test(`V5 publisher death gives bounded ordinary Phi startup disposition: ${caseName}`,
   { skip: process.platform !== 'win32', timeout: 120000 }, () => {
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-crash-selftest', caseName], {
@@ -78,7 +78,8 @@ for (const caseName of [
     assert.equal(receipt.secondStartupGone, true);
     assert.equal(receipt.firstStartupExit, 1);
     assert.equal(receipt.secondStartupExit, 1);
-    assert.equal(receipt.normalPhiStartupsBlocked, !['after-cleanup-unlinked', 'concurrent-terminal'].includes(caseName));
+    assert.equal(receipt.normalPhiStartupsBlocked,
+      !['after-cleanup-unlinked', 'concurrent-terminal', 'append-interrupted'].includes(caseName));
     if (caseName === 'after-cleanup-unlinked') {
       assert.equal(receipt.liveOwnerDenied, true);
       assert.equal(receipt.duplicateTerminalDenied, true);
@@ -89,6 +90,7 @@ for (const caseName of [
     }
     if (caseName === 'corrupt-journal') assert.equal(receipt.corruptJournalRejected, true);
     if (caseName === 'concurrent-terminal') assert.equal(receipt.concurrentSingleTerminal, true);
+    if (caseName === 'append-interrupted') assert.equal(receipt.appendInterruptionFailClosed, true);
     assert.equal(receipt.startupIdempotent, true);
     assert.equal(receipt.gitMetadataClean, true);
     assert.equal(receipt.fixtureCleanup, true);
