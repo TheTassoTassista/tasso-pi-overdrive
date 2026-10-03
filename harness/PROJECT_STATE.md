@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-03 (live Git and GitHub Actions evidence)
+Last verified: 2026-10-04 (exact native gate complete)
+
+## Latest verified checkpoint, not a D6 completion certificate
+
+Functional `b27dbb5b59a632e32180ebea076aa0e5ae69f690` was pushed to the same branch and passed [CI37160704978](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37160704978) on native Windows and Ubuntu. The bounded controller V5 four-operation path admits a one-use publication grant only after a verified draft, clean applicable LSP, full TEST and explicit controller RENAME intent; Worker tool mutation is frozen at READY. Windows focused Worker/controller **6/6 PASS**, V5 dispositions **22/22 PASS**, main and independent clone each **479/467 PASS/0 FAIL/12 skips**; Ubuntu main **479/161 PASS/0 FAIL/318 native skips** and foundation clone PASS. Windows clone LSP install exit0 in 29,197 ms under the unchanged 120-second limit, cleanup PASS/directory removed/residual owned processes0; three Pi controls PASS/external requests0. The startup gate still rejects Windows autonomous workflow before delegation, and secure workflow revokes the Worker attempt after response; this bounded internal test is not normal autonomous production integration. V5 recovery still has only the R1 metadata-observation automatic cell; retention excludes V5 automatic reclaim. D6 remains **PARTIAL**, D **IN_PROGRESS**, Windows autonomy **BLOCKED**, native Linux V5 recovery **unverified**. Main must decide the production-reachable trusted RENAME-intent and Worker-draft lifecycle boundary without enabling Windows autonomy or Worker self-certification. Protected audit hash is unchanged and unstaged.
 
 ## Git
 
@@ -15,7 +19,7 @@ Last verified: 2026-10-03 (live Git and GitHub Actions evidence)
 
 - User-facing name/CLI/symbol: Phi / `phi` / Φ.
 - D6: **PARTIAL**. D: **IN_PROGRESS**. Windows autonomy: **BLOCKED**. Portability: **IN PROGRESS**.
-- V5 now has a bounded normal-`phi` recovery terminal **observation** only: a dead publisher with valid `CLEANUP_STARTED`, known identity/ownership, complete fresh native physical proof and absent owned quarantine can append one recovery-marked `CLEANED` under its transaction lease. Other V5 states stay blocked/manual. The live controller grant still rejects V5. There is no recovered publication certificate, RESUME/replay, original Worker mixed publication, whole-transaction atomicity, D-wide E2E or power-loss proof.
+- V5 has a bounded normal-`phi` recovery terminal **observation** only: a dead publisher with valid `CLEANUP_STARTED`, known identity/ownership, complete fresh native physical proof and absent owned quarantine can append one recovery-marked `CLEANED` under its transaction lease. Other V5 recovery states stay blocked/manual. The live internal controller grant now accepts only the verified serialized four-op handoff; ordinary top-level Windows workflow still cannot reach it. There is no recovered publication certificate, RESUME/replay, ordinary autonomous Worker mixed publication, whole-transaction atomicity, D-wide E2E or power-loss proof.
 
 ## Verified latest checkpoint
 
@@ -31,7 +35,7 @@ Last verified: 2026-10-03 (live Git and GitHub Actions evidence)
 ## Exact unfinished work
 
 1. Keep all earlier, partial, conflicting or ambiguous V5 states manual. The new `CLEANED` certifies the physical observation at T only; it proves neither unlink provenance nor uninterrupted state to append A. Every later physical action requires fresh native proof.
-2. Prove original Worker/controller mixed publication and any additional V5 RESUME/FINALIZE disposition separately, then D-wide E2Es. Preserve D6 PARTIAL, D IN_PROGRESS and Windows autonomy BLOCKED.
+2. Main/Work Control must resolve ordinary production reachability for the trusted controller RENAME intent and Worker draft lifetime without lifting the Windows autonomy gate or allowing Worker self-certification. Keep any additional V5 RESUME/FINALIZE disposition manual until separately proved; D-wide E2Es are Campaign 2. Preserve D6 PARTIAL, D IN_PROGRESS and Windows autonomy BLOCKED.
 3. Native Linux V5 recovery is not implemented or claimed; Ubuntu proves portable rejection/no fallback and the rest of the supported foundation. Power-loss and noncooperative registry tampering remain outside this certificate.
 4. Preserve UNKNOWN for the prior clone test-51, V5 readiness timeout and sequential recovery failures until evidence identifies a cause.
 

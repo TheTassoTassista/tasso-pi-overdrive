@@ -1,6 +1,13 @@
 # Phi — Session Continuation
 
-Last verified: 2026-10-03
+Last verified: 2026-10-04 (exact native Windows/Ubuntu gate complete)
+
+## Current D6 Campaign 1 checkpoint — Main production-reachability boundary
+
+- BRANCH/validated functional HEAD/pushed remote HEAD: `feature/routing-presets-quality` / `b27dbb5b59a632e32180ebea076aa0e5ae69f690`. Exact [CI37160704978](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37160704978) completed **SUCCESS** on native Windows and Ubuntu; do not rerun it blindly. A documentation-only checkpoint may advance HEAD without changing the validated source.
+- Index empty after commit. Remaining working tree contains pre-existing protected `docs/final-adversarial-audit.md`, pre-existing additions to `docs/phi-progress.md`/`docs/phi-portability-report.md`, and the newly added candidate note in this file/progress. Pre-existing untracked `AGENTS.md`, `docs/phi-mixed-native-evidence.json` and `harness/` files remain preserved. Protected SHA-256 still `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba` and was never staged.
+- Main decisions `PORTABILITY-CAMPAIGNS-001`, `D6-PUBLICATION-AUTHORITY-001`, `D6-V5-RECOVERY-DISPOSITIONS-001` are durable in `harness/DECISIONS.md` at this functional commit. The V5-only Worker handoff freezes tool admission after READY, and the existing native four-op publisher is called by the one-use trusted controller grant. Native Worker-hook/registered-tool/LSP/verification/Git-diff and stale/conflict tests **6/6 PASS**; native V5 disposition/death tests **22/22 PASS**. Windows main and independent source clone each **479/467 PASS/0 FAIL/12 skips**; Ubuntu main **479/161 PASS/0 FAIL/318 native skips**. Windows clone LSP install exit0/29,197 ms (<120,000 ms), cleanup PASS/directory removed/residual owned processes0; three isolated Pi controls PASS with external requests0. Local `npm run check` PASS; zero provider/model calls.
+- **Status remains D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.** The ordinary Windows `secure_coding_workflow` rejects at `requireCodingBackend("workflow")` before delegation, and its current Worker attempt is revoked after response. The bounded internal controller path is not a top-level autonomous production integration; it has no trusted ordinary-workflow source for explicit RENAME intent or surviving Worker draft handoff. Recovery has no new physical-mutation authority; only exact R1 metadata observation can act, all earlier/ambiguous states remain manual. V5 retention intentionally keeps journals; native Linux V5 recovery is unverified. **STOP/Main boundary:** ask Φ Work Control/Φ Main whether D6 production reachability requires a new trusted controller entrypoint/intent channel or a change to the ordinary workflow lifecycle, and how to do this without activating Windows autonomy or Worker self-certification. Do not assert Campaign 1 complete or start Campaign 2.
 
 ## Branch / heads / working tree
 
@@ -13,7 +20,7 @@ Last verified: 2026-10-03
 
 ## Current phase / security status
 
-D6 PARTIAL; D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; portability IN PROGRESS. The V5 controller publication grant remains fail-closed; only recovery terminal observation from exact `CLEANUP_STARTED` is enabled. Preserve no-clobber, native isolation, ResourceFS, verified draft continuity, transaction ownership, bounded recovery and protected state. Recovery must not mint PUBLISHED or replay committed operations.
+D6 PARTIAL; D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; portability IN PROGRESS. The V5 controller publication grant is bounded to a verified one-use four-op handoff in the internal path; ordinary Windows autonomous workflow is still blocked before delegation. Only recovery terminal observation from exact `CLEANUP_STARTED` is enabled. Preserve no-clobber, native isolation, ResourceFS, verified draft continuity, transaction ownership, bounded recovery and protected state. Recovery must not mint PUBLISHED or replay committed operations.
 
 ## Last verified checkpoint / tests / CI
 
@@ -36,7 +43,7 @@ D6 PARTIAL; D IN_PROGRESS; WINDOWS AUTONOMY BLOCKED; portability IN PROGRESS. Th
 ## Current unfinished unit / exact next action
 
 1. Keep the R1 terminal observation contract narrow. `CLEANED` from recovery marks an observation, not publisher unlink provenance, continuous filesystem truth or project publication. Every later physical operation reclassifies natively.
-2. Investigate other V5 dispositions only with separate architecture authority and native proof; partial and ambiguous states stay manual. The original Worker/controller mixed grant, D-wide E2Es and Windows autonomy remain blocked.
+2. Preserve the bounded internal Worker/controller mixed grant, but do not claim ordinary production reachability. Escalate the explicit RENAME-intent and surviving Worker-draft workflow boundary to Main. Partial and ambiguous V5 recovery states stay manual; D-wide E2Es and Windows autonomy remain blocked.
 3. If the earlier fixture readiness timeout recurs, inspect its fixed stage evidence. Do not infer a root cause or increase the deadline to hide it.
 
 ## Known limitations / blocker

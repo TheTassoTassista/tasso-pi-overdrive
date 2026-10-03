@@ -1,6 +1,21 @@
 # Phi — Test Baseline
 
-Last verified: 2026-10-03. Branch `feature/routing-presets-quality`; validated implementation HEAD before the documentation checkpoint `0a186919fff0c3a1677a1fdfc143b69538ec1efe`.
+Last verified: 2026-10-04. Branch `feature/routing-presets-quality`; validated functional HEAD `b27dbb5b59a632e32180ebea076aa0e5ae69f690`.
+
+## Latest CI: 37160704978 — SUCCESS
+
+[Run](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37160704978), exact functional HEAD `b27dbb5b59a632e32180ebea076aa0e5ae69f690`, completed **SUCCESS** on native Windows and Ubuntu.
+
+| Gate | Result |
+| --- | --- |
+| Windows focused Worker/controller publication | 6/6 PASS: registered Worker tools, verified handoff, four-operation V5 native publication, exact Git diff, stale grant and concurrent-user conflict. This is an internal bounded controller path. |
+| Windows focused V5 disposition/death cases | 22/22 PASS, including 13 real publisher-death cases and explicit physical disposition labels. |
+| Windows main and independent source clone | Each 479 total / 467 PASS / 0 FAIL / 12 Linux-only skips; clone `PASS_FOUNDATION_ONLY`, pinned LSP install exit0 in 29,197 ms (<120,000 ms), cleanup PASS/directory removed/owned residual 0. |
+| Ubuntu main and source clone | Main 479 / 161 PASS / 0 FAIL / 318 native-Windows skips; clone `PASS_FOUNDATION_ONLY`. Native Linux V5 recovery remains unverified. |
+| Three isolated Pi controls | PASS; external requests 0. |
+| Local full gate | `npm run check` PASS; focused publication/mixed-journal 70 total / 21 PASS / 0 FAIL / 49 native-Windows skips. |
+
+The ordinary Windows `secure_coding_workflow` still fails closed at its backend gate before delegation and revokes a Worker attempt after response; no top-level production-reachable mixed publication was certified. V5 recovery has only R1 metadata observation; partial/ambiguous cells are deliberately manual and V5 journals are retained. D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED. No provider/model calls.
 
 ## Latest CI: 37144185054 — SUCCESS
 
@@ -63,4 +78,4 @@ The prior exact `65b8096` / [CI 37108528590](https://github.com/TheTassoTassista
 
 ## Capability limit
 
-D6 remains PARTIAL. Only V5 terminal observation via normal startup is verified. Other V5 recovery actions and original Worker mixed publication remain unverified; Windows autonomy BLOCKED. Test counts do not certify production-path behavior, full reconstruction or disaster recovery.
+D6 remains PARTIAL. V5 terminal observation via normal startup and the bounded internal Worker/controller four-operation publication path are native-Windows verified; ordinary top-level workflow integration remains blocked before delegation. Other V5 recovery actions remain deliberately manual; Windows autonomy BLOCKED. Test counts do not certify ordinary production-path behavior, full reconstruction or disaster recovery.
