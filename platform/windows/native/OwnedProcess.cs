@@ -121,6 +121,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--publication-modify-fixture-child") return PublicationJournal.ModifyFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-modify-fixture-recover") return PublicationJournal.ModifyFixtureRecover();
       if (args.Length == 1 && args[0] == "--publication-modify" && IntPtr.Size == 8) return PublicationJournal.RunSingleModify(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--publication-mixed" && IntPtr.Size == 8) return PublicationJournal.RunMixed(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-delete" && IntPtr.Size == 8) return PublicationJournal.RunSingleDelete(Console.OpenStandardInput());
       if (args.Length == 2 && args[0] == "--publication-delete-selftest") return PublicationJournal.DeleteSelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-delete-controller-recovery-selftest") return PublicationJournal.DeleteControllerRecoverySelfTest(args[1]);
@@ -138,6 +139,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--publication-rename-controller-recovery-selftest") return PublicationJournal.RenameControllerRecoverySelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-startup-recovery-selftest") return PublicationJournal.StartupRecoverySelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--publication-mixed-journal-selftest") return PublicationJournal.MixedJournalSelfTest(args[1]);
+      if (args.Length == 1 && args[0] == "--publication-mixed-physical-selftest") return PublicationJournal.MixedPhysicalSuccessSelfTest();
       if (args.Length == 2 && args[0] == "--publication-mixed-journal-fixture-child") return PublicationJournal.MixedJournalFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-mixed-journal-fixture-read") return PublicationJournal.MixedJournalFixtureRead();
       if (args.Length == 2 && args[0] == "--publication-rename-fixture-child") return PublicationJournal.RenameFixtureChild(args[1]);

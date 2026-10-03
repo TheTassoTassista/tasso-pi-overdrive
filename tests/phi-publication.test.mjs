@@ -84,7 +84,9 @@ test('V5 representative mixed manifest folds only an explicit rename pair and pr
   assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'c.txt': 'retained' }, 10), intent), /RENAME_INTENT_INVALID/u);
   assert.throws(() => publicationOperations(base, snapshot({ ...next.files, 'extra.txt': 'extra' }, 10), intent), /RENAME_INTENT_INVALID/u);
   assert.throws(() => publicationOperations(base, snapshot({ 'a.txt': 'old a', 'b.txt': 'new b', 'e.txt': 'old d', 'keep.txt': 'same' }, 10), intent), /RENAME_INTENT_INVALID/u);
-  assert.throws(() => publishWindowsSingleOperation({ metadata: { operations } }), /MIXED_NOT_IMPLEMENTED/u);
+  const publisher = fs.readFileSync(new URL('../platform/windows/publication.mjs', import.meta.url), 'utf8');
+  assert.match(publisher, /operations\?\.length === 4\) return publishWindowsMixed\(options\)/u);
+  assert.match(publisher, /\['--publication-mixed'\]/u);
 });
 test('baseline conflicts detect root/file identity, identical-text delete/recreate, edit, removal and new user file', () => {
   const original = snapshot(), base = publicationBase(original);

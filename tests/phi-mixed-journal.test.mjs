@@ -11,7 +11,14 @@ test('V5 mixed journal reconstructs per-operation physical evidence without enab
   assert.match(source, /operationPhases = Enumerable\.Repeat\("NOT_STARTED"/u);
   assert.match(source, /MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION/u);
   assert.match(source, /return parsed\.InspectMixedPhysical\(trace\)/u);
-  assert.match(source, /AtomicModify\.ReplaceDefaultStream\(root/u);
+  assert.match(source, /void PublishMixedModify\([\s\S]*?AtomicModify\.ReplaceDefaultStream\(project/u);
+  assert.match(source, /void PublishMixedCreate\([\s\S]*?AnchoredFile\.CreateNoReplace\(project/u);
+  assert.match(source, /journal\.PublishMixedModify\(Encoding\.UTF8\.GetBytes\("a-new"\)/u);
+  assert.match(source, /journal\.PublishMixedCreate\(Encoding\.UTF8\.GetBytes\("b-new"\)/u);
+  assert.match(source, /void PublishMixedDelete\([\s\S]*?parent\.QuarantineDeleteSource\(source, quarantine\)/u);
+  assert.match(source, /void PublishMixedRename\([\s\S]*?parent\.RenameExpectedSource\(source/u);
+  assert.match(source, /void PublishMixedCleanup\([\s\S]*?parent\.UnlinkQuarantinedFile\(held, expected\)/u);
+  assert.match(source, /internal static int RunMixed\(Stream input\)/u);
   assert.match(source, /observedQuarantineIdentity/u);
   assert.match(source, /observedCreateTempIdentity/u);
   assert.match(source, /new string\[\] \{ "REPLACE", "CREATE", "DELETE", "RENAME" \}/u);
@@ -20,6 +27,33 @@ test('V5 mixed journal reconstructs per-operation physical evidence without enab
     entries: [{ transactionId: 'a'.repeat(32), journalVersion: 5, phase: 'PREPARED', classification: 'MANUAL_RECOVERY_REQUIRED' }] }).kind,
   'BLOCKED_MANUAL_RECOVERY_REQUIRED');
 });
+
+test('production native V5 endpoint physically applies all four operations and retains no temp or quarantine',
+  { skip: process.platform !== 'win32', timeout: 45000 }, () => {
+    const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-selftest'], {
+      shell: false, windowsHide: true, encoding: 'utf8', timeout: 35000, maxBuffer: 8192,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const receipt = JSON.parse(run.stdout);
+    assert.equal(receipt.passed, true);
+    assert.equal(receipt.scope, 'V5_NATIVE_MIXED_NO_CRASH_PHYSICAL_ONLY');
+    assert.equal(receipt.publisherGone, true);
+    assert.equal(receipt.readerNoMutation, true);
+    assert.equal(receipt.fixtureCleanup, true);
+    assert.equal(receipt.projectPublished, false);
+    assert.equal(receipt.externalRequests, 0);
+    assert.equal(receipt.evidence.phase, 'CLEANED');
+    assert.equal(receipt.evidence.journalState, 'FINALIZED');
+    assert.deepEqual(receipt.evidence.operationStates, Array(4).fill('NEW_COMPLETE_OBSERVED'));
+    assert.equal(receipt.evidence.createIdentityPreserved, true);
+    assert.equal(receipt.evidence.renameIdentityPreserved, true);
+    assert.equal(receipt.evidence.deleteDestinationAbsent, true);
+    assert.equal(receipt.evidence.quarantineAbsent, true);
+    assert.equal(receipt.evidence.draftDigestMatched, true);
+    assert.equal(windowsRecoveryStatus().status, 'PASS');
+    assert.doesNotMatch(JSON.stringify(receipt), /a-old|a-new|b-new|c-old|d-old/u);
+    console.log(JSON.stringify({ control: 'V5_NATIVE_MIXED_NO_CRASH_PHYSICAL_ONLY', ...receipt }));
+  });
 
 test('real publisher death retains a four-operation V5 journal for a fresh process without mutating project',
   { skip: process.platform !== 'win32', timeout: 45000 }, () => {

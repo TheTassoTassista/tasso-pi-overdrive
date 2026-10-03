@@ -319,11 +319,65 @@ export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metad
 // Same opaque trusted-controller grant, journal, source-attested helper and
 // one-use private certificate. No extra role/model execution authority.
 export function publishWindowsSingleOperation(options) {
+  if (options?.metadata?.operations?.length === 4) return publishWindowsMixed(options);
   if (options?.metadata?.operations?.length !== 1) fail('MIXED_NOT_IMPLEMENTED');
   if (options?.metadata?.operations?.length === 1 && options.metadata.operations[0].kind === 'RENAME') return publishWindowsSingleRename(options);
   const operations = publicationOperations(options.base, options.snapshot);
   if (operations.length === 1 && operations[0].kind === 'DELETE') return publishWindowsSingleDelete(options);
   return publishWindowsSingleModify(options); // Existing MODIFY path unchanged.
+}
+function publishWindowsMixed({ cwd, base, snapshot, binding, metadata, remainingMs }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  const proposed = metadata?.operations;
+  if (!Array.isArray(proposed) || proposed.length !== 4 || !same(proposed.map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'RENAME'])) fail('MIXED_SHAPE_INVALID');
+  const operations = publicationOperations(base, snapshot, { sourcePath: proposed[3].sourcePath, destinationPath: proposed[3].path });
+  if (metadata.transactionId === null || binding.digest !== draftContentDigest(snapshot.files) || metadata.verifiedDigest !== binding.digest ||
+      metadata.baseDigest !== base.digest || !same(proposed, operations) || !Number.isSafeInteger(remainingMs) || remainingMs < 1) fail('BINDING_INVALID');
+  if (publicationConflicts(base, readWindowsProjectSnapshot(cwd)).length) fail('CONFLICT');
+  const timeoutMs = Math.min(remainingMs, 30000);
+  const header = { transactionId: metadata.transactionId, projectIdentity: base.rootIdentity, draftId: binding.id, draftVersion: binding.revision,
+    verifiedDigest: binding.digest, baseDigest: base.digest, operations };
+  const request = { version: 1, root: cwd, header, modifyContent: snapshot.files[operations[0].path],
+    createContent: snapshot.files[operations[1].path], guardianPid: process.pid, timeoutMs };
+  const input = JSON.stringify(request) + '\n'; if (Buffer.byteLength(input) > 1024 * 1024) fail('REQUEST_LIMIT');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed'], { shell: false, windowsHide: true, encoding: 'utf8', input,
+    timeout: timeoutMs + 1000, maxBuffer: 65536 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('NATIVE_RECEIPT_INVALID'); }
+  if (run.error || run.status !== 0 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1) {
+    const error = new Error('PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); error.code = error.message;
+    if (run.status === 70 && value?.version === 1 && value.status === 'FAIL_NATIVE_MIXED' && value.projectPublished === false && value.externalRequests === 0 &&
+        value.journal?.version === 5 && value.journal?.scope === 'MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION' &&
+        Object.keys(header).every(key => same(value.journal[key], header[key]))) {
+      error.publicationEvidence = freeze({ phase: value.phase, journal: value.journal });
+    }
+    throw error;
+  }
+  const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
+  const stateKinds = ['REPLACE', 'CREATE', 'DELETE', 'RENAME'];
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_MIXED' || value.projectPublished !== false || value.externalRequests !== 0 ||
+      !validWindowsRetention(value.retention) || journal?.version !== 5 || journal.scope !== 'MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION' ||
+      journal.phase !== 'CLEANED' || journal.journalState !== 'FINALIZED' || journal.journalPendingOperations !== 0 || journal.projectPublished !== false ||
+      !Array.isArray(journal.operationStates) || journal.operationStates.length !== 4 ||
+      journal.operationStates.some((state, index) => state.operationIndex !== index || state.kind !== stateKinds[index] ||
+        state.durablePhase !== (index === 3 ? 'CLEANED' : 'FINALIZED')) ||
+      !same(journal.operations, operations) || Object.keys(header).some(key => !same(journal[key], header[key])) ||
+      native?.backend !== 'V5_BOUNDED_NATIVE_MIXED' || native.operations !== 4 || native.committed !== true ||
+      native.projectPublished !== false || native.quarantineAbsent !== true || native.verifiedDraftDigest !== binding.digest ||
+      native.createIdentity !== journal.operationStates[1].recordedCommittedIdentity ||
+      native.deleteIdentity !== operations[2].baseIdentity || native.renameIdentity !== operations[3].baseIdentity) fail('NATIVE_RECEIPT_INVALID');
+  const final = readWindowsProjectSnapshot(cwd);
+  if (final.rootIdentity !== base.rootIdentity || draftContentDigest(final.files) !== binding.digest ||
+      !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) ||
+      final.identities[operations[0].path] !== operations[0].baseIdentity ||
+      final.identities[operations[1].path] !== native.createIdentity || Object.hasOwn(final.files, operations[2].path) ||
+      Object.hasOwn(final.files, operations[3].sourcePath) || final.identities[operations[3].path] !== operations[3].baseIdentity ||
+      Object.entries(base.files).some(([name, file]) => ![operations[0].path, operations[2].path, operations[3].sourcePath].includes(name) &&
+        final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
+  const proof = Object.freeze({});
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'MIXED', native, journal, retention: value.retention,
+    publisherPid: run.pid, publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true,
+    backend: native.backend, scope: 'VERIFIED_WORKER_MIXED' }));
+  return proof;
 }
 function publishWindowsSingleRename({ cwd, base, snapshot, binding, metadata, remainingMs }) {
   if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
