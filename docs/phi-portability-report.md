@@ -2,7 +2,11 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## New local D6 ordinary-publication boundary (not native verified)
+## Current D6 V6 single-CREATE native checkpoint — bounded path PASS, autonomy blocked
+
+Functional `1dad4b8bab9eb96473bc39479bbd16e7c7021808` passed [CI37188510264](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37188510264): Windows aggregate **486/474 PASS/0 FAIL/12 skips**, including both native V6 single-CREATE publication/conflict cases; Ubuntu **486/165 PASS/0 FAIL/321 native skips**. Indexed audit PASS, independent Windows Git-source clone `PASS_FOUNDATION_ONLY` with 474 PASS/0 FAIL, pinned LSP install exit0/no timeout and cleanup PASS/directory removed/owned residual0. Three isolated pinned-Pi foreground smokes PASS, each `externalRequests: 0`. The corrected Task Governor CREATE verb was the deterministic fix after failed CI37187379390; no timeout/retry/security weakening or model/provider call. This proves bounded internal V6 publication after Worker revocation, not ordinary top-level Windows workflow. The normal workflow still fails closed at the backend autonomy gate before delegation; task-to-operation/operand intent and default Worker draft retention are not integrated. **D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.** Main/Work Control must resolve that ordinary-workflow authority/security boundary before implementation continues.
+
+## Historical local D6 ordinary-publication boundary before native V6 verification
 
 `D6-ORDINARY-WORKFLOW-PUBLICATION-001` is recorded. The opt-in post-Worker-revocation private-draft retention slice passed portable regression and the full local gate (1014 total / 695 PASS / 0 FAIL / 319 native skips; syntax/TypeScript/package PASS). The new native post-revoke four-operation test is **not yet run**. Ordinary Windows `secure_coding_workflow` still rejects before delegation; V5 accepts exactly four fixed mixed operations and cannot publish a standalone CREATE transaction. The existing native atomic CREATE test proves only a primitive, not V5 publication. No new CI/provider call, no Windows autonomy certification, no production-path CREATE/MODIFY/DELETE/RENAME claim. Escalate the significant V5 journal shape and trusted intent integration boundary to Φ Main/Work Control before continuing. **D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.**
 

@@ -1,5 +1,13 @@
 # Phi — Test Baseline
 
+## Current D6 CREATE native gate — accepted
+
+`1dad4b8bab9eb96473bc39479bbd16e7c7021808`: `npm run check` PASS, 1020 tests / 699 PASS / 0 FAIL / 321 Windows skips; syntax, installed-Pi TypeScript, package validation PASS. Task Governor focused 17/17 PASS; portable publication 21 PASS/0 FAIL/32 native skips. [CI37188510264](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37188510264) SUCCESS: Windows 486/474 PASS/0 FAIL/12 skips, native V6 cases #277 and #278 PASS; Ubuntu 486/165 PASS/0 FAIL/321 native skips. Indexed audit PASS; independent Windows source clone 474 PASS/0 FAIL, pinned LSP install exit0/no timeout, cleanup PASS/directory removed/owned residual0. Three isolated pinned-Pi smokes PASS, `externalRequests: 0` each. Prior [CI37187379390](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37187379390) failed overall with Windows aggregate 486/472 PASS/2 FAIL/12 skips at V6 fixtures before native publication (`PHI_WORKER_CAPABILITY_DENIED`, omitted “Create” mutation verb); Ubuntu PASS. Its clone and Pi smokes did not run. No model/provider calls. Do not credit the previous focused-step PASS to V6 because its test-name filter excluded those cases. This remains internal-path V6 evidence, not an ordinary Windows autonomous-workflow certificate.
+
+## Historical local D6 candidate before native CI
+
+At functional `bc109afe7b442726e146fbb63fe97b546ad2ce44`, `npm run check` PASS: 1019 tests total, 698 PASS, 0 FAIL, 321 Windows-native skips; syntax, installed-Pi TypeScript and package validation PASS. Focused portable `phi-publication` 21 PASS/0 FAIL/32 native skips; `phi-mixed-journal` 3 PASS/0 FAIL/20 native skips. Exact [CI37187379390](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37187379390) was launched for native Windows/Ubuntu proof and is not yet a PASS certificate. No model/provider calls. Existing accepted V5/R1 native evidence remains valid for its original commits; it does not certify V6.
+
 Last verified: 2026-10-04. Branch `feature/routing-presets-quality`; validated functional HEAD `b27dbb5b59a632e32180ebea076aa0e5ae69f690`.
 
 ## New local-only post-revocation slice (not a native certificate)
