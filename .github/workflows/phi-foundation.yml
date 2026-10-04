@@ -7,11 +7,38 @@ on:
         description: Compare owned independent-clone LSP installation on runner temp volumes; no full gate
         type: boolean
         default: false
+      clone-foundation-diagnostic-only:
+        description: Reproduce only the owned independent-clone foundation suite with redacted TAP progress; no full gate
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
+  clone-foundation-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs['clone-foundation-diagnostic-only']
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Install source-only dependencies (same clone precondition)
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Build existing trusted native Windows process owner
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
+      - name: Warm the same pinned LSP package cache as the full gate
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Owned independent-clone foundation suite under unchanged internal limits
+        env:
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+        run: node scripts/phi-clean-room.mjs
   lsp-clone-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && inputs['lsp-diagnostic-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only']
     runs-on: windows-latest
     timeout-minutes: 12
     steps:
@@ -50,7 +77,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || !inputs['lsp-diagnostic-only']
+    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'])
     strategy:
       fail-fast: false
       matrix:

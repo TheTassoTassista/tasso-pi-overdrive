@@ -1,6 +1,14 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-04 (exact native gate complete)
+Last verified: 2026-10-05 (main Windows suite green; independent clone gate red)
+
+## Bounded ordinary CREATE: native clone gate blocked before Pi smoke
+
+Functional `2eea581e3a05b3769e383dc639fb711c3ae47663` has main Windows suite and source audit PASS in CI37214734941, but the full Windows job FAILED when the independent clone's 600-second `foundation-tests` suite timed out. Clone LSP installed successfully in 19,811 ms; owned clone cleanup and residual-process checks passed. The ordinary real-Pi Windows CREATE smoke and preceding three smokes did not run. Exact clone stopping case remains UNKNOWN; main suite duration 623,197 ms makes an aggregate budget overrun LIKELY, not proven. Diagnostic-only TAP progress and clone-only workflow are local, with no timeout/security/product change. D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED. See `docs/phi-progress.md` and `harness/CONTINUATION.md` for the exact gate and next action.
+
+## Bounded ordinary CREATE candidate (not yet Windows-certified)
+
+Functional `2eea581e3a05b3769e383dc639fb711c3ae47663` is pushed; [CI37214734941](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37214734941) is in progress. The new operation-specific Windows bounded-publication capability map contains CREATE only; `sandbox.implemented` and `sandbox.autonomousReady` remain false and the full-backend gate remains active. A direct-user-task-bound, path/root/policy-checked envelope is created before Worker; retained draft survives child revocation; exact single CREATE intent is revalidated before one-shot V6 publication. Local full gate and real offline Linux normal-workflow smoke PASS, but native ordinary Windows publication remains UNVERIFIED. MODIFY/DELETE/RENAME are not enabled. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `docs/phi-progress.md` and `harness/CONTINUATION.md` for exact CI and next action.
 
 ## Current D6 CREATE gate state
 

@@ -46,6 +46,14 @@ test('clean-room failure receipt identifies its stage/codes/counts without leaki
   assert.deepEqual(evidence, { failureStage: 'foundation-tests', exitCode: 1, timedOut: false, diagnosticCodes: ['CS1234', 'PHI_NATIVE_PROCESS_FAILED'], testCounts: { total: 47, passed: 39, failed: 1 }, failedTestNumbers: [12] });
   assert.doesNotMatch(JSON.stringify(evidence), /private|secret-fixture-value|PRIVATE_SECRET/u);
 });
+test('timed-out clone foundation suite retains only bounded serial TAP ordinals', () => {
+  const row = validationFailureEvidence('foundation-tests', { status: 124, error: { code: 'ETIMEDOUT' },
+    stdout: '# Subtest: private-secret-one\nok 1 - private-secret-one\n# Subtest: private-secret-two\nok 2 - private-secret-two\n# Subtest: private-secret-three\n' });
+  assert.deepEqual(row.tapProgress, { completed: 2, lastCompleted: 2, started: 3,
+    stdoutBytes: Buffer.byteLength('# Subtest: private-secret-one\nok 1 - private-secret-one\n# Subtest: private-secret-two\nok 2 - private-secret-two\n# Subtest: private-secret-three\n') });
+  assert.doesNotMatch(JSON.stringify(row), /private-secret/u);
+  assert.equal(validationFailureEvidence('foundation-tests', { status: 0, stdout: 'ok 1 - safe\n' }).tapProgress, undefined);
+});
 test('clone timeout failure stage survives redaction as a fixed code only', () => {
   const row = validationFailureEvidence('foundation-tests', { status: 1, stdout: '# PHI_CLONE_TIMEOUT_DELETE_DENIAL private-path\n# fail 1' });
   assert.deepEqual(row.diagnosticCodes, ['PHI_CLONE_TIMEOUT_DELETE_DENIAL']);
