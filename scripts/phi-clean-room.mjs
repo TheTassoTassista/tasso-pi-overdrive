@@ -9,7 +9,25 @@ import { runValidationCommand, validationCommandTimeout } from '../platform/wind
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
 import { installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 
+if (process.argv.length > 3 || process.argv.length === 3 && process.argv[2] !== '--runtime-diagnostic-only') throw new Error('PHI_CLEAN_ROOM_USAGE');
+const diagnosticOnly = process.argv[2] === '--runtime-diagnostic-only';
+function tapRuntimeEvidence(output) {
+  const lines = output.split(/\r?\n/u), progressEvents = [];
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^ok (\d+)(?=\s|$)/u.exec(lines[i]);
+    if (!match) continue;
+    const ordinal = Number(match[1]);
+    const duration = lines.slice(i + 1, i + 5).map(line => /^\s+duration_ms: (\d+(?:\.\d+)?)$/u.exec(line)?.[1]).find(Boolean);
+    progressEvents.push({ ordinal, durationMs: duration === undefined ? null : Number(duration) });
+  }
+  const measured = progressEvents.map(row => row.durationMs).filter(Number.isFinite);
+  return { completed: progressEvents.length, lastCompleted: progressEvents.at(-1)?.ordinal ?? null,
+    contiguous: progressEvents.every((row, index) => row.ordinal === index + 1), progressEvents,
+    longestCaseDurationMs: measured.length ? Math.max(...measured) : null,
+    longestObservedCompletionGapMs: null, completionGapReason: 'TAP_OUTPUT_HAS_NO_WALL_CLOCK_COMPLETION_TIMESTAMPS' };
+}
 const source = path.resolve(import.meta.dirname, '..');
+const runStarted = performance.now();
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
 const clone = path.join(temp, 'source with spaces');
 const identity = cloneIdentity(temp), commandReceipts = [];
@@ -20,7 +38,8 @@ async function run(command, args, cwd = source, env = process.env) {
   // the fixed serial validation entry is owned by a real native Job throughout.
   let result;
   const startedUtc = new Date().toISOString(), started = performance.now();
-  try { result = await runValidationCommand(command, args, { cwd, env, timeoutMs: validationCommandTimeout(command, args, cwd) }); }
+  const extended = diagnosticOnly && stage === 'foundation-tests';
+  try { result = await runValidationCommand(command, args, { cwd, env, diagnosticOnly: extended, timeoutMs: validationCommandTimeout(command, args, cwd, { diagnosticOnly: extended }) }); }
   catch (cause) {
     commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' });
     const evidence = { ...validationFailureEvidence(stage), controllerException: validationExceptionEvidence(cause) };
@@ -30,7 +49,7 @@ async function run(command, args, cwd = source, env = process.env) {
   if (result.receipt) commandReceipts.push(result.receipt);
   if (stage === 'pinned-lsp-runtime') console.log(JSON.stringify(installDiagnostic({ command, args, cwd, env, startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started), result })));
   commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
-    ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
+    ...validationFailureEvidence(stage, result), ...(diagnosticOnly ? { elapsedMs: Math.ceil(performance.now() - started) } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
   if (result.status !== 0 || result.error || process.platform === 'win32' && (!result.receipt.jobEmptyVerified || !result.receipt.pipesDrained)) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
     error.evidence = { ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
@@ -79,6 +98,9 @@ try {
   const testCount = Number(/^# tests (\d+)$/mu.exec(tests)?.[1]);
   const passed = Number(/^# pass (\d+)$/mu.exec(tests)?.[1]);
   const skipped = Number(/^# skipped (\d+)$/mu.exec(tests)?.[1]);
+  if (diagnosticOnly && (testCount !== 490 || passed !== 478 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
+  const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
+  if (diagnosticOnly && (tapRuntime.completed !== 490 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
   let recoveryAfterTests = 'NOT_NATIVE_WINDOWS';
   if (process.platform === 'win32') {
     stage = 'post-test-recovery';
@@ -90,7 +112,7 @@ try {
   stage = 'brand-smoke';
   const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
   if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
-  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
+  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
 } catch (error) {
   report = { version: 1, status: error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;
@@ -98,6 +120,8 @@ try {
   report.commands = commands;
   const cleanup = await cleanupClone(temp, identity, { safeCwd: source, receipts: commandReceipts });
   report = combineValidationResults(report, cleanup);
+  if (diagnosticOnly && report.status === 'PASS_FOUNDATION_ONLY') { report.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; report.primary.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; }
   if (report.status === 'FAIL') process.exitCode = 1;
+  if (diagnosticOnly) report.totalElapsedMs = Math.ceil(performance.now() - runStarted);
 }
 console.log(JSON.stringify(report, null, 2));

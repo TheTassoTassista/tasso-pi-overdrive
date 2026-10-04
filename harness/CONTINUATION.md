@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-Last verified: 2026-10-05 (focused clone diagnosis reached final TAP case; gate still red)
+Last verified: 2026-10-05 (new Main decision; one extended non-certifying clone diagnostic pending)
+
+## Current Campaign 1 action — authorized runtime observation, not certification
+
+`D6-CLONE-RUNTIME-GATE-001` is now recorded in `harness/DECISIONS.md`. A narrow diagnostic-only `phi-clean-room` mode is being prepared for **one** controlled Windows independent-clone run: full 490-case corpus, same native Job/cleanup, no skips/retry/security change; exact diagnostic suite request only may run at most 780,000 ms to observe beyond the old aggregate 600,000 ms, while normal certification remains 600,000 ms pending classification. Phase elapsed times and safe TAP ordinal/duration metadata are collected; no wall-clock completion gaps are claimed from buffered TAP. Even a complete diagnostic result is labeled NON_CERTIFYING. Local focused/complete checks must pass, then publish only the scoped candidate and dispatch the manual clone-only workflow; do not run normal full CI first. Classify CASE A/B/C from actual receipt. Existing user edits, unstaged bounded-smoke diagnostics and protected audit are preserved. D6 PARTIAL; Windows autonomy BLOCKED.
 
 ## Current Campaign 1 STOP — aggregate clone budget decision required
 

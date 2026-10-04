@@ -75,12 +75,15 @@ test('cleanup diagnostics contain category/operation/code only, never raw paths,
     assert.equal(result.nativeError, 'NOT_EXPOSED_BY_NODE'); assert.doesNotMatch(JSON.stringify(result), /PRIVATE|phi-clone-cleanup-/u);
   } finally { releaseFixture(root); }
 });
-test('aggregate validation budget cannot leak into post-test recovery or other commands', () => {
+test('aggregate validation budget cannot leak into post-test recovery or other commands', async () => {
   const cwd = process.cwd(), entry = path.join(cwd, 'scripts', 'phi-check.mjs');
   assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd), 600000);
+  assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd, { diagnosticOnly: true }), 780000);
   for (const args of [['--scope-recovery-status'], [entry], [entry, '--owned-validation', 'extra'], ['--validation-lock', 'directory', cwd]]) {
     assert.equal(validationCommandTimeout(process.execPath, args, cwd), 120000);
+    assert.equal(validationCommandTimeout(process.execPath, args, cwd, { diagnosticOnly: true }), 120000);
   }
+  await assert.rejects(runValidationCommand(process.execPath, ['-e', '1'], { cwd, diagnosticOnly: true, timeoutMs: 780000 }), /PHI_VALIDATION_DIAGNOSTIC_SCOPE_INVALID/u);
 });
 test('native cwd-inside cleanup reproduces EBUSY, leaves cwd and removes only its fixture', native, async () => {
   const root = fixture(), originalCwd = process.cwd(), identity = cloneIdentity(root);

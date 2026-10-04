@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-05 (focused clone reproduced final-case aggregate timeout)
+Last verified: 2026-10-05 (Main authorized one non-certifying extended clone diagnostic)
+
+## D6 clone runtime policy diagnosis in progress
+
+Main decision `D6-CLONE-RUNTIME-GATE-001` is in force. The ordinary clone certification limit, Windows sandbox/ownership and global autonomy gate are unchanged. One full-corpus, native-owned, explicitly non-certifying clone diagnostic is pending to distinguish aggregate duration from a true stall. No new correctness/liveness certificate or ordinary Windows CREATE smoke exists yet. D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.
 
 ## Clone foundation budget blocks bounded CREATE certification
 

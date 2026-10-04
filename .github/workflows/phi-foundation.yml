@@ -17,7 +17,7 @@ jobs:
   clone-foundation-diagnostic:
     if: github.event_name == 'workflow_dispatch' && inputs['clone-foundation-diagnostic-only']
     runs-on: windows-latest
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
         with:
@@ -32,11 +32,11 @@ jobs:
         run: ./scripts/build-windows-process.ps1
       - name: Warm the same pinned LSP package cache as the full gate
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
-      - name: Owned independent-clone foundation suite under unchanged internal limits
+      - name: Owned independent-clone full-corpus runtime diagnostic, never certification
         env:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
-        run: node scripts/phi-clean-room.mjs
+        run: node scripts/phi-clean-room.mjs --runtime-diagnostic-only
   lsp-clone-diagnostic:
     if: github.event_name == 'workflow_dispatch' && inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only']
     runs-on: windows-latest

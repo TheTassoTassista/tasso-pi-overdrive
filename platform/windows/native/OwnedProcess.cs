@@ -390,6 +390,8 @@ namespace Phi.Native {
         JavaScriptSerializer serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = MaxRequest;
         Dictionary<string, object> request = serializer.Deserialize<Dictionary<string, object>>(ReadRequest(input));
         string[] keys = { "command", "args", "cwd", "env", "timeoutMs", "guardianPid" };
+        bool diagnosticOnly = request != null && request.ContainsKey("diagnosticOnly") && request["diagnosticOnly"] is bool && (bool)request["diagnosticOnly"];
+        if (diagnosticOnly) keys = keys.Concat(new string[] { "diagnosticOnly" }).ToArray();
         if (request == null || request.Count != keys.Length || keys.Any(k => !request.ContainsKey(k))) throw new InvalidDataException();
         string command = StringValue(request["command"]), cwd = StringValue(request["cwd"]);
         if (!Path.IsPathRooted(command) || command.StartsWith("\\\\") || !command.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || !Path.IsPathRooted(cwd) || cwd.StartsWith("\\\\")) throw new InvalidDataException();
@@ -403,7 +405,8 @@ namespace Phi.Native {
         bool suite = validation && scope == null && String.Equals(Path.GetFileName(command), "node.exe", StringComparison.OrdinalIgnoreCase) &&
           arguments.Count == 2 && String.Equals(StringValue(arguments[0]), Path.Combine(cwd, "scripts", "phi-check.mjs"), StringComparison.OrdinalIgnoreCase) &&
           StringValue(arguments[1]) == "--owned-validation";
-        if (timeout < 1 || timeout > (suite ? 600000 : MaxLifetime)) throw new InvalidDataException();
+        if (diagnosticOnly && (!suite || timeout != 780000)) throw new InvalidDataException();
+        if (timeout < 1 || timeout > (suite ? diagnosticOnly ? 780000 : 600000 : MaxLifetime)) throw new InvalidDataException();
         if (validation && scope == null && capture != null && timeout == MaxLifetime &&
             String.Equals(command, Path.Combine(Path.GetDirectoryName(command), "node.exe"), StringComparison.OrdinalIgnoreCase) &&
             arguments.Count == 9 && String.Equals(StringValue(arguments[0]), Path.Combine(Path.GetDirectoryName(command), "node_modules", "npm", "bin", "npm-cli.js"), StringComparison.OrdinalIgnoreCase) &&

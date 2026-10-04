@@ -32,11 +32,13 @@ function resolveValidationExecutable(command, environment) {
 }
 
 // Budget is tied to the exact aggregate entry, never to a stale diagnostic stage.
-export function validationCommandTimeout(command, args, cwd) {
-  return command === process.execPath && args.length === 2 && args[0] === path.join(cwd, 'scripts', 'phi-check.mjs') && args[1] === '--owned-validation' ? 600000 : 120000;
+export function validationCommandTimeout(command, args, cwd, { diagnosticOnly = false } = {}) {
+  const suite = command === process.execPath && args.length === 2 && args[0] === path.join(cwd, 'scripts', 'phi-check.mjs') && args[1] === '--owned-validation';
+  return suite ? diagnosticOnly ? 780000 : 600000 : 120000;
 }
 
-export async function runValidationCommand(command, args, { cwd, env = process.env, timeoutMs = 120000 } = {}) {
+export async function runValidationCommand(command, args, { cwd, env = process.env, timeoutMs = 120000, diagnosticOnly = false } = {}) {
+  if (diagnosticOnly && (command !== process.execPath || args.length !== 2 || args[0] !== path.join(cwd, 'scripts', 'phi-check.mjs') || args[1] !== '--owned-validation' || timeoutMs !== 780000)) throw new Error('PHI_VALIDATION_DIAGNOSTIC_SCOPE_INVALID');
   if (process.platform !== 'win32') return spawnSync(command, args, { cwd, env, shell: false, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
   let phase = 'RESOLVE_COMMAND';
   try {
@@ -47,7 +49,7 @@ export async function runValidationCommand(command, args, { cwd, env = process.e
   const helper = ownedWindowsHelper();
   phase = 'SUPERVISOR_SPAWN';
   const child = spawn(helper, ['--validation-run'], { shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-  const request = { command, args, cwd, env, timeoutMs, guardianPid: process.pid };
+  const request = { command, args, cwd, env, timeoutMs, guardianPid: process.pid, ...(diagnosticOnly ? { diagnosticOnly: true } : {}) };
   let output = '', nativeError = '', bytes = 0, overflow = false;
   child.stdout.on('data', b => { bytes += b.length; if (bytes > 6 * 1024 * 1024) { overflow = true; child.kill(); } else output += b; });
   child.stderr.on('data', b => { if (nativeError.length < 65536) nativeError += b; });
