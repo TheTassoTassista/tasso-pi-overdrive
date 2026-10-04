@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## Current bounded experiment — D6-CLONE-RUNTIME-DIAGNOSTIC-002
+
+Start HEAD `54eb4410ec275c6773618c0a92bf0844668eb60b`, matching live remote `feature/routing-presets-quality`. Maximum two additional clone-only samples; neither dispatched yet. Numeric Node reporter instrumentation adds observation UTC/monotonic times and test durations without changing the 491-case corpus/order/assertions. The existing 780s diagnostic cap and 600s certification cap remain unchanged. Reporter delivery may be buffered; an observed gap does not identify the executing test. No Pi smoke/full Campaign CI. Analyze Run 1 before deciding on Run 2, then return A/B/C/D and STOP. Preserve pre-existing user edits/untracked files and protected audit. D6 PARTIAL; Windows autonomy BLOCKED.
+
 Last verified: 2026-10-05 (one non-certifying clone run complete; CASE C, no certification)
 
 ## Current Campaign 1 STOP — variable runtime; Main decision required before another full run

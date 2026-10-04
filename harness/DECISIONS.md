@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-05 — D6-CLONE-RUNTIME-DIAGNOSTIC-002
+
+User-supplied Φ Main decision: **EXPERIMENT**, maximum two additional clone-only NON-CERTIFYING measurements. Preserve the same functional candidate, 491-case ordered corpus, assertions, retries, isolation, ownership and cleanup. Record phase duration, numeric test durations and observed completion gaps; do not equate buffered reporter delivery with actual test execution. Run 2 only if Run 1 lacks a sufficient explanation. Classify A/B/C/D and STOP; no permanent certification-policy change, Pi smoke, ordinary CREATE certification, separate V5/R1 or full Campaign CI. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. D6-CLONE-RUNTIME-GATE-001 is an option for a subsequent Main-authorized step, not adopted by this experiment.
+
 ## 2026-10-05 — D6-CLONE-RUNTIME-GATE-001 (user-supplied Φ Main / Architecture decision)
 
 Status: **IN FORCE; first non-certifying diagnosis completed with CASE C / no certification**. Decision: **IMPLEMENT_SMALLER**. Separate the independent-clone gate into full-corpus correctness/completeness, an authoritative test-progress inactivity watchdog, and versioned runtime-budget evidence, with an empirically justified outer resource-safety ceiling. The historical 600-second aggregate wall-clock cap is not itself a correctness or liveness definition. One controlled, explicitly **non-certifying** diagnostic clone run was authorized to observe beyond that cap while retaining all original 490 tests (491 after a metadata-only regression), the same isolation, native Job ownership, cleanup, zero residual processes and no automatic retry. Classify aggregate budget exhaustion versus genuine stall from its evidence before implementing the new gate; the first run completed under 600 seconds and therefore remains CASE C, not CASE A.

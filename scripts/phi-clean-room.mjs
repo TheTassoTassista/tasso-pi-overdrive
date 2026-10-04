@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -24,7 +24,7 @@ async function run(command, args, cwd = source, env = process.env) {
   let result;
   const startedUtc = new Date().toISOString(), started = performance.now();
   const extended = diagnosticOnly && stage === 'foundation-tests';
-  try { result = await runValidationCommand(command, args, { cwd, env, diagnosticOnly: extended, timeoutMs: validationCommandTimeout(command, args, cwd, { diagnosticOnly: extended }) }); }
+  try { result = await runValidationCommand(command, args, { cwd, env: extended ? { ...env, PHI_CLONE_RUNTIME_DIAGNOSTIC: '1' } : env, diagnosticOnly: extended, timeoutMs: validationCommandTimeout(command, args, cwd, { diagnosticOnly: extended }) }); }
   catch (cause) {
     commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' });
     const evidence = { ...validationFailureEvidence(stage), controllerException: validationExceptionEvidence(cause) };
@@ -34,7 +34,8 @@ async function run(command, args, cwd = source, env = process.env) {
   if (result.receipt) commandReceipts.push(result.receipt);
   if (stage === 'pinned-lsp-runtime') console.log(JSON.stringify(installDiagnostic({ command, args, cwd, env, startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started), result })));
   commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
-    ...validationFailureEvidence(stage, result), ...(diagnosticOnly ? { elapsedMs: Math.ceil(performance.now() - started) } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
+    ...validationFailureEvidence(stage, result), ...(diagnosticOnly ? { startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started) } : {}),
+    ...(extended ? { runtime: runtimeObservations(result.stdout ?? '') } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
   if (result.status !== 0 || result.error || process.platform === 'win32' && (!result.receipt.jobEmptyVerified || !result.receipt.pipesDrained)) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
     error.evidence = { ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
@@ -89,6 +90,7 @@ try {
   if (diagnosticOnly && (testCount !== 491 || passed !== 479 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
   const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
   if (diagnosticOnly && (tapRuntime.completed !== 491 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
+  if (diagnosticOnly && (commands.at(-1).runtime.completed !== 491 || !commands.at(-1).runtime.contiguous || commands.at(-1).runtime.rows.at(-1)?.kind !== 'end')) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_TIMING_INCOMPLETE');
   let recoveryAfterTests = 'NOT_NATIVE_WINDOWS';
   if (process.platform === 'win32') {
     stage = 'post-test-recovery';
@@ -97,16 +99,20 @@ try {
     if (status.scope !== 'FIXED_NATIVE_SCOPES_ONLY' || status.status !== 'PASS' || ['scanned', 'active', 'stale', 'quarantined', 'processKills'].some(key => status[key] !== 0) || status.cleanupPerformed !== false) throw new Error('PHI_CLEAN_ROOM_RESIDUAL_SCOPE');
     recoveryAfterTests = { status: 'PASS', active: 0, stale: 0, quarantined: 0, processKills: 0, cleanupPerformed: false };
   }
-  stage = 'brand-smoke';
-  const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
-  if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
+  if (!diagnosticOnly) {
+    stage = 'brand-smoke';
+    const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
+    if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
+  }
   report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
 } catch (error) {
   report = { version: 1, status: error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;
 } finally {
   report.commands = commands;
+  const cleanupStarted = performance.now();
   const cleanup = await cleanupClone(temp, identity, { safeCwd: source, receipts: commandReceipts });
+  if (diagnosticOnly) report.cleanupElapsedMs = Math.ceil(performance.now() - cleanupStarted);
   report = combineValidationResults(report, cleanup);
   if (diagnosticOnly && report.status === 'PASS_FOUNDATION_ONLY') { report.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; report.primary.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; }
   if (report.status === 'FAIL') process.exitCode = 1;
