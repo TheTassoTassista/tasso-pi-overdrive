@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-05 (main Windows suite green; independent clone gate red)
+Last verified: 2026-10-05 (focused clone reproduced final-case aggregate timeout)
+
+## Clone foundation budget blocks bounded CREATE certification
+
+Diagnostic-only `a22bcd1` / CI37239362749 confirms independent Windows clone LSP PASS (20,561 ms), then unchanged 600-second suite exit124 with 489/490 TAP cases complete and final case 490 unfinished. Owned clone cleanup PASS/0 residual. This is an aggregate-budget gate failure, not LSP. Same-candidate main suite needed 623,197 ms and passed case 490. Cause of the total runtime increase remains UNKNOWN; cumulative budget pressure is LIKELY. No policy/security/product change or full CI retry. Ordinary Pi CREATE and three preceding smokes remain unrun. **STOP for Φ Work Control/Main** on gate/latency policy; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
 
 ## Bounded ordinary CREATE: native clone gate blocked before Pi smoke
 

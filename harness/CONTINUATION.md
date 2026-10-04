@@ -1,6 +1,12 @@
 # Phi — Session Continuation
 
-Last verified: 2026-10-05 (clone foundation timeout diagnosed to stage; exact test unknown)
+Last verified: 2026-10-05 (focused clone diagnosis reached final TAP case; gate still red)
+
+## Current Campaign 1 STOP — aggregate clone budget decision required
+
+Diagnostic commit `a22bcd19c3fa0cacdf53f245fb0e89b6b14f3f21` was pushed after live remote comparison; manual clone-only [CI37239362749](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37239362749), Windows job `111544762707`, completed **FAILURE**. Pinned LSP install passed in 20,561 ms (<120,000). The unchanged 600,000-ms `foundation-tests` limit then expired, exit124, after **489/490** top-level cases completed. Exact unfinished case 490 is `native unsafe draft readback cannot silently omit protected files or accept alias output` in `tests/phi-worker-transport.test.mjs`; no test failure was emitted before timeout. The same test passed in the preceding main Windows suite, which took 623,197 ms total. Immediate cause KNOWN: aggregate budget exhausted at the final case. Cumulative duration pressure LIKELY; underlying runtime increase and any clone-specific last-case slowdown UNKNOWN. Clone cleanup PASS/directory removed/owned Job empty/pipes drained/0 residual processes; model/provider calls0. Manual run intentionally did not rerun the full gate or any Pi smoke. D6 PARTIAL; Windows autonomy BLOCKED.
+
+**STOP for Φ Work Control/Main:** changing the 600-second aggregate policy or suite execution/coverage entails a gate/latency trade-off; no narrow reproducible implementation defect was established. Do not silently increase the limit, split/skip tests, launch another aggregate, or credit ordinary Windows CREATE. Exact next action is a Work Control/Main decision on whether and how to resolve the now-demonstrated suite-budget boundary while preserving full coverage and native ownership. Reuse prior main-suite/source-audit PASS and both failed clone receipts; do not redo them merely for freshness. Preserve pre-existing protected audit/progress/report edits and untracked files; protected SHA256 `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`. The unrelated local bounded-smoke/fixture diagnostic edits remain unstaged. Index should be empty after the documentation checkpoint; verify live Git/remote state on resume.
 
 ## Current Campaign 1 stop point — targeted clone diagnosis, not a full-gate retry
 

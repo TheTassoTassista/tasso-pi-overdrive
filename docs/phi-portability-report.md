@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Focused clone diagnosis — final TAP case interrupted by aggregate limit
+
+[CI37239362749](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37239362749) on diagnostic `a22bcd1` reproduced the independent Windows clone only: LSP install exit0 in **20,561 ms** (<120 s), then `foundation-tests` exit124 at the unchanged **600 s** budget with **489/490 top-level cases completed** and the final `native unsafe draft readback` case unfinished. The same case passed in the prior main Windows suite, whose full duration was **623,197 ms**. Clone cleanup PASS/directory removed/0 owned residual processes. This establishes the immediate aggregate-budget failure, not the underlying reason for the duration increase or a clone-specific defect in the final case. No full CI rerun or Pi smoke was performed; bounded ordinary CREATE remains UNVERIFIED, **D6 PARTIAL**, Windows autonomy **BLOCKED**. A timeout/gate-policy change needs Φ Work Control/Main review; no limit was changed.
+
 ## Current D6 bounded CREATE candidate — independent clone foundation gate FAIL
 
 Functional `2eea581e3a05b3769e383dc639fb711c3ae47663` / [CI37214734941](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37214734941) has Windows main foundation **490/478 PASS/0 FAIL/12 skips** (623,197 ms), Ubuntu **490/167 PASS/0 FAIL/323 native skips**, and source audit PASS. The independent Windows Git clone's LSP installed successfully in **19,811 ms** under the unchanged 120-second limit. Its later foundation suite timed out at the unchanged 600-second aggregate limit (exit124), so the overall Windows job is **FAIL** and all four subsequent real-Pi smokes, including ordinary bounded CREATE, were not run. Clone cleanup PASS/directory removed/0 residual Phi-owned processes. Exact clone stopping test and root cause remain UNKNOWN; cumulative suite-duration pressure is LIKELY because the same-run main suite required 623,197 ms. A redacted TAP-progress diagnostic and focused clone-only run are pending; no timeout/retry/security/product change or Windows autonomy claim. **D6 PARTIAL; Windows autonomy BLOCKED.**

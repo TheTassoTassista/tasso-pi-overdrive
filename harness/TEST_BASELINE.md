@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## CI37239362749 — focused Windows independent-clone diagnostic, FAIL
+
+Diagnostic `a22bcd1`, job `111544762707`: pinned clone LSP `npm ci` exit0/**20,561 ms** under 120,000 ms; unchanged `foundation-tests` timeout exit124/**600,000 ms** with **489 completed, last ordinal489, next case490 unfinished, no final TAP footer**, 0 `not ok` cases. Case490 is the native unsafe draft readback test in `tests/phi-worker-transport.test.mjs`; it passed in CI37214734941 main Windows suite (623,197 ms total). Clone cleanup PASS/one attempt/directory removed/owned residual0; full gate and four Pi smokes intentionally not run. This is a diagnostic reproduction, **not** a passing foundation/CREATE certificate. Local redaction regression 16/16 and `npm run check` 1028/705 PASS/0 FAIL/323 native skips, syntax/TypeScript/package PASS at diagnostic source. Internal limits, retries and security unchanged. D6 PARTIAL; Windows autonomy BLOCKED.
+
 ## CI37214734941 — Windows clone foundation-tests timeout; bounded CREATE unverified
 
 Exact source `2eea581e3a05b3769e383dc639fb711c3ae47663`: Windows main `check:phi` **490 total / 478 PASS / 0 FAIL / 12 skips**, duration **623,197 ms**; indexed source audit PASS. Ubuntu **490 / 167 PASS / 0 FAIL / 323 native skips**. Independent Windows clone: pinned LSP `npm ci` exit0/**19,811 ms**, owned Job empty/0 residual; subsequent `foundation-tests` exit124 at unchanged **600,000-ms** internal limit, test counts unavailable. Clone cleanup PASS, directory removed, residual Phi-owned processes0. All four Pi smokes downstream skipped, so no ordinary Windows CREATE certificate. Exact clone test at timeout UNKNOWN. Diagnostic TAP ordinal-only change locally passes focused **16/16** and full `npm run check` **1028/705 PASS/0 FAIL/323 native skips**, syntax/TypeScript/package PASS; native clone-only diagnostic pending. No limit/retry/security change.
