@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-05 (Main authorized one non-certifying extended clone diagnostic)
+Last verified: 2026-10-05 (one non-certifying clone experiment: CASE C / wrapper false-negative)
+
+## Clone runtime diagnosis: CASE C, no certification
+
+[CI37241028198](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37241028198) at `75f9831` completed the **491-case** owned Windows clone suite in **441,827 ms**, 479 PASS/0 FAIL/12 skips, but its diagnostic wrapper falsely expected the pre-regression 490-case count and failed before post-test recovery/brand smoke. Clone cleanup PASS/directory removed/owned residual0. The original 490 cases were retained; `a22bcd1` added one diagnostic test. The earlier clone timeout was after 489/491, not 489/490, with ordinal490 next and unsafe readback at491. The one authorized observation completed below the historic 600-second cap, so this is **CASE C**, not evidence for CASE A or a certification. Root timing variance UNKNOWN; no deterministic hang proved. The wrapper count is corrected locally without a second full run. D6 PARTIAL; Windows autonomy BLOCKED; all four downstream Pi smokes unrun. See progress/continuation for exact next decision boundary.
 
 ## D6 clone runtime policy diagnosis in progress
 
@@ -8,7 +12,7 @@ Main decision `D6-CLONE-RUNTIME-GATE-001` is in force. The ordinary clone certif
 
 ## Clone foundation budget blocks bounded CREATE certification
 
-Diagnostic-only `a22bcd1` / CI37239362749 confirms independent Windows clone LSP PASS (20,561 ms), then unchanged 600-second suite exit124 with 489/490 TAP cases complete and final case 490 unfinished. Owned clone cleanup PASS/0 residual. This is an aggregate-budget gate failure, not LSP. Same-candidate main suite needed 623,197 ms and passed case 490. Cause of the total runtime increase remains UNKNOWN; cumulative budget pressure is LIKELY. No policy/security/product change or full CI retry. Ordinary Pi CREATE and three preceding smokes remain unrun. **STOP for Φ Work Control/Main** on gate/latency policy; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+Diagnostic-only `a22bcd1` / CI37239362749 confirms independent Windows clone LSP PASS (20,561 ms), then unchanged 600-second suite exit124 with 489/491 TAP cases complete and ordinal490 next; unsafe draft readback is ordinal491. Owned clone cleanup PASS/0 residual. This is an aggregate-budget gate failure, not LSP. The preceding 490-case main suite needed 623,197 ms. Cause of runtime variability remains UNKNOWN; cumulative budget pressure is LIKELY. No policy/security/product change or full CI retry in that historical run. Ordinary Pi CREATE and three preceding smokes remain unrun. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
 
 ## Bounded ordinary CREATE: native clone gate blocked before Pi smoke
 

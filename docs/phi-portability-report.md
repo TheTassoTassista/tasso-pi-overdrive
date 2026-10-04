@@ -2,9 +2,13 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
-## Focused clone diagnosis — final TAP case interrupted by aggregate limit
+## One extended clone observation — CASE C, no certification
 
-[CI37239362749](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37239362749) on diagnostic `a22bcd1` reproduced the independent Windows clone only: LSP install exit0 in **20,561 ms** (<120 s), then `foundation-tests` exit124 at the unchanged **600 s** budget with **489/490 top-level cases completed** and the final `native unsafe draft readback` case unfinished. The same case passed in the prior main Windows suite, whose full duration was **623,197 ms**. Clone cleanup PASS/directory removed/0 owned residual processes. This establishes the immediate aggregate-budget failure, not the underlying reason for the duration increase or a clone-specific defect in the final case. No full CI rerun or Pi smoke was performed; bounded ordinary CREATE remains UNVERIFIED, **D6 PARTIAL**, Windows autonomy **BLOCKED**. A timeout/gate-policy change needs Φ Work Control/Main review; no limit was changed.
+[CI37241028198](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37241028198) at diagnostic `75f9831` completed the 491-case owned Windows clone suite in **441,827 ms**: 479 PASS/0 FAIL/12 skips, no timeout, owned Job empty/pipes drained. Overall diagnostic wrapper **FAILED** because it asserted the earlier 490-case baseline, before post-test recovery/brand smoke. Clone cleanup PASS/directory removed/0 owned residual; total attempt 455,666 ms. The original 490 cases remained and one metadata-only regression had been added by `a22bcd1`. This one authorized observation ended below the historical 600-second cap; runtime behavior is **CASE C / variable, root UNKNOWN**, not a three-gate certificate. No Pi smoke or ordinary Windows CREATE certificate; D6 PARTIAL, Windows autonomy BLOCKED. The stale wrapper assertion is corrected locally without another full run.
+
+## Focused clone diagnosis — aggregate timeout with two ordinals remaining
+
+[CI37239362749](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37239362749) on diagnostic `a22bcd1` reproduced the independent Windows clone only: LSP install exit0 in **20,561 ms** (<120 s), then `foundation-tests` exit124 at the unchanged **600 s** budget with **489/491 top-level cases completed**. The next ordinal490 is the native partial-failed-command/revocation test; unsafe draft readback is ordinal491. The preceding 490-case main Windows suite took **623,197 ms**. Clone cleanup PASS/directory removed/0 owned residual processes. This establishes only the immediate aggregate-budget failure, not the underlying reason for variable duration or a specific-case defect. No full CI rerun or Pi smoke was performed; bounded ordinary CREATE remains UNVERIFIED, **D6 PARTIAL**, Windows autonomy **BLOCKED**. No limit was changed in this historical run.
 
 ## Current D6 bounded CREATE candidate — independent clone foundation gate FAIL
 
