@@ -6,7 +6,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { WorkerDraft, draftContentDigest } from '../lib/phi-worker-draft.mjs';
-import { PublicationPreflight, publicationBase, publicationConflicts, publicationOperations, PUBLICATION_STATES } from '../lib/phi-publication-plan.mjs';
+import { PublicationPreflight, publicationBase, publicationConflicts, publicationOperations, publicationTransactionProfile, PUBLICATION_STATES } from '../lib/phi-publication-plan.mjs';
 import { reserveWindowsWorker, bindWindowsWorker, windowsWorkerAuthority, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
@@ -89,6 +89,26 @@ test('V5 representative mixed manifest folds only an explicit rename pair and pr
   assert.match(publisher, /operations\?\.length === 4\) return publishWindowsMixed\(options\)/u);
   assert.match(publisher, /\['--publication-mixed'\]/u);
   if (process.platform !== 'win32') assert.throws(() => publishWindowsSingleOperation({ metadata: { operations } }), /BACKEND_UNAVAILABLE/u);
+});
+test('durable transaction profile distinguishes legacy V5 from exact single-operation versions', () => {
+  const base = publicationBase(snapshot({ 'modify.txt': 'old', 'delete.txt': 'old', 'from.txt': 'move' }));
+  const cases = [
+    [snapshot({ 'modify.txt': 'new', 'delete.txt': 'old', 'from.txt': 'move' }), null, 2, 'MODIFY'],
+    [snapshot({ 'modify.txt': 'old', 'delete.txt': 'old', 'from.txt': 'move', 'create.txt': 'new' }), null, 6, 'CREATE'],
+    [snapshot({ 'modify.txt': 'old', 'from.txt': 'move' }), null, 3, 'DELETE'],
+    [snapshot({ 'modify.txt': 'old', 'delete.txt': 'old', 'to.txt': 'move' }), { sourcePath: 'from.txt', destinationPath: 'to.txt' }, 4, 'RENAME'],
+  ];
+  for (const [next, rename, version, operation] of cases) {
+    const result = publicationTransactionProfile(publicationOperations(base, next, rename));
+    assert.deepEqual(result, { profile: 'SINGLE_OPERATION', journalVersion: version, operation });
+    assert.throws(() => { result.operation = 'RENAME'; }, TypeError);
+  }
+  const mixed = publicationTransactionProfile(publicationOperations(publicationBase(snapshot({ 'a.txt': 'old', 'c.txt': 'old', 'd.txt': 'move' })),
+    snapshot({ 'a.txt': 'new', 'b.txt': 'new', 'e.txt': 'move' }), { sourcePath: 'd.txt', destinationPath: 'e.txt' }));
+  assert.deepEqual(mixed, { profile: 'LEGACY_COMPOSITE', journalVersion: 5, operation: null });
+  for (const malformed of [[], [{ kind: 'CREATE' }, { kind: 'DELETE' }], [{ kind: 'UNKNOWN' }],
+    [{ kind: 'CREATE' }, { kind: 'REPLACE' }, { kind: 'DELETE' }, { kind: 'RENAME' }]])
+    assert.throws(() => publicationTransactionProfile(malformed), /TRANSACTION_PROFILE_INVALID/u);
 });
 test('baseline conflicts detect root/file identity, identical-text delete/recreate, edit, removal and new user file', () => {
   const original = snapshot(), base = publicationBase(original);
@@ -250,6 +270,19 @@ test('RENAME failure decoder accepts only bound V4 pre-mutation conflicts, never
   value.journal = { ...value.journal, tempIdentity: null, operations: [] };
   assert.equal(windowsPublicationFailure(run, value, header).publicationEvidence, undefined);
 });
+test('single CREATE admission conflict is bound to V6 and cannot masquerade as legacy V5', () => {
+  const { run, value, header } = admissionFixture();
+  header.operations = publicationOperations(publicationBase(snapshot({ 'keep.txt': 'same' })), snapshot({ 'keep.txt': 'same', 'new.txt': 'new' }, 10));
+  value.status = 'FAIL_NATIVE_SINGLE_CREATE'; value.admission.operations = header.operations;
+  assert.equal(windowsPublicationFailure(run, value, header).code, 'PHI_PUBLICATION_CONFLICT');
+  value.admission = { ...value.admission, operations: [{ ...header.operations[0], path: 'substituted.txt' }] };
+  assert.equal(windowsPublicationFailure(run, value, header).code, 'PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED');
+  value.admission = null;
+  value.journal = { version: 5, scope: 'MIXED_JOURNAL_ONLY_NOT_VERIFIED_PUBLICATION', ...header,
+    phase: 'CONFLICT', sequence: 1, operationIndex: 0, tempIdentity: null, committedIdentity: null,
+    filesCommitted: [], pendingOperations: 1, recoveryState: 'INSPECTION_REQUIRED', cleanup: 'NOT_PROVEN', projectPublished: false };
+  assert.equal(windowsPublicationFailure(run, value, header).publicationEvidence, undefined);
+});
 
 function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify', retainForController = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
@@ -263,6 +296,10 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
     files['remove.txt'] = 'obsolete-delete-fixture';
     files['edit.cjs'] = "require('node:fs').unlinkSync('remove.txt');console.log(process.pid)";
     files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);a.throws(()=>f.unlinkSync('config.json'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
+  }
+  if (operation === 'create') {
+    files['edit.cjs'] = "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log(process.pid)";
+    files['test.cjs'] = "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');a.throws(()=>f.writeFileSync('created.txt','forbidden'),e=>['EACCES','EPERM'].includes(e.code));console.log(process.pid)";
   }
   if (operation === 'rename') {
     files['move.txt'] = 'unchanged-rename-fixture';
@@ -578,6 +615,42 @@ test('native V5 controller publishes after Worker revocation without restoring c
     assert.equal(item.reservation.status().draft.payloadCleared, true);
     console.log(JSON.stringify({ control: 'V5_POST_WORKER_REVOKE', workerRevokedBeforePublication: true,
       childAuthorityRestored: false, publication, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native single CREATE V6 publishes only the intended file after Worker revocation', native, async () => {
+  const item = nativeFixture('Create one fixture and verify it', 'create', true);
+  try {
+    const before = fs.readdirSync(item.project).sort();
+    const evidence = await nativeVerified(item);
+    item.reservation.finishWorker();
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    assert.deepEqual(ready.receipt.operations.map(op => [op.kind, op.path]), [['CREATE', 'created.txt']]);
+    assert.deepEqual(publicationTransactionProfile(ready.receipt.operations), { profile: 'SINGLE_OPERATION', journalVersion: 6, operation: 'CREATE' });
+    const published = executePreparedWindowsPublication(ready.authority);
+    assert.equal(published.state, 'PUBLISHED');
+    assert.equal(published.publicationProof.journal.version, 6);
+    assert.equal(published.publicationProof.journal.phase, 'CLEANED');
+    assert.equal(published.publicationProof.native.backend, 'JOURNALED_NO_CLOBBER_CREATE');
+    assert.equal(published.publicationProof.verifiedDigest, evidence.verification.draft.contentDigest);
+    assert.deepEqual(fs.readdirSync(item.project).sort(), [...before, 'created.txt'].sort());
+    assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'new-create-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    console.log(JSON.stringify({ control: 'NATIVE_V6_SINGLE_CREATE_POST_REVOKE', published, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native single CREATE V6 preserves a user-created target and consumes the grant', native, async () => {
+  const item = nativeFixture('Create one fixture and verify it', 'create', true);
+  try {
+    await nativeVerified(item);
+    item.reservation.finishWorker();
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    fs.writeFileSync(path.join(item.project, 'created.txt'), 'user-owned-content', { flag: 'wx' });
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /CONFLICT/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'user-owned-content');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
   } finally { item.close(); }
 });
 test('native V5 stale handoff and concurrent user destination never grant publication or replay', native, async () => {

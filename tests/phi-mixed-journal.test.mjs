@@ -44,6 +44,25 @@ test('V5 startup disposition is explicit and fail-closed for every durable phase
   for (const classification of ['MANUAL_RECOVERY_REQUIRED', 'CONFLICT'])
     assert.equal(plan('CLEANED', classification).kind, `BLOCKED_${classification}`);
 });
+test('V6 single CREATE has distinct durable phases and only manual restart dispositions', () => {
+  const source = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
+  assert.match(source, /version == 6 && \(operations\.Count != 1/u);
+  assert.match(source, /"CREATE"\)\) throw new InvalidDataException\(\)/u);
+  assert.match(source, /static void ValidateSingleCreateEvent/u);
+  assert.match(source, /internal object PublishSingleCreate/u);
+  assert.match(source, /internal static int RunSingleCreate/u);
+  assert.match(source, /object InspectSingleCreate/u);
+  const plan = (phase, classification) => planWindowsStartupRecovery({ status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
+    projectPublished: false, actionPerformed: false, projectTransactions: 1,
+    entries: [{ transactionId: 'a'.repeat(32), journalVersion: 6, phase, classification }] });
+  for (const phase of ['PREPARED', 'MUTATION_STARTED', 'COMMITTED', 'POST_COMMIT_VERIFIED']) {
+    assert.equal(plan(phase, 'RECOVERY_REQUIRED').kind, 'BLOCKED_UNSUPPORTED_VERSION');
+    assert.equal(plan(phase, 'MANUAL_RECOVERY_REQUIRED').kind, 'BLOCKED_MANUAL_RECOVERY_REQUIRED');
+    assert.equal(plan(phase, 'CONFLICT').kind, 'BLOCKED_CONFLICT');
+  }
+  assert.equal(plan('CLEANED', 'TERMINAL_RETAINED').kind, 'NO_PENDING');
+  assert.equal(plan('CLEANED', 'CONFLICT').kind, 'BLOCKED_CONFLICT');
+});
 
 test('production native V5 endpoint physically applies all four operations and retains no temp or quarantine',
   { skip: process.platform !== 'win32', timeout: 45000 }, () => {

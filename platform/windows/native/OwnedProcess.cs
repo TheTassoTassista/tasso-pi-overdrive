@@ -121,6 +121,7 @@ namespace Phi.Native {
       if (args.Length == 2 && args[0] == "--publication-modify-fixture-child") return PublicationJournal.ModifyFixtureChild(args[1]);
       if (args.Length == 1 && args[0] == "--publication-modify-fixture-recover") return PublicationJournal.ModifyFixtureRecover();
       if (args.Length == 1 && args[0] == "--publication-modify" && IntPtr.Size == 8) return PublicationJournal.RunSingleModify(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--publication-create" && IntPtr.Size == 8) return PublicationJournal.RunSingleCreate(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-mixed" && IntPtr.Size == 8) return PublicationJournal.RunMixed(Console.OpenStandardInput());
       if (args.Length == 1 && args[0] == "--publication-delete" && IntPtr.Size == 8) return PublicationJournal.RunSingleDelete(Console.OpenStandardInput());
       if (args.Length == 2 && args[0] == "--publication-delete-selftest") return PublicationJournal.DeleteSelfTest(args[1]);

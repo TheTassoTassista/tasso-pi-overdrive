@@ -110,7 +110,7 @@ namespace Phi.Native {
     }
     static void ValidateHeader(Dictionary<string, object> value, string transactionId) {
       Keys(value, "version", "transactionId", "projectIdentity", "draftId", "draftVersion", "verifiedDigest", "baseDigest", "creatorPid", "creatorGeneration", "operations");
-      int version = Number(value, "version", 1, 5); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
+      int version = Number(value, "version", 1, 6); if (StringField(value, "transactionId", Id) != transactionId) throw new InvalidDataException();
       StringField(value, "projectIdentity", Identity); StringField(value, "draftId", Id); Number(value, "draftVersion", 0, Int32.MaxValue);
       StringField(value, "verifiedDigest", Digest); StringField(value, "baseDigest", Digest); Number(value, "creatorPid", 1, Int32.MaxValue);
       StringField(value, "creatorGeneration", new Regex("\\A[0-9a-f]{16}\\z"));
@@ -119,6 +119,10 @@ namespace Phi.Native {
       if (version == 5 && (operations.Count != 4 ||
           !operations.Cast<object>().Select(item => (item as Dictionary<string, object>) == null ? null : ((Dictionary<string, object>)item)["kind"] as string)
             .SequenceEqual(new string[] { "REPLACE", "CREATE", "DELETE", "RENAME" }))) throw new InvalidDataException();
+      // V6 is single CREATE only. V5's unprofiled four-operation meaning is
+      // immutable, including its rejection of every shorter manifest.
+      if (version == 6 && (operations.Count != 1 || !(operations[0] is Dictionary<string, object>) ||
+          (string)((Dictionary<string, object>)operations[0])["kind"] != "CREATE")) throw new InvalidDataException();
       foreach (object entry in operations) {
         Dictionary<string, object> op = entry as Dictionary<string, object>;
         if ((version == 4 || version == 5) && op != null && (op["kind"] as string) == "RENAME") Keys(op, "sourcePath", "path", "kind", "baseIdentity", "baseDigest", "newDigest", "newBytes");
@@ -146,6 +150,14 @@ namespace Phi.Native {
       }
     }
     static bool Transition(string from, string to, int previousOp, int nextOp, int count, int version) {
+      if (version == 6) {
+        if (count != 1 || previousOp != 0 || nextOp != 0 || from == "CLEANED" || from == "CONFLICT") return false;
+        if (to == "CONFLICT") return true;
+        return from == "PREPARED" && to == "MUTATION_STARTED" ||
+          from == "MUTATION_STARTED" && to == "COMMITTED" ||
+          from == "COMMITTED" && to == "POST_COMMIT_VERIFIED" ||
+          from == "POST_COMMIT_VERIFIED" && to == "CLEANED";
+      }
       if (version == 5) {
         if (from == "CLEANED" || from == "CONFLICT" || from == "MANUAL_RECOVERY_REQUIRED" || from == "ROLLED_BACK") return false;
         if (previousOp != nextOp) return from == "FINALIZED" && to == "PREPARED" && nextOp == previousOp + 1 && nextOp < count;
@@ -188,6 +200,21 @@ namespace Phi.Native {
           new string[] { "DELETE", "RENAME" }.Contains(kind) && temp != null && temp != expected ||
           kind == "CREATE" && committed != null && committed != temp ||
           temps[index] != null && temp != temps[index] || commits[index] != null && committed != commits[index]) throw new InvalidDataException();
+    }
+    static void ValidateSingleCreateEvent(Dictionary<string, object> body, Dictionary<string, object> prior) {
+      if ((int)body["operationIndex"] != 0) throw new InvalidDataException();
+      string phase = (string)body["phase"], temp = body["tempIdentity"] as string, committed = body["committedIdentity"] as string;
+      if (phase == "PREPARED") {
+        if (temp != null || committed != null || prior != null) throw new InvalidDataException();
+      } else if (phase == "MUTATION_STARTED") {
+        if (temp == null || committed != null) throw new InvalidDataException();
+      } else if (new string[] { "COMMITTED", "POST_COMMIT_VERIFIED", "CLEANED" }.Contains(phase)) {
+        if (temp == null || committed != temp) throw new InvalidDataException();
+      } else if (phase == "CONFLICT") {
+        if (prior == null || temp != (prior["tempIdentity"] as string) || committed != (prior["committedIdentity"] as string)) throw new InvalidDataException();
+      } else throw new InvalidDataException();
+      if (prior != null && prior["tempIdentity"] != null && temp != (string)prior["tempIdentity"] ||
+          prior != null && prior["committedIdentity"] != null && committed != (string)prior["committedIdentity"]) throw new InvalidDataException();
     }
     static Dictionary<string, object> Snapshot(string project, string expected, string ownedQuarantine = null) {
       using (RecoveryFilesystem pins = new RecoveryFilesystem(project)) {
@@ -333,7 +360,13 @@ namespace Phi.Native {
       if ((int)value["creatorPid"] != pid || ScopeRecovery.ProcessCreation(pid, out alive) != (string)value["creatorGeneration"] || !alive) throw new InvalidDataException();
       PublicationJournal result = new PublicationJournal(transactionId, project);
       try {
-        if (!MatchesBase(project, value)) {
+        bool baseMatches = MatchesBase(project, value);
+        if (baseMatches && (int)value["version"] == 6) {
+          Dictionary<string, object> before = Snapshot(project, (string)value["projectIdentity"]);
+          baseMatches = ProjectBaseDigest((string)value["projectIdentity"],
+            (Dictionary<string, object>)before["files"], (Dictionary<string, object>)before["identities"]) == (string)value["baseDigest"];
+        }
+        if (!baseMatches) {
           // Keep V1 semantics and unknown/root/schema/sharing exceptions intact.
           // Only known V2 destination absence/identity/content mismatch reaches
           // this branch. No journal key or native transaction exists yet.
@@ -387,6 +420,7 @@ namespace Phi.Native {
         string[] phases = mixedPhases ?? Enumerable.Repeat("NOT_STARTED", Operations(header).Count).ToArray();
         ValidateMixedEvent(header, body, phases, mixedTempIdentities ?? new string[phases.Length], mixedCommittedIdentities ?? new string[phases.Length]);
       }
+      if ((int)header["version"] == 6) ValidateSingleCreateEvent(body, last);
       string name = "E" + sequence.ToString("D8");
       if (key.GetValueNames().Contains(name)) throw new InvalidDataException();
       byte[] bytes = Envelope(body);
@@ -738,6 +772,107 @@ namespace Phi.Native {
           projectPublished = false, externalRequests = 0 })); return 70;
       } finally { if (journal != null) journal.Dispose(); }
     }
+    internal object PublishSingleCreate(byte[] bytes, Action<string> checkpoint) {
+      if ((int)header["version"] != 6 || (string)last["phase"] != "PREPARED") throw new InvalidDataException();
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      if (bytes == null || bytes.Length != (int)op["newBytes"] || Hash(bytes) != (string)op["newDigest"]) throw new InvalidDataException();
+      string createdIdentity = null;
+      try {
+        AnchoredFile.CreateNoReplace(project, (string)header["projectIdentity"], (string)op["path"], bytes,
+          "phi-publish-" + id + ".tmp", delegate(string phase, string identity) {
+            if (phase == "temp") Observe("MUTATION_STARTED", identity, null);
+            else if (phase == "rename") Observe("COMMITTED", identity, identity);
+            else if (phase == "postverify") { Observe("POST_COMMIT_VERIFIED", identity, identity); createdIdentity = identity; }
+            checkpoint("create-" + phase);
+          });
+        if (createdIdentity == null) throw new InvalidDataException();
+        Dictionary<string, object> final = Snapshot(project, (string)header["projectIdentity"]);
+        Dictionary<string, object> files = (Dictionary<string, object>)final["files"], identities = (Dictionary<string, object>)final["identities"];
+        string[] parts = AnchoredFile.Segments((string)op["path"]);
+        string target = parts.Aggregate(project, (current, part) => Path.Combine(current, part));
+        bool tempAbsent;
+        using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(target)))
+          tempAbsent = ReadDeleteLeaf(parent, "phi-publish-" + id + ".tmp") == null;
+        if (ProjectDraftDigest(files) != (string)header["verifiedDigest"] ||
+            !files.ContainsKey((string)op["path"]) || (string)identities[(string)op["path"]] != createdIdentity ||
+            !tempAbsent) throw new InvalidOperationException("PHI_PUBLICATION_CONFLICT");
+        Observe("CLEANED", createdIdentity, createdIdentity); checkpoint("create-cleaned");
+        return new { journal = Metadata("NOT_REQUIRED"), nativeProof = new { backend = "JOURNALED_NO_CLOBBER_CREATE",
+          createdIdentity, digest = op["newDigest"], noClobber = true, committed = true, tempAbsent = true, projectPublished = false } };
+      } catch (InvalidOperationException error) {
+        if (error.Message != "PHI_PUBLICATION_CONFLICT") throw;
+        if ((string)last["phase"] != "CONFLICT") Observe("CONFLICT", last["tempIdentity"] as string, last["committedIdentity"] as string);
+        throw;
+      }
+    }
+    internal static int RunSingleCreate(Stream input) {
+      PublicationJournal journal = null; object result = null; string phase = "REQUEST";
+      try {
+        byte[] bytes;
+        using (MemoryStream line = new MemoryStream()) {
+          bool complete = false;
+          for (int i = 0; i < 1024 * 1024; i++) { int next = input.ReadByte(); if (next < 0) throw new InvalidDataException(); if (next == 10) { complete = true; break; } line.WriteByte((byte)next); }
+          if (!complete) throw new InvalidDataException(); bytes = line.ToArray();
+        }
+        JavaScriptSerializer reader = new JavaScriptSerializer { MaxJsonLength = 1024 * 1024, RecursionLimit = 16 };
+        Dictionary<string, object> request = reader.Deserialize<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(bytes));
+        Keys(request, "version", "root", "header", "content", "guardianPid", "timeoutMs"); Number(request, "version", 1, 1);
+        string project = request["root"] as string, content = request["content"] as string;
+        if (project == null || project.Length > 1024 || project.IndexOf('\0') >= 0 || !Path.IsPathRooted(project) || content == null || content.IndexOf('\0') >= 0) throw new InvalidDataException();
+        byte[] value = new UTF8Encoding(false, true).GetBytes(content);
+        Dictionary<string, object> header = request["header"] as Dictionary<string, object>;
+        Keys(header, "transactionId", "projectIdentity", "draftId", "draftVersion", "verifiedDigest", "baseDigest", "operations");
+        bool alive; int pid = Process.GetCurrentProcess().Id;
+        header.Add("version", 6); header.Add("creatorPid", pid); header.Add("creatorGeneration", ScopeRecovery.ProcessCreation(pid, out alive));
+        if (!alive) throw new InvalidDataException(); ValidateHeader(header, header["transactionId"] as string);
+        Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+        if (value.Length != (int)op["newBytes"] || Hash(value) != (string)op["newDigest"]) throw new InvalidDataException();
+        OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 30000), delegate(Action live) {
+          phase = "ADMISSION"; journal = Begin(project, header); phase = "PREPARED";
+          result = journal.PublishSingleCreate(value, delegate(string observed) { phase = observed; live(); });
+        });
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_CREATE", receipt = result,
+          retention = journal.ReclamationMetadata, projectPublished = false, externalRequests = 0 })); return 0;
+      } catch (Exception error) {
+        Console.WriteLine(Serializer().Serialize(new { version = 1, status = "FAIL_NATIVE_SINGLE_CREATE", phase,
+          reason = error is AdmissionConflict || error is InvalidOperationException && error.Message == "PHI_PUBLICATION_CONFLICT" ? "CONFLICT" : "UNCONFIRMED",
+          nativeCode = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8"), journal = journal == null ? null : journal.Metadata("INSPECTION_REQUIRED"),
+          admission = error is AdmissionConflict ? ((AdmissionConflict)error).Evidence : null, projectPublished = false, externalRequests = 0 })); return 70;
+      } finally { if (journal != null) journal.Dispose(); }
+    }
+    object InspectSingleCreate() {
+      if ((int)header["version"] != 6) throw new InvalidDataException();
+      Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
+      string[] parts = AnchoredFile.Segments((string)op["path"]);
+      string targetPath = parts.Aggregate(project, (current, part) => Path.Combine(current, part));
+      DeleteObject target, temp;
+      using (RecoveryFilesystem parent = new RecoveryFilesystem(Path.GetDirectoryName(targetPath))) {
+        target = ReadDeleteLeaf(parent, parts.Last());
+        temp = ReadDeleteLeaf(parent, "phi-publish-" + id + ".tmp");
+      }
+      string phase = (string)last["phase"], recorded = last["tempIdentity"] as string;
+      string status = "UNKNOWN_FAIL_SAFE";
+      if (phase == "CONFLICT") status = "CONFLICT";
+      else if (target == null && temp == null) {
+        Dictionary<string, object> current = Snapshot(project, (string)header["projectIdentity"]);
+        bool baseMatches = ProjectBaseDigest((string)header["projectIdentity"],
+          (Dictionary<string, object>)current["files"], (Dictionary<string, object>)current["identities"]) == (string)header["baseDigest"];
+        status = baseMatches && phase == "PREPARED" ? "OLD_COMPLETE_OBSERVED" : "CONFLICT";
+      } else if (target != null && temp == null) {
+        Dictionary<string, object> current = Snapshot(project, (string)header["projectIdentity"]);
+        bool verified = recorded != null && target.Identity == recorded && target.Digest == (string)op["newDigest"] &&
+          target.Bytes == (int)op["newBytes"] &&
+          ProjectDraftDigest((Dictionary<string, object>)current["files"]) == (string)header["verifiedDigest"];
+        status = verified && phase != "PREPARED" ? "NEW_COMPLETE_OBSERVED" : "CONFLICT";
+      } else if (target != null || temp.Identity != recorded || temp.Digest != (string)op["newDigest"] ||
+          temp.Bytes != (int)op["newBytes"]) status = "CONFLICT";
+      // A staged temporary object or a physical commit before its durable
+      // record is observation only. No automatic cleanup/resume is granted.
+      return new { status, metadata = Metadata(status == "CONFLICT" ? "CONFLICT" : phase == "CLEANED" && status == "NEW_COMPLETE_OBSERVED" ?
+          "TERMINAL_RETAINED" : "MANUAL_RECOVERY_REQUIRED"), ownerGenerationAlive = false,
+        observedIdentity = target == null ? null : target.Identity, tempIdentity = temp == null ? null : temp.Identity,
+        journalMutations = 0, projectMutations = 0, processKills = 0, projectPublished = false };
+    }
     static string DeleteLeaf(string transactionId) {
       if (!Id.IsMatch(transactionId)) throw new InvalidDataException();
       return "phi-delete-" + transactionId + ".quarantine";
@@ -1046,6 +1181,7 @@ namespace Phi.Native {
           operationTemps[index] = body["tempIdentity"] as string;
           operationCommits[index] = body["committedIdentity"] as string;
         }
+        if ((int)original["version"] == 6) ValidateSingleCreateEvent(body, prior);
         previous = Hash(bytes); prior = body;
       }
       if (lastDigest != null && previous != lastDigest) throw new InvalidDataException();
@@ -1076,7 +1212,7 @@ namespace Phi.Native {
           terminalObservation = last.ContainsKey("terminalObservation") ? last["terminalObservation"] : null, cleanup = "NOT_PROVEN",
           projectPublished = false };
       }
-      if ((int)header["version"] >= 2) return new { version = (int)header["version"], scope = (int)header["version"] == 4 ? "SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION" : (int)header["version"] == 3 ? "SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION" : "SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION", transactionId = id,
+      if ((int)header["version"] >= 2) return new { version = (int)header["version"], scope = (int)header["version"] == 6 ? "SINGLE_FILE_CREATE_JOURNAL_NOT_CONTROLLER_PUBLICATION" : (int)header["version"] == 4 ? "SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION" : (int)header["version"] == 3 ? "SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION" : "SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION", transactionId = id,
         projectIdentity = header["projectIdentity"], draftId = header["draftId"], draftVersion = header["draftVersion"], verifiedDigest = header["verifiedDigest"], baseDigest = header["baseDigest"],
         phase = last["phase"], sequence = last["sequence"], operationIndex = last["operationIndex"], operations = header["operations"], tempIdentity = last["tempIdentity"], committedIdentity = last["committedIdentity"],
         filesCommitted = last["committedIdentity"] == null ? new string[0] : new string[] { (string)((Dictionary<string, object>)Operations(header)[0])["path"] },
@@ -1198,6 +1334,10 @@ namespace Phi.Native {
               if ((int)parsed.header["version"] == 2) return parsed.InspectSingleModify(recover);
               if ((int)parsed.header["version"] == 3) return parsed.InspectSingleDelete(recover);
               if ((int)parsed.header["version"] == 4) return parsed.InspectSingleRename(recover);
+              if ((int)parsed.header["version"] == 6) {
+                if (recover) throw new InvalidDataException();
+                return parsed.InspectSingleCreate();
+              }
               if ((int)parsed.header["version"] == 5) {
                 if (recover) throw new InvalidDataException();
                 // Physical evidence is read-only. No V5 recovery action or

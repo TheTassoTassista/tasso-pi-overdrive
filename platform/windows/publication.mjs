@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper } from './process.mjs';
 import { readWindowsProjectSnapshot } from './coding-tools.mjs';
-import { draftContentDigest, publicationConflicts, publicationOperations } from '../../lib/phi-publication-plan.mjs';
+import { draftContentDigest, publicationConflicts, publicationOperations, publicationTransactionProfile } from '../../lib/phi-publication-plan.mjs';
 
 // INTERNAL_TRUSTED controller adapter. Never registered as a model tool and
 // never accepts a caller-supplied runner, binary/profile or successful receipt.
@@ -39,7 +39,7 @@ export function validateWindowsKnownReconstruction(run, value, transactionId) {
       value.transactionId !== transactionId || !/^[0-9a-f]{16}:[0-9a-f]{32}$/u.test(value.rootIdentity ?? '') ||
       !reconstructionStates.has(value.observedStatus) || value.rootIdentityVerified !== true ||
       value.decision !== (value.observedStatus === 'OLD_COMPLETE_OBSERVED' ? 'ROLLBACK' : value.observedStatus === 'CONFLICT' ? 'CONFLICT' : 'MANUAL_RECOVERY_REQUIRED') ||
-      typeof value.phase !== 'string' || !/^[A-Z_]{3,32}$/u.test(value.phase) || !Number.isInteger(value.journalVersion) || value.journalVersion < 1 || value.journalVersion > 5 ||
+      typeof value.phase !== 'string' || !/^[A-Z_]{3,32}$/u.test(value.phase) || !Number.isInteger(value.journalVersion) || value.journalVersion < 1 || value.journalVersion > 6 ||
       value.actionPerformed !== false || value.journalMutations !== 0 || value.projectMutations !== 0 || value.processKills !== 0 ||
       value.projectPublished !== false || value.externalRequests !== 0) fail('RECONSTRUCTION_UNCONFIRMED');
   return freeze({ ...value });
@@ -74,7 +74,7 @@ export function validateWindowsTransactionDiscovery(run, value) {
   let previous = '';
   for (const entry of value.entries) {
     if (!exactKeys(entry, discoveryEntryKeys) || !/^[0-9a-f]{32}$/u.test(entry.transactionId ?? '') ||
-        entry.transactionId <= previous || !Number.isInteger(entry.journalVersion) || entry.journalVersion < 1 || entry.journalVersion > 5 ||
+        entry.transactionId <= previous || !Number.isInteger(entry.journalVersion) || entry.journalVersion < 1 || entry.journalVersion > 6 ||
         !/^[A-Z_]{3,32}$/u.test(entry.phase ?? '') ||
         !['ACTIVE', 'OLD_COMPLETE_OBSERVED', 'NEW_COMPLETE_OBSERVED', 'DELETE_COMMITTED_QUARANTINE_RETAINED',
           'DELETE_COMMITTED_CLEANUP_OBSERVED', 'RENAME_COMMITTED_DESTINATION_RETAINED', 'CONFLICT', 'UNKNOWN_FAIL_SAFE',
@@ -285,15 +285,16 @@ export function recoverKnownWindowsMixedObservation({ cwd, transactionId }) {
 export function windowsPublicationFailure(run, value, header) {
   const error = new Error('PHI_PUBLICATION_NATIVE_EXECUTION_UNCONFIRMED'); error.code = error.message;
   if (run.error || run.status !== 70 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1 || value?.version !== 1 ||
-      !['FAIL_NATIVE_SINGLE_MODIFY', 'FAIL_NATIVE_SINGLE_DELETE', 'FAIL_NATIVE_SINGLE_RENAME'].includes(value.status) || value.projectPublished !== false || value.externalRequests !== 0) return error;
+      !['FAIL_NATIVE_SINGLE_CREATE', 'FAIL_NATIVE_SINGLE_MODIFY', 'FAIL_NATIVE_SINGLE_DELETE', 'FAIL_NATIVE_SINGLE_RENAME'].includes(value.status) || value.projectPublished !== false || value.externalRequests !== 0) return error;
+  const creation = value.status === 'FAIL_NATIVE_SINGLE_CREATE';
   const deletion = value.status === 'FAIL_NATIVE_SINGLE_DELETE';
   const renaming = value.status === 'FAIL_NATIVE_SINGLE_RENAME';
-  if (!Array.isArray(header.operations) || header.operations.length !== 1 || header.operations[0].kind !== (deletion ? 'DELETE' : renaming ? 'RENAME' : 'REPLACE')) return error;
+  if (!Array.isArray(header.operations) || header.operations.length !== 1 || header.operations[0].kind !== (creation ? 'CREATE' : deletion ? 'DELETE' : renaming ? 'RENAME' : 'REPLACE')) return error;
   const bound = item => Object.keys(header).every(key => same(item?.[key], header[key]));
   const phase = /^[a-zA-Z-]{1,40}$/u.test(value.phase ?? '') ? value.phase : 'UNKNOWN';
   const nativeCode = /^[0-9a-f]{8}$/u.test(value.nativeCode ?? '') ? value.nativeCode : null;
   const j = value.journal, a = value.admission;
-  if (exactKeys(j, journalKeys) && j.version === (deletion ? 3 : renaming ? 4 : 2) && j.scope === (deletion ? 'SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION' : renaming ? 'SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION' : 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION') &&
+  if (exactKeys(j, journalKeys) && j.version === (creation ? 6 : deletion ? 3 : renaming ? 4 : 2) && j.scope === (creation ? 'SINGLE_FILE_CREATE_JOURNAL_NOT_CONTROLLER_PUBLICATION' : deletion ? 'SINGLE_FILE_DELETE_JOURNAL_NOT_CONTROLLER_PUBLICATION' : renaming ? 'SINGLE_FILE_RENAME_JOURNAL_NOT_CONTROLLER_PUBLICATION' : 'SINGLE_FILE_MODIFY_JOURNAL_NOT_CONTROLLER_PUBLICATION') &&
       j.projectPublished === false && bound(j)) {
     error.publicationEvidence = freeze({ phase, nativeCode, journal: j });
     if (value.reason === 'CONFLICT' && j.phase === 'CONFLICT' && j.committedIdentity === null && (!(deletion || renaming) || j.tempIdentity === null) && j.pendingOperations === 1 && same(j.filesCommitted, [])) {
@@ -307,6 +308,42 @@ export function windowsPublicationFailure(run, value, header) {
     error.publicationEvidence = freeze({ phase, nativeCode, journal: null, admission: a });
   }
   return error;
+}
+
+export function publishWindowsSingleCreate({ cwd, base, snapshot, binding, metadata, remainingMs }) {
+  if (process.platform !== 'win32') fail('BACKEND_UNAVAILABLE');
+  const operations = publicationOperations(base, snapshot);
+  if (publicationTransactionProfile(operations).journalVersion !== 6) fail('SINGLE_CREATE_ONLY');
+  if (metadata.transactionId === null || binding.digest !== draftContentDigest(snapshot.files) || metadata.verifiedDigest !== binding.digest ||
+      metadata.baseDigest !== base.digest || !same(metadata.operations, operations) || !Number.isSafeInteger(remainingMs) || remainingMs < 1) fail('BINDING_INVALID');
+  if (publicationConflicts(base, readWindowsProjectSnapshot(cwd)).length) fail('CONFLICT');
+  const op = operations[0], timeoutMs = Math.min(remainingMs, 30000);
+  const header = { transactionId: metadata.transactionId, projectIdentity: base.rootIdentity, draftId: binding.id, draftVersion: binding.revision,
+    verifiedDigest: binding.digest, baseDigest: base.digest, operations };
+  const input = JSON.stringify({ version: 1, root: cwd, header, content: snapshot.files[op.path], guardianPid: process.pid, timeoutMs }) + '\n';
+  if (Buffer.byteLength(input) > 1024 * 1024) fail('REQUEST_LIMIT');
+  const run = spawnSync(ownedWindowsHelper(), ['--publication-create'], { shell: false, windowsHide: true, encoding: 'utf8', input,
+    timeout: timeoutMs + 1000, maxBuffer: 32768 });
+  let value; try { value = JSON.parse(run.stdout); } catch { fail('NATIVE_RECEIPT_INVALID'); }
+  if (run.error || run.status !== 0 || run.signal || !Number.isSafeInteger(run.pid) || run.pid < 1) throw windowsPublicationFailure(run, value, header);
+  const journal = value?.receipt?.journal, native = value?.receipt?.nativeProof;
+  if (value.version !== 1 || value.status !== 'PASS_NATIVE_SINGLE_CREATE' || value.projectPublished !== false || value.externalRequests !== 0 ||
+      !validWindowsRetention(value.retention) || journal?.version !== 6 || journal.scope !== 'SINGLE_FILE_CREATE_JOURNAL_NOT_CONTROLLER_PUBLICATION' ||
+      journal.phase !== 'CLEANED' || journal.cleanup !== 'PASS' || journal.projectPublished !== false || journal.pendingOperations !== 0 ||
+      !same(journal.operations, operations) || !same(journal.filesCommitted, [op.path]) ||
+      Object.keys(header).filter(key => key !== 'operations').some(key => journal[key] !== header[key]) ||
+      native?.backend !== 'JOURNALED_NO_CLOBBER_CREATE' || native.createdIdentity !== journal.tempIdentity ||
+      journal.committedIdentity !== journal.tempIdentity || native.digest !== op.newDigest || native.noClobber !== true ||
+      native.committed !== true || native.tempAbsent !== true || native.projectPublished !== false) fail('NATIVE_RECEIPT_INVALID');
+  const final = readWindowsProjectSnapshot(cwd);
+  if (final.rootIdentity !== base.rootIdentity || draftContentDigest(final.files) !== binding.digest ||
+      !same(Object.keys(final.files).sort(), Object.keys(snapshot.files).sort()) || final.identities[op.path] !== native.createdIdentity ||
+      Object.entries(base.files).some(([name, file]) => final.identities[name] !== file.identity)) fail('POSTVERIFY_FAILED');
+  const proof = Object.freeze({});
+  proofs.set(proof, freeze({ ...header, finalDigest: binding.digest, operation: 'CREATE', native, journal, retention: value.retention,
+    publisherPid: run.pid, publisherExitCode: run.status, publisherExited: true, cleanup: 'PASS', projectPublished: true,
+    backend: native.backend, scope: 'VERIFIED_WORKER_SINGLE_CREATE' }));
+  return proof;
 }
 
 export function publishWindowsSingleModify({ cwd, base, snapshot, binding, metadata, remainingMs }) {
@@ -355,6 +392,7 @@ export function publishWindowsSingleOperation(options) {
   if (options?.metadata?.operations?.length !== 1) fail('MIXED_NOT_IMPLEMENTED');
   if (options?.metadata?.operations?.length === 1 && options.metadata.operations[0].kind === 'RENAME') return publishWindowsSingleRename(options);
   const operations = publicationOperations(options.base, options.snapshot);
+  if (operations.length === 1 && operations[0].kind === 'CREATE') return publishWindowsSingleCreate(options);
   if (operations.length === 1 && operations[0].kind === 'DELETE') return publishWindowsSingleDelete(options);
   return publishWindowsSingleModify(options); // Existing MODIFY path unchanged.
 }
