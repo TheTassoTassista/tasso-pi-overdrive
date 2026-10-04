@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { requireCodingBackend, sandboxInvocation } from '../platform/shared/coding-execution.mjs';
+import { requireBoundedWindowsPublication, requireCodingBackend, sandboxInvocation } from '../platform/shared/coding-execution.mjs';
+import { windowsPlatform } from '../platform/windows/index.mjs';
+import { boundedCreateTaskTarget } from '../lib/phi-worker-authority.mjs';
+import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { EditEngine } from '../lib/edit-engine.mjs';
 import { DapEngine } from '../lib/dap-engine.mjs';
 import { PersistentEvalEngine, spawnPersistentEvalKernel } from '../lib/persistent-eval.mjs';
@@ -25,6 +28,32 @@ test('production capability dispatch uses the actual host and never treats fixed
       assert.equal(Object.isFrozen(result), true);
     }
   }
+});
+
+test('bounded CREATE admission never promotes the Windows full backend or other operations', () => {
+  assert.equal(windowsPlatform.sandbox.implemented, false);
+  assert.equal(windowsPlatform.sandbox.autonomousReady, false);
+  assert.deepEqual(Object.keys(windowsPlatform.boundedPublication), ['CREATE']);
+  for (const operation of ['MODIFY', 'DELETE', 'RENAME']) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
+  for (const operation of ['workflow', '__proto__', undefined]) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_OPERATION_INVALID/u);
+  if (process.platform === 'win32') {
+    assert.equal(requireBoundedWindowsPublication('CREATE').operation, 'CREATE');
+    assert.throws(() => requireCodingBackend('workflow'), denied);
+  } else assert.throws(() => requireBoundedWindowsPublication('CREATE'), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
+});
+
+test('bounded CREATE target is anchored to exact direct-user task and mutating policy', () => {
+  const task = 'Create file `src/new.js` containing export const answer = 42;';
+  const policy = resolveTaskPolicy({ task });
+  assert.equal(boundedCreateTaskTarget(task, task, policy), 'src/new.js');
+  for (const other of [null, task + ' ', 'Create file `src/other.js` containing export const answer = 42;'])
+    assert.throws(() => boundedCreateTaskTarget(task, other, policy), /PUBLICATION_ENVELOPE_DENIED/u);
+  for (const target of ['.env', 'src/.env', '../outside.js', 'src/../outside.js', 'src\\new.js', 'src/file.js:ads']) {
+    const request = `Create file \`${target}\` containing safe text`;
+    assert.throws(() => boundedCreateTaskTarget(request, request, resolveTaskPolicy({ task: request })), /PUBLICATION_ENVELOPE_DENIED/u);
+  }
+  const readOnly = resolveTaskPolicy({ task: 'Inspect `src/new.js` without changing it' });
+  assert.throws(() => boundedCreateTaskTarget(task, task, readOnly), /PUBLICATION_ENVELOPE_DENIED/u);
 });
 
 test('unknown or inherited operation names cannot select a coding capability', () => {

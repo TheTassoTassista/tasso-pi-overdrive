@@ -26,8 +26,8 @@ import { AgentAttemptController, requestExactUserCancellation } from "../lib/age
 import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
-import { requireCodingBackend } from "../platform/shared/coding-execution.mjs";
-import { reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
+import { requireBoundedWindowsPublication, requireCodingBackend } from "../platform/shared/coding-execution.mjs";
+import { boundedCreateTaskTarget, createWindowsPublicationEnvelope, executePreparedWindowsPublication, reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -59,6 +59,19 @@ class WorkflowFailure extends Error {
   }
 }
 
+function latestDirectUserTask(ctx: any): string | null {
+  const branch = ctx.sessionManager.getBranch();
+  if (!Array.isArray(branch)) return null;
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const entry = branch[index];
+    if (entry?.type !== "message" || entry.message?.role !== "user") continue;
+    const content = entry.message.content;
+    if (!Array.isArray(content) || content.length !== 1 || content[0]?.type !== "text" || typeof content[0].text !== "string") return null;
+    return content[0].text.trim();
+  }
+  return null;
+}
+
 function sanitizeState(state: any) {
   const evidence = state?.evidence ?? {};
   return {
@@ -87,6 +100,7 @@ function sanitizeState(state: any) {
     evidence: {
       roles: Array.isArray(evidence.roles) ? evidence.roles.map((item: any) => ({ agent: item.agent, status: item.status, model: item.model, thinking: item.thinking, provider: item.provider, fallbackIndex: item.fallbackIndex, callNumber: item.callNumber, retryCount: item.retryCount, runId: item.runId, nodeId: item.nodeId, ownerRunId: item.ownerRunId, usage: item.usage, round: item.round, iteration: item.iteration, receipt: item.receipt })) : [],
       receipts: Array.isArray(evidence.receipts) ? evidence.receipts.map((item: any) => ({ agent: item.agent, round: item.round, iteration: item.iteration, executionId: item.executionId, sequence: item.sequence, sha256: item.sha256 })) : [],
+      publications: Array.isArray(evidence.publications) ? evidence.publications.map((item: any) => ({ round: item.round, iteration: item.iteration, status: item.status, operation: item.operation, transactionId: item.transactionId, journalVersion: item.journalVersion, intentDigest: item.intentDigest })) : [],
       transitions: Array.isArray(evidence.transitions) ? evidence.transitions : [],
       verifications: Array.isArray(evidence.verifications) ? evidence.verifications.map((item: any) => ({
         status: item.status,
@@ -202,7 +216,24 @@ export default function (pi: ExtensionAPI) {
     parameters: Params,
     executionMode: "sequential",
     async execute(toolCallId, params, signal, _update, ctx) {
-      requireCodingBackend("workflow");
+      const storedModelPolicy = readModelPolicy();
+      let activeTaskPolicy: any = resolveTaskPolicy({
+        task: params.task,
+        preset: storedModelPolicy.preset === "custom" ? storedModelPolicy.basePreset : storedModelPolicy.preset,
+        quality: getSessionQuality(),
+        includeOracle: params.includeOracle ?? false,
+        includeSecurity: params.includeSecurity ?? true,
+        availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
+      });
+      const trustedUserTask = process.platform === "win32" ? latestDirectUserTask(ctx) : null;
+      let boundedCreate = false;
+      if (process.platform === "win32") {
+        try {
+          boundedCreateTaskTarget(params.task, trustedUserTask, activeTaskPolicy);
+          requireBoundedWindowsPublication("CREATE");
+          boundedCreate = true;
+        } catch { requireCodingBackend("workflow"); }
+      } else requireCodingBackend("workflow");
       if (running) throw new WorkflowFailure("Another secure workflow is already active.");
       const spawnBudgetPlan = workflowSpawnBudgetForRequest({ includeOracle: params.includeOracle ?? false, includeSecurity: params.includeSecurity ?? true });
       const configuredSpawnLimit = readConfiguredSpawnLimit();
@@ -235,6 +266,8 @@ export default function (pi: ExtensionAPI) {
       let receiptSequence = 0;
       let protocolNonce = taskDigest(randomUUID());
       let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
+      let boundedEnvelope: ReturnType<typeof createWindowsPublicationEnvelope> | undefined;
+      const retainedWorkers = new Map<string, ReturnType<typeof reserveWindowsWorker>>();
       const publishHub = (value: Record<string, unknown>) => {
         try { pi.events.emit(AGENT_HUB_EVENT, value); } catch {}
       };
@@ -251,15 +284,6 @@ export default function (pi: ExtensionAPI) {
       const availableModels = ctx.modelRegistry.getAvailable();
       const registeredModels = ctx.modelRegistry.getAll();
       const modelCapabilityOptions = { registeredModels };
-      const storedModelPolicy = readModelPolicy();
-      let activeTaskPolicy: any = resolveTaskPolicy({
-        task: params.task,
-        preset: storedModelPolicy.preset === "custom" ? storedModelPolicy.basePreset : storedModelPolicy.preset,
-        quality: getSessionQuality(),
-        includeOracle: params.includeOracle ?? false,
-        includeSecurity: params.includeSecurity ?? true,
-        availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
-      });
       let activeRoutingStrategy = activeTaskPolicy.routingStrategy;
       let activeModelPolicy: any = resolveModelPolicy(availableModels, storedModelPolicy, { ...modelCapabilityOptions, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality });
       pi.events.emit("pi-overdrive:routing-metadata", { kind: "workflow-policy", preset: activeRoutingStrategy.preset, qualityRequested: activeRoutingStrategy.qualityRequested, effectiveQuality: activeRoutingStrategy.effectiveQuality, difficulty: activeRoutingStrategy.difficulty, securitySensitive: activeRoutingStrategy.securitySensitive, modelCallLimit: activeRoutingStrategy.maxModelCalls, policyDigest: activeModelPolicy.digest });
@@ -333,14 +357,16 @@ export default function (pi: ExtensionAPI) {
           publishHub(reservationMetadata);
         } catch {}
         const workerTransport = process.platform === "win32" && agent === "worker"
-          ? reserveWindowsWorker({ executionId, parentSessionId: ctx.sessionManager.getSessionId(), cwd, task, taskPolicy: activeTaskPolicy })
+          ? reserveWindowsWorker({ executionId, parentSessionId: ctx.sessionManager.getSessionId(), cwd, task, taskPolicy: activeTaskPolicy,
+              ...(boundedEnvelope ? { retainForController: true, publicationEnvelope: boundedEnvelope } : {}) })
           : undefined;
         let settled = false;
         let attemptStarted = false;
         const finish = (callback: (value: any) => void, value: any, terminalStatus: string) => {
           if (settled) return;
           settled = true;
-          workerTransport?.revoke();
+          if (workerTransport && boundedEnvelope && terminalStatus === "completed") retainedWorkers.set(executionId, workerTransport);
+          else workerTransport?.revoke();
           agentControl?.terminal(executionId, terminalStatus);
           clearTimeout(timer);
           unsubscribeStarted();
@@ -521,6 +547,11 @@ export default function (pi: ExtensionAPI) {
           allocation = await createRuntimeWorktree(ctx.cwd, { evidenceRunId: evidenceRun.runId, ownerRunId });
           checkpointJournal({ allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
         }
+        if (boundedCreate) {
+          if (resumable) throw new Error("PHI_BOUNDED_PUBLICATION_RESUME_REQUIRES_MANUAL_INSPECTION");
+          boundedEnvelope = createWindowsPublicationEnvelope({ task: params.task, trustedUserTask,
+            cwd: allocation!.worktree, taskPolicy: activeTaskPolicy });
+        }
         if (resumable) {
           const priorBudget = latestState?.spawnBudget;
           if (!Number.isSafeInteger(priorBudget?.used) || !Number.isSafeInteger(priorBudget?.retriesUsed)) throw new Error("interrupted workflow has no valid spawn budget state");
@@ -579,6 +610,25 @@ export default function (pi: ExtensionAPI) {
                   thinking: expectedRoute.thinking,
                 }, admittedExecutionIds);
               },
+              ...(boundedEnvelope ? { afterWorker: (response: any) => {
+                const executionId = response?.workflowReceipt?.executionId;
+                const reservation = retainedWorkers.get(executionId);
+                if (!reservation) throw new Error("PHI_BOUNDED_WORKER_RESERVATION_MISSING");
+                try {
+                  reservation.finishWorker();
+                  if (!reservation.status().workerRevoked) throw new Error("PHI_BOUNDED_WORKER_NOT_REVOKED");
+                  const ready = reservation.preparePublication({ approveProjectMutation: true });
+                  if (ready.receipt?.state !== "READY_TO_PUBLISH" || ready.receipt.operations?.length !== 1 ||
+                      ready.receipt.operations[0]?.kind !== "CREATE" || ready.receipt.operations[0].path !== boundedEnvelope!.target || !ready.authority)
+                    throw new Error("PHI_BOUNDED_PUBLICATION_INTENT_DENIED");
+                  const published = executePreparedWindowsPublication(ready.authority);
+                  if (published.state !== "PUBLISHED" || published.publicationProof?.journal?.version !== 6 || published.projectPublished !== true)
+                    throw new Error("PHI_BOUNDED_PUBLICATION_UNVERIFIED");
+                  if (!/^[0-9a-f]{64}$/u.test(ready.intentDigest ?? "")) throw new Error("PHI_BOUNDED_INTENT_UNBOUND");
+                  return { status: "PUBLISHED", operation: "CREATE", transactionId: ready.receipt.transactionId,
+                    journalVersion: 6, intentDigest: ready.intentDigest };
+                } finally { reservation.revoke(); retainedWorkers.delete(executionId); }
+              } } : {}),
               resumeState: resumable ? latestState : undefined,
               policyReview: ({ cwd }: { cwd: string }) => localReviewPolicy(cwd),
               onCheckpoint: (checkpoint: any) => {
@@ -608,6 +658,8 @@ export default function (pi: ExtensionAPI) {
           try { repositoryEvidence = snapshotWorktree(allocation.worktree); } catch {}
         }
       } finally {
+        for (const reservation of retainedWorkers.values()) reservation.revoke();
+        retainedWorkers.clear();
         if (agentControlUncertain) workflowError ??= new Error("Exact attempt cancellation was not acknowledged by the delegated controller.");
         let execution: any = priorExecution;
         let executionSha256: string | undefined = priorExecutionSha256;

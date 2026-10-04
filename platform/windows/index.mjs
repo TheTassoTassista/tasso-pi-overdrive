@@ -10,4 +10,7 @@ export const windowsPlatform = Object.freeze({
   // A Job Object alone is NOT a filesystem/network sandbox. Never substitute
   // unrestricted execution while the AppContainer backend is unverified.
   sandbox: Object.freeze({ id: 'appcontainer-pending', implemented: false, autonomousReady: false }),
+  // This is narrower than backend readiness: only the journaled V6 CREATE
+  // publication path has native evidence. It grants no command/tool surface.
+  boundedPublication: Object.freeze({ CREATE: 'NATIVE_VERIFIED_V6' }),
 });

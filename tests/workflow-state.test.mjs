@@ -55,6 +55,50 @@ test("blocking review mechanically forces Worker correction and complete re-veri
   assert.equal(state.evidence.transitions.some((entry) => entry.state === "CORRECTION_REQUIRED"), true);
 });
 
+test("bounded publication is required after Worker receipt and before deterministic verification", async () => {
+  const steps = [];
+  const transactionId = 'a'.repeat(32);
+  const state = await runEnforcedWorkflow({ task: "Create file `new.js` containing safe code", allocation, modelPolicy,
+    delegate: async ({ agent, result }) => { steps.push(agent); return result.kind === "structured" ? structuredResponse(agent) : textResponse(agent); },
+    receiptVerifier: (_response, { agent }) => ({ executionId: `${agent}-receipt`, sequence: 1, sha256: 'b'.repeat(64) }),
+    afterWorker: (_response, { admitted }) => {
+      assert.equal(admitted.executionId, 'worker-receipt');
+      steps.push('published');
+      return { status: 'PUBLISHED', operation: 'CREATE', transactionId, journalVersion: 6, intentDigest: 'c'.repeat(64) };
+    },
+    verify: async () => { steps.push('verified'); return { status: 'PASS', processExitCode: 0 }; },
+  });
+  assert.equal(state.status, 'PASS');
+  assert.ok(steps.indexOf('worker') < steps.indexOf('published') && steps.indexOf('published') < steps.indexOf('verified'));
+  assert.deepEqual(state.evidence.publications.map(({ operation, journalVersion, transactionId: id }) => [operation, journalVersion, id]), [['CREATE', 6, transactionId]]);
+});
+
+test("missing or forged bounded publication fails before verification and reviewers", async () => {
+  for (const publication of [null, { status: 'PUBLISHED', operation: 'MODIFY', transactionId: 'a'.repeat(32), journalVersion: 6, intentDigest: 'c'.repeat(64) }, { status: 'PUBLISHED', operation: 'CREATE', transactionId: 'bad', journalVersion: 6, intentDigest: 'c'.repeat(64) }, { status: 'PUBLISHED', operation: 'CREATE', transactionId: 'a'.repeat(32), journalVersion: 5, intentDigest: 'c'.repeat(64) }]) {
+    const calls = [];
+    await assert.rejects(() => runEnforcedWorkflow({ task: 'bounded negative', allocation, modelPolicy,
+      delegate: async ({ agent, result }) => { calls.push(agent); return result.kind === 'structured' ? structuredResponse(agent) : textResponse(agent); },
+      afterWorker: () => publication,
+      verify: async () => { calls.push('verification'); return { status: 'PASS' }; },
+    }), /bounded Worker publication was not proved/u);
+    assert.equal(calls.includes('verification'), false);
+    assert.equal(calls.some(agent => agent.endsWith('-reviewer')), false);
+  }
+});
+
+test("published bounded CREATE never launches a correction Worker without new authority", async () => {
+  const calls = [];
+  await assert.rejects(() => runEnforcedWorkflow({ task: 'bounded blocked review', allocation, modelPolicy,
+    delegate: async ({ agent, result }) => {
+      calls.push(agent);
+      return result.kind === 'structured' ? structuredResponse(agent, agent === 'correctness-reviewer') : textResponse(agent);
+    },
+    afterWorker: () => ({ status: 'PUBLISHED', operation: 'CREATE', transactionId: 'a'.repeat(32), journalVersion: 6, intentDigest: 'c'.repeat(64) }),
+    verify: async () => ({ status: 'PASS', processExitCode: 0 }),
+  }), /PHI_BOUNDED_CREATE_CORRECTION_REQUIRES_NEW_AUTHORITY/u);
+  assert.equal(calls.filter(agent => agent === 'worker').length, 1);
+});
+
 test("failed verification can never become PASS and stops after bounded correction", async () => {
   const delegate = async ({ agent, result }) => result.kind === "structured"
     ? structuredResponse(agent)

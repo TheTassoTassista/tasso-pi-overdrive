@@ -49,6 +49,15 @@ export function requireCodingBackend(operation) {
   return Object.freeze({ platform: adapter.id, backend: adapter.sandbox.id, operation, capability: OPERATIONS[operation] });
 }
 
+// Separate, operation-specific admission for the controller-owned publication
+// lane. This never changes or substitutes the full workflow/backend gate.
+export function requireBoundedWindowsPublication(operation) {
+  if (typeof operation !== 'string' || !['CREATE', 'MODIFY', 'DELETE', 'RENAME'].includes(operation)) denied('PHI_PUBLICATION_OPERATION_INVALID');
+  const adapter = platformAdapter();
+  if (adapter.id !== 'win32' || adapter.boundedPublication?.[operation] !== 'NATIVE_VERIFIED_V6') denied('PHI_PUBLICATION_CAPABILITY_UNAVAILABLE');
+  return Object.freeze({ platform: adapter.id, operation, evidence: adapter.boundedPublication[operation] });
+}
+
 export function sandboxInvocation(operation, args, options = {}) {
   const backend = requireCodingBackend(operation); // before any caller override
   if (!['safe-exec', 'lsp', 'debug', 'eval', 'verification'].includes(operation)) denied('PHI_CODING_OPERATION_INVALID');

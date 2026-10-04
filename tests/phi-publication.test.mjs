@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { WorkerDraft, draftContentDigest } from '../lib/phi-worker-draft.mjs';
 import { PublicationPreflight, publicationBase, publicationConflicts, publicationOperations, publicationTransactionProfile, PUBLICATION_STATES } from '../lib/phi-publication-plan.mjs';
-import { reserveWindowsWorker, bindWindowsWorker, windowsWorkerAuthority, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
+import { createWindowsPublicationEnvelope, reserveWindowsWorker, bindWindowsWorker, windowsWorkerAuthority, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
@@ -284,7 +284,7 @@ test('single CREATE admission conflict is bound to V6 and cannot masquerade as l
   assert.equal(windowsPublicationFailure(run, value, header).publicationEvidence, undefined);
 });
 
-function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify', retainForController = false) {
+function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify', retainForController = false, bounded = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
   const files = {
     'config.json': '{}',
@@ -317,9 +317,11 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   const sessionId = randomUUID();
-  const reservation = reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: project, task, taskPolicy: resolveTaskPolicy({ task }), retainForController });
+  const taskPolicy = resolveTaskPolicy({ task });
+  const publicationEnvelope = bounded ? createWindowsPublicationEnvelope({ task, trustedUserTask: task, cwd: project, taskPolicy }) : undefined;
+  const reservation = reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: project, task, taskPolicy, retainForController, publicationEnvelope });
   const token = bindWindowsWorker({ cwd: project, task: 'Task: ' + task, sessionId });
-  return { project, reservation, token, sessionId, context: { workerAuthority: token, sessionId, runtime: path.resolve(import.meta.dirname, '../runtime/lsp') },
+  return { project, reservation, token, sessionId, publicationEnvelope, context: { workerAuthority: token, sessionId, runtime: path.resolve(import.meta.dirname, '../runtime/lsp') },
     close: () => { reservation.revoke(); fs.rmSync(root, { recursive: true, force: true }); assert.equal(fs.existsSync(root), false); } };
 }
 async function nativeVerified(item) {
@@ -651,6 +653,41 @@ test('native single CREATE V6 preserves a user-created target and consumes the g
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /CONFLICT/u);
     assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'user-owned-content');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded CREATE envelope admits exact target only after Worker revocation', native, async () => {
+  const task = 'Create file `created.txt` containing new-create-fixture';
+  const item = nativeFixture(task, 'create', true, true);
+  try {
+    assert.throws(() => reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: item.project,
+      task: 'Create file `other.txt` containing unauthorized text', taskPolicy: resolveTaskPolicy({ task }), retainForController: true,
+      publicationEnvelope: item.publicationEnvelope }), /PUBLICATION_ENVELOPE_DENIED/u);
+    assert.throws(() => reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: item.project,
+      task, taskPolicy: resolveTaskPolicy({ task }), retainForController: true,
+      publicationEnvelope: { ...item.publicationEnvelope } }), /PUBLICATION_ENVELOPE_DENIED/u);
+    const verified = await nativeVerified(item);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /WORKER_NOT_REVOKED/u);
+    item.reservation.finishWorker();
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.deepEqual(ready.receipt.operations.map(op => [op.kind, op.path]), [['CREATE', 'created.txt']]);
+    assert.match(ready.intentDigest, /^[0-9a-f]{64}$/u);
+    const published = executePreparedWindowsPublication(ready.authority);
+    assert.equal(published.state, 'PUBLISHED');
+    assert.equal(published.publicationProof.journal.version, 6);
+    assert.equal(published.publicationProof.verifiedDigest, verified.verification.draft.contentDigest);
+    assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'new-create-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded CREATE rejects an otherwise verified Worker delta outside envelope', native, async () => {
+  const item = nativeFixture('Create file `other.txt` containing authorized text', 'create', true, true);
+  try {
+    await nativeVerified(item);
+    item.reservation.finishWorker();
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.existsSync(path.join(item.project, 'created.txt')), false);
+    assert.equal(fs.existsSync(path.join(item.project, 'other.txt')), false);
   } finally { item.close(); }
 });
 test('native V5 stale handoff and concurrent user destination never grant publication or replay', native, async () => {

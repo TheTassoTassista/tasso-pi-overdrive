@@ -188,5 +188,14 @@ jobs:
           $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
           node scripts/phi-worker-pi-smoke.mjs --lsp
           exit $LASTEXITCODE
+      - name: Normal secure_coding_workflow bounded CREATE through real Pi and V6 (zero external provider calls)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs
+          exit $LASTEXITCODE
       - name: Scope reminder
         run: node -e "console.log('FOUNDATION ONLY. Windows autonomous engine remains BLOCKED; no live auth or sandbox parity claimed. Full Linux regression is a separate mandatory gate.')"

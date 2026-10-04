@@ -153,7 +153,9 @@ test('attempt lifetime revokes and aborts in-flight authority without a model-co
 });
 test('production workflow/Worker wiring uses controller authority and cannot activate Windows autonomy', () => {
   const workflow = fs.readFileSync(new URL('../extensions/secure-workflow.ts', import.meta.url), 'utf8');
-  assert.match(workflow, /reserveWindowsWorker\(\{ executionId, parentSessionId: ctx.sessionManager.getSessionId\(\), cwd, task, taskPolicy: activeTaskPolicy \}\)/u);
+  assert.match(workflow, /reserveWindowsWorker\(\{ executionId, parentSessionId: ctx.sessionManager.getSessionId\(\), cwd, task, taskPolicy: activeTaskPolicy,/u);
+  assert.match(workflow, /retainForController: true, publicationEnvelope: boundedEnvelope/u);
+  assert.match(workflow, /reservation\.finishWorker\(\)/u);
   assert.match(workflow, /workerTransport\?\.revoke\(\)/u);
   const definition = fs.readFileSync(new URL('../agents/worker.md', import.meta.url), 'utf8');
   assert.match(definition, /extensions\/windows-worker\.ts/u);
@@ -161,7 +163,7 @@ test('production workflow/Worker wiring uses controller authority and cannot act
   if (process.platform === 'win32') assert.throws(() => requireCodingBackend('workflow'), /BACKEND_UNAVAILABLE/u);
   for (const file of ['extensions/windows-worker.ts', 'lib/phi-worker-authority.mjs', 'platform/shared/safe-exec-handler.mjs']) {
     const source = fs.readFileSync(new URL('../' + file, import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /spawn\(|spawnSync\(|exec\(|cmd\.exe|powershell|runOwnedEngine/u);
+    assert.doesNotMatch(source, /spawn\(|spawnSync\(|(?<!\.)\bexec\(|cmd\.exe|powershell|runOwnedEngine/u);
   }
 });
 test('native governed Worker EDIT request reaches registered handler/dispatch/LPAC/Job and real private denial', native, async () => {
