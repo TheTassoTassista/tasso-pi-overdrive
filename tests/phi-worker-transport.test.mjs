@@ -102,6 +102,21 @@ test('revocation aborts admitted tools and root replacement invalidates the sess
     } finally { next.close(); }
   } finally { attempt.close(); item.cleanup(); }
 });
+test('controller-retained handoff rejects an in-flight Worker tool and disposes its reservation', () => {
+  const item = fixture(), task = approved, sessionId = randomUUID();
+  const reservation = reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: item.project,
+    task, taskPolicy: resolveTaskPolicy({ task }), retainForController: true });
+  try {
+    const token = bindWindowsWorker({ cwd: item.project, task: `Task: ${task}`, sessionId });
+    const admitted = admitWindowsWorkerTool(token, { cwd: item.project, sessionId, syntax: true });
+    assert.throws(() => reservation.finishWorker(), /AUTHORITY_UNAVAILABLE/u);
+    assert.equal(admitted.signal.aborted, true);
+    assert.equal(reservation.status().revoked, true);
+    assert.equal(reservation.status().draft?.payloadCleared ?? true, true);
+    assert.throws(() => admitWindowsWorkerTool(token, { cwd: item.project, sessionId, syntax: true }), /AUTHORITY_UNAVAILABLE/u);
+    admitted.release();
+  } finally { reservation.revoke(); item.cleanup(); }
+});
 test('stale tool lease cannot unlock or settle a later command in the same draft/session', () => {
   const item = fixture(), attempt = controller(item);
   try {

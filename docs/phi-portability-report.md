@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## New local D6 ordinary-publication boundary (not native verified)
+
+`D6-ORDINARY-WORKFLOW-PUBLICATION-001` is recorded. The opt-in post-Worker-revocation private-draft retention slice passed portable regression and the full local gate (1014 total / 695 PASS / 0 FAIL / 319 native skips; syntax/TypeScript/package PASS). The new native post-revoke four-operation test is **not yet run**. Ordinary Windows `secure_coding_workflow` still rejects before delegation; V5 accepts exactly four fixed mixed operations and cannot publish a standalone CREATE transaction. The existing native atomic CREATE test proves only a primitive, not V5 publication. No new CI/provider call, no Windows autonomy certification, no production-path CREATE/MODIFY/DELETE/RENAME claim. Escalate the significant V5 journal shape and trusted intent integration boundary to Φ Main/Work Control before continuing. **D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.**
+
 ## D6 V5 disposition matrix checkpoint — Windows-native gate PASS
 
 Functional `b27dbb5b59a632e32180ebea076aa0e5ae69f690` passed native Windows and Ubuntu [CI37160704978](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37160704978): Windows focused V5 22/22 and Worker/controller publication 6/6, Windows main and independent clone 479/467 PASS/0 FAIL/12 skips, Ubuntu main 479/161 PASS/0 FAIL/318 native skips. Windows clone cleanup PASS/directory removed/residual owned processes 0; all three isolated Pi controls PASS with zero external requests. `PublicationJournal.cs::InspectMixedPhysical` classifies the actual native identities/content for the fixed `REPLACE, CREATE, DELETE, RENAME` order. Its operation-level durable phases are `NOT_STARTED`, `PREPARED`, `MUTATION_STARTED`, `COMMITTED`, `POST_COMMIT_VERIFIED`, `FINALIZED`; the final RENAME also has global `CLEANUP_STARTED`/`CLEANED`. The physical classes are `OLD_COMPLETE_OBSERVED`, `NEW_COMPLETE_OBSERVED`, CREATE-only staged complete, `UNVERIFIED` and `CONFLICT`. The explicit transaction disposition is:

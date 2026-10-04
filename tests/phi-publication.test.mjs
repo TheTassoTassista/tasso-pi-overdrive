@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { WorkerDraft, draftContentDigest } from '../lib/phi-worker-draft.mjs';
 import { PublicationPreflight, publicationBase, publicationConflicts, publicationOperations, PUBLICATION_STATES } from '../lib/phi-publication-plan.mjs';
-import { reserveWindowsWorker, bindWindowsWorker, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
+import { reserveWindowsWorker, bindWindowsWorker, windowsWorkerAuthority, executePreparedWindowsPublication, registerWindowsWorkerBoundary } from '../lib/phi-worker-authority.mjs';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
@@ -251,7 +251,7 @@ test('RENAME failure decoder accepts only bound V4 pre-mutation conflicts, never
   assert.equal(windowsPublicationFailure(run, value, header).publicationEvidence, undefined);
 });
 
-function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify') {
+function nativeFixture(task = 'Fix JSON configuration code and test diagnostics', operation = 'modify', retainForController = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-publication-')), project = path.join(root, 'project'); fs.mkdirSync(project);
   const files = {
     'config.json': '{}',
@@ -280,7 +280,7 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(project, name), text);
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   const sessionId = randomUUID();
-  const reservation = reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: project, task, taskPolicy: resolveTaskPolicy({ task }) });
+  const reservation = reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: project, task, taskPolicy: resolveTaskPolicy({ task }), retainForController });
   const token = bindWindowsWorker({ cwd: project, task: 'Task: ' + task, sessionId });
   return { project, reservation, token, sessionId, context: { workerAuthority: token, sessionId, runtime: path.resolve(import.meta.dirname, '../runtime/lsp') },
     close: () => { reservation.revoke(); fs.rmSync(root, { recursive: true, force: true }); assert.equal(fs.existsSync(root), false); } };
@@ -541,6 +541,43 @@ test('native V5 governed Worker to controller handoff publishes exact four-opera
     assert.equal(item.reservation.status().draft.payloadCleared, true);
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_MIXED', edit: edit.details.receipt, lsp: lsp.receipt,
       verification: verified.status, publication, exactGitDiff: true, oneUseHandoff: true, workerAuthorityRevoked: true, externalRequests: 0 }));
+  } finally { item.close(); }
+});
+test('native V5 controller publishes after Worker revocation without restoring child authority', native, async () => {
+  const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
+  const item = nativeFixture(task, 'mixed', true);
+  const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+  try {
+    const evidence = await nativeVerified(item);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), /WORKER_NOT_REVOKED/u);
+    const before = item.reservation.status().draft;
+    item.reservation.finishWorker();
+    assert.equal(item.reservation.status().workerRevoked, true);
+    assert.equal(item.reservation.status().revoked, false);
+    assert.equal(item.reservation.status().draft.payloadCleared, false);
+    assert.equal(item.reservation.status().draft.contentDigest, before.contentDigest);
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    await assert.rejects(executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 },
+      { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token }), /AUTHORITY_UNAVAILABLE/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
+    assert.deepEqual(ready.receipt.operations.map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'RENAME']);
+    const publication = executePreparedWindowsPublication(ready.authority);
+    assert.equal(publication.state, 'PUBLISHED');
+    assert.equal(publication.publicationProof.journal.version, 5);
+    assert.equal(publication.publicationProof.journal.phase, 'CLEANED');
+    assert.equal(publication.publicationProof.native.quarantineAbsent, true);
+    assert.equal(publication.publicationProof.verifiedDigest, evidence.verification.draft.contentDigest);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"changed":true}');
+    assert.equal(fs.readFileSync(path.join(item.project, 'created.txt'), 'utf8'), 'created-mixed-fixture');
+    assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), false);
+    assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), false);
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'unchanged-mixed-rename-fixture');
+    item.reservation.revoke();
+    assert.equal(item.reservation.status().draft.payloadCleared, true);
+    console.log(JSON.stringify({ control: 'V5_POST_WORKER_REVOKE', workerRevokedBeforePublication: true,
+      childAuthorityRestored: false, publication, externalRequests: 0 }));
   } finally { item.close(); }
 });
 test('native V5 stale handoff and concurrent user destination never grant publication or replay', native, async () => {

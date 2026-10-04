@@ -2,6 +2,10 @@
 
 Last verified: 2026-10-04. Branch `feature/routing-presets-quality`; validated functional HEAD `b27dbb5b59a632e32180ebea076aa0e5ae69f690`.
 
+## New local-only post-revocation slice (not a native certificate)
+
+At the current unpushed candidate, direct `node tests/phi-worker-transport.test.mjs`: 17 total / 10 PASS / 0 FAIL / 7 Windows skips. Direct `node tests/phi-publication.test.mjs`: 49 total / 19 PASS / 0 FAIL / 30 Windows skips; the new native post-Worker-revocation V5 case is skipped on Linux. Full `npm run check` succeeded outside the managed nested-spawn restriction: 1014 total / 695 PASS / 0 FAIL / 319 Windows skips, all syntax checks, installed-Pi TypeScript and pinned-package validation PASS. An initial restricted `npm run check` did not pass because unrelated fixture tests could not spawn `git` (`EPERM`); direct reproduction confirmed this environment denial. No native Windows CI or ordinary-workflow E2E has been run for this slice. Prior exact native gate CI37160704978 remains the last Windows certificate. D6 PARTIAL; Windows autonomy BLOCKED.
+
 ## Latest CI: 37160704978 — SUCCESS
 
 [Run](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37160704978), exact functional HEAD `b27dbb5b59a632e32180ebea076aa0e5ae69f690`, completed **SUCCESS** on native Windows and Ubuntu.
