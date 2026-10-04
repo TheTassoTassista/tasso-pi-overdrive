@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validationFailureEvidence, validationExceptionEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence } from '../lib/phi-validation-evidence.mjs';
 const failure = { operation: 'NT_OPEN', access: '00110080', share: 1, options: '00200060', nativeStatus: 'c0000043', nativeError: 32, objectIdentity: `${'a'.repeat(16)}:${'b'.repeat(32)}`, leafDigest: 'c'.repeat(64) };
 test('pre-receipt controller exceptions preserve fixed phase/code without private exception context', () => {
   for (const [phase, code] of [['RESOLVE_COMMAND', 'PHI_VALIDATION_COMMAND_UNAVAILABLE'], ['HELPER_VALIDATION', 'PHI_NATIVE_PROCESS_BUILD_INVALID'], ['SUPERVISOR_SPAWN', 'ENOENT'], ['RECEIPT_PARSE', 'PHI_VALIDATION_RECEIPT_MISSING'], ['RECEIPT_VALIDATE', 'PHI_VALIDATION_RECEIPT_INVALID']]) {
@@ -53,6 +53,11 @@ test('timed-out clone foundation suite retains only bounded serial TAP ordinals'
     stdoutBytes: Buffer.byteLength('# Subtest: private-secret-one\nok 1 - private-secret-one\n# Subtest: private-secret-two\nok 2 - private-secret-two\n# Subtest: private-secret-three\n') });
   assert.doesNotMatch(JSON.stringify(row), /private-secret/u);
   assert.equal(validationFailureEvidence('foundation-tests', { status: 0, stdout: 'ok 1 - safe\n' }).tapProgress, undefined);
+  const safe = tapRuntimeEvidence('  ok 99 - nested-private\n# Subtest: private-secret-one\nok 1 - private-secret-one\n  ---\n  duration_ms: 1.25\n  ...\n# Subtest: private-secret-two\nok 2 - private-secret-two\n  ---\n  duration_ms: 3.5\n  ...\n');
+  assert.deepEqual(safe, { completed: 2, lastCompleted: 2, contiguous: true,
+    progressEvents: [{ ordinal: 1, durationMs: 1.25 }, { ordinal: 2, durationMs: 3.5 }],
+    longestCaseDurationMs: 3.5, longestObservedCompletionGapMs: null, completionGapReason: 'TAP_OUTPUT_HAS_NO_WALL_CLOCK_COMPLETION_TIMESTAMPS' });
+  assert.doesNotMatch(JSON.stringify(safe), /private-secret|nested-private/u);
 });
 test('clone timeout failure stage survives redaction as a fixed code only', () => {
   const row = validationFailureEvidence('foundation-tests', { status: 1, stdout: '# PHI_CLONE_TIMEOUT_DELETE_DENIAL private-path\n# fail 1' });

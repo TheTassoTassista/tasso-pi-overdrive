@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -11,21 +11,6 @@ import { installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 
 if (process.argv.length > 3 || process.argv.length === 3 && process.argv[2] !== '--runtime-diagnostic-only') throw new Error('PHI_CLEAN_ROOM_USAGE');
 const diagnosticOnly = process.argv[2] === '--runtime-diagnostic-only';
-function tapRuntimeEvidence(output) {
-  const lines = output.split(/\r?\n/u), progressEvents = [];
-  for (let i = 0; i < lines.length; i++) {
-    const match = /^ok (\d+)(?=\s|$)/u.exec(lines[i]);
-    if (!match) continue;
-    const ordinal = Number(match[1]);
-    const duration = lines.slice(i + 1, i + 5).map(line => /^\s+duration_ms: (\d+(?:\.\d+)?)$/u.exec(line)?.[1]).find(Boolean);
-    progressEvents.push({ ordinal, durationMs: duration === undefined ? null : Number(duration) });
-  }
-  const measured = progressEvents.map(row => row.durationMs).filter(Number.isFinite);
-  return { completed: progressEvents.length, lastCompleted: progressEvents.at(-1)?.ordinal ?? null,
-    contiguous: progressEvents.every((row, index) => row.ordinal === index + 1), progressEvents,
-    longestCaseDurationMs: measured.length ? Math.max(...measured) : null,
-    longestObservedCompletionGapMs: null, completionGapReason: 'TAP_OUTPUT_HAS_NO_WALL_CLOCK_COMPLETION_TIMESTAMPS' };
-}
 const source = path.resolve(import.meta.dirname, '..');
 const runStarted = performance.now();
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
@@ -98,9 +83,12 @@ try {
   const testCount = Number(/^# tests (\d+)$/mu.exec(tests)?.[1]);
   const passed = Number(/^# pass (\d+)$/mu.exec(tests)?.[1]);
   const skipped = Number(/^# skipped (\d+)$/mu.exec(tests)?.[1]);
-  if (diagnosticOnly && (testCount !== 490 || passed !== 478 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
+  // a22bcd1 added one metadata-only regression to the 490-case source corpus.
+  // Keep the diagnostic pinned to the now-observed 491-case version; a future
+  // corpus edit requires an explicit baseline update, never silent acceptance.
+  if (diagnosticOnly && (testCount !== 491 || passed !== 479 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
   const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
-  if (diagnosticOnly && (tapRuntime.completed !== 490 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
+  if (diagnosticOnly && (tapRuntime.completed !== 491 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
   let recoveryAfterTests = 'NOT_NATIVE_WINDOWS';
   if (process.platform === 'win32') {
     stage = 'post-test-recovery';
