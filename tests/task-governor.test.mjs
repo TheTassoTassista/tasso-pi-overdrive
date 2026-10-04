@@ -20,6 +20,18 @@ test("simple string change selects a minimal policy with no expensive systems", 
   assert.ok(policy.toolNeed.capabilities.length <= 4, policy.toolNeed.capabilities.join(","));
 });
 
+test("CREATE task is a mutation, while a read-only description of creation is not", () => {
+  for (const task of ["Create one fixture and verify it", "Crea un file di test e verificalo"]) {
+    const policy = resolveTaskPolicy({ task });
+    assert.equal(policy.classification.signals.mutating, true, task);
+    assert.ok(policy.toolNeed.capabilities.includes("edit"), task);
+    assert.ok(policy.toolNeed.capabilities.includes("verify"), task);
+  }
+  const readOnly = resolveTaskPolicy({ task: "Explain how file creation works without changing files." });
+  assert.equal(readOnly.classification.signals.mutating, false);
+  assert.equal(readOnly.toolNeed.capabilities.includes("edit"), false);
+});
+
 test("intermittent race under load activates focused debugging capabilities", () => {
   const policy = resolveTaskPolicy({ task: "Find and fix the intermittent race condition under load in src/queue.ts.", preset: "normal", quality: "auto" });
   for (const key of ["planner", "secondBrain", "smartRead", "lsp", "debugger", "eval", "sentinel", "reviewer"]) assert.equal(policy.needs[key], true, key);
