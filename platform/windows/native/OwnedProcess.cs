@@ -203,6 +203,8 @@ namespace Phi.Native {
       internal Action<byte[], int> OnOutput;
       internal Action OnStarted;
       internal InstallObservation Install;
+      internal ValidationProgress Progress;
+      internal bool StallTimedOut, OuterTimedOut;
       int bytes;
       internal Thread Drain(IntPtr handle, MemoryStream destination) {
         Thread thread = new Thread(delegate() {
@@ -213,6 +215,7 @@ namespace Phi.Native {
                 if (Interlocked.Add(ref bytes, count) > 2 * 1024 * 1024) { Overflow.Set(); break; }
                 destination.Write(block, 0, count);
                 if (Install != null) Install.Data(destination == Output, count);
+                if (destination == Output && Progress != null) Progress.Data(block, count);
                 if (destination == Output && OnOutput != null) OnOutput(block, count);
               }
             }
@@ -220,6 +223,59 @@ namespace Phi.Native {
         });
         thread.IsBackground = true; thread.Start(); return thread;
       }
+    }
+    // Trusted fixed validation entry only. The stream originates at Node's
+    // top-level reporter; arbitrary test stdout is TAP-comment escaped.
+    internal sealed class ValidationProgress {
+      internal const int StallMs = 150000;
+      readonly object sync = new object();
+      readonly Stopwatch clock = Stopwatch.StartNew();
+      readonly StringBuilder line = new StringBuilder();
+      bool discarding, invalid, started, ended;
+      int completed, failed;
+      long lastProgress, longestGap;
+      internal void Data(byte[] block, int count) {
+        lock (sync) {
+          for (int i = 0; i < count; i++) {
+            char ch = (char)block[i];
+            if (ch == '\n') {
+              if (!discarding) Consume(line.ToString().TrimEnd('\r'));
+              line.Clear(); discarding = false;
+            } else if (!discarding) {
+              if (line.Length >= 2048) { line.Clear(); discarding = true; }
+              else line.Append(ch);
+            }
+          }
+        }
+      }
+      void Consume(string text) {
+        const string prefix = "# PHI_RUNTIME ";
+        if (!text.StartsWith(prefix, StringComparison.Ordinal)) return;
+        try {
+          Dictionary<string, object> row = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(text.Substring(prefix.Length));
+          if (row == null || !row.ContainsKey("kind")) { invalid = true; return; }
+          string kind = row["kind"] as string;
+          if (String.Equals(kind, "start", StringComparison.Ordinal)) {
+            if (started || ended) { invalid = true; return; }
+            started = true;
+          } else if (String.Equals(kind, "completion", StringComparison.Ordinal)) {
+            if (!started || ended) { invalid = true; return; }
+            if (!row.ContainsKey("ordinal") || !(row["ordinal"] is int) || (int)row["ordinal"] != completed + 1 ||
+                !row.ContainsKey("failed") || !(row["failed"] is bool)) { invalid = true; return; }
+            long now = clock.ElapsedMilliseconds;
+            longestGap = Math.Max(longestGap, now - lastProgress);
+            completed++; if ((bool)row["failed"]) failed++; lastProgress = now;
+          } else if (String.Equals(kind, "end", StringComparison.Ordinal)) {
+            if (!started || ended || !row.ContainsKey("completed") || !(row["completed"] is int) || (int)row["completed"] != completed) { invalid = true; return; }
+            ended = true;
+          } else invalid = true;
+        } catch { invalid = true; }
+      }
+      internal bool Invalid { get { lock (sync) return invalid; } }
+      internal bool Stalled { get { lock (sync) return clock.ElapsedMilliseconds - lastProgress >= StallMs; } }
+      internal object Result() { lock (sync) return new { scope = "FIXED_SUITE_PROGRESS_ONLY", started, ended, completed, failed,
+        lastProgressMs = lastProgress, longestObservedGapMs = longestGap, stallThresholdMs = StallMs,
+        invalid, stalled = clock.ElapsedMilliseconds - lastProgress >= StallMs }; }
     }
     // Read-only observations of the SAME owned Job, for the fixed trusted clone
     // install only. No extra process, target argument/environment change, wait
@@ -316,6 +372,8 @@ namespace Phi.Native {
         jobEmptyVerified = capture.JobEmptyVerified, pipesDrained = capture.Drained,
         residualOwnedProcesses = capture.JobEmptyVerified ? (int?)0 : null,
         childPid = capture.ChildPid, childGeneration = capture.ChildGeneration,
+        stallTimedOut = capture.StallTimedOut, outerTimedOut = capture.OuterTimedOut,
+        progress = capture.Progress == null ? null : capture.Progress.Result(),
         stdoutBase64 = Convert.ToBase64String(capture.Output.ToArray()),
         stderrBase64 = Convert.ToBase64String(capture.Error.ToArray())
       }));
@@ -406,7 +464,8 @@ namespace Phi.Native {
           arguments.Count == 2 && String.Equals(StringValue(arguments[0]), Path.Combine(cwd, "scripts", "phi-check.mjs"), StringComparison.OrdinalIgnoreCase) &&
           StringValue(arguments[1]) == "--owned-validation";
         if (diagnosticOnly && (!suite || timeout != 780000)) throw new InvalidDataException();
-        if (timeout < 1 || timeout > (suite ? diagnosticOnly ? 780000 : 600000 : MaxLifetime)) throw new InvalidDataException();
+        if (timeout < 1 || timeout > (suite ? diagnosticOnly ? 780000 : 900000 : MaxLifetime)) throw new InvalidDataException();
+        if (suite && capture != null) capture.Progress = new ValidationProgress();
         if (validation && scope == null && capture != null && timeout == MaxLifetime &&
             String.Equals(command, Path.Combine(Path.GetDirectoryName(command), "node.exe"), StringComparison.OrdinalIgnoreCase) &&
             arguments.Count == 9 && String.Equals(StringValue(arguments[0]), Path.Combine(Path.GetDirectoryName(command), "node_modules", "npm", "bin", "npm-cli.js"), StringComparison.OrdinalIgnoreCase) &&
@@ -501,13 +560,25 @@ namespace Phi.Native {
         if (capture != null && capture.OnStarted != null) capture.OnStarted();
         if (capture != null && capture.Install != null) { capture.Install.Phase("TARGET_RESUMED"); capture.Install.Start(job); }
         IntPtr[] waitHandles = capture == null ? new IntPtr[] { child.Process, guardian } : new IntPtr[] { child.Process, guardian, capture.Overflow.SafeWaitHandle.DangerousGetHandle() };
-        uint waited = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, (uint)timeout);
+        Stopwatch outer = Stopwatch.StartNew();
+        uint waited = 258;
+        bool stalled = false, progressInvalid = false;
+        while (outer.ElapsedMilliseconds < timeout) {
+          waited = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, (uint)Math.Min(500, timeout - outer.ElapsedMilliseconds));
+          if (waited != 258) break;
+          if (capture != null && capture.Progress != null) {
+            progressInvalid = capture.Progress.Invalid;
+            stalled = capture.Progress.Stalled;
+            if (progressInvalid || stalled) break;
+          }
+        }
         if (capture != null && capture.Install != null) { capture.Install.Phase(waited == 258 ? "TARGET_DEADLINE" : "TARGET_WAIT_END"); capture.Install.Stop(); capture.Install.Snapshot(job, "BEFORE_TERMINATION"); }
         if (capture != null && waited == 2) throw new InvalidDataException();
         if (waited != 0 && waited != 1 && waited != 258) throw new Win32Exception(Marshal.GetLastWin32Error());
-        uint code = waited == 1 ? 125U : 124U;
+        uint code = waited == 1 ? 125U : progressInvalid ? 126U : 124U;
         if (waited == 0) Check(GetExitCodeProcess(child.Process, out code));
-        if (capture != null) { capture.PrimaryExitCode = code <= 255 ? (int)code : 1; capture.TimedOut = waited == 258; }
+        if (capture != null) { capture.PrimaryExitCode = code <= 255 ? (int)code : 1; capture.TimedOut = waited == 258;
+          capture.StallTimedOut = stalled; capture.OuterTimedOut = waited == 258 && !stalled && !progressInvalid; }
         // A successful parent exit is not evidence that descendants finished.
         phase = "CLEANUP";
         if (capture != null && capture.Install != null) capture.Install.Phase("JOB_TERMINATION_START");

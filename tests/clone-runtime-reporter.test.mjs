@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { runtimeObservations } from '../lib/phi-validation-evidence.mjs';
 
 test('diagnostic TAP preserves pass/fail and emits only safe, ordered timing metadata', () => {
@@ -32,5 +32,34 @@ test('private-two', () => { throw new Error('private-error'); });
     assert.ok(evidence.longestObservedCompletionGap.elapsedMs >= 30);
     assert.doesNotMatch(JSON.stringify(evidence), /private-|fixture\.mjs/);
     assert.throws(() => runtimeObservations('# PHI_RUNTIME {"kind":"completion"}'), /PHI_RUNTIME_DIAGNOSTIC_INVALID/);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('reporter publishes completed ordinals while the next test is still running', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-reporter-live-'));
+  try {
+    const fixture = path.join(directory, 'fixture.mjs');
+    fs.writeFileSync(fixture, `import test from 'node:test';
+test('first', async () => { await new Promise(r => setTimeout(r, 150)); });
+test('second', async () => { await new Promise(r => setTimeout(r, 600)); });
+`);
+    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, ['--test', '--test-reporter', pathToFileURL(path.resolve('scripts/phi-runtime-reporter.mjs')).href, fixture], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const started = performance.now(), seen = [];
+    let output = '', error = '';
+    child.stdout.on('data', block => {
+      output += block.toString();
+      for (const line of output.split(/\r?\n/u).slice(0, -1)) {
+        if (line.startsWith('# PHI_RUNTIME ')) seen.push({ row: JSON.parse(line.slice(14)), atMs: performance.now() - started });
+      }
+      output = output.split(/\r?\n/u).at(-1);
+    });
+    child.stderr.on('data', block => { error += block.toString(); });
+    const exit = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+    assert.equal(exit, 0, error);
+    const first = seen.find(event => event.row.kind === 'completion' && event.row.ordinal === 1);
+    const second = seen.find(event => event.row.kind === 'completion' && event.row.ordinal === 2);
+    assert.ok(first && second);
+    assert.ok(second.atMs - first.atMs >= 400, `completion events arrived too close together: ${second.atMs - first.atMs}ms`);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });

@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current implementation candidate — D6-CLONE-RUNTIME-GATE-001
+
+Φ Main has now authorized IMPLEMENT after `D6-CLONE-RUNTIME-DIAGNOSTIC-002` closed CASE A. Local candidate separates the fixed 491-case correctness gate, a 150-second native Job no-completion watchdog and runtime evidence, bounded by an exact-suite 900-second resource ceiling. Local focused reporter/classification checks passed; native focused semantics, auto-review and one Windows certifying clone remain pending. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; Pi smokes and ordinary Windows CREATE remain uncredited. Runtime-variance root cause UNKNOWN. Current action and do-not-redo rules are in `harness/CONTINUATION.md`.
+
 Last verified: 2026-10-05 (D6-CLONE-RUNTIME-DIAGNOSTIC-002 complete: CASE A, non-certifying)
 
 ## Current D6 clone runtime status

@@ -77,7 +77,7 @@ test('cleanup diagnostics contain category/operation/code only, never raw paths,
 });
 test('aggregate validation budget cannot leak into post-test recovery or other commands', async () => {
   const cwd = process.cwd(), entry = path.join(cwd, 'scripts', 'phi-check.mjs');
-  assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd), 600000);
+  assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd), 900000);
   assert.equal(validationCommandTimeout(process.execPath, [entry, '--owned-validation'], cwd, { diagnosticOnly: true }), 780000);
   for (const args of [['--scope-recovery-status'], [entry], [entry, '--owned-validation', 'extra'], ['--validation-lock', 'directory', cwd]]) {
     assert.equal(validationCommandTimeout(process.execPath, args, cwd), 120000);

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -17,6 +17,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
 const clone = path.join(temp, 'source with spaces');
 const identity = cloneIdentity(temp), commandReceipts = [];
 const commands = [];
+let foundationGate = null;
 let stage = 'git-source';
 async function run(command, args, cwd = source, env = process.env) {
   // Aggregate suite budget only. Ordinary/LPAC commands keep their 120s cap;
@@ -24,7 +25,9 @@ async function run(command, args, cwd = source, env = process.env) {
   let result;
   const startedUtc = new Date().toISOString(), started = performance.now();
   const extended = diagnosticOnly && stage === 'foundation-tests';
-  try { result = await runValidationCommand(command, args, { cwd, env: extended ? { ...env, PHI_CLONE_RUNTIME_DIAGNOSTIC: '1' } : env, diagnosticOnly: extended, timeoutMs: validationCommandTimeout(command, args, cwd, { diagnosticOnly: extended }) }); }
+  const observedSuite = stage === 'foundation-tests' && process.platform === 'win32';
+  const commandEnv = extended ? { ...env, PHI_CLONE_RUNTIME_DIAGNOSTIC: '1' } : observedSuite ? { ...env, PHI_CLONE_RUNTIME_OBSERVATION: '1' } : env;
+  try { result = await runValidationCommand(command, args, { cwd, env: commandEnv, diagnosticOnly: extended, timeoutMs: validationCommandTimeout(command, args, cwd, { diagnosticOnly: extended }) }); }
   catch (cause) {
     commandReceipts.push({ scope: 'OWNERSHIP_UNVERIFIED' });
     const evidence = { ...validationFailureEvidence(stage), controllerException: validationExceptionEvidence(cause) };
@@ -32,13 +35,14 @@ async function run(command, args, cwd = source, env = process.env) {
     const error = new Error('PHI_CLEAN_ROOM_OWNER_FAILED'); error.evidence = evidence; throw error;
   }
   if (result.receipt) commandReceipts.push(result.receipt);
+  if (observedSuite && !diagnosticOnly) foundationGate = cloneFoundationGate(result, { native: true });
   if (stage === 'pinned-lsp-runtime') console.log(JSON.stringify(installDiagnostic({ command, args, cwd, env, startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started), result })));
   commands.push({ stage, status: result.status === 0 && !result.error ? 'PASS' : result.error?.code === 'ETIMEDOUT' ? 'TIMEOUT' : 'FAIL',
-    ...validationFailureEvidence(stage, result), ...(diagnosticOnly ? { startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started) } : {}),
-    ...(extended ? { runtime: runtimeObservations(result.stdout ?? '') } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
+    ...validationFailureEvidence(stage, result), startedUtc, endedUtc: new Date().toISOString(), elapsedMs: Math.ceil(performance.now() - started),
+    ...(extended ? { runtime: runtimeObservations(result.stdout ?? '') } : {}), ...(foundationGate ? { foundationGate } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}) });
   if (result.status !== 0 || result.error || process.platform === 'win32' && (!result.receipt.jobEmptyVerified || !result.receipt.pipesDrained)) {
     const error = new Error('PHI_CLEAN_ROOM_COMMAND_FAILED');
-    error.evidence = { ...validationFailureEvidence(stage, result), ...(result.receipt ? { processReceipt: result.receipt } : {}), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
+    error.evidence = { ...validationFailureEvidence(stage, result), ...(foundationGate ? { foundationGate } : {}), ...(result.receipt ? { processReceipt: result.receipt } : {}), ...(stage === 'windows-process-build' ? { shellIdentity: windowsBuildEnvironment(), outputShape: { stdoutChars: result.stdout?.length ?? 0, stderrChars: result.stderr?.length ?? 0, nulInterleaved: /\0/u.test(`${result.stdout ?? ''}${result.stderr ?? ''}`) } } : {}) };
     throw error;
   }
   return result.stdout;
@@ -88,6 +92,7 @@ try {
   // Keep the diagnostic pinned to the now-observed 491-case version; a future
   // corpus edit requires an explicit baseline update, never silent acceptance.
   if (diagnosticOnly && (testCount !== 491 || passed !== 479 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
+  if (process.platform === 'win32' && !diagnosticOnly && foundationGate?.classification !== 'SUCCESS') throw new Error('PHI_CLEAN_ROOM_FOUNDATION_GATE_FAILED');
   const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
   if (diagnosticOnly && (tapRuntime.completed !== 491 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
   if (diagnosticOnly && (commands.at(-1).runtime.completed !== 491 || !commands.at(-1).runtime.contiguous || commands.at(-1).runtime.rows.at(-1)?.kind !== 'end')) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_TIMING_INCOMPLETE');
@@ -104,9 +109,9 @@ try {
     const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
     if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
   }
-  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
+  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(foundationGate ? { foundationGate } : {}), ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
 } catch (error) {
-  report = { version: 1, status: error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(error.evidence ?? validationFailureEvidence(stage)) };
+  report = { version: 1, status: foundationGate?.classification && foundationGate.classification !== 'SUCCESS' ? foundationGate.classification : error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(foundationGate ? { foundationGate } : {}), ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;
 } finally {
   report.commands = commands;
@@ -116,6 +121,6 @@ try {
   report = combineValidationResults(report, cleanup);
   if (diagnosticOnly && report.status === 'PASS_FOUNDATION_ONLY') { report.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; report.primary.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; }
   if (report.status === 'FAIL') process.exitCode = 1;
-  if (diagnosticOnly) report.totalElapsedMs = Math.ceil(performance.now() - runStarted);
+  report.totalElapsedMs = Math.ceil(performance.now() - runStarted);
 }
 console.log(JSON.stringify(report, null, 2));

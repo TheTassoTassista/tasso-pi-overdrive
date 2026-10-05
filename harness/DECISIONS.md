@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-05 — D6-CLONE-RUNTIME-GATE-001 adopted implementation candidate
+
+The latest user-supplied Φ Main decision is **IMPLEMENT**: independent correctness/completeness (A), observed test-progress liveness (B), and runtime/performance evidence (C), with a finite outer resource-safety ceiling. The historical 600-second aggregate limit is retired as a correctness boundary. The bounded diagnostic `D6-CLONE-RUNTIME-DIAGNOSTIC-002` is **COMPLETE, CASE A**, not a certification. The current candidate reuses the fixed serial TAP reporter and native owned Job: 150-second no-completion watchdog, 900-second exact-suite outer ceiling, 491/479/12 corpus proof and distinct failure classes. Thresholds/rationale are in `harness/TEST_BASELINE.md`. Native focused watchdog tests, auto-review and one Windows clone certification remain pending; no D6 or Windows-autonomy promotion is implied. Runtime variance cause remains UNKNOWN.
+
 ## 2026-10-05 — D6-CLONE-RUNTIME-DIAGNOSTIC-002
 
 User-supplied Φ Main decision: **EXPERIMENT**, maximum two additional clone-only NON-CERTIFYING measurements. Preserve the same functional candidate, 491-case ordered corpus, assertions, retries, isolation, ownership and cleanup. Record phase duration, numeric test durations and observed completion gaps; do not equate buffered reporter delivery with actual test execution. Run 2 only if Run 1 lacks a sufficient explanation. Classify A/B/C/D and STOP; no permanent certification-policy change, Pi smoke, ordinary CREATE certification, separate V5/R1 or full Campaign CI. **Outcome: CASE A aggregate budget exhaustion supported** by CI37345377138 completing491 tests in654,644 ms with observed progress/cleanup intact, beyond the ordinary600s cap. Root of runtime variation UNKNOWN. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. D6-CLONE-RUNTIME-GATE-001 remains an option for a subsequent Main-authorized step, not adopted by this experiment.

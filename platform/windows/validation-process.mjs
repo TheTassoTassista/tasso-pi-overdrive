@@ -34,7 +34,7 @@ function resolveValidationExecutable(command, environment) {
 // Budget is tied to the exact aggregate entry, never to a stale diagnostic stage.
 export function validationCommandTimeout(command, args, cwd, { diagnosticOnly = false } = {}) {
   const suite = command === process.execPath && args.length === 2 && args[0] === path.join(cwd, 'scripts', 'phi-check.mjs') && args[1] === '--owned-validation';
-  return suite ? diagnosticOnly ? 780000 : 600000 : 120000;
+  return suite ? diagnosticOnly ? 780000 : 900000 : 120000;
 }
 
 export async function runValidationCommand(command, args, { cwd, env = process.env, timeoutMs = 120000, diagnosticOnly = false } = {}) {
@@ -61,8 +61,10 @@ export async function runValidationCommand(command, args, { cwd, env = process.e
     let row;
     try { row = JSON.parse(output); } catch { throw new Error('PHI_VALIDATION_RECEIPT_MISSING'); }
     phase = 'RECEIPT_VALIDATE';
-    const keys = ['version', 'scope', 'resultExitCode', 'primaryExitCode', 'timedOut', 'jobAttested', 'targetStarted', 'jobEmptyVerified', 'pipesDrained', 'residualOwnedProcesses', 'childPid', 'childGeneration', 'stdoutBase64', 'stderrBase64'];
-    if (overflow || !row || Object.keys(row).length !== keys.length || keys.some(k => !Object.hasOwn(row, k)) || row.version !== 1 || row.scope !== 'TRUSTED_VALIDATION_JOB_NOT_SANDBOX' || status !== row.resultExitCode || !Number.isInteger(row.resultExitCode) || ![null, ...Array.from({length:256},(_,i)=>i)].includes(row.primaryExitCode) || !['timedOut','jobAttested','targetStarted','jobEmptyVerified','pipesDrained'].every(k=>typeof row[k]==='boolean') || !Number.isSafeInteger(row.childPid) || row.childGeneration !== null && !/^\d{1,20}$/u.test(row.childGeneration) || row.residualOwnedProcesses !== (row.jobEmptyVerified ? 0 : null) || !['stdoutBase64','stderrBase64'].every(k=>typeof row[k]==='string' && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(row[k]))) throw new Error('PHI_VALIDATION_RECEIPT_INVALID');
+    const keys = ['version', 'scope', 'resultExitCode', 'primaryExitCode', 'timedOut', 'jobAttested', 'targetStarted', 'jobEmptyVerified', 'pipesDrained', 'residualOwnedProcesses', 'childPid', 'childGeneration', 'stallTimedOut', 'outerTimedOut', 'progress', 'stdoutBase64', 'stderrBase64'];
+    const progressKeys = ['scope', 'started', 'ended', 'completed', 'failed', 'lastProgressMs', 'longestObservedGapMs', 'stallThresholdMs', 'invalid', 'stalled'];
+    const validProgress = row?.progress === null || row?.progress && Object.keys(row.progress).length === progressKeys.length && progressKeys.every(k => Object.hasOwn(row.progress, k)) && row.progress.scope === 'FIXED_SUITE_PROGRESS_ONLY' && ['started', 'ended', 'invalid', 'stalled'].every(k => typeof row.progress[k] === 'boolean') && ['completed', 'failed', 'lastProgressMs', 'longestObservedGapMs'].every(k => Number.isSafeInteger(row.progress[k]) && row.progress[k] >= 0) && row.progress.completed <= 65535 && row.progress.failed <= row.progress.completed && row.progress.stallThresholdMs === 150000;
+    if (overflow || !row || Object.keys(row).length !== keys.length || keys.some(k => !Object.hasOwn(row, k)) || row.version !== 1 || row.scope !== 'TRUSTED_VALIDATION_JOB_NOT_SANDBOX' || status !== row.resultExitCode || !Number.isInteger(row.resultExitCode) || ![null, ...Array.from({length:256},(_,i)=>i)].includes(row.primaryExitCode) || !['timedOut','jobAttested','targetStarted','jobEmptyVerified','pipesDrained','stallTimedOut','outerTimedOut'].every(k=>typeof row[k]==='boolean') || !validProgress || row.stallTimedOut && !row.timedOut || row.outerTimedOut && !row.timedOut || row.stallTimedOut && row.outerTimedOut || !Number.isSafeInteger(row.childPid) || row.childGeneration !== null && !/^\d{1,20}$/u.test(row.childGeneration) || row.residualOwnedProcesses !== (row.jobEmptyVerified ? 0 : null) || !['stdoutBase64','stderrBase64'].every(k=>typeof row[k]==='string' && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(row[k]))) throw new Error('PHI_VALIDATION_RECEIPT_INVALID');
     const { stdoutBase64, stderrBase64, ...receipt } = row;
     return { status, stdout: Buffer.from(stdoutBase64, 'base64').toString('utf8'), stderr: Buffer.from(stderrBase64, 'base64').toString('utf8') + nativeError,
       error: row.timedOut ? { code: 'ETIMEDOUT' } : undefined, receipt };
