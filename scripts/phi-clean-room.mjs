@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate, finalizeCloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -119,6 +119,13 @@ try {
   const cleanup = await cleanupClone(temp, identity, { safeCwd: source, receipts: commandReceipts });
   if (diagnosticOnly) report.cleanupElapsedMs = Math.ceil(performance.now() - cleanupStarted);
   report = combineValidationResults(report, cleanup);
+  if (foundationGate && !diagnosticOnly) {
+    report.gates = finalizeCloneFoundationGate(foundationGate, report.primary.status, cleanup,
+      { native: process.platform === 'win32', runtimeRecorded: commands.some(row => row.stage === 'foundation-tests') });
+    if (report.gates.gateA !== 'PASS' && report.status === 'PASS_FOUNDATION_ONLY') {
+      report.status = 'FAIL'; report.classification = 'INCOMPLETE_SUITE';
+    }
+  }
   if (diagnosticOnly && report.status === 'PASS_FOUNDATION_ONLY') { report.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; report.primary.status = 'DIAGNOSTIC_COMPLETE_NON_CERTIFYING'; }
   if (report.status === 'FAIL') process.exitCode = 1;
   report.totalElapsedMs = Math.ceil(performance.now() - runStarted);

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { cloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
+import { cloneFoundationGate, finalizeCloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
 import { runValidationCommand } from '../platform/windows/validation-process.mjs';
 
 function corpus({ total = 491, failed = 0, lastOrdinal = total } = {}) {
@@ -15,23 +15,34 @@ function corpus({ total = 491, failed = 0, lastOrdinal = total } = {}) {
   event({ kind: 'end', completed: lastOrdinal }), `# tests ${total}`, `# pass ${total - 12 - failed}`, `# fail ${failed}`, '# skipped 12'].join('\n');
 }
 function receipt(overrides = {}) {
-  return { jobEmptyVerified: true, pipesDrained: true, residualOwnedProcesses: 0, stallTimedOut: false, outerTimedOut: false,
+  return { jobEmptyVerified: true, pipesDrained: true, residualOwnedProcesses: 0, timedOut: false, stallTimedOut: false, outerTimedOut: false,
     progress: { scope: 'FIXED_SUITE_PROGRESS_ONLY', started: true, ended: true, completed: 491, failed: 0,
       invalid: false, stalled: false, lastProgressMs: 1, longestObservedGapMs: 1, stallThresholdMs: 150000 }, ...overrides };
 }
 test('fixed corpus, numeric reporter and native owned observations jointly certify', () => {
   const gate = cloneFoundationGate({ stdout: corpus(), status: 0, receipt: receipt() }, { native: true });
   assert.equal(gate.classification, 'SUCCESS');
-  assert.equal(gate.gateA, 'PASS');
+  assert.equal(gate.gateA, 'PENDING_CLEANUP');
   assert.equal(gate.gateB, 'PASS');
   assert.equal(JSON.stringify(gate).includes('synthetic'), false);
+});
+test('Gate A waits for every post-suite check, clone removal and zero owned residuals', () => {
+  const make = () => cloneFoundationGate({ stdout: corpus(), status: 0, receipt: receipt() }, { native: true });
+  const cleanup = { status: 'PASS', directoryRemoved: true, residualOwnedProcesses: 0, processOwnership: 'NATIVE_JOB_HANDLES' };
+  assert.equal(finalizeCloneFoundationGate(make(), 'PASS_FOUNDATION_ONLY', cleanup, { native: true, runtimeRecorded: true }).gateA, 'PASS');
+  assert.equal(finalizeCloneFoundationGate(make(), 'FAIL', cleanup, { native: true }).gateA, 'FAIL');
+  assert.equal(finalizeCloneFoundationGate(make(), 'PASS_FOUNDATION_ONLY', { ...cleanup, status: 'FAIL' }, { native: true }).gateA, 'FAIL');
+  assert.equal(finalizeCloneFoundationGate(make(), 'PASS_FOUNDATION_ONLY', { ...cleanup, directoryRemoved: false }, { native: true }).gateA, 'FAIL');
+  assert.equal(finalizeCloneFoundationGate(make(), 'PASS_FOUNDATION_ONLY', { ...cleanup, residualOwnedProcesses: 1 }, { native: true }).gateA, 'FAIL');
 });
 test('incomplete ordinals, count mismatch, failed tests and invalid reporter fail closed', () => {
   for (const result of [
     { stdout: corpus({ lastOrdinal: 490 }), status: 0, receipt: receipt() },
     { stdout: corpus({ total: 490, lastOrdinal: 490 }), status: 0, receipt: receipt() },
     { stdout: corpus(), status: 0, receipt: receipt({ progress: { ...receipt().progress, completed: 490 } }) },
+    { stdout: corpus(), status: 0, receipt: receipt({ progress: { ...receipt().progress, invalid: true } }) },
     { stdout: corpus().replace('# PHI_RUNTIME {', '# PHI_RUNTIME {bad'), status: 0, receipt: receipt() },
+    { stdout: corpus().replace('ok 2 - synthetic', `${corpus().split('\n').find(line => line.includes('"ordinal":1'))}\nok 2 - synthetic`), status: 0, receipt: receipt() },
   ]) assert.equal(cloneFoundationGate(result, { native: true }).classification, 'INCOMPLETE_SUITE');
   assert.equal(cloneFoundationGate({ stdout: corpus({ failed: 1 }), status: 1, receipt: receipt() }, { native: true }).classification, 'TEST_FAILURE');
 });
@@ -40,6 +51,9 @@ test('watchdog and outer ceiling are distinct from assertion and completeness fa
     receipt: receipt({ stallTimedOut: true }) }, { native: true }).classification, 'STALL_TIMEOUT');
   assert.equal(cloneFoundationGate({ stdout: corpus({ lastOrdinal: 3 }), status: 124,
     receipt: receipt({ outerTimedOut: true }) }, { native: true }).classification, 'OUTER_RUNTIME_LIMIT');
+  assert.equal(cloneFoundationGate({ stdout: corpus(), status: 0,
+    receipt: receipt({ progress: { ...receipt().progress, stalled: true, longestObservedGapMs: 150001 } }) },
+    { native: true }).classification, 'STALL_TIMEOUT');
 });
 
 // Real Windows Job focused controls. This exact trusted validation entry uses a
@@ -57,15 +71,16 @@ const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', '-
   path.join(process.cwd(), 'tests', 'fixture.mjs')], { stdio: 'inherit', shell: false });
 process.exitCode = result.status ?? 1;
 `);
+    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
     return await runValidationCommand(process.execPath, [path.join(root, 'scripts', 'phi-check.mjs'), '--owned-validation'],
-      { cwd: root, timeoutMs });
+      { cwd: root, env, timeoutMs });
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }
 test('native progressing-but-slow runner survives beyond 150 seconds', { skip: process.platform !== 'win32' }, async () => {
   const result = await nativeFixture(`import test from 'node:test';
 test('slow one', async () => { await new Promise(resolve => setTimeout(resolve, 85000)); });
 test('slow two', async () => { await new Promise(resolve => setTimeout(resolve, 85000)); });
-`, 190000);
+`, 220000);
   assert.equal(result.status, 0);
   assert.equal(result.receipt.stallTimedOut, false);
   assert.equal(result.receipt.outerTimedOut, false);

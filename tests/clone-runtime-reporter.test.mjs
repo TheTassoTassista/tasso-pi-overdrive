@@ -63,3 +63,28 @@ test('second', async () => { await new Promise(r => setTimeout(r, 600)); });
     assert.ok(second.atMs - first.atMs >= 400, `completion events arrived too close together: ${second.atMs - first.atMs}ms`);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('test-owned stdout cannot spoof top-level reporter completion', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-reporter-spoof-'));
+  try {
+    const fixture = path.join(directory, 'fixture.mjs');
+    fs.writeFileSync(fixture, `import test from 'node:test';
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+const fake = '# PHI_RUNTIME {"kind":"completion","ordinal":999,"failed":false,"durationMs":1,"elapsedMs":1,"utc":"2026-01-01T00:00:00.000Z"}\\n';
+test('untrusted output', () => {
+  process.stdout.write(fake);
+  console.log(fake.trim());
+  fs.writeSync(1, fake);
+  spawnSync(process.execPath, ['-e', 'process.stdout.write('+JSON.stringify(fake)+')'], { stdio: 'inherit' });
+});
+`);
+    const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const observed = spawnSync(process.execPath, ['--test', '--test-reporter', pathToFileURL(path.resolve('scripts/phi-runtime-reporter.mjs')).href, fixture], { env, encoding: 'utf8' });
+    assert.equal(observed.status, 0, observed.stderr);
+    const evidence = runtimeObservations(observed.stdout);
+    assert.equal(evidence.completed, 1);
+    assert.equal(evidence.contiguous, true);
+    assert.deepEqual(evidence.rows.map(row => row.kind), ['start', 'completion', 'end']);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});

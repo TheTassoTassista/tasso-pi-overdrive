@@ -231,7 +231,7 @@ namespace Phi.Native {
       readonly object sync = new object();
       readonly Stopwatch clock = Stopwatch.StartNew();
       readonly StringBuilder line = new StringBuilder();
-      bool discarding, invalid, started, ended;
+      bool discarding, invalid, started, ended, stalledEver;
       int completed, failed;
       long lastProgress, longestGap;
       internal void Data(byte[] block, int count) {
@@ -263,7 +263,9 @@ namespace Phi.Native {
             if (!row.ContainsKey("ordinal") || !(row["ordinal"] is int) || (int)row["ordinal"] != completed + 1 ||
                 !row.ContainsKey("failed") || !(row["failed"] is bool)) { invalid = true; return; }
             long now = clock.ElapsedMilliseconds;
-            longestGap = Math.Max(longestGap, now - lastProgress);
+            long gap = now - lastProgress;
+            longestGap = Math.Max(longestGap, gap);
+            if (gap >= StallMs) stalledEver = true;
             completed++; if ((bool)row["failed"]) failed++; lastProgress = now;
           } else if (String.Equals(kind, "end", StringComparison.Ordinal)) {
             if (!started || ended || !row.ContainsKey("completed") || !(row["completed"] is int) || (int)row["completed"] != completed) { invalid = true; return; }
@@ -272,10 +274,10 @@ namespace Phi.Native {
         } catch { invalid = true; }
       }
       internal bool Invalid { get { lock (sync) return invalid; } }
-      internal bool Stalled { get { lock (sync) return clock.ElapsedMilliseconds - lastProgress >= StallMs; } }
+      internal bool Stalled { get { lock (sync) return stalledEver || clock.ElapsedMilliseconds - lastProgress >= StallMs; } }
       internal object Result() { lock (sync) return new { scope = "FIXED_SUITE_PROGRESS_ONLY", started, ended, completed, failed,
         lastProgressMs = lastProgress, longestObservedGapMs = longestGap, stallThresholdMs = StallMs,
-        invalid, stalled = clock.ElapsedMilliseconds - lastProgress >= StallMs }; }
+        invalid, stalled = stalledEver || clock.ElapsedMilliseconds - lastProgress >= StallMs }; }
     }
     // Read-only observations of the SAME owned Job, for the fixed trusted clone
     // install only. No extra process, target argument/environment change, wait
