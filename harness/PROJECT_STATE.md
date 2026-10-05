@@ -1,14 +1,18 @@
 # Phi — Current Project State
 
-Last verified: 2026-10-05 (one non-certifying clone experiment: CASE C / wrapper false-negative)
+Last verified: 2026-10-05 (D6-CLONE-RUNTIME-DIAGNOSTIC-002 complete: CASE A, non-certifying)
+
+## Current D6 clone runtime status
+
+Run 2 [CI37345377138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37345377138) at `7ee1ce5` completed all 491 independent Windows clone tests in654,644 ms, 479 PASS/0 FAIL/12 skips, beyond the unchanged ordinary600s cap. Numeric reporter showed contiguous completions; longest observed gap51,874 ms (after ordinal404; active test UNKNOWN). LSP21,233 ms, post-test recovery PASS, native Job empty/pipes drained, clone cleanup3,054 ms/directory removed/residual0. Historical same-corpus completion441,827 ms; the experiment supports CASE A aggregate budget exhaustion, while the reason for runtime variation remains UNKNOWN. Run 1 `5e52be2` failed before TAP from a LIKELY reporter path issue, with cleanup intact; it is not a suite-runtime sample. Both authorized experimental runs are consumed. Permanent liveness/runtime gate NOT ADOPTED; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; four Pi smokes unrun on current candidate.
 
 ## Clone runtime diagnosis: CASE C, no certification
 
 [CI37241028198](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37241028198) at `75f9831` completed the **491-case** owned Windows clone suite in **441,827 ms**, 479 PASS/0 FAIL/12 skips, but its diagnostic wrapper falsely expected the pre-regression 490-case count and failed before post-test recovery/brand smoke. Clone cleanup PASS/directory removed/owned residual0. The original 490 cases were retained; `a22bcd1` added one diagnostic test. The earlier clone timeout was after 489/491, not 489/490, with ordinal490 next and unsafe readback at491. The one authorized observation completed below the historic 600-second cap, so this is **CASE C**, not evidence for CASE A or a certification. Root timing variance UNKNOWN; no deterministic hang proved. The wrapper count is corrected locally without a second full run. D6 PARTIAL; Windows autonomy BLOCKED; all four downstream Pi smokes unrun. See progress/continuation for exact next decision boundary.
 
-## D6 clone runtime policy diagnosis in progress
+## Historical D6 clone runtime policy diagnosis
 
-Main decision `D6-CLONE-RUNTIME-GATE-001` is in force. The ordinary clone certification limit, Windows sandbox/ownership and global autonomy gate are unchanged. One full-corpus, native-owned, explicitly non-certifying clone diagnostic is pending to distinguish aggregate duration from a true stall. No new correctness/liveness certificate or ordinary Windows CREATE smoke exists yet. D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.
+Main decision `D6-CLONE-RUNTIME-GATE-001` records a possible subsequent policy step. The ordinary clone certification limit, Windows sandbox/ownership and global autonomy gate are unchanged. Its policy is not implemented. No new correctness/liveness certificate or ordinary Windows CREATE smoke exists yet. D6 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.
 
 ## Clone foundation budget blocks bounded CREATE certification
 

@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Bounded clone runtime experiment — CASE A evidence, no certification
+
+[CI37345377138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37345377138) at `7ee1ce5` completed the full 491-case independent Windows clone suite in **654,644 ms**, 479 PASS/0 FAIL/12 existing skips, with contiguous observed test completions; the longest observed gap was51,874 ms after ordinal404 (active test UNKNOWN). The unchanged certification cap is600,000 ms; this run used only the existing non-certifying780,000-ms envelope. Cloned LSP21,233 ms, post-test recovery PASS, native Job empty/pipes drained, cleanup3,054 ms/directory removed/0 owned residual. Prior same-corpus completion441,827 ms. CASE A aggregate budget exhaustion is supported, while the root of duration variation remains UNKNOWN. Run 1 `5e52be2` failed before TAP from a LIKELY reporter loading issue, then cleanup passed; its 1,704-ms suite attempt is excluded from runtime comparisons. No permanent gate change, downstream Pi smoke or ordinary CREATE certificate; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## One extended clone observation — CASE C, no certification
 
 [CI37241028198](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37241028198) at diagnostic `75f9831` completed the 491-case owned Windows clone suite in **441,827 ms**: 479 PASS/0 FAIL/12 skips, no timeout, owned Job empty/pipes drained. Overall diagnostic wrapper **FAILED** because it asserted the earlier 490-case baseline, before post-test recovery/brand smoke. Clone cleanup PASS/directory removed/0 owned residual; total attempt 455,666 ms. The original 490 cases remained and one metadata-only regression had been added by `a22bcd1`. This one authorized observation ended below the historical 600-second cap; runtime behavior is **CASE C / variable, root UNKNOWN**, not a three-gate certificate. No Pi smoke or ordinary Windows CREATE certificate; D6 PARTIAL, Windows autonomy BLOCKED. The stale wrapper assertion is corrected locally without another full run.
