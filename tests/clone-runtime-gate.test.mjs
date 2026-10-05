@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { cloneFoundationGate, finalizeCloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
 import { runValidationCommand } from '../platform/windows/validation-process.mjs';
@@ -100,10 +101,19 @@ test('hang with owned descendant', () => { spawn(process.execPath, ['-e', 'setIn
   assert.equal(result.receipt.pipesDrained, true);
   assert.equal(result.receipt.residualOwnedProcesses, 0);
 });
+const outerCeilingFixture = `import test from 'node:test';
+test('hang', () => { setInterval(() => {}, 1000); return new Promise(() => {}); });
+`;
+test('outer ceiling fixture stays live until an external deadline', () => {
+  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', outerCeilingFixture],
+    { encoding: 'utf8', env, timeout: 1200 });
+  assert.equal(result.error?.code, 'ETIMEDOUT');
+  assert.equal(result.status, null);
+  assert.match(result.stdout, /TAP version 13/);
+});
 test('native outer resource ceiling terminates owned Job independently', { skip: process.platform !== 'win32' }, async () => {
-  const result = await nativeFixture(`import test from 'node:test';
-test('hang', () => new Promise(() => {}));
-`, 4000);
+  const result = await nativeFixture(outerCeilingFixture, 4000);
   assert.equal(result.status, 124);
   assert.equal(result.receipt.stallTimedOut, false);
   assert.equal(result.receipt.outerTimedOut, true);
