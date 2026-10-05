@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current STOP: auto-review rejected before Windows focused/certifying gates
+
+Local implementation candidate `f6063bf` passes local deterministic checks, but mandatory auto-review was refused on authority/security grounds before execution: potential external-model egress of private repository content conflicts with the task's zero-call scope. No push or native Windows run occurred. D6-CLONE-RUNTIME-GATE-001 remains an **unverified candidate**; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` for exact next decision.
+
 ## Current implementation candidate — D6-CLONE-RUNTIME-GATE-001
 
 Φ Main has now authorized IMPLEMENT after `D6-CLONE-RUNTIME-DIAGNOSTIC-002` closed CASE A. Local candidate separates the fixed 491-case correctness gate, a 150-second native Job no-completion watchdog and runtime evidence, bounded by an exact-suite 900-second resource ceiling. Local focused reporter/classification checks passed; native focused semantics, auto-review and one Windows certifying clone remain pending. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; Pi smokes and ordinary Windows CREATE remain uncredited. Runtime-variance root cause UNKNOWN. Current action and do-not-redo rules are in `harness/CONTINUATION.md`.
