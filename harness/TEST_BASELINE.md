@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Zero-egress review checkpoint for clone-runtime candidate
+
+Functional scope: `f6063bf` plus local review fix `9a5a2c0`; docs-only `f63c4a8` assessed separately. `ZERO_EGRESS_REVIEW: PASS` (structured local security/correctness review, **not** external model review). Focused `node --test tests/clone-runtime-gate.test.mjs tests/clone-runtime-reporter.test.mjs tests/phi-clone-cleanup.test.mjs`: **24 total / 14 PASS / 0 FAIL / 10 native-Windows skips**. Covers numeric reporter live delivery, test-owned stdout spoof resistance, malformed/duplicate/missing ordinals, failed exit, late completion stall, outer classification and final Gate A cleanup dependency. Full local `npm run check`: PASS, including syntax, TypeScript and package validation. `node scripts/phi-repository-audit.mjs`: WARN only for historical docs/fixtures, **zero FAIL**, model calls0. Exact functional and review-fix diffs pass whitespace checks. Native Windows slow-progress/stall/outer/cleanup controls remain pending; no certification claim. External model review NOT RUN / NOT AUTHORIZED.
+
 ## D6-CLONE-RUNTIME-GATE-001 candidate (native certification pending)
 
 Local `node --test tests/clone-runtime-gate.test.mjs tests/clone-runtime-reporter.test.mjs`: **5 PASS / 0 FAIL / 3 Windows-native skips**. The focused cleanup/timeout regressions also passed locally with native cases skipped. Full `npm run check` exited 0 (syntax, TypeScript and package validation PASS). The native Windows controls remain unrun because mandatory auto-review was denied before execution; no native certificate is claimed.

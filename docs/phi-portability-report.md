@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current D6 review gate — zero-egress PASS, native verification pending
+
+`D6-ZERO-EGRESS-AUTOREVIEW-001` replaces external-model review for this candidate. External review is NOT RUN / NOT AUTHORIZED; structured zero-egress review is PASS after local fixes for a missed late-progress stall and premature Gate A cleanup credit. Functional `f6063bf` plus review-fix `9a5a2c0` pass focused local 14/14 runnable cases, `npm run check`, and the indexed source/security audit with historical WARN only. Native Windows watchdog tests and full clone certification have not run; no Pi smoke/ordinary CREATE credit, D6 PARTIAL, Windows autonomy BLOCKED.
+
 ## Bounded clone runtime experiment — CASE A evidence, no certification
 
 [CI37345377138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37345377138) at `7ee1ce5` completed the full 491-case independent Windows clone suite in **654,644 ms**, 479 PASS/0 FAIL/12 existing skips, with contiguous observed test completions; the longest observed gap was51,874 ms after ordinal404 (active test UNKNOWN). The unchanged certification cap is600,000 ms; this run used only the existing non-certifying780,000-ms envelope. Cloned LSP21,233 ms, post-test recovery PASS, native Job empty/pipes drained, cleanup3,054 ms/directory removed/0 owned residual. Prior same-corpus completion441,827 ms. CASE A aggregate budget exhaustion is supported, while the root of duration variation remains UNKNOWN. Run 1 `5e52be2` failed before TAP from a LIKELY reporter loading issue, then cleanup passed; its 1,704-ms suite attempt is excluded from runtime comparisons. No permanent gate change, downstream Pi smoke or ordinary CREATE certificate; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.

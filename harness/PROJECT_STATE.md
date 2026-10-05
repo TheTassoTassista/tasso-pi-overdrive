@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current D6 clone review state — zero-egress PASS, native unverified
+
+Main decision `D6-ZERO-EGRESS-AUTOREVIEW-001` is adopted. External model review is **NOT RUN / NOT AUTHORIZED**. Structured zero-egress security/correctness review of `f6063bf` plus review-fix `9a5a2c0` is **PASS** after the late-gap and premature-Gate-A findings were fixed and tested. Windows-native watchdog/clone certification has not run; D6-CLONE-RUNTIME-GATE-001 remains implemented but not native verified. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` for exact next action.
+
 ## Current STOP: auto-review rejected before Windows focused/certifying gates
 
 Local implementation candidate `f6063bf` passes local deterministic checks, but mandatory auto-review was refused on authority/security grounds before execution: potential external-model egress of private repository content conflicts with the task's zero-call scope. No push or native Windows run occurred. D6-CLONE-RUNTIME-GATE-001 remains an **unverified candidate**; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` for exact next decision.
