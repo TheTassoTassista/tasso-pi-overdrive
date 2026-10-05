@@ -103,6 +103,28 @@ for (const caseName of [
     const run = spawnSync(ownedWindowsHelper(), ['--publication-mixed-physical-crash-selftest', caseName], {
       shell: false, windowsHide: true, encoding: 'utf8', timeout: 105000, maxBuffer: 8192,
     });
+    if (caseName === 'after-cleanup-unlinked') {
+      let nativeDiagnostic;
+      try { nativeDiagnostic = JSON.parse(run.stdout).diagnostic; } catch { /* a failed native receipt is still a test failure */ }
+      const stages = new Set(['BEGIN', 'FIXTURE_SETUP', 'PUBLISHER_START', 'PUBLISHER_INPUT', 'PUBLISHER_READY_WAIT',
+        'PUBLISHER_READY_TIMEOUT', 'PUBLISHER_READY_MISSING', 'PUBLISHER_READY_OVERSIZE', 'PUBLISHER_READY_PARSE',
+        'LIVE_OWNER_INSPECT', 'KILL', 'FRESH_READER_START', 'FRESH_READER_EXIT', 'FRESH_READER_CONTRACT',
+        'PHYSICAL_STATE', 'PRE_STARTUP_SNAPSHOT', 'FIRST_NORMAL_PHI_STARTUP', 'SECOND_NORMAL_PHI_STARTUP',
+        'STARTUP_RECEIPT_CONTRACT', 'STARTUP_SIDE_EFFECTS', 'DUPLICATE_TERMINAL_DENIAL', 'QUARANTINE_IDENTITY',
+        'TERMINAL_JOURNAL_STATE', 'COMPLETE']);
+      const safeStage = value => stages.has(value) ? value : 'UNKNOWN';
+      const safeBoolean = value => value === true ? true : value === false ? false : null;
+      console.log(`PHI_TEST206_DIAGNOSTIC ${JSON.stringify({
+        nativeExit: Number.isInteger(run.status) && run.status >= 0 && run.status <= 255 ? run.status : null,
+        nativeTimeout: run.error?.code === 'ETIMEDOUT',
+        lastStage: safeStage(nativeDiagnostic?.lastStage), failureStage: nativeDiagnostic?.failureStage == null ? null : safeStage(nativeDiagnostic.failureStage),
+        failureHresult: /^[0-9a-f]{8}$/u.test(nativeDiagnostic?.failureHresult) ? nativeDiagnostic.failureHresult : null,
+        elapsedMs: Number.isSafeInteger(nativeDiagnostic?.elapsedMs) && nativeDiagnostic.elapsedMs >= 0 ? nativeDiagnostic.elapsedMs : null,
+        fixtureCleanup: safeBoolean(nativeDiagnostic?.fixtureCleanup), publisherGone: safeBoolean(nativeDiagnostic?.publisherGone),
+        readerGone: safeBoolean(nativeDiagnostic?.readerGone), firstStartupGone: safeBoolean(nativeDiagnostic?.firstStartupGone),
+        secondStartupGone: safeBoolean(nativeDiagnostic?.secondStartupGone),
+      })}`);
+    }
     assert.equal(run.status, 0, run.stderr);
     const receipt = JSON.parse(run.stdout);
     assert.equal(receipt.passed, true);

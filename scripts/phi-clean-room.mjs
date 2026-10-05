@@ -3,14 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate, finalizeCloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate, finalizeCloneFoundationGate, test206DiagnosticEvidence } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
 import { installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 
-if (process.argv.length > 3 || process.argv.length === 3 && process.argv[2] !== '--runtime-diagnostic-only') throw new Error('PHI_CLEAN_ROOM_USAGE');
+if (process.argv.length > 3 || process.argv.length === 3 && !['--runtime-diagnostic-only', '--test206-diagnostic-only'].includes(process.argv[2])) throw new Error('PHI_CLEAN_ROOM_USAGE');
 const diagnosticOnly = process.argv[2] === '--runtime-diagnostic-only';
+const test206Only = process.argv[2] === '--test206-diagnostic-only';
 const source = path.resolve(import.meta.dirname, '..');
 const runStarted = performance.now();
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
@@ -82,12 +83,19 @@ try {
   if (plan.writes !== 0 || installed.engineReady !== false || !doctor.checks.some((row) => row.capability === 'Pi runtime' && row.status === 'FAIL')) throw new Error('PHI_CLEAN_ROOM_FALSE_ENGINE_READINESS');
   const recovery = process.platform === 'win32' ? doctor.checks.find((row) => row.capability === 'Windows scope recovery') : null;
   if (process.platform === 'win32' && recovery?.status !== 'PASS') throw new Error('PHI_CLEAN_ROOM_UNHEALTHY_SCOPE_RECOVERY');
-  stage = 'foundation-tests';
-  const tests = await run(process.execPath, [path.join(clone, 'scripts', 'phi-check.mjs'), '--owned-validation'], clone, env);
+  stage = test206Only ? 'test206' : 'foundation-tests';
+  const tests = test206Only ? await run(process.execPath, ['--test',
+    '--test-name-pattern=^V5 publisher death gives bounded ordinary Phi startup disposition: after-cleanup-unlinked$',
+    path.join(clone, 'tests', 'phi-mixed-journal.test.mjs')], clone, env) :
+    await run(process.execPath, [path.join(clone, 'scripts', 'phi-check.mjs'), '--owned-validation'], clone, env);
   if (!/^# fail 0$/mu.test(tests)) throw new Error('PHI_CLEAN_ROOM_TEST_FAILURE');
   const testCount = Number(/^# tests (\d+)$/mu.exec(tests)?.[1]);
   const passed = Number(/^# pass (\d+)$/mu.exec(tests)?.[1]);
   const skipped = Number(/^# skipped (\d+)$/mu.exec(tests)?.[1]);
+  const test206Diagnostic = test206Only ? test206DiagnosticEvidence(tests) : null;
+  if (test206Only && (process.platform !== 'win32' || passed !== 1 || !Number.isInteger(testCount) || testCount < 1 || !test206Diagnostic ||
+    test206Diagnostic.nativeExit !== 0 || test206Diagnostic.lastStage !== 'COMPLETE' || test206Diagnostic.failureStage !== null))
+    throw new Error('PHI_CLEAN_ROOM_TEST206_DIAGNOSTIC_INVALID');
   // a22bcd1 added one metadata-only regression to the 490-case source corpus.
   // Keep the diagnostic pinned to the now-observed 491-case version; a future
   // corpus edit requires an explicit baseline update, never silent acceptance.
@@ -104,12 +112,12 @@ try {
     if (status.scope !== 'FIXED_NATIVE_SCOPES_ONLY' || status.status !== 'PASS' || ['scanned', 'active', 'stale', 'quarantined', 'processKills'].some(key => status[key] !== 0) || status.cleanupPerformed !== false) throw new Error('PHI_CLEAN_ROOM_RESIDUAL_SCOPE');
     recoveryAfterTests = { status: 'PASS', active: 0, stale: 0, quarantined: 0, processKills: 0, cleanupPerformed: false };
   }
-  if (!diagnosticOnly) {
+  if (!diagnosticOnly && !test206Only) {
     stage = 'brand-smoke';
     const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
     if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
   }
-  report = { version: 1, status: 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(foundationGate ? { foundationGate } : {}), ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
+  report = { version: 1, status: test206Only ? 'FOCUSED_TEST206_PASS_NON_CERTIFYING' : 'PASS_FOUNDATION_ONLY', head, platform: process.platform, tests: { total: testCount, passed, failed: 0, skipped }, ...(test206Diagnostic ? { test206Diagnostic } : {}), ...(foundationGate ? { foundationGate } : {}), ...(tapRuntime ? { tapRuntime } : {}), bootstrap: 'PASS_FOUNDATION_ONLY', doctor: doctor.status, fixedScopeRecovery: recovery?.status ?? 'NOT_NATIVE_WINDOWS', recoveryAfterTests, ownedCommands: commandReceipts.length, fullEngine: 'BLOCKED_NOT_INSTALLED', modelCalls: 0, authCopied: false, ignoredRuntimesCopied: false, limitation: 'Not full fresh-machine product acceptance; native isolation/runtime reconstruction still pending' };
 } catch (error) {
   report = { version: 1, status: foundationGate?.classification && foundationGate.classification !== 'SUCCESS' ? foundationGate.classification : error.evidence?.timedOut ? 'TIMEOUT' : 'FAIL', modelCalls: 0, cause: 'local clone/bootstrap/foundation invariant failed; no raw command output or private values printed', ...(foundationGate ? { foundationGate } : {}), ...(error.evidence ?? validationFailureEvidence(stage)) };
   process.exitCode = 1;

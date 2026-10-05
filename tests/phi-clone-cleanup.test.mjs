@@ -30,6 +30,10 @@ test('cleanup cannot mask any primary result or receipt, including simultaneous 
     const result = combineValidationResults(primary, cleanup);
     assert.deepEqual(result.primary, primary); assert.deepEqual(result.cleanup, cleanup); assert.equal(result.status, 'FAIL');
   }
+  const primary = { status: 'FOCUSED_TEST206_PASS_NON_CERTIFYING' };
+  assert.deepEqual(combineValidationResults(primary, { status: 'PASS' }).status, 'FOCUSED_TEST206_PASS_NON_CERTIFYING');
+  assert.equal(combineValidationResults(primary, { status: 'PASS' }).classification, 'FOCUSED_DIAGNOSTIC_ONLY');
+  assert.equal(combineValidationResults(primary, { status: 'FAIL' }).status, 'FAIL');
 });
 test('bounded Windows transient retry retains each failed attempt and the primary timeout', async () => {
   const root = fixture(), identity = cloneIdentity(root); let tick = 0, calls = 0;

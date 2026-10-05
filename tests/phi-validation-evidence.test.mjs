@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, test206DiagnosticEvidence } from '../lib/phi-validation-evidence.mjs';
 const failure = { operation: 'NT_OPEN', access: '00110080', share: 1, options: '00200060', nativeStatus: 'c0000043', nativeError: 32, objectIdentity: `${'a'.repeat(16)}:${'b'.repeat(32)}`, leafDigest: 'c'.repeat(64) };
 test('pre-receipt controller exceptions preserve fixed phase/code without private exception context', () => {
   for (const [phase, code] of [['RESOLVE_COMMAND', 'PHI_VALIDATION_COMMAND_UNAVAILABLE'], ['HELPER_VALIDATION', 'PHI_NATIVE_PROCESS_BUILD_INVALID'], ['SUPERVISOR_SPAWN', 'ENOENT'], ['RECEIPT_PARSE', 'PHI_VALIDATION_RECEIPT_MISSING'], ['RECEIPT_VALIDATE', 'PHI_VALIDATION_RECEIPT_INVALID']]) {
@@ -45,6 +45,16 @@ test('clean-room failure receipt identifies its stage/codes/counts without leaki
   const evidence = validationFailureEvidence('foundation-tests', { status: 1, stdout: 'not ok 12 - secret-fixture-value\n# tests 47\n# pass 39\n# fail 1', stderr: 'private-path secret-fixture-value error CS1234 PHI_NATIVE_PROCESS_FAILED PHI_USER_PRIVATE_SECRET_VALUE PHI_WINDOWS_BUILD_SECRET_VALUE private contents' });
   assert.deepEqual(evidence, { failureStage: 'foundation-tests', exitCode: 1, timedOut: false, diagnosticCodes: ['CS1234', 'PHI_NATIVE_PROCESS_FAILED'], testCounts: { total: 47, passed: 39, failed: 1 }, failedTestNumbers: [12] });
   assert.doesNotMatch(JSON.stringify(evidence), /private|secret-fixture-value|PRIVATE_SECRET/u);
+  const diagnostic = { nativeExit: 70, nativeTimeout: false, lastStage: 'PUBLISHER_READY_TIMEOUT',
+    failureStage: 'PUBLISHER_READY_TIMEOUT', failureHresult: '80131501', elapsedMs: 7042,
+    fixtureCleanup: true, publisherGone: true, readerGone: false, firstStartupGone: false, secondStartupGone: false };
+  const output = `# PHI_TEST206_DIAGNOSTIC ${JSON.stringify(diagnostic)}\nnot ok 1 - PRIVATE_TEST_NAME\n# fail 1\n`;
+  assert.deepEqual(test206DiagnosticEvidence(output), diagnostic);
+  assert.deepEqual(validationFailureEvidence('test206', { status: 1, stdout: output }).test206Diagnostic, diagnostic);
+  assert.doesNotMatch(JSON.stringify(validationFailureEvidence('test206', { status: 1, stdout: output })), /PRIVATE/u);
+  assert.equal(test206DiagnosticEvidence(`# PHI_TEST206_DIAGNOSTIC ${JSON.stringify({ ...diagnostic, privatePath: 'SECRET' })}`), null);
+  assert.equal(test206DiagnosticEvidence(`# PHI_TEST206_DIAGNOSTIC ${JSON.stringify({ ...diagnostic, lastStage: 'SECRET' })}`), null);
+  assert.equal(test206DiagnosticEvidence(`${output}${output}`), null);
 });
 test('timed-out clone foundation suite retains only bounded serial TAP ordinals', () => {
   const row = validationFailureEvidence('foundation-tests', { status: 124, error: { code: 'ETIMEDOUT' },

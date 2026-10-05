@@ -2107,6 +2107,8 @@ namespace Phi.Native {
         "after-cleanup-unlinked" : name;
       try { stop = MixedCrashCheckpoint(childCaseName); } catch { return 70; }
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
+      Stopwatch diagnosticClock = Stopwatch.StartNew();
+      string failureStage = null, failureHresult = null;
       string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
       bool passed = false, clean = false, gitClean = false, killed = false, publisherGone = false, readerGone = false;
       bool firstStartupGone = false, secondStartupGone = false, startupIdempotent = false;
@@ -2116,6 +2118,7 @@ namespace Phi.Native {
       int firstStartupExit = -1, secondStartupExit = -1;
       object evidence = null;
       try {
+        stage = "FIXTURE_SETUP";
         scope = ScopeRecovery.Begin(); scope.CreateRoot(); scope.Ready();
         File.WriteAllText(Path.Combine(scope.Root, "a.txt"), "a-old", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(scope.Root, "c.txt"), "c-old", new UTF8Encoding(false));
@@ -2144,6 +2147,7 @@ namespace Phi.Native {
         Dictionary<string, object> announced = Serializer().Deserialize<Dictionary<string, object>>(ready);
         if (!(bool)announced["ready"] || (string)announced["transactionId"] != tx) throw new InvalidDataException();
         if (name == "after-cleanup-unlinked") {
+          stage = "LIVE_OWNER_INSPECT";
           Dictionary<string, object> active = Serializer().Deserialize<Dictionary<string, object>>(
             Serializer().Serialize(Inspect(tx, scope.Root, rootId)));
           liveOwnerDenied = (string)active["status"] == "ACTIVE" && (int)active["journalMutations"] == 0 &&
@@ -2153,7 +2157,7 @@ namespace Phi.Native {
         stage = "KILL"; publisher.Kill(); killed = true;
         if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException();
         publisherGone = true;
-        stage = "FRESH_READER";
+        stage = "FRESH_READER_START";
         using (Process reader = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-mixed-journal-fixture-read", UseShellExecute = false,
           RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true })) {
@@ -2162,10 +2166,12 @@ namespace Phi.Native {
           Thread stdout = new Thread(delegate() { try { output = reader.StandardOutput.ReadToEnd(); } catch { } });
           Thread stderr = new Thread(delegate() { try { errors = reader.StandardError.ReadToEnd(); } catch { } });
           stdout.IsBackground = true; stderr.IsBackground = true; stdout.Start(); stderr.Start();
+          stage = "FRESH_READER_EXIT";
           if (!reader.WaitForExit(7000)) { reader.Kill(); reader.WaitForExit(3000); throw new InvalidDataException(); }
           if (!stdout.Join(2000) || !stderr.Join(2000) || reader.ExitCode != 0 || output == null || output.Length > 8192)
             throw new InvalidDataException();
           readerGone = reader.HasExited;
+          stage = "FRESH_READER_CONTRACT";
           Dictionary<string, object> observed = Serializer().Deserialize<Dictionary<string, object>>(output);
           Dictionary<string, object> metadata = observed["metadata"] as Dictionary<string, object>;
           IList operations = observed["operationEvidence"] as IList;
@@ -2184,7 +2190,7 @@ namespace Phi.Native {
             recoveryDisposition = observed["recoveryDisposition"],
             operationPhysicalStates = expectedPhysical, journalMutationsByReader = observed["journalMutations"], projectMutationsByReader = observed["projectMutations"] };
         }
-        stage = "PHYSICAL";
+        stage = "PHYSICAL_STATE";
         bool quarantine = File.Exists(Path.Combine(scope.Root, DeleteLeaf(tx)));
         bool temp = File.Exists(Path.Combine(scope.Root, "phi-publish-" + tx + ".tmp"));
         if (temp || quarantine != (MixedDeleteCommitted(name) && childCaseName != "after-cleanup-unlinked") ||
@@ -2224,7 +2230,7 @@ namespace Phi.Native {
         // and fail closed twice. The read-only inspector above is not a
         // substitute for normal startup, and a startup attempt must not alter
         // even a retained transaction quarantine or the private journal.
-        stage = "NORMAL_PHI_STARTUP";
+        stage = "PRE_STARTUP_SNAPSHOT";
         string quarantineLeaf = DeleteLeaf(tx), quarantineIdentity = null, quarantineDigest = null;
         using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
           DeleteObject held = ReadDeleteLeaf(parent, quarantineLeaf);
@@ -2289,10 +2295,12 @@ namespace Phi.Native {
           if (!appendInterruptionFailClosed || Serializer().Serialize(Snapshot(scope.Root, rootId, quarantineLeaf)) != projectBefore)
             throw new InvalidDataException();
         }
+        stage = "FIRST_NORMAL_PHI_STARTUP";
         string firstError, secondError;
         Dictionary<string, object> first = RunNormalPhiStartup(scope.Root, out firstStartupGone, out firstStartupExit, out firstError);
         stage = "SECOND_NORMAL_PHI_STARTUP";
         Dictionary<string, object> second = RunNormalPhiStartup(scope.Root, out secondStartupGone, out secondStartupExit, out secondError);
+        stage = "STARTUP_RECEIPT_CONTRACT";
         bool eligible = name == "after-cleanup-unlinked",
           alreadyTerminal = name == "concurrent-terminal" || name == "append-interrupted";
         foreach (Dictionary<string, object> startup in new Dictionary<string, object>[] { first, second }) {
@@ -2314,6 +2322,7 @@ namespace Phi.Native {
               (int)startup["journalMutations"] != (eligible && initial ? 1 : 0) || (bool)startup["projectPublished"] ||
               (int)startup["externalRequests"] != 0) throw new InvalidDataException();
         }
+        stage = "STARTUP_SIDE_EFFECTS";
         if (!firstStartupGone || !secondStartupGone || firstStartupExit != 1 || secondStartupExit != 1 ||
             firstError != (eligible || alreadyTerminal ? "PHI_SANDBOX_UNAVAILABLE: native Windows isolation is not yet verified; engine execution is blocked" :
               name == "corrupt-journal" ? "PHI_STARTUP_RECOVERY_UNCONFIRMED" : "PHI_STARTUP_RECOVERY_BLOCKED") ||
@@ -2323,6 +2332,7 @@ namespace Phi.Native {
             FixtureGit(scope.Root, "diff --name-only --no-renames") != gitDiffBefore ||
             FixtureGit(scope.Root, "diff --check") != "") throw new InvalidDataException();
         if (eligible) {
+          stage = "DUPLICATE_TERMINAL_DENIAL";
           using (PublicationJournal duplicate = new PublicationJournal(tx, scope.Root))
           using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
             if (key == null) throw new InvalidDataException(); duplicate.ReadChain(key);
@@ -2331,11 +2341,13 @@ namespace Phi.Native {
           }
           if (!duplicateTerminalDenied) throw new InvalidDataException();
         }
+        stage = "QUARANTINE_IDENTITY";
         using (RecoveryFilesystem parent = new RecoveryFilesystem(scope.Root)) {
           DeleteObject held = ReadDeleteLeaf(parent, quarantineLeaf);
           if ((held == null ? null : held.Identity) != quarantineIdentity ||
               (held == null ? null : held.Digest) != quarantineDigest) throw new InvalidDataException();
         }
+        stage = "TERMINAL_JOURNAL_STATE";
         if (name == "corrupt-journal") {
           using (RegistryKey registry = OpenBase(false)) using (RegistryKey key = registry.OpenSubKey(tx, false)) {
             if (key == null) throw new InvalidDataException();
@@ -2351,8 +2363,11 @@ namespace Phi.Native {
                 (string)journal.last["terminalObservation"] == RecoveryTerminalObservation);
           }
         if (!startupIdempotent) throw new InvalidDataException();
-        passed = true;
-      } catch (Exception error) { Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + stage + ":" + unchecked((uint)Marshal.GetHRForException(error)).ToString("x8")); }
+        passed = true; stage = "COMPLETE";
+      } catch (Exception error) {
+        failureStage = stage; failureHresult = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8");
+        Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + failureStage + ":" + failureHresult);
+      }
       finally {
         if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
         try { CleanupFixtureGit(gitDirectory, tx); gitClean = true; } catch { gitClean = false; }
@@ -2366,6 +2381,9 @@ namespace Phi.Native {
           name != "append-interrupted", startupIdempotent, fixtureCleanup = clean && gitClean,
         gitMetadataClean = gitClean, externalChangedAfterObservation, laterClassificationSawChange,
         liveOwnerDenied, duplicateTerminalDenied, corruptJournalRejected, concurrentSingleTerminal, appendInterruptionFailClosed, evidence,
+        diagnostic = name == "after-cleanup-unlinked" ? new { lastStage = stage, failureStage, failureHresult,
+          elapsedMs = diagnosticClock.ElapsedMilliseconds, fixtureCleanup = clean && gitClean,
+          publisherGone, readerGone, firstStartupGone, secondStartupGone } : null,
         scope = "V5_PHYSICAL_DEATH_FRESH_READER_TERMINAL_OBSERVATION_ONLY",
         projectPublished = false, externalRequests = 0 }));
       return passed && clean && gitClean && publisherGone && readerGone && firstStartupGone && secondStartupGone && startupIdempotent ? 0 : 70;
