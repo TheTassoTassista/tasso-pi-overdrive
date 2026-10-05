@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { runtimeObservations } from '../lib/phi-validation-evidence.mjs';
 
@@ -17,7 +18,7 @@ test('private-two', () => { throw new Error('private-error'); });
     const reporter = path.resolve('scripts/phi-runtime-reporter.mjs');
     const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
     const ordinary = spawnSync(process.execPath, ['--test', '--test-reporter=tap', fixture], { env, encoding: 'utf8', timeout: 10000 });
-    const observed = spawnSync(process.execPath, ['--test', '--test-reporter', reporter, fixture], { env, encoding: 'utf8', timeout: 10000 });
+    const observed = spawnSync(process.execPath, ['--test', '--test-reporter', pathToFileURL(reporter).href, fixture], { env, encoding: 'utf8', timeout: 10000 });
     assert.ifError(ordinary.error); assert.ifError(observed.error);
     assert.equal(ordinary.status, 1); assert.equal(observed.status, ordinary.status);
     for (const output of [ordinary.stdout, observed.stdout]) {

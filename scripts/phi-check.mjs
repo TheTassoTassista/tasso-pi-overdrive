@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(import.meta.dirname, '..');
 const sources = ['bin', 'branding', 'platform', 'bootstrap'].flatMap((directory) => fs.readdirSync(path.join(root, directory), { recursive: true }).filter((file) => file.endsWith('.mjs')).map((file) => path.join(root, directory, file)));
@@ -20,5 +21,5 @@ if (!tests.length) throw new Error('Phi tests missing');
 if (process.argv.slice(2).some(arg => arg !== '--owned-validation')) throw new Error('PHI_CHECK_USAGE');
 const diagnostic = process.argv.includes('--owned-validation') && process.env.PHI_CLONE_RUNTIME_DIAGNOSTIC === '1';
 const result = spawnSync(process.execPath, ['--test', ...(process.argv.includes('--owned-validation') ? ['--test-concurrency=1'] : []),
-  ...(diagnostic ? ['--test-reporter', path.join(root, 'scripts', 'phi-runtime-reporter.mjs')] : []), ...tests], { cwd: root, stdio: 'inherit', shell: false });
+  ...(diagnostic ? ['--test-reporter', pathToFileURL(path.join(root, 'scripts', 'phi-runtime-reporter.mjs')).href] : []), ...tests], { cwd: root, stdio: 'inherit', shell: false });
 process.exitCode = result.status ?? 1;
