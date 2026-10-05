@@ -12,6 +12,7 @@ import { installDiagnostic } from '../lib/phi-lsp-install-diagnostics.mjs';
 if (process.argv.length > 3 || process.argv.length === 3 && !['--runtime-diagnostic-only', '--test206-diagnostic-only'].includes(process.argv[2])) throw new Error('PHI_CLEAN_ROOM_USAGE');
 const diagnosticOnly = process.argv[2] === '--runtime-diagnostic-only';
 const test206Only = process.argv[2] === '--test206-diagnostic-only';
+const fullCertification = !diagnosticOnly && !test206Only;
 const source = path.resolve(import.meta.dirname, '..');
 const runStarted = performance.now();
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-clean-room-'));
@@ -100,7 +101,7 @@ try {
   // Keep the diagnostic pinned to the now-observed 491-case version; a future
   // corpus edit requires an explicit baseline update, never silent acceptance.
   if (diagnosticOnly && (testCount !== 491 || passed !== 479 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
-  if (process.platform === 'win32' && !diagnosticOnly && foundationGate?.classification !== 'SUCCESS') throw new Error('PHI_CLEAN_ROOM_FOUNDATION_GATE_FAILED');
+  if (process.platform === 'win32' && fullCertification && foundationGate?.classification !== 'SUCCESS') throw new Error('PHI_CLEAN_ROOM_FOUNDATION_GATE_FAILED');
   const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
   if (diagnosticOnly && (tapRuntime.completed !== 491 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
   if (diagnosticOnly && (commands.at(-1).runtime.completed !== 491 || !commands.at(-1).runtime.contiguous || commands.at(-1).runtime.rows.at(-1)?.kind !== 'end')) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_TIMING_INCOMPLETE');
@@ -112,7 +113,7 @@ try {
     if (status.scope !== 'FIXED_NATIVE_SCOPES_ONLY' || status.status !== 'PASS' || ['scanned', 'active', 'stale', 'quarantined', 'processKills'].some(key => status[key] !== 0) || status.cleanupPerformed !== false) throw new Error('PHI_CLEAN_ROOM_RESIDUAL_SCOPE');
     recoveryAfterTests = { status: 'PASS', active: 0, stale: 0, quarantined: 0, processKills: 0, cleanupPerformed: false };
   }
-  if (!diagnosticOnly && !test206Only) {
+  if (fullCertification) {
     stage = 'brand-smoke';
     const version = (await run(process.execPath, [path.join(clone, 'bin', 'phi.mjs'), '--version'], clone, env)).trim();
     if (!version.startsWith('Phi ')) throw new Error('PHI_CLEAN_ROOM_BRAND_FAILURE');
