@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Current D6 clone-runtime checkpoint — native focused PASS, certification FAIL
+
+Zero-egress review remains PASS; external model review NOT RUN/NOT AUTHORIZED. On source `5717199`, [focused Windows CI37356395247](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37356395247) passed 11/11 real watchdog/outer/Job controls after a test-only fixture correction. [Full CI37357312199](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37357312199) passed Ubuntu 491/168 and Windows main 491/479, both 0 FAIL, but the independent Windows clone failed native ordinal206 (`after-cleanup-unlinked`): 491/478 PASS/1 FAIL/12 skips, exit1, suite651,579ms. Gate A FAIL, B UNPROVEN, C RUNTIME_RECORDED. No 150-second stall or 900-second outer timeout; native Job empty, pipes drained, clone cleanup PASS/directory removed/owned residual0. The four real Pi/ordinary CREATE smokes were skipped. The exact native failure stage and handle holder remain UNKNOWN; aggregate safe filesystem diagnostics do not identify the failed test. No replacement CI, provider/model calls, timeout increase or security change. D6 PARTIAL, Windows autonomy BLOCKED; no clone certificate or daily Windows autonomous-readiness claim.
+
 ## Current D6 review gate — zero-egress PASS, native verification pending
 
 `D6-ZERO-EGRESS-AUTOREVIEW-001` replaces external-model review for this candidate. External review is NOT RUN / NOT AUTHORIZED; structured zero-egress review is PASS after local fixes for a missed late-progress stall and premature Gate A cleanup credit. Functional `f6063bf` plus review-fix `9a5a2c0` pass focused local 14/14 runnable cases, `npm run check`, and the indexed source/security audit with historical WARN only. Native Windows watchdog tests and full clone certification have not run; no Pi smoke/ordinary CREATE credit, D6 PARTIAL, Windows autonomy BLOCKED.

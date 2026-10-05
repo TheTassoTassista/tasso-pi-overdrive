@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current D6 certification state — clone TEST_FAILURE, no runtime timeout
+
+At `5717199b61f7898946426d311dfc7e30d195c260`, zero-egress review and Windows focused watchdog controls PASS. Full [CI37357312199](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37357312199) passed Ubuntu and the Windows main 491-case suite, but the independent Windows clone failed native case206 (`after-cleanup-unlinked`) with 1 test failure. Suite651,579ms, no stall/outer timeout; clone cleanup PASS, directory removed, owned residual0. Gate A FAIL, Gate B UNPROVEN, Gate C RUNTIME_RECORDED. The four Pi/ordinary CREATE smokes did not execute. Cause of case206 UNKNOWN from bounded public evidence. No replacement run. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` and `docs/phi-progress.md`.
+
 ## Current D6 clone review state — zero-egress PASS, native unverified
 
 Main decision `D6-ZERO-EGRESS-AUTOREVIEW-001` is adopted. External model review is **NOT RUN / NOT AUTHORIZED**. Structured zero-egress security/correctness review of `f6063bf` plus review-fix `9a5a2c0` is **PASS** after the late-gap and premature-Gate-A findings were fixed and tested. Windows-native watchdog/clone certification has not run; D6-CLONE-RUNTIME-GATE-001 remains implemented but not native verified. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` for exact next action.
