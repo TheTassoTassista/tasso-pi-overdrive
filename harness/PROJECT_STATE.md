@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current D6 focused experiment — CASE E, original clone failure unresolved
+
+`D6-CLONE-TEST206-DIAGNOSTIC-001` consumed exactly two focused native Windows independent-clone runs. [CI37383051251](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37383051251) passed the real test206 1/1 but its new wrapper incorrectly applied the full-corpus condition after the test; owned cleanup passed. The metadata-wrapper correction `eb25576` yielded [CI37383507243](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37383507243) SUCCESS: test206 1/1, native COMPLETE, post-test recovery and owned clone cleanup PASS, residual0. These passes do not identify why the earlier full-clone test206 failed. **CASE E, root cause UNKNOWN; no third sample/full certification without a new Main decision.** D6-CLONE-RUNTIME-GATE-001 remains IMPLEMENTED + FOCUSED_NATIVE_VALIDATED + CERTIFICATION_NOT_PASSED; four Pi/CREATE smokes uncredited, D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## Current D6 certification state — clone TEST_FAILURE, no runtime timeout
 
 At `5717199b61f7898946426d311dfc7e30d195c260`, zero-egress review and Windows focused watchdog controls PASS. Full [CI37357312199](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37357312199) passed Ubuntu and the Windows main 491-case suite, but the independent Windows clone failed native case206 (`after-cleanup-unlinked`) with 1 test failure. Suite651,579ms, no stall/outer timeout; clone cleanup PASS, directory removed, owned residual0. Gate A FAIL, Gate B UNPROVEN, Gate C RUNTIME_RECORDED. The four Pi/ordinary CREATE smokes did not execute. Cause of case206 UNKNOWN from bounded public evidence. No replacement run. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. See `harness/CONTINUATION.md` and `docs/phi-progress.md`.
