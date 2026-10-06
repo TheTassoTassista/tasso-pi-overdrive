@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current mandatory STOP — Qualification Run 1 FAIL
+
+`D6-NATIVE-STABILITY-QUALIFICATION-001` is **BLOCKED** at immutable candidate `7458dca45a9d4cd6c8a0e59f6e9ba8b338a8f332`. [CI37510013520](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37510013520) passed Ubuntu, the Windows main 491-case suite, the independent Windows clone's A/B/C sub-gates and all three deterministic real-Pi Worker smokes, then failed the ordinary Windows CREATE step (exit1, public `workflow evidence finalization failed`, exact internal cause UNKNOWN). Clone cleanup was attested PASS/directory removed/owned residual0; failed CREATE fixture temporary removal was attested, but its global owned-process cleanup and internal Worker/publication/V6 stages were not. Run 2 is **NOT EXECUTED / NOT AUTHORIZED** because the decision requires immediate stop on any Run 1 failure. No product/test/security/routing change or paid provider call. Historical test206/209 root causes remain UNKNOWN. D6-CLONE-RUNTIME-GATE-001 remains IMPLEMENTED + FOCUSED_NATIVE_VALIDATED + CERTIFICATION_NOT_PASSED; D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Return evidence to Φ Work Control/Main; do not continue Campaign 1 or 2 without a new decision.
+
 ## Current D6 native stability qualification
 
 `D6-NATIVE-STABILITY-QUALIFICATION-001` authorizes a bounded PASS+PASS qualification on one immutable candidate after the static hermeticity audit. `docs/phi-native-stability-audit.md` records execution model, intentional shared namespaces, owned lifecycle checks and remaining observability limits. No proven isolation defect; historical 206/209 causes remain UNKNOWN. Existing metadata-only sentinels suffice for the unchanged candidate; no new product/test behavior was introduced. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED pending full native evidence.
