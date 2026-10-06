@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## D6 corrupt-journal publisher readiness — bounded diagnostic CASE E
+
+Following main-suite test209 `PUBLISHER_READY_TIMEOUT` in CI37384516310, two authorized native Windows diagnostic runs both passed: isolated [CI37505495334](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505495334) 1/1 and ordered-prefix [CI37505879192](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505879192) 217 total/214 PASS/0 FAIL/3 skips. Publisher readiness was observed in465 ms and370 ms respectively, before this fixture applies journal corruption. Both native fixtures cleaned and the tracked publisher had zero residual instances; any-Job membership was observed, but no fixture-specific Job or total Phi-owned process count is certified. **CASE E / root cause UNKNOWN**, relationship to historical publisher-ready timeouts UNKNOWN. Both diagnostic runs are consumed; no independent Windows clone, Pi smoke or ordinary CREATE was performed. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; return to Φ Work Control/Main.
+
 ## D6 one-shot recertification — FAIL before independent Windows clone
 
 On unchanged candidate `cccc4224d373cd6ee97850bd4c056e7433457669`, the sole authorized full [CI37384516310](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37384516310) passed Ubuntu (491/168 PASS/0 FAIL/323 skips), but Windows main completed 491/478 PASS/1 FAIL/12 skips. First failure was native ordinal209 (`corrupt-journal`): `PHI_MIXED_CRASH_SELFTEST_FAILED:PUBLISHER_READY_TIMEOUT:80131501`, exit70. Main ordinal206 passed. The independent clean-room clone, its LSP/runtime and owned cleanup proof, the three Pi smokes and ordinary bounded CREATE smoke were not reached. This run neither reproduces nor resolves the historical clone ordinal206 failure. Ordinal209 cause and failing fixture's residual owned-process count remain UNKNOWN; do not classify as product or infrastructure without evidence. The one-shot authority is consumed; no automatic retry or Windows autonomy credit. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Return to Φ Work Control/Main.

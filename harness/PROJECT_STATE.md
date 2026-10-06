@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current Campaign 1 STOP — corrupt-journal readiness diagnostic CASE E
+
+`D6-CORRUPT-JOURNAL-READY-DIAGNOSTIC-001` used both authorized native Windows runs. Isolated [CI37505495334](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505495334) passed test209 1/1; ordered-prefix [CI37505879192](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505879192) passed 217/214 PASS/0 FAIL/3 skips with test209 readiness. Both reported `SUCCESS/LINE`, fixture cleanup true, tracked publisher residual0. No failure reproduced or root cause identified. **CASE E / root cause UNKNOWN**; no third diagnostic or full certification under this packet. Historical CI37384516310 remains red before clone; historical clone test206 remains unexplained. D6-CLONE-RUNTIME-GATE-001 = IMPLEMENTED + FOCUSED_NATIVE_VALIDATED + CERTIFICATION_NOT_PASSED. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Return to Φ Work Control/Main.
+
 ## Current D6 state — one-shot recertification failed before clone
 
 `D6-CLONE-RECERTIFICATION-001` used its sole full run: [CI37384516310](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37384516310) on candidate `cccc422`. Ubuntu passed 491/168/0/323; Windows main completed 491/478 PASS/1 FAIL/12 skips, first failure ordinal209 (`corrupt-journal`, native publisher-ready timeout, exit70). Windows main ordinal206 passed; independent clone, its LSP/runtime/cleanup gates, three Pi smokes and ordinary CREATE smoke were not reached. Cause of 209 and failing fixture's owned residual count are UNKNOWN. The prior full-clone case206 remains unexplained. No retry is authorized; return to Φ Work Control/Main. **D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.**
