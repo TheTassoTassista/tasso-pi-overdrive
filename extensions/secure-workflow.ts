@@ -719,7 +719,7 @@ export default function (pi: ExtensionAPI) {
         }
         for (const reservation of retainedWorkers.values()) reservation.revoke();
         retainedWorkers.clear();
-        diagnostic("WORKER_AUTHORITY_REVOKED");
+        diagnostic("RETAINED_WORKER_RESERVATIONS_CLEARED");
         if (agentControlUncertain) workflowError ??= new Error("Exact attempt cancellation was not acknowledged by the delegated controller.");
         let execution: any = priorExecution;
         let executionSha256: string | undefined = priorExecutionSha256;
