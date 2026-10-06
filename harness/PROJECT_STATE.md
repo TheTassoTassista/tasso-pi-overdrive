@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current authority STOP — Windows ordinary CREATE pre-publication portability
+
+The new `D6-WINDOWS-PREPUBLICATION-PORTABILITY-001` decision reached its explicit security/format boundary before implementation. Deterministic local replay reproduced `ENOENT` at Linux `/proc` boot-ID capture after evidence-run/receipt-store setup; the exact CI syscall was not individually logged. The process identity is security-required for workflow/runtime recovery and cannot be replaced with a fake value or silently mapped to existing native Windows creation-time generation inside the old durable `{pid,bootId,startTicks}` record. Separately, Windows receipt writer/reader owner-only semantics remain incompatible; the existing native recovery ACL does not yet define the workflow-evidence trust contract. No code or native CREATE run under this decision. Prior physical mutation NO/V6 authority NO, ordinary CREATE BLOCKING, D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Main must decide the identity format/compatibility and ACL policy.
+
 ## Current STOP — ordinary Windows CREATE remains blocking
 
 Post-fix focused [CI37543922909](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37543922909) at `d5c5bb4` crossed the original evidence-directory `EPERM` boundary but failed with `ENOENT` before journal, worktree, Worker or V6. Target absent/no worktree/native mutation NO; attempted evidence-finalization receipt was present but its Windows owner-only check rejected it. Root of `ENOENT` likely Linux `/proc` process-identity dependency, exact throwing call unproven. Two focused native executions consumed; no third run or new fix under the current packet. Cleanup fixture removed/child closed, global owned-process census UNKNOWN. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; qualification BLOCKED/CLOSED, clone-runtime gate NOT YET NATIVE VERIFIED. Return to Main.
