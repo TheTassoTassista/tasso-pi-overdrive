@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current D6 native stability qualification
+
+`D6-NATIVE-STABILITY-QUALIFICATION-001` authorizes a bounded PASS+PASS qualification on one immutable candidate after the static hermeticity audit. `docs/phi-native-stability-audit.md` records execution model, intentional shared namespaces, owned lifecycle checks and remaining observability limits. No proven isolation defect; historical 206/209 causes remain UNKNOWN. Existing metadata-only sentinels suffice for the unchanged candidate; no new product/test behavior was introduced. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED pending full native evidence.
+
 ## Current Campaign 1 STOP — corrupt-journal readiness diagnostic CASE E
 
 `D6-CORRUPT-JOURNAL-READY-DIAGNOSTIC-001` used both authorized native Windows runs. Isolated [CI37505495334](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505495334) passed test209 1/1; ordered-prefix [CI37505879192](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37505879192) passed 217/214 PASS/0 FAIL/3 skips with test209 readiness. Both reported `SUCCESS/LINE`, fixture cleanup true, tracked publisher residual0. No failure reproduced or root cause identified. **CASE E / root cause UNKNOWN**; no third diagnostic or full certification under this packet. Historical CI37384516310 remains red before clone; historical clone test206 remains unexplained. D6-CLONE-RUNTIME-GATE-001 = IMPLEMENTED + FOCUSED_NATIVE_VALIDATED + CERTIFICATION_NOT_PASSED. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Return to Φ Work Control/Main.

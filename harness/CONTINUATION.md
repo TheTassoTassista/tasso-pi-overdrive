@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## Current Campaign 1 action — D6 native stability qualification
+
+Main decision `D6-NATIVE-STABILITY-QUALIFICATION-001` is EXPERIMENT → VERIFY. Static suite/resource/lifecycle audit is recorded in `docs/phi-native-stability-audit.md` and the ledger. The existing metadata-only 206/209 diagnostics plus clone Job, pipes, scope-status and cleanup checks are the available minimal sentinels; no supported collision or lifecycle root cause was found and no new instrumentation/product change was justified. Historical 206/209 failures remain real with root causes UNKNOWN. Local zero-egress review of the documentation-only differential PASS; external review/model calls NOT RUN. Freeze one immutable candidate, execute at most two normal full native certifications with PASS+PASS required and stop immediately on any failure. Do not run historical focused loops, runtime variance, R1 or Campaign 2. D6 PARTIAL; Windows autonomy BLOCKED until actual qualification/downstream evidence. Preserve protected audit and unrelated user work.
+
 ## Current Campaign 1 STOP — test209 diagnostic CASE E, cause UNKNOWN
 
 `D6-CORRUPT-JOURNAL-READY-DIAGNOSTIC-001` supersedes the previous STOP only for bounded diagnosis of CI37384516310 Windows main test209. Live start HEAD `5dd79d98caab9afe6ad5d5e32978249f111a7426`; branch `feature/routing-presets-quality`; remote matched. Protected audit hash remains `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba`; unrelated user edits/untracked files remain untouched. The real code starts the publisher and observes readiness **before** applying corrupt-journal mutation. Metadata-only native diagnostics distinguish spawn, early exit, alive-not-ready, observation and cleanup outcomes, with fixed-value CI publication. Focused local tests PASS (39 total, 19 PASS, 0 FAIL, 20 native skips); full local `npm run check` PASS; source audit exit0 with historical WARN only.
