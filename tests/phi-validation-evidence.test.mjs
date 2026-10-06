@@ -64,10 +64,12 @@ test('clean-room failure receipt identifies its stage/codes/counts without leaki
     publisherKillAttempted: true, stdoutPipeClosed: true, stderrPipeDrained: true,
     residualTrackedPublisher: 0, fixtureCleanup: true, gitMetadataClean: true,
     privatePath: 'PRIVATE_PATH', journalContents: 'PRIVATE_SECRET' };
-  const row = corruptJournalReadyDiagnostic(JSON.stringify({ diagnostic: readyDiagnostic, privateReceipt: 'PRIVATE_SECRET' }), 70, false);
+  const row = corruptJournalReadyDiagnostic(JSON.stringify({ diagnostic: readyDiagnostic, gitMetadataClean: true,
+    privateReceipt: 'PRIVATE_SECRET' }), 70, false);
   assert.equal(row.readinessClass, 'ALIVE_NOT_READY');
   assert.equal(row.publisherPid, 1234);
   assert.equal(row.residualTrackedPublisher, 0);
+  assert.equal(row.gitMetadataClean, true);
   assert.doesNotMatch(JSON.stringify(row), /PRIVATE|journalContents|privateReceipt/u);
   const invalid = corruptJournalReadyDiagnostic(JSON.stringify({ diagnostic: { ...readyDiagnostic,
     lastStage: 'PRIVATE_STAGE', readinessClass: 'PRIVATE_CLASS', publisherPid: 'PRIVATE_PID',

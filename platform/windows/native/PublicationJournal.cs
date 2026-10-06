@@ -2178,7 +2178,7 @@ namespace Phi.Native {
             (int)active["projectMutations"] == 0 && !(bool)active["projectPublished"];
           if (!liveOwnerDenied) throw new InvalidDataException();
         }
-        stage = "KILL"; publisher.Kill(); killed = true;
+        stage = "KILL"; publisherKillAttempted = true; publisher.Kill(); killed = true;
         if (!publisher.WaitForExit(3000) || !publisher.HasExited || publisher.ExitCode == 0) throw new InvalidDataException();
         publisherGone = true;
         stage = "FRESH_READER_START";
