@@ -69,6 +69,39 @@ function stream(model: Model<any>, context: Context, options?: SimpleStreamOptio
 }
 
 export default function register(pi: ExtensionAPI): void {
+  pi.events.on("pi-overdrive:create-stage-metadata", (value) => {
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    const stages = new Set(["WORKFLOW_ADMITTED", "EVIDENCE_RUN_START", "EVIDENCE_RUN_CREATED", "JOURNAL_CREATED", "RUNTIME_ALLOCATED",
+      "ENVELOPE_ESTABLISHED", "WORKER_RESERVED", "WORKER_REQUESTED", "WORKER_STARTED", "WORKER_RESULT", "WORKER_REVOKED",
+      "CONTROLLER_VALIDATION_START", "CREATE_INTENT_AND_V6_READY", "NATIVE_PUBLICATION_CALL_ENTERED", "NATIVE_RESULT_OBSERVED",
+      "PHYSICAL_POSTVERIFY_COMPLETE", "EXECUTION_THROWN", "PRE_CLEANUP_PHYSICAL_SNAPSHOT", "WORKER_AUTHORITY_REVOKED",
+      "EVIDENCE_FINALIZATION_START", "EXECUTION_EVIDENCE_WRITTEN", "EVIDENCE_WRITE_FAILED", "RUNTIME_CLEANUP_COMPLETE",
+      "RUNTIME_CLEANUP_FAILED", "FINAL_RECEIPT_WRITTEN", "TERMINAL_STATUS_COMMITTED", "FINAL_RECEIPT_FAILED"]);
+    if (!stages.has(String(record.stage))) return;
+    audit({ kind: "create_stage", stage: record.stage, monotonicMs: Number.isSafeInteger(record.monotonicMs) ? record.monotonicMs : null,
+      afterStage: stages.has(String(record.afterStage)) ? record.afterStage : null,
+      errorCode: typeof record.errorCode === "string" && /^(?:EACCES|EEXIST|EISDIR|ENOENT|ENOTSUP|EPERM|PHI_[A-Z_]{3,80}|OTHER)$/u.test(record.errorCode) ? record.errorCode : null,
+      targetState: ["PRESENT", "ABSENT", "NO_WORKTREE", "UNKNOWN", "NOT_SAMPLED"].includes(String(record.targetState)) ? record.targetState : null,
+      digestMatch: typeof record.digestMatch === "boolean" ? record.digestMatch : null,
+      identityMatch: typeof record.identityMatch === "boolean" ? record.identityMatch : null,
+      v6Phase: typeof record.v6Phase === "string" && /^(?:[A-Z_]{3,40}|NOT_ESTABLISHED|NOT_FOUND|UNKNOWN)$/u.test(record.v6Phase) ? record.v6Phase : null,
+      v6Observed: typeof record.v6Observed === "string" && /^(?:[A-Z_]{3,40}|NOT_ESTABLISHED|NOT_FOUND|UNKNOWN)$/u.test(record.v6Observed) ? record.v6Observed : null,
+      result: ["COMPLETED", "OTHER"].includes(String(record.result)) ? record.result : null,
+      reserved: record.reserved === true, authorityRetained: record.authorityRetained === true,
+      published: record.published === true, grantConsumed: record.grantConsumed === true,
+      transactionEstablished: record.transactionEstablished === true, grantIssued: record.grantIssued === true,
+      cleanupStatus: ["PASS", "FAIL", "RELEASED", "NOT_ALLOCATED"].includes(String(record.cleanupStatus)) ? record.cleanupStatus : null,
+      workflowStatus: ["PASS", "FAIL"].includes(String(record.workflowStatus)) ? record.workflowStatus : null });
+  });
+  pi.on("tool_call", (event, ctx) => {
+    if (event.toolName !== "secure_coding_workflow") return;
+    const branch = ctx.sessionManager.getBranch();
+    const lastUser = Array.isArray(branch) ? [...branch].reverse().find((entry: any) => entry?.type === "message" && entry.message?.role === "user") : undefined;
+    const content = lastUser?.message?.content;
+    audit({ kind: "controller_user_shape", branchArray: Array.isArray(branch), singleText: Array.isArray(content) && content.length === 1 && content[0]?.type === "text",
+      exactTaskMatch: Array.isArray(content) && content.length === 1 && typeof content[0]?.text === "string" && content[0].text.trim() === (event.input as any)?.task });
+  });
   pi.registerProvider("openai-codex", {
     name: "Phi bounded-publication offline fixture", baseUrl: "http://127.0.0.1.invalid",
     apiKey: "$PHI_BOUNDED_TEST_KEY", api: "phi-bounded-offline-api",

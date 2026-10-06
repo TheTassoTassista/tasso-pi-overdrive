@@ -28,6 +28,7 @@ const task = 'Create file `created.txt` containing new-create-fixture';
 let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0 };
 let child;
 let childClosed;
+let childExitStatus = null;
 try {
   fs.mkdirSync(project);
   fs.mkdirSync(path.join(agentDir, 'agents'), { recursive: true, mode: 0o700 });
@@ -91,6 +92,7 @@ try {
   if (!events.some(event => event.type === 'agent_settled')) throw new Error(`PHI_BOUNDED_TEST_NOT_SETTLED:${stderr}`);
   child.stdin.end();
   const exit = await Promise.race([childClosed, new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 10000))]);
+  childExitStatus = exit;
   if (exit === 'TIMEOUT') { child.kill(); throw new Error('PHI_BOUNDED_TEST_CHILD_SHUTDOWN_TIMEOUT'); }
   const tool = events.findLast(event => event.type === 'tool_execution_end' && event.toolName === 'secure_coding_workflow');
   const details = tool?.result?.details;
@@ -102,7 +104,10 @@ try {
       if (failure.runId) durable = readEvidenceReceipt({ root: evidenceRoot, runId: failure.runId });
     } catch (error) { durableError = error instanceof Error ? error.message : String(error); }
   }
-  const turns = fs.existsSync(auditFile) ? fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+  const auditRows = fs.existsSync(auditFile) ? fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
+  const turns = auditRows.filter(row => row.kind === 'local_model_turn');
+  const stages = auditRows.filter(row => row.kind === 'create_stage');
+  const userShape = auditRows.find(row => row.kind === 'controller_user_shape');
   const publications = details?.evidence?.publications ?? [];
   const expectedPublished = process.platform === 'win32';
   const cleanup = details?.cleanup;
@@ -112,12 +117,14 @@ try {
     failure: details?.failure ?? durable?.execution?.failure ?? null,
     attempts: (details?.delegationAttempts ?? durable?.execution?.delegationAttempts ?? []).map(({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls }) => ({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls })),
     lastTransition: durable?.execution?.evidence?.transitions?.at(-1) ?? null,
-    turns, eventTypes: events.map(event => event.type).slice(-12), stderr };
+    turns, stages, userShape, eventTypes: events.map(event => event.type).slice(-12), stderr };
   assert.ok(tool, `normal secure_coding_workflow did not run: ${stderr}`);
   assert.equal(tool.isError, false, 'normal workflow tool failed');
   assert.equal(details.status, 'PASS');
   assert.equal(cleanup?.status, 'PASS');
-  assert.equal(turns.every(turn => turn.kind === 'local_model_turn' && turn.provider === 'openai-codex'), true);
+  assert.equal(turns.every(turn => turn.provider === 'openai-codex'), true);
+  assert.deepEqual({ branchArray: userShape?.branchArray, singleText: userShape?.singleText, exactTaskMatch: userShape?.exactTaskMatch },
+    { branchArray: true, singleText: true, exactTaskMatch: true });
   assert.ok(turns.some(turn => turn.lane === 'controller'));
   assert.ok(turns.some(turn => turn.lane === 'worker'));
   assert.equal(publications.length, expectedPublished ? 1 : 0);
@@ -136,8 +143,31 @@ try {
 } finally {
   try {
     if (child && child.exitCode === null) child.kill();
-    if (childClosed) await Promise.race([childClosed, new Promise(resolve => setTimeout(resolve, 5000))]);
+    if (childClosed) childExitStatus ??= await Promise.race([childClosed, new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 5000))]);
   } catch { report.status = 'FAIL'; }
+  try {
+    const diagnosticRows = fs.existsSync(auditFile) ? fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).flatMap(line => {
+      try { return [JSON.parse(line)]; } catch { return []; }
+    }) : [];
+    const runIds = fs.existsSync(evidenceRoot) ? fs.readdirSync(evidenceRoot).filter(name => /^[0-9a-f-]{36}$/u.test(name)) : [];
+    const runDirectory = runIds.length === 1 ? path.join(evidenceRoot, runIds[0]) : null;
+    const category = value => typeof value === 'string' && /^[A-Z_]{3,40}$/u.test(value) ? value : null;
+    let journal = null;
+    if (runDirectory && fs.existsSync(path.join(runDirectory, 'state.json'))) {
+      try {
+        const state = JSON.parse(fs.readFileSync(path.join(runDirectory, 'state.json'), 'utf8'));
+        journal = { status: category(state.status), phase: category(state.current_phase), workflowStatus: category(state.workflow_status),
+          workerStatus: category(state.worker_status), evidenceStatus: category(state.evidence_status), cleanupStatus: category(state.cleanup_status) };
+      } catch { journal = { status: 'UNREADABLE' }; }
+    }
+    report.preFixtureCleanup = { childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null, childExitStatus,
+      originalTargetExists: fs.existsSync(path.join(project, 'created.txt')),
+      evidenceRunCount: runIds.length, journal, executionExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'execution.json'))),
+      receiptExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'receipt.json'))),
+      stages: diagnosticRows.filter(row => row.kind === 'create_stage').slice(-64),
+      runtimeRootExists: fs.existsSync(path.join(temp, 'runtime')), worktreeRootExists: fs.existsSync(path.join(temp, 'worktrees')),
+      ownedResidualProcesses: null, jobEmptyVerified: null, pipesDrained: null };
+  } catch { report.preFixtureCleanup = { status: 'UNKNOWN', childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null }; }
   fs.rmSync(temp, { recursive: true, force: true });
   report.temporaryRemoved = !fs.existsSync(temp);
   if (!report.temporaryRemoved) report.status = 'FAIL';

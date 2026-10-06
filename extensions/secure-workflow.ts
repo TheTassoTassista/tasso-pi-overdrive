@@ -28,6 +28,8 @@ import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveMode
 import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
 import { requireBoundedWindowsPublication, requireCodingBackend } from "../platform/shared/coding-execution.mjs";
 import { boundedCreateTaskTarget, createWindowsPublicationEnvelope, executePreparedWindowsPublication, reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
+import { readWindowsProjectSnapshot } from "../platform/windows/coding-tools.mjs";
+import { discoverWindowsTransactions } from "../platform/windows/publication.mjs";
 
 const REQUEST_EVENT = "prompt-template:subagent:request";
 const STARTED_EVENT = "prompt-template:subagent:started";
@@ -227,9 +229,10 @@ export default function (pi: ExtensionAPI) {
       });
       const trustedUserTask = process.platform === "win32" ? latestDirectUserTask(ctx) : null;
       let boundedCreate = false;
+      let boundedTarget: string | undefined;
       if (process.platform === "win32") {
         try {
-          boundedCreateTaskTarget(params.task, trustedUserTask, activeTaskPolicy);
+          boundedTarget = boundedCreateTaskTarget(params.task, trustedUserTask, activeTaskPolicy);
           requireBoundedWindowsPublication("CREATE");
           boundedCreate = true;
         } catch { requireCodingBackend("workflow"); }
@@ -267,6 +270,20 @@ export default function (pi: ExtensionAPI) {
       let protocolNonce = taskDigest(randomUUID());
       let roleReceiptStore: ReturnType<typeof openRoleReceiptStore> | undefined;
       let boundedEnvelope: ReturnType<typeof createWindowsPublicationEnvelope> | undefined;
+      let expectedCreatedDigest: string | undefined;
+      let expectedCreatedIdentity: string | undefined;
+      let boundedTransactionId: string | undefined;
+      let lastDiagnosticStage = "WORKFLOW_ADMITTED";
+      const diagnostic = (stage: string, fields: Record<string, unknown> = {}) => {
+        if (!boundedCreate) return;
+        lastDiagnosticStage = stage;
+        try { pi.events.emit("pi-overdrive:create-stage-metadata", { stage, monotonicMs: Math.round(performance.now()), ...fields }); } catch {}
+      };
+      const diagnosticErrorCode = (error: unknown) => {
+        const code = error && typeof error === "object" ? (error as { code?: unknown }).code : null;
+        return typeof code === "string" && /^(?:EACCES|EEXIST|EISDIR|ENOENT|ENOTSUP|EPERM|PHI_[A-Z_]{3,80})$/u.test(code) ? code : "OTHER";
+      };
+      diagnostic("WORKFLOW_ADMITTED");
       const retainedWorkers = new Map<string, ReturnType<typeof reserveWindowsWorker>>();
       const publishHub = (value: Record<string, unknown>) => {
         try { pi.events.emit(AGENT_HUB_EVENT, value); } catch {}
@@ -360,6 +377,7 @@ export default function (pi: ExtensionAPI) {
           ? reserveWindowsWorker({ executionId, parentSessionId: ctx.sessionManager.getSessionId(), cwd, task, taskPolicy: activeTaskPolicy,
               ...(boundedEnvelope ? { retainForController: true, publicationEnvelope: boundedEnvelope } : {}) })
           : undefined;
+        if (agent === "worker") diagnostic("WORKER_RESERVED", { reserved: Boolean(workerTransport) });
         let settled = false;
         let attemptStarted = false;
         const finish = (callback: (value: any) => void, value: any, terminalStatus: string) => {
@@ -367,6 +385,7 @@ export default function (pi: ExtensionAPI) {
           settled = true;
           if (workerTransport && boundedEnvelope && terminalStatus === "completed") retainedWorkers.set(executionId, workerTransport);
           else workerTransport?.revoke();
+          if (agent === "worker") diagnostic("WORKER_RESULT", { result: terminalStatus === "completed" ? "COMPLETED" : "OTHER", authorityRetained: Boolean(workerTransport && boundedEnvelope && terminalStatus === "completed") });
           agentControl?.terminal(executionId, terminalStatus);
           clearTimeout(timer);
           unsubscribeStarted();
@@ -378,6 +397,7 @@ export default function (pi: ExtensionAPI) {
           const started = data as Record<string, unknown>;
           if (started?.requestId === requestId && started?.ownerRunId === ownerRunId && started?.nodeId === nodeId) {
             attemptStarted = true;
+            if (agent === "worker") diagnostic("WORKER_STARTED");
             agentControl?.started(executionId);
             if (hubReservation) try { publishHub(roleStartedMetadata(hubReservation)); } catch {}
           }
@@ -441,6 +461,7 @@ export default function (pi: ExtensionAPI) {
           failWithReceipt("timed_out", `${agent} delegation timed out`);
         }, 20 * 60 * 1000);
         signal?.addEventListener("abort", abort, { once: true });
+        if (agent === "worker") diagnostic("WORKER_REQUESTED");
         pi.events.emit(REQUEST_EVENT, subagentDelegationRequest({
             requestId, ownerRunId, nodeId, agent, task, context: "fresh", cwd,
             model: route.model,
@@ -539,18 +560,23 @@ export default function (pi: ExtensionAPI) {
             try { publishHub(roleReceiptMetadata(entry.receipt, entry)); } catch {}
           }
         } else {
+          diagnostic("EVIDENCE_RUN_START");
           evidenceRun = createEvidenceRun();
+          diagnostic("EVIDENCE_RUN_CREATED");
           roleReceiptStore = openRoleReceiptStore(evidenceRun);
           journal = initialWorkflowJournal(evidenceRun, { taskDigest: digest, protocolNonce, workflowVersion: WORKFLOW_VERSION, sourceRepository, ownerRunId });
           writeWorkflowJournal(evidenceRun, journal);
+          diagnostic("JOURNAL_CREATED");
           publishJournal();
           allocation = await createRuntimeWorktree(ctx.cwd, { evidenceRunId: evidenceRun.runId, ownerRunId });
+          diagnostic("RUNTIME_ALLOCATED");
           checkpointJournal({ allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
         }
         if (boundedCreate) {
           if (resumable) throw new Error("PHI_BOUNDED_PUBLICATION_RESUME_REQUIRES_MANUAL_INSPECTION");
           boundedEnvelope = createWindowsPublicationEnvelope({ task: params.task, trustedUserTask,
             cwd: allocation!.worktree, taskPolicy: activeTaskPolicy });
+          diagnostic("ENVELOPE_ESTABLISHED");
         }
         if (resumable) {
           const priorBudget = latestState?.spawnBudget;
@@ -617,13 +643,22 @@ export default function (pi: ExtensionAPI) {
                 try {
                   reservation.finishWorker();
                   if (!reservation.status().workerRevoked) throw new Error("PHI_BOUNDED_WORKER_NOT_REVOKED");
+                  diagnostic("WORKER_REVOKED");
+                  diagnostic("CONTROLLER_VALIDATION_START");
                   const ready = reservation.preparePublication({ approveProjectMutation: true });
                   if (ready.receipt?.state !== "READY_TO_PUBLISH" || ready.receipt.operations?.length !== 1 ||
                       ready.receipt.operations[0]?.kind !== "CREATE" || ready.receipt.operations[0].path !== boundedEnvelope!.target || !ready.authority)
                     throw new Error("PHI_BOUNDED_PUBLICATION_INTENT_DENIED");
+                  expectedCreatedDigest = ready.receipt.operations[0].newDigest;
+                  boundedTransactionId = ready.receipt.transactionId;
+                  diagnostic("CREATE_INTENT_AND_V6_READY", { transactionEstablished: true, grantIssued: true });
+                  diagnostic("NATIVE_PUBLICATION_CALL_ENTERED");
                   const published = executePreparedWindowsPublication(ready.authority);
+                  diagnostic("NATIVE_RESULT_OBSERVED", { published: published.state === "PUBLISHED" });
                   if (published.state !== "PUBLISHED" || published.publicationProof?.journal?.version !== 6 || published.projectPublished !== true)
                     throw new Error("PHI_BOUNDED_PUBLICATION_UNVERIFIED");
+                  expectedCreatedIdentity = published.publicationProof?.native?.createdIdentity;
+                  diagnostic("PHYSICAL_POSTVERIFY_COMPLETE", { grantConsumed: true, journalVersion: 6 });
                   if (!/^[0-9a-f]{64}$/u.test(ready.intentDigest ?? "")) throw new Error("PHI_BOUNDED_INTENT_UNBOUND");
                   return { status: "PUBLISHED", operation: "CREATE", transactionId: ready.receipt.transactionId,
                     journalVersion: 6, intentDigest: ready.intentDigest };
@@ -652,14 +687,39 @@ export default function (pi: ExtensionAPI) {
           if (latestState.status !== "PASS") workflowError = new Error("Enforced workflow exhausted its correction budget without a passing final state.");
         }
       } catch (error) {
+        diagnostic("EXECUTION_THROWN", { afterStage: lastDiagnosticStage, errorCode: diagnosticErrorCode(error) });
         workflowError = error;
         if (error && typeof error === "object" && "workflowState" in error) latestState = (error as any).workflowState;
         if (allocation?.worktree && fs.existsSync(allocation.worktree)) {
           try { repositoryEvidence = snapshotWorktree(allocation.worktree); } catch {}
         }
       } finally {
+        if (boundedCreate) {
+          let targetState = "NOT_SAMPLED", digestMatch: boolean | null = null, identityMatch: boolean | null = null;
+          if (!process.env.PHI_BOUNDED_TEST_AUDIT) targetState = "NOT_SAMPLED";
+          else if (!allocation?.worktree || !fs.existsSync(allocation.worktree)) targetState = "NO_WORKTREE";
+          else try {
+            const snapshot = readWindowsProjectSnapshot(allocation.worktree);
+            targetState = boundedTarget && Object.hasOwn(snapshot.files, boundedTarget) ? "PRESENT" : "ABSENT";
+            if (targetState === "PRESENT") {
+              digestMatch = expectedCreatedDigest ? createHash("sha256").update(snapshot.files[boundedTarget!]).digest("hex") === expectedCreatedDigest : null;
+              identityMatch = expectedCreatedIdentity ? snapshot.identities[boundedTarget!] === expectedCreatedIdentity : null;
+            }
+          } catch { targetState = "UNKNOWN"; }
+          let v6Phase = "NOT_ESTABLISHED", v6Observed = "NOT_ESTABLISHED";
+          if (boundedTransactionId && allocation?.worktree && fs.existsSync(allocation.worktree) && process.env.PHI_BOUNDED_TEST_AUDIT) {
+            try {
+              const entries = discoverWindowsTransactions({ cwd: allocation.worktree }).entries;
+              const entry = entries.find((item: any) => item.transactionId === boundedTransactionId);
+              v6Phase = entry?.phase ?? "NOT_FOUND";
+              v6Observed = entry?.observedStatus ?? "NOT_FOUND";
+            } catch { v6Phase = "UNKNOWN"; v6Observed = "UNKNOWN"; }
+          }
+          diagnostic("PRE_CLEANUP_PHYSICAL_SNAPSHOT", { targetState, digestMatch, identityMatch, v6Phase, v6Observed });
+        }
         for (const reservation of retainedWorkers.values()) reservation.revoke();
         retainedWorkers.clear();
+        diagnostic("WORKER_AUTHORITY_REVOKED");
         if (agentControlUncertain) workflowError ??= new Error("Exact attempt cancellation was not acknowledged by the delegated controller.");
         let execution: any = priorExecution;
         let executionSha256: string | undefined = priorExecutionSha256;
@@ -667,6 +727,7 @@ export default function (pi: ExtensionAPI) {
         if (evidenceRun) {
           try {
             if (!execution) {
+              diagnostic("EVIDENCE_FINALIZATION_START");
               latestState ??= { workflowVersion: WORKFLOW_VERSION, status: "FAIL", ownerRunId, allocation };
               latestState.evidenceStatus = "RUNNING";
               if (journal) checkpointJournal({ ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
@@ -686,12 +747,14 @@ export default function (pi: ExtensionAPI) {
                 failure: workflowError ? { type: workflowError instanceof Error ? workflowError.name : "UnknownError", digest: taskDigest(workflowError instanceof Error ? workflowError.message : String(workflowError)) } : undefined,
               };
               writeEvidenceExecution(evidenceRun, execution);
+              diagnostic("EXECUTION_EVIDENCE_WRITTEN");
               executionSha256 = createHash("sha256").update(fs.readFileSync(evidenceRun.executionFile)).digest("hex");
               evidenceStatus = "PASS";
               latestState.evidenceStatus = "EXECUTION_WRITTEN";
               if (journal) checkpointJournal({ ...journalUpdate(latestState), current_phase: "EVIDENCE_FINALIZATION" });
             }
           } catch (error) {
+            diagnostic("EVIDENCE_WRITE_FAILED", { errorCode: diagnosticErrorCode(error) });
             workflowError ??= error;
           }
         }
@@ -714,8 +777,10 @@ export default function (pi: ExtensionAPI) {
               cleanup = { status: "RELEASED", mode: "retain-worktree", resourcesAbsent: !fs.existsSync(allocation.portReservation) };
             }
             if (latestState) latestState.cleanupStatus = cleanup.status;
+            diagnostic("RUNTIME_CLEANUP_COMPLETE", { cleanupStatus: cleanup.status });
             if (evidenceRun && journal && latestState) checkpointJournal({ ...journalUpdate(latestState), current_phase: "CLEANUP" });
           } catch (error) {
+            diagnostic("RUNTIME_CLEANUP_FAILED", { errorCode: diagnosticErrorCode(error) });
             cleanup = { status: "FAIL", mode: process.env.PI_OVERDRIVE_CLEANUP_WORKFLOW === "1" ? "destroy" : "retain-worktree", resourcesAbsent: false };
             workflowError ??= error;
             if (latestState) latestState.cleanupStatus = "FAIL";
@@ -737,12 +802,15 @@ export default function (pi: ExtensionAPI) {
               finalVerdict: verdict,
             };
             writeEvidenceReceipt(evidenceRun, finalReceipt);
+            diagnostic("FINAL_RECEIPT_WRITTEN");
             if (latestState && journal) {
               latestState.cleanupStatus = cleanup.status;
               latestState.evidenceStatus = "PASS";
               checkpointJournal({ ...journalUpdate(latestState, finalReceipt.status === "PASS" ? "COMPLETED" : "FAILED", true), current_phase: "FINALIZED" });
             }
+            diagnostic("TERMINAL_STATUS_COMMITTED", { workflowStatus: finalReceipt.status });
           } catch (error) {
+            diagnostic("FINAL_RECEIPT_FAILED", { errorCode: diagnosticErrorCode(error) });
             workflowError ??= error;
             finalReceipt = undefined;
             if (latestState && journal && evidenceRun) {
