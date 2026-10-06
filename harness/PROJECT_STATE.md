@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current STOP — ordinary Windows CREATE remains blocking
+
+Post-fix focused [CI37543922909](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37543922909) at `d5c5bb4` crossed the original evidence-directory `EPERM` boundary but failed with `ENOENT` before journal, worktree, Worker or V6. Target absent/no worktree/native mutation NO; attempted evidence-finalization receipt was present but its Windows owner-only check rejected it. Root of `ENOENT` likely Linux `/proc` process-identity dependency, exact throwing call unproven. Two focused native executions consumed; no third run or new fix under the current packet. Cleanup fixture removed/child closed, global owned-process census UNKNOWN. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; qualification BLOCKED/CLOSED, clone-runtime gate NOT YET NATIVE VERIFIED. Return to Main.
+
 ## Bounded ordinary CREATE diagnostic — CASE A, fix validation pending
 
 [CI37543362273](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37543362273) at `946c9f3` proved `EPERM` at evidence-run directory synchronization before worktree, Worker, V6 or native publication. The target was absent and no worktree existed: physical mutation NO; publication authority NO. An implementation-local Windows directory-fsync portability candidate is locally green but native fix validation is pending; no power-loss durability or process-census claim. Diagnostic Run 2 is not run. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Qualification BLOCKED/CLOSED and clone-runtime gate NOT YET NATIVE VERIFIED.
