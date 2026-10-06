@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { planWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
+import { corruptJournalReadyDiagnostic } from '../lib/phi-validation-evidence.mjs';
 
 test('V5 mixed journal reconstructs per-operation physical evidence without enabling publication', () => {
   const source = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
@@ -22,6 +23,9 @@ test('V5 mixed journal reconstructs per-operation physical evidence without enab
   assert.match(source, /observedQuarantineIdentity/u);
   assert.match(source, /observedCreateTempIdentity/u);
   assert.match(source, /new string\[\] \{ "REPLACE", "CREATE", "DELETE", "RENAME" \}/u);
+  assert.match(source, /readyPipe\.Join\(7000\)/u);
+  assert.ok(source.indexOf('stage = "PUBLISHER_READY_PARSE"') < source.indexOf('stage = "CORRUPT_LAST_EVENT"'));
+  assert.match(source, /diagnostic = name == "after-cleanup-unlinked" \|\| name == "corrupt-journal"/u);
   assert.equal(planWindowsStartupRecovery({ status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
     projectPublished: false, actionPerformed: false, projectTransactions: 1,
     entries: [{ transactionId: 'a'.repeat(32), journalVersion: 5, phase: 'PREPARED', classification: 'MANUAL_RECOVERY_REQUIRED' }] }).kind,
@@ -125,6 +129,8 @@ for (const caseName of [
         secondStartupGone: safeBoolean(nativeDiagnostic?.secondStartupGone),
       })}`);
     }
+    if (caseName === 'corrupt-journal') console.log(`PHI_TEST209_DIAGNOSTIC ${JSON.stringify(
+      corruptJournalReadyDiagnostic(run.stdout, run.status, run.error?.code === 'ETIMEDOUT'))}`);
     assert.equal(run.status, 0, run.stderr);
     const receipt = JSON.parse(run.stdout);
     assert.equal(receipt.passed, true);

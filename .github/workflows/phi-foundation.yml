@@ -19,9 +19,40 @@ on:
         description: Run only test 206 in an owned independent Windows clone; diagnostic, not certification
         type: boolean
         default: false
+      corrupt-journal-ready-mode:
+        description: Test 209 publisher readiness only; isolated or ordered prefix, never certification
+        type: choice
+        options: [none, isolated, ordered-prefix]
+        default: none
 permissions:
   contents: read
 jobs:
+  corrupt-journal-ready-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && (inputs['corrupt-journal-ready-mode'] == 'isolated' || inputs['corrupt-journal-ready-mode'] == 'ordered-prefix')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Windows foundation bootstrap
+        shell: pwsh
+        run: ./bootstrap/windows.ps1
+      - name: Build existing trusted native Windows process owner
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
+      - name: Install existing pinned LSP runtime for ordered-prefix context
+        if: inputs['corrupt-journal-ready-mode'] == 'ordered-prefix'
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Native test 209 readiness diagnosis only; no clone, Pi or CREATE
+        env:
+          PHI_READY_DIAGNOSTIC_MODE: ${{ inputs['corrupt-journal-ready-mode'] }}
+        run: node scripts/phi-ready-diagnostic.mjs
   clone-test206-focused:
     if: github.event_name == 'workflow_dispatch' && inputs['clone-test206-focused-only']
     runs-on: windows-latest
@@ -126,7 +157,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix')
     strategy:
       fail-fast: false
       matrix:

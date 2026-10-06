@@ -31,6 +31,7 @@ namespace Phi.Native {
     [DllImport("advapi32.dll")] static extern int RegFlushKey(IntPtr key);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode, ExactSpelling=true)] static extern int RegDeleteKeyW(IntPtr key, string name);
     [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegQueryValueExW(IntPtr key, string name, IntPtr reserved, out uint type, byte[] bytes, ref uint size);
+    [DllImport("kernel32.dll", SetLastError=true)] static extern bool IsProcessInJob(IntPtr process, IntPtr job, out bool inside);
     readonly string id, project;
     readonly Mutex lease;
     readonly RecoveryFilesystem pins;
@@ -2109,6 +2110,13 @@ namespace Phi.Native {
       ScopeRecovery scope = null; Process publisher = null; string tx = Guid.NewGuid().ToString("N"), stage = "BEGIN";
       Stopwatch diagnosticClock = Stopwatch.StartNew();
       string failureStage = null, failureHresult = null;
+      string lastCompletedStage = "BEGIN", readinessResult = "NOT_STARTED", readinessClass = "UNKNOWN";
+      long fixtureSetupMs = -1, publisherSpawnMs = -1, readinessElapsedMs = -1, cleanupElapsedMs = -1;
+      int? publisherPid = null, publisherExitAtReadiness = null, residualTrackedPublisher = null;
+      bool? publisherAliveAtReadiness = null, publisherInAnyJob = null;
+      bool publisherKillAttempted = false, stdoutPipeClosed = false, stderrPipeDrained = false;
+      int readinessProbeCount = 0;
+      Thread readyPipe = null;
       string gitDirectory = Path.Combine(Path.GetTempPath(), "phi-git-" + tx);
       bool passed = false, clean = false, gitClean = false, killed = false, publisherGone = false, readerGone = false;
       bool firstStartupGone = false, secondStartupGone = false, startupIdempotent = false;
@@ -2130,22 +2138,38 @@ namespace Phi.Native {
         FixtureGit(scope.Root, "-c user.name=Phi -c user.email=phi@example.invalid commit -qm baseline");
         if (FixtureGit(scope.Root, "status --porcelain") != "") throw new InvalidDataException();
         string input = Serializer().Serialize(new { scopeId = scope.Id, rootIdentity = rootId, transactionId = tx });
+        fixtureSetupMs = diagnosticClock.ElapsedMilliseconds; lastCompletedStage = "FIXTURE_SETUP";
         stage = "PUBLISHER_START";
         publisher = Process.Start(new ProcessStartInfo { FileName = Process.GetCurrentProcess().MainModule.FileName,
           Arguments = "--publication-mixed-physical-crash-child " + childCaseName, UseShellExecute = false,
           RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true });
+        if (publisher == null) throw new InvalidDataException();
+        publisherPid = publisher.Id; publisherSpawnMs = diagnosticClock.ElapsedMilliseconds;
+        try { bool inJob; if (IsProcessInJob(publisher.Handle, IntPtr.Zero, out inJob)) publisherInAnyJob = inJob; } catch { }
+        lastCompletedStage = "PUBLISHER_START";
         stage = "PUBLISHER_INPUT";
         publisher.StandardInput.WriteLine(input); publisher.StandardInput.Close();
+        lastCompletedStage = "PUBLISHER_INPUT";
         string ready = null;
-        Thread readyPipe = new Thread(delegate() { try { ready = publisher.StandardOutput.ReadLine(); } catch { } });
-        readyPipe.IsBackground = true; readyPipe.Start();
+        readyPipe = new Thread(delegate() {
+          try { ready = publisher.StandardOutput.ReadLine(); readinessResult = ready == null ? "EOF" : "LINE"; }
+          catch { readinessResult = "READ_EXCEPTION"; }
+        });
+        readyPipe.IsBackground = true; readinessProbeCount = 1; readinessResult = "PENDING";
+        Stopwatch readinessClock = Stopwatch.StartNew(); readyPipe.Start();
         stage = "PUBLISHER_READY_WAIT";
-        if (!readyPipe.Join(7000)) { stage = "PUBLISHER_READY_TIMEOUT"; throw new InvalidDataException(); }
+        bool readyCompleted = readyPipe.Join(7000);
+        readinessElapsedMs = readinessClock.ElapsedMilliseconds;
+        if (!readyCompleted) { stage = "PUBLISHER_READY_TIMEOUT"; throw new InvalidDataException(); }
         if (ready == null) { stage = "PUBLISHER_READY_MISSING"; throw new InvalidDataException(); }
         if (ready.Length > 1024) { stage = "PUBLISHER_READY_OVERSIZE"; throw new InvalidDataException(); }
         stage = "PUBLISHER_READY_PARSE";
         Dictionary<string, object> announced = Serializer().Deserialize<Dictionary<string, object>>(ready);
         if (!(bool)announced["ready"] || (string)announced["transactionId"] != tx) throw new InvalidDataException();
+        readinessClass = "SUCCESS";
+        try { publisherAliveAtReadiness = !publisher.HasExited;
+          if (!publisherAliveAtReadiness.Value) publisherExitAtReadiness = publisher.ExitCode; } catch { }
+        lastCompletedStage = "PUBLISHER_READY_PARSE";
         if (name == "after-cleanup-unlinked") {
           stage = "LIVE_OWNER_INSPECT";
           Dictionary<string, object> active = Serializer().Deserialize<Dictionary<string, object>>(
@@ -2363,17 +2387,35 @@ namespace Phi.Native {
                 (string)journal.last["terminalObservation"] == RecoveryTerminalObservation);
           }
         if (!startupIdempotent) throw new InvalidDataException();
-        passed = true; stage = "COMPLETE";
+        passed = true; stage = "COMPLETE"; lastCompletedStage = "COMPLETE";
       } catch (Exception error) {
         failureStage = stage; failureHresult = unchecked((uint)Marshal.GetHRForException(error)).ToString("x8");
+        if (publisher != null) try {
+          publisherAliveAtReadiness = !publisher.HasExited;
+          if (!publisherAliveAtReadiness.Value) publisherExitAtReadiness = publisher.ExitCode;
+        } catch { }
+        if (stage == "PUBLISHER_START") readinessClass = "SPAWN_FAILURE";
+        else if (stage == "PUBLISHER_READY_TIMEOUT" || stage == "PUBLISHER_READY_MISSING") {
+          readinessClass = readinessResult == "READ_EXCEPTION" ? "READINESS_OBSERVATION_FAILURE" :
+            publisherAliveAtReadiness == false ? "EARLY_EXIT" :
+            publisherAliveAtReadiness == true ? "ALIVE_NOT_READY" : "UNKNOWN";
+        } else if (stage == "PUBLISHER_READY_OVERSIZE" || stage == "PUBLISHER_READY_PARSE")
+          readinessClass = "READINESS_OBSERVATION_FAILURE";
         Console.Error.WriteLine("PHI_MIXED_CRASH_SELFTEST_FAILED:" + failureStage + ":" + failureHresult);
       }
       finally {
-        if (publisher != null) { try { if (!publisher.HasExited) { publisher.Kill(); publisher.WaitForExit(3000); } } finally { publisher.Dispose(); } }
+        Stopwatch cleanupClock = Stopwatch.StartNew();
+        if (publisher != null) { try {
+          if (!publisher.HasExited) { publisherKillAttempted = true; publisher.Kill(); publisher.WaitForExit(3000); }
+          residualTrackedPublisher = publisher.HasExited ? 0 : 1;
+          if (publisher.HasExited) { try { publisher.StandardError.ReadToEnd(); stderrPipeDrained = true; } catch { } }
+        } finally { publisher.Dispose(); } }
+        stdoutPipeClosed = readyPipe != null && readyPipe.Join(1000);
         try { CleanupFixtureGit(gitDirectory, tx); gitClean = true; } catch { gitClean = false; }
         try { using (RegistryKey root = OpenBase(true)) if (root.GetSubKeyNames().Contains(tx)) root.DeleteSubKeyTree(tx);
           if (scope != null) { scope.CleanupFiles(); clean = !Directory.Exists(scope.Root); scope.Complete(clean); }
         } catch { clean = false; if (scope != null) scope.Dispose(); }
+        cleanupElapsedMs = cleanupClock.ElapsedMilliseconds;
       }
       Console.WriteLine(Serializer().Serialize(new { caseName = name, checkpoint = stop, passed, actualPublisherKilled = killed,
         publisherGone, freshReaderGone = readerGone, firstStartupGone, secondStartupGone, firstStartupExit, secondStartupExit,
@@ -2381,9 +2423,14 @@ namespace Phi.Native {
           name != "append-interrupted", startupIdempotent, fixtureCleanup = clean && gitClean,
         gitMetadataClean = gitClean, externalChangedAfterObservation, laterClassificationSawChange,
         liveOwnerDenied, duplicateTerminalDenied, corruptJournalRejected, concurrentSingleTerminal, appendInterruptionFailClosed, evidence,
-        diagnostic = name == "after-cleanup-unlinked" ? new { lastStage = stage, failureStage, failureHresult,
+        diagnostic = name == "after-cleanup-unlinked" || name == "corrupt-journal" ? new { lastStage = stage, lastCompletedStage,
+          failureStage, failureHresult, readinessClass = !clean || !gitClean || residualTrackedPublisher == 1 ? "CLEANUP_FAILURE" :
+            passed ? "SUCCESS" : readinessClass,
           elapsedMs = diagnosticClock.ElapsedMilliseconds, fixtureCleanup = clean && gitClean,
-          publisherGone, readerGone, firstStartupGone, secondStartupGone } : null,
+          publisherGone, readerGone, firstStartupGone, secondStartupGone,
+          fixtureSetupMs, publisherSpawnMs, readinessElapsedMs, cleanupElapsedMs, publisherPid, publisherInAnyJob,
+          publisherAliveAtReadiness, publisherExitAtReadiness, readinessProbeCount, readinessResult,
+          publisherKillAttempted, stdoutPipeClosed, stderrPipeDrained, residualTrackedPublisher } : null,
         scope = "V5_PHYSICAL_DEATH_FRESH_READER_TERMINAL_OBSERVATION_ONLY",
         projectPublished = false, externalRequests = 0 }));
       return passed && clean && gitClean && publisherGone && readerGone && firstStartupGone && secondStartupGone && startupIdempotent ? 0 : 70;

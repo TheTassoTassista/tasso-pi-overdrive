@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-06 — D6-CORRUPT-JOURNAL-READY-DIAGNOSTIC-001 (user-supplied Φ Main decision)
+
+Decision: **EXPERIMENT**, maximum two native Windows executions to diagnose CI37384516310 main-suite test209 publisher readiness. Run 1 is isolated; Run 2 may preserve the ordered prefix only if Run 1 passes or is inconclusive. Keep the original 7-second readiness wait, publisher implementation, journal semantics, security and cleanup contract. Add only fixed, bounded metadata; no raw contents, paths, commands or secrets. No full clone certification, Pi smoke, ordinary CREATE, test206/runtime resampling or R1 under this decision. If evidence remains insufficient after at most two runs, classify CASE E and STOP for Φ Work Control/Main. No external model review/provider call.
+
 ## 2026-10-06 — D6-CLONE-RECERTIFICATION-001 (user-supplied Φ Main decision)
 
 Decision: **IMPLEMENT / VERIFY**, exactly one full native Windows clean-room clone certification attempt on the current valid candidate. A red run requires STOP without an automatic second attempt; only a green clone permits the already-authorized downstream Pi smokes and ordinary CREATE. Historical [CI37357312199](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37357312199) test206 failure remains real with unknown cause regardless of a later pass. No timeout, retry, ownership, sandbox or provider policy change is authorized. The one-shot [CI37384516310](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37384516310) on `cccc422` ended **FAIL** at main Windows test209 (`corrupt-journal`, `PUBLISHER_READY_TIMEOUT`, native exit70) before the independent Windows clone; its cause is UNKNOWN. The authority is consumed, no clone certificate or downstream smoke is credited, and the campaign stops for Φ Work Control/Main.

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, test206DiagnosticEvidence } from '../lib/phi-validation-evidence.mjs';
+import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, test206DiagnosticEvidence,
+  corruptJournalReadyDiagnostic } from '../lib/phi-validation-evidence.mjs';
 const failure = { operation: 'NT_OPEN', access: '00110080', share: 1, options: '00200060', nativeStatus: 'c0000043', nativeError: 32, objectIdentity: `${'a'.repeat(16)}:${'b'.repeat(32)}`, leafDigest: 'c'.repeat(64) };
 test('pre-receipt controller exceptions preserve fixed phase/code without private exception context', () => {
   for (const [phase, code] of [['RESOLVE_COMMAND', 'PHI_VALIDATION_COMMAND_UNAVAILABLE'], ['HELPER_VALIDATION', 'PHI_NATIVE_PROCESS_BUILD_INVALID'], ['SUPERVISOR_SPAWN', 'ENOENT'], ['RECEIPT_PARSE', 'PHI_VALIDATION_RECEIPT_MISSING'], ['RECEIPT_VALIDATE', 'PHI_VALIDATION_RECEIPT_INVALID']]) {
@@ -55,6 +56,28 @@ test('clean-room failure receipt identifies its stage/codes/counts without leaki
   assert.equal(test206DiagnosticEvidence(`# PHI_TEST206_DIAGNOSTIC ${JSON.stringify({ ...diagnostic, privatePath: 'SECRET' })}`), null);
   assert.equal(test206DiagnosticEvidence(`# PHI_TEST206_DIAGNOSTIC ${JSON.stringify({ ...diagnostic, lastStage: 'SECRET' })}`), null);
   assert.equal(test206DiagnosticEvidence(`${output}${output}`), null);
+  const readyDiagnostic = { lastStage: 'PUBLISHER_READY_TIMEOUT', lastCompletedStage: 'PUBLISHER_INPUT',
+    failureStage: 'PUBLISHER_READY_TIMEOUT', failureHresult: '80131501', readinessClass: 'ALIVE_NOT_READY',
+    readinessResult: 'PENDING', elapsedMs: 7120, fixtureSetupMs: 42, publisherSpawnMs: 77,
+    readinessElapsedMs: 7002, cleanupElapsedMs: 31, publisherPid: 1234, publisherInAnyJob: false,
+    publisherAliveAtReadiness: true, publisherExitAtReadiness: null, readinessProbeCount: 1,
+    publisherKillAttempted: true, stdoutPipeClosed: true, stderrPipeDrained: true,
+    residualTrackedPublisher: 0, fixtureCleanup: true, gitMetadataClean: true,
+    privatePath: 'PRIVATE_PATH', journalContents: 'PRIVATE_SECRET' };
+  const row = corruptJournalReadyDiagnostic(JSON.stringify({ diagnostic: readyDiagnostic, privateReceipt: 'PRIVATE_SECRET' }), 70, false);
+  assert.equal(row.readinessClass, 'ALIVE_NOT_READY');
+  assert.equal(row.publisherPid, 1234);
+  assert.equal(row.residualTrackedPublisher, 0);
+  assert.doesNotMatch(JSON.stringify(row), /PRIVATE|journalContents|privateReceipt/u);
+  const invalid = corruptJournalReadyDiagnostic(JSON.stringify({ diagnostic: { ...readyDiagnostic,
+    lastStage: 'PRIVATE_STAGE', readinessClass: 'PRIVATE_CLASS', publisherPid: 'PRIVATE_PID',
+    readinessResult: 'PRIVATE_RESULT' } }), 70, false);
+  assert.equal(invalid.lastStage, 'UNKNOWN');
+  assert.equal(invalid.readinessClass, 'UNKNOWN');
+  assert.equal(invalid.readinessResult, 'UNKNOWN');
+  assert.equal(invalid.publisherPid, null);
+  assert.equal(invalid.publisherTrackedByFixture, false);
+  assert.equal(corruptJournalReadyDiagnostic('PRIVATE_RAW_OUTPUT', 70, false).readinessClass, 'UNKNOWN');
 });
 test('timed-out clone foundation suite retains only bounded serial TAP ordinals', () => {
   const row = validationFailureEvidence('foundation-tests', { status: 124, error: { code: 'ETIMEDOUT' },
