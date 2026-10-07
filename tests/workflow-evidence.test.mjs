@@ -55,24 +55,26 @@ test("run-specific evidence survives disposable cleanup and rejects stale, forei
 
 test("incomplete and malformed crash artifacts fail closed without invalidating prior evidence", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-evidence-crash-"));
+  const evidenceRoot = path.join(root, "evidence");
   try {
-    const interrupted = createEvidenceRun({ root, runId: randomUUID() });
+    const interrupted = createEvidenceRun({ root: evidenceRoot, runId: randomUUID() });
     const digest = taskDigest("interrupted task");
     const journal = initialWorkflowJournal(interrupted, { taskDigest: digest, workflowVersion: 4, sourceRepository: "/tmp/source", ownerRunId: "owner" });
-    journal.process.bootId = "00000000-0000-0000-0000-000000000000";
+    if (process.platform === "win32") journal.process.creationTime = "0000000000000000";
+    else journal.process.bootId = "00000000-0000-0000-0000-000000000000";
     journal.current_phase = "CLEANUP";
     journal.cleanup_status = "PASS";
     journal.workflow_status = "PASS";
     writeWorkflowJournal(interrupted, journal);
     writeEvidenceExecution(interrupted, { runId: interrupted.runId, taskDigest: digest, status: "PASS" });
-    const recovered = recoverInterruptedWorkflowRuns({ root });
+    const recovered = recoverInterruptedWorkflowRuns({ root: evidenceRoot });
     assert.equal(recovered.recovered[0].status, "INTERRUPTED");
     assert.equal(readWorkflowJournal(interrupted).evidence_status, "INCOMPLETE");
-    assert.throws(() => readEvidenceReceipt({ root, runId: interrupted.runId, taskDigest: digest }));
+    assert.throws(() => readEvidenceReceipt({ root: evidenceRoot, runId: interrupted.runId, taskDigest: digest }));
 
-    const malformed = createEvidenceRun({ root, runId: randomUUID() });
+    const malformed = createEvidenceRun({ root: evidenceRoot, runId: randomUUID() });
     privateFixtureFile(malformed.stateFile, "{\"status\":");
-    const malformedRecovery = recoverInterruptedWorkflowRuns({ root });
+    const malformedRecovery = recoverInterruptedWorkflowRuns({ root: evidenceRoot });
     assert.equal(malformedRecovery.inconsistent.some((entry) => entry.runId === malformed.runId), true);
     if (process.platform === "win32") {
       assert.throws(() => readWorkflowJournal(malformed), /malformed/u);
@@ -89,7 +91,7 @@ test("incomplete and malformed crash artifacts fail closed without invalidating 
 test("workflow journal checkpoint sequence is controller-owned and monotonic", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-journal-order-"));
   try {
-    const run = createEvidenceRun({ root });
+    const run = createEvidenceRun({ root: path.join(root, "evidence") });
     let journal = initialWorkflowJournal(run, { taskDigest: taskDigest("ordered"), workflowVersion: 4, sourceRepository: "/tmp/source", ownerRunId: "owner" });
     writeWorkflowJournal(run, journal);
     assert.equal(readWorkflowJournal(run).checkpoint_seq, 0);

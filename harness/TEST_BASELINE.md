@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Focused CI37633332909 and implementation-local correction
+
+Native Windows focused regression step: **25 total / 8 PASS / 16 FAIL / 1 skip**; process generation exactness, ACL selftest and workflow protected receipt/tamper case PASS. Failure preceded LSP/Pi/ordinary CREATE. The same-run failure log proves the stale `.json` validation expectation against a `.win-v1.lock` writer and non-protected existing fixture root rejection; repository-child overlap test also did not reject. After the scoped correction, local focused **91 total / 30 PASS / 0 FAIL / 61 Windows skips** and full `npm run check` PASS. No native CREATE success claim. One final focused Run 2 pending; no full certification or provider call.
+
 ## D6 Windows process identity and protected ACL candidate — local verification
 
 Focused `node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/workflow-recovery.test.mjs tests/runtime-isolation.test.mjs tests/phi-windows-confinement.test.mjs tests/receipt-protocol.test.mjs`: **91 total / 30 PASS / 0 FAIL / 61 native Windows skips**. Full `npm run check` exited 0, including syntax, TypeScript against installed Pi and package validation. Scoped whitespace check PASS. Windows native compiler/ACL/process tests and ordinary CREATE remain pending; Linux-only results cannot certify them. Zero external provider/model calls.

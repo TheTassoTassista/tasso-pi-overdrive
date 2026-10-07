@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Native Run 1 pre-CREATE failure; one corrected focused run remains
+
+[CI37633332909](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37633332909) failed in the new Windows regression step, before LSP/Pi/ordinary CREATE. Native identity and ACL primitives and the protected receipt read/write tamper test passed; the failures exposed a stale runtime port-lock validator suffix and fixtures that passed unprotected existing temp roots to a strict evidence API. A lexical overlap check also failed natively, so the correction adds an additional fail-closed lexical comparison. Focused local tests and full `npm run check` pass after the correction. One final focused native Run 2 is available only on this corrected candidate; no full Campaign certification. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## Current D6 candidate — process identity and protected workflow evidence
 
 Φ Main authorized the two security/format decisions previously blocking ordinary Windows CREATE. The local candidate uses native process creation generation losslessly, separates Windows durable records from old readers, and shares recovery's protected ACL policy across authoritative evidence and runtime metadata. Focused local tests and full `npm run check` pass; zero-egress source review passes. Native Windows proof has not run, so ordinary CREATE remains unverified. Only one focused Run 1 may now be launched after the scoped checkpoint; a second is conditional on a demonstrated implementation-local fix. Full certification and the closed stability qualification remain blocked. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.

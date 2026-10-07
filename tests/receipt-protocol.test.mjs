@@ -15,7 +15,7 @@ const taskId = taskDigest("receipt-protocol-task");
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-receipts-"));
-  const run = createEvidenceRun({ root });
+  const run = createEvidenceRun({ root: path.join(root, "evidence") });
   const store = openRoleReceiptStore(run);
   return { root, run, store };
 }
