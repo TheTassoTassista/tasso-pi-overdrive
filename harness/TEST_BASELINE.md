@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Final focused Windows Run 2 — terminal pre-CREATE FAIL
+
+[CI37634476513](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37634476513), exact functional source `a0c64e43a3e386bdf35a5d6ffa2999a9dc9ac84a`, Windows job `112836946391`: bootstrap/native build PASS; focused **25 total / 21 PASS / 3 FAIL / 1 skip**. Failed case16 and case17 at `tests/receipt-protocol.test.mjs:174,190` with protected-root rejection; case19 at `tests/runtime-isolation.test.mjs:59` with `resumed worktree is not registered by Git`. Native process identity, ACL selftest, protected evidence/tamper and runtime overlap cases PASS. LSP install, isolated Pi, three predecessor smokes and genuine ordinary CREATE SKIPPED. CI post-actions complete; Phi-owned residual census not attested. No further native run under current authority; no ordinary CREATE PASS claim. Local focused 91/30 PASS/0 FAIL/61 Windows skips and full `npm run check` PASS on this functional candidate, but native failures take precedence.
+
 ## Focused CI37633332909 and implementation-local correction
 
 Native Windows focused regression step: **25 total / 8 PASS / 16 FAIL / 1 skip**; process generation exactness, ACL selftest and workflow protected receipt/tamper case PASS. Failure preceded LSP/Pi/ordinary CREATE. The same-run failure log proves the stale `.json` validation expectation against a `.win-v1.lock` writer and non-protected existing fixture root rejection; repository-child overlap test also did not reject. After the scoped correction, local focused **91 total / 30 PASS / 0 FAIL / 61 Windows skips** and full `npm run check` PASS. No native CREATE success claim. One final focused Run 2 pending; no full certification or provider call.
