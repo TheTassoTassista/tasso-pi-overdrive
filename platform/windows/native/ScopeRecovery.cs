@@ -15,6 +15,114 @@ using System.Web.Script.Serialization;
 using Microsoft.Win32;
 
 namespace Phi.Native {
+  // The recovery tree and authoritative workflow artifacts share one owner/ACL
+  // contract. This is a trusted-controller primitive, never an agent tool.
+  internal static class ProtectedArtifactAccessPolicy {
+    static SecurityIdentifier User { get { return WindowsIdentity.GetCurrent().User; } }
+    static SecurityIdentifier SystemSid { get { return new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null); } }
+    static SecurityIdentifier OwnerRights { get { return new SecurityIdentifier("S-1-3-4"); } }
+    internal static DirectorySecurity PrivateDirectoryAcl() {
+      DirectorySecurity acl = new DirectorySecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(User);
+      foreach (SecurityIdentifier sid in new SecurityIdentifier[] { User, SystemSid })
+        acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+      acl.AddAccessRule(new FileSystemAccessRule(OwnerRights, FileSystemRights.ReadPermissions, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
+      return acl;
+    }
+    static FileSecurity PrivateFileAcl() {
+      FileSecurity acl = new FileSecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(User);
+      foreach (SecurityIdentifier sid in new SecurityIdentifier[] { User, SystemSid })
+        acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, AccessControlType.Allow));
+      acl.AddAccessRule(new FileSystemAccessRule(OwnerRights, FileSystemRights.ReadPermissions, AccessControlType.Allow));
+      return acl;
+    }
+    static void ValidateRaw(RawSecurityDescriptor raw) {
+      if (!raw.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclPresent) || raw.DiscretionaryAcl == null ||
+          !raw.ControlFlags.HasFlag(ControlFlags.DiscretionaryAclProtected) || !User.Equals(raw.Owner)) throw new InvalidDataException();
+    }
+    static void Validate(FileSystemSecurity acl, bool directory) {
+      RawSecurityDescriptor raw = new RawSecurityDescriptor(acl.GetSecurityDescriptorBinaryForm(), 0);
+      ValidateRaw(raw);
+      bool user = false, system = false, ownerRights = false;
+      foreach (FileSystemAccessRule rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier))) {
+        string sid = rule.IdentityReference.Value;
+        FileSystemRights rights = rule.FileSystemRights & ~FileSystemRights.Synchronize;
+        InheritanceFlags expectedInheritance = directory ? InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit : InheritanceFlags.None;
+        if (rule.AccessControlType != AccessControlType.Allow || rule.IsInherited || rule.InheritanceFlags != expectedInheritance || rule.PropagationFlags != PropagationFlags.None) throw new InvalidDataException();
+        if (sid == User.Value && rights == (FileSystemRights.FullControl & ~FileSystemRights.Synchronize) && !user) user = true;
+        else if (sid == SystemSid.Value && rights == (FileSystemRights.FullControl & ~FileSystemRights.Synchronize) && !system) system = true;
+        else if (sid == OwnerRights.Value && rights == FileSystemRights.ReadPermissions && !ownerRights) ownerRights = true;
+        else throw new InvalidDataException();
+      }
+      if (!user || !system || !ownerRights || raw.DiscretionaryAcl.Count != 3) throw new InvalidDataException();
+    }
+    internal static void ValidateDirectory(string directory) {
+      using (RecoveryFilesystem pins = new RecoveryFilesystem(directory)) Validate(Directory.GetAccessControl(directory), true);
+    }
+    internal static void ValidateFile(string file) {
+      RecoveryFilesystem.WithPinnedFile(file, delegate() { Validate(File.GetAccessControl(file), false); });
+    }
+    internal static void EnsureDirectory(string directory, bool exclusive) {
+      string full = Path.GetFullPath(directory);
+      if (Directory.Exists(full)) {
+        if (exclusive) throw new IOException("protected directory exists");
+        ValidateDirectory(full); return;
+      }
+      string parent = Path.GetDirectoryName(full);
+      if (String.IsNullOrEmpty(parent) || parent == full) throw new InvalidDataException();
+      // An existing ancestor can be the caller's ordinary temporary/profile
+      // directory. Pin it against reparse traversal, but require the protected
+      // ACL only for the authoritative directory being created or opened.
+      if (!Directory.Exists(parent)) EnsureDirectory(parent, false);
+      RecoveryFilesystem.CreateDirectory(full, PrivateDirectoryAcl(), false);
+      ValidateDirectory(full);
+    }
+    internal static void CreateFile(string file) {
+      ValidateDirectory(Path.GetDirectoryName(Path.GetFullPath(file)));
+      RecoveryFilesystem.CreateProtectedFile(file, PrivateFileAcl());
+      ValidateFile(file);
+    }
+    internal static int HandleRequest(Stream input) {
+      try {
+        string text;
+        using (StreamReader reader = new StreamReader(input, Encoding.UTF8)) {
+          char[] bounded = new char[8193]; int count = reader.ReadBlock(bounded, 0, bounded.Length);
+          if (count > 8192) throw new InvalidDataException();
+          text = new string(bounded, 0, count);
+        }
+        Dictionary<string, object> request = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(text);
+        if (request == null || request.Count != 2 || !request.ContainsKey("operation") || !request.ContainsKey("path") ||
+            !(request["operation"] is string) || !(request["path"] is string)) throw new InvalidDataException();
+        string operation = (string)request["operation"], target = (string)request["path"];
+        if (target.Length < 4 || target.Length > 4096 || !Path.IsPathRooted(target) || target.StartsWith("\\\\")) throw new InvalidDataException();
+        if (operation == "ensure-directory") EnsureDirectory(target, false);
+        else if (operation == "create-exclusive-directory") EnsureDirectory(target, true);
+        else if (operation == "create-exclusive-file") CreateFile(target);
+        else if (operation == "validate-directory") ValidateDirectory(target);
+        else if (operation == "validate-file") ValidateFile(target);
+        else throw new InvalidDataException();
+        Console.WriteLine("PROTECTED_ARTIFACT_PASS"); return 0;
+      } catch (IOException) { Console.Error.WriteLine("PROTECTED_ARTIFACT_IO_FAILURE"); return 71; }
+        catch { Console.Error.WriteLine("PROTECTED_ARTIFACT_UNVERIFIED"); return 70; }
+    }
+    internal static int SelfTest() {
+      try {
+        Validate(PrivateDirectoryAcl(), true);
+        Validate(PrivateFileAcl(), false);
+        DirectorySecurity permissive = PrivateDirectoryAcl();
+        permissive.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.ReadData, AccessControlType.Allow));
+        bool permissiveRejected = false;
+        try { Validate(permissive, true); } catch (InvalidDataException) { permissiveRejected = true; }
+        RawSecurityDescriptor raw = new RawSecurityDescriptor(ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclProtected, User, null, null, null);
+        bool nullRejected = false;
+        try { ValidateRaw(raw); } catch (InvalidDataException) { nullRejected = true; }
+        bool missingRejected = false;
+        try { ValidateFile(Path.Combine(Path.GetTempPath(), "phi-missing-" + Guid.NewGuid().ToString("N"))); } catch { missingRejected = true; }
+        if (!permissiveRejected || !nullRejected || !missingRejected) throw new InvalidDataException();
+        Console.WriteLine(new JavaScriptSerializer().Serialize(new { status = "PASS", trustedAcl = true, permissiveRejected, nullRejected, missingRejected }));
+        return 0;
+      } catch { Console.Error.WriteLine("PROTECTED_ARTIFACT_SELFTEST_FAILED"); return 70; }
+    }
+  }
   internal sealed class ScopeRecovery : IDisposable {
     internal const string RegistryBase = "Software\\Phi\\NativeScopeRecoveryV1";
     const int MaxScopes = 64;
@@ -84,26 +192,13 @@ namespace Phi.Native {
       if (key == null) throw new InvalidDataException();
       try { ValidateRegistry(key); return key; } catch { key.Dispose(); throw; }
     }
-    static DirectorySecurity PrivateDirectoryAcl() {
-      DirectorySecurity acl = new DirectorySecurity(); acl.SetAccessRuleProtection(true, false); acl.SetOwner(User);
-      foreach (SecurityIdentifier sid in new SecurityIdentifier[] { User, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null) })
-        acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-      acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier("S-1-3-4"), FileSystemRights.ReadPermissions, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-      return acl;
-    }
+    static DirectorySecurity PrivateDirectoryAcl() { return ProtectedArtifactAccessPolicy.PrivateDirectoryAcl(); }
     static void EnsureRootBase() {
       DirectorySecurity acl = PrivateDirectoryAcl();
       RecoveryFilesystem.CreateDirectory(Path.GetDirectoryName(RootBase), acl, true);
       RecoveryFilesystem.CreateDirectory(RootBase, acl, true);
       using (RecoveryFilesystem pins = new RecoveryFilesystem(RootBase)) {
-        DirectorySecurity actual = Directory.GetAccessControl(RootBase);
-        if (!actual.AreAccessRulesProtected || !User.Equals(actual.GetOwner(typeof(SecurityIdentifier)))) throw new InvalidDataException();
-        foreach (FileSystemAccessRule rule in actual.GetAccessRules(true, true, typeof(SecurityIdentifier))) {
-          string sid = rule.IdentityReference.Value;
-          // FileSystemAccessRule automatically adds SYNCHRONIZE to Allow
-          // masks. Accept only that normalization, never WRITE_DAC/WRITE_OWNER.
-          if (rule.AccessControlType != AccessControlType.Allow || (sid != User.Value && sid != "S-1-5-18" && !(sid == "S-1-3-4" && (rule.FileSystemRights & ~FileSystemRights.Synchronize) == FileSystemRights.ReadPermissions))) throw new InvalidDataException();
-        }
+        ProtectedArtifactAccessPolicy.ValidateDirectory(RootBase);
       }
     }
     static Mutex ScopeMutex(string id) {

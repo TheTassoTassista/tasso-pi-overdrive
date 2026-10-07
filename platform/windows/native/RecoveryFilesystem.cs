@@ -390,6 +390,26 @@ namespace Phi.Native {
         } finally { Marshal.FreeHGlobal(descriptor); }
       }
     }
+    internal static void CreateProtectedFile(string file, FileSecurity acl) {
+      using (RecoveryFilesystem pins = new RecoveryFilesystem(Path.GetDirectoryName(file))) {
+        byte[] bytes = acl.GetSecurityDescriptorBinaryForm(); IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
+        try {
+          Marshal.Copy(bytes, 0, descriptor, bytes.Length);
+          Info info; IntPtr handle = OpenRelative(pins.DirectoryHandle, Path.GetFileName(file), 0x12019f, 1, 2, 0x40, descriptor, out info);
+          try { if ((info.Attributes & (0x10 | 0x400)) != 0 || info.Links != 1) throw new InvalidDataException(); }
+          finally { CloseHandle(handle); }
+        } finally { Marshal.FreeHGlobal(descriptor); }
+      }
+    }
+    internal static void WithPinnedFile(string file, Action action) {
+      using (RecoveryFilesystem pins = new RecoveryFilesystem(Path.GetDirectoryName(file))) {
+        Info info; IntPtr handle = OpenRelative(pins.DirectoryHandle, Path.GetFileName(file), 0x20080, 1, 1, 0x40, IntPtr.Zero, out info);
+        try {
+          if ((info.Attributes & (0x10 | 0x400)) != 0 || info.Links != 1) throw new InvalidDataException();
+          action();
+        } finally { CloseHandle(handle); }
+      }
+    }
     void CreateChildDirectory(string name, IntPtr descriptor, bool allowExisting) {
       Info info; IntPtr child = OpenRelative(parents[parents.Count - 1], name, 0xa0, 1, allowExisting ? 3U : 2U, 1, descriptor, out info);
       try { if ((info.Attributes & 0x10) == 0) throw new InvalidDataException(); }

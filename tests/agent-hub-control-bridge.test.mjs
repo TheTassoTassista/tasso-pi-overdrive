@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 import { AgentAttemptController, requestExactUserCancellation } from "../lib/agent-hub-control.mjs";
 import { AgentHubProjection, roleReceiptMetadata, roleReservationMetadata, roleStartedMetadata, workflowJournalMetadata } from "../lib/agent-hub.mjs";
 import { makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
+import { ensureProtectedDirectory } from "../lib/protected-artifact.mjs";
 
 const upstreamRoot = path.join(process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent"), "npm", "node_modules", "pi-subagents");
 const requireFromUpstream = createRequire(path.join(upstreamRoot, "package.json"));
@@ -76,7 +77,9 @@ test("installed pi-subagents bridge cancels only the exact owned attempt and sup
     assert.equal(pending.get(executionId)?.signal.aborted, true);
     assert.equal(pending.get(unrelatedRequestId)?.signal.aborted, false);
     const receipt = makeRoleReceipt({ runId, taskId: taskDigest, protocolNonce: "b".repeat(64), executionId, sequence: 0, role: "worker", round: 0, iteration: 0, attempt: 1, nodeId, ownerRunId, response: { ...responses.get(executionId), launchStatus: "launched" } });
-    const reference = writeRoleReceipt(openRoleReceiptStore({ runId, directory: temporary }), receipt);
+    const receiptDirectory = process.platform === "win32" ? path.join(temporary, "protected") : temporary;
+    if (process.platform === "win32") ensureProtectedDirectory(receiptDirectory);
+    const reference = writeRoleReceipt(openRoleReceiptStore({ runId, directory: receiptDirectory }), receipt);
     controller.terminal(executionId, receipt.status);
     projection.ingest(roleReceiptMetadata(receipt, reference));
     assert.equal(projection.snapshot().roster.roles[0].status, "CANCELLED");

@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## D6 Windows process identity and protected ACL candidate — local verification
+
+Focused `node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/workflow-recovery.test.mjs tests/runtime-isolation.test.mjs tests/phi-windows-confinement.test.mjs tests/receipt-protocol.test.mjs`: **91 total / 30 PASS / 0 FAIL / 61 native Windows skips**. Full `npm run check` exited 0, including syntax, TypeScript against installed Pi and package validation. Scoped whitespace check PASS. Windows native compiler/ACL/process tests and ordinary CREATE remain pending; Linux-only results cannot certify them. Zero external provider/model calls.
+
 ## D6 Windows pre-publication portability attribution — local only, authority STOP
 
 Deterministic local replay of the exact post-`EVIDENCE_RUN_CREATED` sequence: evidence run created, `openRoleReceiptStore()` succeeded, then an absent Windows `/proc` read produced `ENOENT` at `/proc/sys/kernel/random/boot_id` inside `initialWorkflowJournal()`/`captureProcessIdentity()`. No product/test file was modified to manufacture a passing workflow. This proves the source path can produce the observed error; the prior native CI stage lacked an individual throwing-call marker, so exact same-run syscall remains LIKELY. No native Windows CREATE run, no suite/clone rerun, no provider/model call under the new decision. Previous CI37543922909 remains FAIL with target absent/no worktree/V6 not established, receipt physically written but owner-only validation rejected, global Job/pipes/residual process count UNKNOWN. New process-identity semantics and workflow ACL trust are referred to Main before functional change.

@@ -107,6 +107,18 @@ namespace Phi.Native {
       if (args.Length == 4 && args[0] == "--confinement-probe") return AppContainerScope.Probe(args[1], args[2], args[3]);
       if (args.Length == 1 && args[0] == "--recover-scopes") return ScopeRecovery.Recover(true, null);
       if (args.Length == 1 && args[0] == "--scope-recovery-status") return ScopeRecovery.Status(true);
+      if (args.Length == 1 && args[0] == "--protected-artifact" && IntPtr.Size == 8) return ProtectedArtifactAccessPolicy.HandleRequest(Console.OpenStandardInput());
+      if (args.Length == 1 && args[0] == "--protected-artifact-selftest" && IntPtr.Size == 8) return ProtectedArtifactAccessPolicy.SelfTest();
+      if (args.Length == 2 && args[0] == "--process-identity") {
+        int pid;
+        if (!Int32.TryParse(args[1], out pid) || pid <= 0) return 70;
+        try {
+          bool alive;
+          string creationTime = ScopeRecovery.ProcessCreation(pid, out alive);
+          Console.WriteLine(new JavaScriptSerializer().Serialize(new { version = 1, pid, alive, creationTime }));
+          return 0;
+        } catch { Console.Error.WriteLine("PHI_PROCESS_IDENTITY_UNKNOWN"); return 70; }
+      }
       if (args.Length == 2 && args[0] == "--recover-scope") return ScopeRecovery.Recover(true, args[1]);
       if (args.Length == 2 && args[0] == "--recovery-selftest") return ScopeRecovery.SelfTest(args[1]);
       if (args.Length == 2 && args[0] == "--anchored-file-selftest") return AnchoredFile.SelfTest(args[1]);

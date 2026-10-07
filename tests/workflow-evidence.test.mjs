@@ -5,6 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { checkpointWorkflowJournal, createEvidenceRun, initialWorkflowJournal, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
+import { assertProtectedArtifact, createProtectedFile, ensureProtectedDirectory } from "../lib/protected-artifact.mjs";
+
+function privateFixtureFile(file, content) {
+  if (process.platform === "win32") createProtectedFile(file);
+  fs.writeFileSync(file, content, process.platform === "win32" ? undefined : { mode: 0o600 });
+}
 
 function writeRun(run, digest) {
   const execution = { runId: run.runId, taskDigest: digest, status: "PASS", evidence: { roles: [], transitions: [], verifications: [], reviews: [] } };
@@ -23,6 +29,7 @@ test("run-specific evidence survives disposable cleanup and rejects stale, forei
     fs.mkdirSync(disposable);
     const run = createEvidenceRun({ root: evidenceRoot, runId });
     writeRun(run, digest);
+    assertProtectedArtifact(run.receiptFile, "file", "workflow receipt is not protected");
     fs.rmSync(disposable, { recursive: true, force: true });
     assert.equal(readEvidenceReceipt({ root: evidenceRoot, runId, taskDigest: digest }).receipt.status, "PASS");
     assert.throws(() => createEvidenceRun({ root: evidenceRoot, runId }), /exist/iu);
@@ -31,17 +38,15 @@ test("run-specific evidence survives disposable cleanup and rejects stale, forei
 
     const foreignId = randomUUID();
     const foreignDir = path.join(evidenceRoot, foreignId);
-    fs.mkdirSync(foreignDir, { mode: 0o700 });
-    fs.copyFileSync(run.receiptFile, path.join(foreignDir, "receipt.json"));
-    fs.copyFileSync(run.executionFile, path.join(foreignDir, "execution.json"));
-    fs.chmodSync(path.join(foreignDir, "receipt.json"), 0o400);
-    fs.chmodSync(path.join(foreignDir, "execution.json"), 0o400);
+    ensureProtectedDirectory(foreignDir, { exclusive: true });
+    privateFixtureFile(path.join(foreignDir, "receipt.json"), fs.readFileSync(run.receiptFile));
+    privateFixtureFile(path.join(foreignDir, "execution.json"), fs.readFileSync(run.executionFile));
     assert.throws(() => readEvidenceReceipt({ root: evidenceRoot, runId: foreignId }), /another run/iu);
 
     const malformedId = randomUUID();
     const malformedDir = path.join(evidenceRoot, malformedId);
-    fs.mkdirSync(malformedDir, { mode: 0o700 });
-    fs.writeFileSync(path.join(malformedDir, "receipt.json"), "not-json\n", { mode: 0o400 });
+    ensureProtectedDirectory(malformedDir, { exclusive: true });
+    privateFixtureFile(path.join(malformedDir, "receipt.json"), "not-json\n");
     assert.throws(() => readEvidenceReceipt({ root: evidenceRoot, runId: malformedId }), /malformed/iu);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -66,11 +71,16 @@ test("incomplete and malformed crash artifacts fail closed without invalidating 
     assert.throws(() => readEvidenceReceipt({ root, runId: interrupted.runId, taskDigest: digest }));
 
     const malformed = createEvidenceRun({ root, runId: randomUUID() });
-    fs.writeFileSync(malformed.stateFile, "{\"status\":", { mode: 0o600 });
+    privateFixtureFile(malformed.stateFile, "{\"status\":");
     const malformedRecovery = recoverInterruptedWorkflowRuns({ root });
     assert.equal(malformedRecovery.inconsistent.some((entry) => entry.runId === malformed.runId), true);
-    assert.equal(readWorkflowJournal(malformed).status, "INCONSISTENT");
-    assert.equal(fs.readdirSync(malformed.directory).some((name) => name.startsWith("state.corrupt-")), true);
+    if (process.platform === "win32") {
+      assert.throws(() => readWorkflowJournal(malformed), /malformed/u);
+      assert.equal(fs.readdirSync(malformed.directory).some((name) => name.startsWith("state.corrupt-")), false);
+    } else {
+      assert.equal(readWorkflowJournal(malformed).status, "INCONSISTENT");
+      assert.equal(fs.readdirSync(malformed.directory).some((name) => name.startsWith("state.corrupt-")), true);
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -87,5 +97,21 @@ test("workflow journal checkpoint sequence is controller-owned and monotonic", (
     assert.equal(journal.checkpoint_seq, 1);
     journal = checkpointWorkflowJournal(run, journal, { checkpoint_seq: 0, current_phase: "PLANNER" });
     assert.equal(readWorkflowJournal(run).checkpoint_seq, 2);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("an unsupported durable process identity cannot trigger workflow recovery mutation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-journal-identity-"));
+  try {
+    const run = createEvidenceRun({ root: path.join(root, "evidence") });
+    const journal = initialWorkflowJournal(run, { taskDigest: taskDigest("identity"), workflowVersion: 4, sourceRepository: root, ownerRunId: "owner" });
+    writeWorkflowJournal(run, journal);
+    const tampered = { ...journal, process: { ...journal.process, kind: "unknown" } };
+    const content = `${JSON.stringify(tampered)}\n`;
+    fs.writeFileSync(run.stateFile, content);
+    const result = recoverInterruptedWorkflowRuns({ root: run.root });
+    assert.equal(result.recovered.length, 0);
+    assert.equal(result.unknown.length + result.inconsistent.length, 1);
+    assert.equal(fs.readFileSync(run.stateFile, "utf8"), content);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

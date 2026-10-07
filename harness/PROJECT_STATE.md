@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current D6 candidate — process identity and protected workflow evidence
+
+Φ Main authorized the two security/format decisions previously blocking ordinary Windows CREATE. The local candidate uses native process creation generation losslessly, separates Windows durable records from old readers, and shares recovery's protected ACL policy across authoritative evidence and runtime metadata. Focused local tests and full `npm run check` pass; zero-egress source review passes. Native Windows proof has not run, so ordinary CREATE remains unverified. Only one focused Run 1 may now be launched after the scoped checkpoint; a second is conditional on a demonstrated implementation-local fix. Full certification and the closed stability qualification remain blocked. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## Current authority STOP — Windows ordinary CREATE pre-publication portability
 
 The new `D6-WINDOWS-PREPUBLICATION-PORTABILITY-001` decision reached its explicit security/format boundary before implementation. Deterministic local replay reproduced `ENOENT` at Linux `/proc` boot-ID capture after evidence-run/receipt-store setup; the exact CI syscall was not individually logged. The process identity is security-required for workflow/runtime recovery and cannot be replaced with a fake value or silently mapped to existing native Windows creation-time generation inside the old durable `{pid,bootId,startTicks}` record. Separately, Windows receipt writer/reader owner-only semantics remain incompatible; the existing native recovery ACL does not yet define the workflow-evidence trust contract. No code or native CREATE run under this decision. Prior physical mutation NO/V6 authority NO, ordinary CREATE BLOCKING, D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED. Main must decide the identity format/compatibility and ACL policy.

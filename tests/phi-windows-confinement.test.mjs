@@ -101,7 +101,9 @@ test('scope recovery uses bounded durable receipts, generation checks and opened
   assert.match(recovery, /size > 4096/u);
   assert.match(recovery, /deadline.ElapsedMilliseconds >= 10000/u);
   assert.match(recovery, /PHI_RECOVERY_STARTUP/u);
-  assert.match(recovery, /rule\.FileSystemRights & ~FileSystemRights\.Synchronize\) == FileSystemRights\.ReadPermissions/u);
+  assert.match(recovery, /FileSystemRights rights = rule\.FileSystemRights & ~FileSystemRights\.Synchronize/u);
+  assert.match(recovery, /sid == OwnerRights\.Value && rights == FileSystemRights\.ReadPermissions/u);
+  assert.match(recovery, /raw\.DiscretionaryAcl == null/u);
   assert.doesNotMatch(recovery, /TerminateProcess|\.Kill\(|Directory\.Delete/u);
   assert.match(filesystem, /GetFileInformationByHandleEx\(handle, 18/u);
   assert.match(filesystem, /HandleIdentity\(handle\) != expected/u);

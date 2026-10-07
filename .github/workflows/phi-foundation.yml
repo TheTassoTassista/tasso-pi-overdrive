@@ -51,6 +51,8 @@ jobs:
       - name: Build trusted native Windows process owner
         shell: powershell
         run: ./scripts/build-windows-process.ps1
+      - name: Focused process identity and protected workflow evidence regression
+        run: node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/receipt-protocol.test.mjs tests/runtime-isolation.test.mjs
       - name: Install pinned LSP runtime
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
       - name: Install isolated pinned Pi and subagents (no auth or lifecycle scripts)

@@ -5,6 +5,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { cleanupRuntimeResources, createRuntimeWorktree, findRuntimeAllocation, recoverStaleRuntimeAllocations, releaseRuntimeResources, resumeRuntimeResources } from "../lib/runtime-isolation.mjs";
+import { assertProtectedArtifact } from "../lib/protected-artifact.mjs";
 
 function fixture(root) {
   const repo = path.join(root, "repo");
@@ -32,10 +33,24 @@ test("worktree runtime allocations have independent branches, ports, state, prof
     assert.notEqual(first.browserProfile, second.browserProfile);
     assert.notEqual(first.database, second.database);
     assert.equal(findRuntimeAllocation(path.join(first.worktree), options)?.allocationId, first.allocationId);
-    assert.equal(statSync(path.join(options.stateRoot, "allocations", first.allocationId, "allocation.json")).mode & 0o077, 0);
+    if (process.platform === "win32") {
+      assert.equal(JSON.parse(readFileSync(path.join(options.stateRoot, "allocations", first.allocationId, "allocation.json"), "utf8")).version, 3);
+      assert.match(first.portReservation, /\.win-v1\.lock$/u);
+    }
+    const secondAllocationFile = path.join(options.stateRoot, "allocations", second.allocationId, "allocation.json");
+    const secondOriginal = readFileSync(secondAllocationFile, "utf8");
+    const unsupported = JSON.parse(secondOriginal);
+    unsupported.process.kind = "unknown";
+    writeFileSync(secondAllocationFile, `${JSON.stringify(unsupported)}\n`);
+    const unknownRecovery = recoverStaleRuntimeAllocations(options);
+    assert.equal(unknownRecovery.unknown.some((entry) => entry.allocationId === second.allocationId), true);
+    assert.equal(existsSync(second.portReservation), true);
+    writeFileSync(secondAllocationFile, secondOriginal);
+    assertProtectedArtifact(path.join(options.stateRoot, "allocations", first.allocationId, "allocation.json"), "file", "runtime allocation is not protected");
     const firstAllocationFile = path.join(options.stateRoot, "allocations", first.allocationId, "allocation.json");
     const stale = JSON.parse(readFileSync(firstAllocationFile, "utf8"));
-    stale.process.bootId = "00000000-0000-0000-0000-000000000000";
+    if (process.platform === "win32") stale.process.creationTime = "0000000000000000";
+    else stale.process.bootId = "00000000-0000-0000-0000-000000000000";
     writeFileSync(firstAllocationFile, `${JSON.stringify(stale, null, 2)}\n`, { mode: 0o600 });
     const recovery = recoverStaleRuntimeAllocations(options);
     assert.deepEqual(recovery.recovered.map((entry) => entry.allocationId), [first.allocationId]);
@@ -99,7 +114,7 @@ test("tampered allocation paths and symlinked records fail closed before cleanup
     writeFileSync(hostile, original, { mode: 0o600 });
     renameSync(allocationFile, backup);
     symlinkSync(hostile, allocationFile);
-    assert.throws(() => releaseRuntimeResources(allocation.allocationId, options), /ELOOP|symbolic link/iu);
+    assert.throws(() => releaseRuntimeResources(allocation.allocationId, options), /ELOOP|symbolic link|runtime allocation file rejected/iu);
     rmSync(allocationFile);
     renameSync(backup, allocationFile);
     const cleaned = cleanupRuntimeResources(allocation.allocationId, options);

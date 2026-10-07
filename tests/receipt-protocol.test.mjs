@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { createEvidenceRun, taskDigest } from "../lib/workflow-evidence.mjs";
 import { admitRoleReceipt, listRoleReceipts, makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
 import { runEnforcedWorkflow } from "../lib/workflow-state.mjs";
+import { createProtectedFile } from "../lib/protected-artifact.mjs";
 
 const protocolNonce = taskDigest("receipt-protocol-nonce");
 const taskId = taskDigest("receipt-protocol-task");
@@ -121,8 +122,9 @@ test("missing, malformed, truncated, and non-completed receipts fail closed", ()
     const failedReference = writeRoleReceipt(store, failed);
     assert.throws(() => admitRoleReceipt(store, failedReference, { ...expected(failed), status: "failed" }, new Set()), /not completed/u);
     const malformedName = `000009-${randomUUID()}.json`;
+    if (process.platform === "win32") createProtectedFile(path.join(store.directory, malformedName));
     fs.writeFileSync(path.join(store.directory, malformedName), '{"version":1');
-    fs.chmodSync(path.join(store.directory, malformedName), 0o400);
+    if (process.platform !== "win32") fs.chmodSync(path.join(store.directory, malformedName), 0o400);
     assert.throws(() => admitRoleReceipt(store, { file: path.join(store.directory, malformedName) }, {}, new Set()), /malformed/u);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

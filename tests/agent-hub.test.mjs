@@ -15,6 +15,7 @@ import {
   workflowJournalMetadata,
 } from "../lib/agent-hub.mjs";
 import { makeRoleReceipt, openRoleReceiptStore, writeRoleReceipt } from "../lib/workflow-receipts.mjs";
+import { ensureProtectedDirectory } from "../lib/protected-artifact.mjs";
 
 const policy = { version: 1, enabled: true, maxRoleAttempts: 42, maxRenderedRoleAttempts: 42 };
 const taskDigest = "a".repeat(64);
@@ -69,7 +70,9 @@ function reservation(workflow, overrides = {}) {
 
 function durableReceipt(workflow, reserved, responseOverrides = {}) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-agent-hub-test-"));
-  const run = { runId: workflow.runId, directory: temporary };
+  const directory = process.platform === "win32" ? path.join(temporary, "protected") : temporary;
+  if (process.platform === "win32") ensureProtectedDirectory(directory);
+  const run = { runId: workflow.runId, directory };
   const store = openRoleReceiptStore(run);
   const receipt = makeRoleReceipt({
     runId: workflow.runId,

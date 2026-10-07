@@ -153,9 +153,10 @@ try {
     const runDirectory = runIds.length === 1 ? path.join(evidenceRoot, runIds[0]) : null;
     const category = value => typeof value === 'string' && /^[A-Z_]{3,40}$/u.test(value) ? value : null;
     let journal = null;
-    if (runDirectory && fs.existsSync(path.join(runDirectory, 'state.json'))) {
+    const stateFile = runDirectory ? path.join(runDirectory, process.platform === 'win32' ? 'state.win-v1.json' : 'state.json') : null;
+    if (stateFile && fs.existsSync(stateFile)) {
       try {
-        const state = JSON.parse(fs.readFileSync(path.join(runDirectory, 'state.json'), 'utf8'));
+        const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
         journal = { status: category(state.status), phase: category(state.current_phase), workflowStatus: category(state.workflow_status),
           workerStatus: category(state.worker_status), evidenceStatus: category(state.evidence_status), cleanupStatus: category(state.cleanup_status) };
       } catch { journal = { status: 'UNREADABLE' }; }
