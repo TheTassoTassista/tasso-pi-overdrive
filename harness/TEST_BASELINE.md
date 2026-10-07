@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## D6-WINDOWS-PRECREATE-INTEGRATION-001 — A1 native evidence and A2 boundary
+
+[CI37637450595](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37637450595), functional `d980b76`, Windows focused block: **27 total / 24 PASS / 2 FAIL / 1 skip**, job 12m10s. Both 100-run Scout→Planner fixtures PASS; explicitly permissive root rejected; process identity and protected ACL tests PASS. The only failures are runtime resume and wrong-branch negative test because Git-reported and Node allocation roots remain textually unequal even after `realpathSync`. Native metadata shows Git `/`, Node `\`; physical dev/ino equality and exact residual spelling subtype were not logged. LSP/Pi/CREATE skipped. A2 is allowed only for the implementation-local physical-identity correction and must run the same 27-test block. If red, no CREATE. Native Job/pipe/global residual-process census was not part of A1 and is UNKNOWN, not PASS.
+
 ## Final focused Windows Run 2 — terminal pre-CREATE FAIL
 
 [CI37634476513](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37634476513), exact functional source `a0c64e43a3e386bdf35a5d6ffa2999a9dc9ac84a`, Windows job `112836946391`: bootstrap/native build PASS; focused **25 total / 21 PASS / 3 FAIL / 1 skip**. Failed case16 and case17 at `tests/receipt-protocol.test.mjs:174,190` with protected-root rejection; case19 at `tests/runtime-isolation.test.mjs:59` with `resumed worktree is not registered by Git`. Native process identity, ACL selftest, protected evidence/tamper and runtime overlap cases PASS. LSP install, isolated Pi, three predecessor smokes and genuine ordinary CREATE SKIPPED. CI post-actions complete; Phi-owned residual census not attested. No further native run under current authority; no ordinary CREATE PASS claim. Local focused 91/30 PASS/0 FAIL/61 Windows skips and full `npm run check` PASS on this functional candidate, but native failures take precedence.

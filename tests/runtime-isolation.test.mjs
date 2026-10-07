@@ -61,9 +61,14 @@ test("worktree runtime allocations have independent branches, ports, state, prof
     assert.ok(firstRecord, "Git must report the managed branch");
     const reportedPath = firstRecord.split("\0")[0].slice("worktree ".length);
     const rawEqual = reportedPath === first.worktree;
-    const canonicalEqual = realpathSync(reportedPath) === realpathSync(first.worktree);
-    if (process.platform === "win32") console.log(`# worktree-representation ${JSON.stringify({ rawEqual, canonicalEqual, gitForwardSeparators: reportedPath.includes("/"), gitBackSeparators: reportedPath.includes("\\"), nodeForwardSeparators: first.worktree.includes("/"), nodeBackSeparators: first.worktree.includes("\\") })}`);
-    assert.equal(canonicalEqual, true, "Git-reported and allocated roots must identify the same filesystem directory");
+    const reportedCanonical = realpathSync(reportedPath);
+    const allocatedCanonical = realpathSync(first.worktree);
+    const canonicalEqual = reportedCanonical === allocatedCanonical;
+    const reportedIdentity = statSync(reportedCanonical, { bigint: true });
+    const allocatedIdentity = statSync(allocatedCanonical, { bigint: true });
+    const physicalEqual = reportedIdentity.ino !== 0n && reportedIdentity.dev === allocatedIdentity.dev && reportedIdentity.ino === allocatedIdentity.ino;
+    if (process.platform === "win32") console.log(`# worktree-representation ${JSON.stringify({ rawEqual, canonicalEqual, physicalEqual, normalizedEqual: path.normalize(reportedCanonical) === path.normalize(allocatedCanonical), caseFoldedEqual: path.normalize(reportedCanonical).toLowerCase() === path.normalize(allocatedCanonical).toLowerCase(), gitForwardSeparators: reportedPath.includes("/"), gitBackSeparators: reportedPath.includes("\\"), nodeForwardSeparators: first.worktree.includes("/"), nodeBackSeparators: first.worktree.includes("\\"), gitExtendedRoot: reportedCanonical.startsWith("\\\\?\\"), nodeExtendedRoot: allocatedCanonical.startsWith("\\\\?\\") })}`);
+    assert.equal(physicalEqual, true, "Git-reported and allocated roots must identify the same physical directory");
     assert.doesNotThrow(() => assertUniqueManagedWorktreeRecord(`${firstRecord}\0\0`, first.worktree, first.branch));
     if (process.platform !== "win32") {
       const alias = path.join(root, "git-spelling-alias");
