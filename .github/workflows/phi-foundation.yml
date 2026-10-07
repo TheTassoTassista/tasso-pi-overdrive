@@ -29,11 +29,15 @@ on:
         type: choice
         options: [none, isolated, predecessor-context]
         default: none
+      precreate-regression-only:
+        description: Run the ordinary CREATE preflight regression block only; no Pi or CREATE
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   ordinary-create-finalization-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context')
+    if: github.event_name == 'workflow_dispatch' && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context' || inputs['precreate-regression-only'])
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -54,8 +58,10 @@ jobs:
       - name: Focused process identity and protected workflow evidence regression
         run: node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/receipt-protocol.test.mjs tests/runtime-isolation.test.mjs
       - name: Install pinned LSP runtime
+        if: ${{ !inputs['precreate-regression-only'] }}
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
       - name: Install isolated pinned Pi and subagents (no auth or lifecycle scripts)
+        if: ${{ !inputs['precreate-regression-only'] }}
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
@@ -75,6 +81,7 @@ jobs:
           node scripts/phi-worker-pi-smoke.mjs --lsp
           exit $LASTEXITCODE
       - name: Focused genuine ordinary CREATE with pre-cleanup metadata snapshot
+        if: ${{ !inputs['precreate-regression-only'] }}
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
@@ -212,7 +219,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context')
+    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'])
     strategy:
       fail-fast: false
       matrix:

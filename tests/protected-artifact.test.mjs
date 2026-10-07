@@ -47,6 +47,15 @@ test("native protected ACL policy creates, validates and rejects permissive/null
   assert.deepEqual(JSON.parse(result.stdout), { status: "PASS", trustedAcl: true, permissiveRejected: true, nullRejected: true, missingRejected: true });
 });
 
+test("Windows evidence creation rejects an existing unprotected fixture root", { skip: process.platform !== "win32" }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "phi-unprotected-evidence-"));
+  try {
+    const weakened = spawnSync("icacls", [root, "/grant", "*S-1-1-0:(R)"], { windowsHide: true, encoding: "utf8" });
+    assert.equal(weakened.status, 0);
+    assert.throws(() => createEvidenceRun({ root }), /protected artifact security could not be verified/u);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test("Windows workflow writer and reader agree on protected ACL and reject a permissive receipt", { skip: process.platform !== "win32" }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "phi-protected-flow-"));
   try {

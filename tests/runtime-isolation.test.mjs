@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { cleanupRuntimeResources, createRuntimeWorktree, findRuntimeAllocation, recoverStaleRuntimeAllocations, releaseRuntimeResources, resumeRuntimeResources } from "../lib/runtime-isolation.mjs";
+import { assertUniqueManagedWorktreeRecord, cleanupRuntimeResources, createRuntimeWorktree, findRuntimeAllocation, recoverStaleRuntimeAllocations, releaseRuntimeResources, resumeRuntimeResources } from "../lib/runtime-isolation.mjs";
 import { assertProtectedArtifact } from "../lib/protected-artifact.mjs";
 
 function fixture(root) {
@@ -56,6 +56,26 @@ test("worktree runtime allocations have independent branches, ports, state, prof
     assert.deepEqual(recovery.recovered.map((entry) => entry.allocationId), [first.allocationId]);
     assert.equal(existsSync(first.portReservation), false);
     assert.equal(existsSync(first.worktree), true);
+    const gitRecords = execFileSync("git", ["-C", repo, "worktree", "list", "--porcelain", "-z"], { encoding: "utf8" }).split("\0\0");
+    const firstRecord = gitRecords.find((record) => record.split("\0").includes(`branch refs/heads/${first.branch}`));
+    assert.ok(firstRecord, "Git must report the managed branch");
+    const reportedPath = firstRecord.split("\0")[0].slice("worktree ".length);
+    const rawEqual = reportedPath === first.worktree;
+    const canonicalEqual = realpathSync(reportedPath) === realpathSync(first.worktree);
+    if (process.platform === "win32") console.log(`# worktree-representation ${JSON.stringify({ rawEqual, canonicalEqual, gitForwardSeparators: reportedPath.includes("/"), gitBackSeparators: reportedPath.includes("\\"), nodeForwardSeparators: first.worktree.includes("/"), nodeBackSeparators: first.worktree.includes("\\") })}`);
+    assert.equal(canonicalEqual, true, "Git-reported and allocated roots must identify the same filesystem directory");
+    assert.doesNotThrow(() => assertUniqueManagedWorktreeRecord(`${firstRecord}\0\0`, first.worktree, first.branch));
+    if (process.platform !== "win32") {
+      const alias = path.join(root, "git-spelling-alias");
+      symlinkSync(first.worktree, alias, "dir");
+      const aliasedRecord = firstRecord.replace(`worktree ${reportedPath}`, `worktree ${alias}`);
+      assert.notEqual(alias, first.worktree);
+      assert.doesNotThrow(() => assertUniqueManagedWorktreeRecord(`${aliasedRecord}\0\0`, first.worktree, first.branch));
+    }
+    assert.throws(() => assertUniqueManagedWorktreeRecord(`${firstRecord}\0\0${firstRecord}\0\0`, first.worktree, first.branch), /not uniquely registered/u);
+    assert.throws(() => assertUniqueManagedWorktreeRecord(`${firstRecord}\0\0`, second.worktree, first.branch), /not uniquely registered/u);
+    assert.throws(() => assertUniqueManagedWorktreeRecord(`worktree relative-root\0branch refs/heads/${first.branch}\0\0`, first.worktree, first.branch), /registration is malformed/u);
+    assert.throws(() => assertUniqueManagedWorktreeRecord(`worktree ${path.join(root, "missing-worktree")}\0branch refs/heads/${first.branch}\0\0${firstRecord}\0\0`, first.worktree, first.branch), /identity is unknown/u);
     const resumed = await resumeRuntimeResources(first.allocationId, options);
     assert.notEqual(resumed.port, first.port);
     assert.notEqual(resumed.browserProfile, first.browserProfile);
@@ -72,6 +92,23 @@ test("worktree runtime allocations have independent branches, ports, state, prof
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("runtime resume refuses a managed path checked out on the wrong branch", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "pi-runtime-wrong-branch-"));
+  const options = { shareRoot: path.join(root, "worktrees"), stateRoot: path.join(root, "runtime") };
+  try {
+    const repo = fixture(root);
+    const allocation = await createRuntimeWorktree(repo, options);
+    const allocationFile = path.join(options.stateRoot, "allocations", allocation.allocationId, "allocation.json");
+    const interrupted = { ...JSON.parse(readFileSync(allocationFile, "utf8")), status: "interrupted" };
+    writeFileSync(allocationFile, `${JSON.stringify(interrupted, null, 2)}\n`, { mode: 0o600 });
+    execFileSync("git", ["-C", allocation.worktree, "checkout", "-qb", "fixture-wrong-branch"]);
+    await assert.rejects(resumeRuntimeResources(allocation.allocationId, options), /branch identity rejected/u);
+    assert.equal(existsSync(allocation.portReservation), true, "rejected resume must not alter the existing reservation");
+    execFileSync("git", ["-C", allocation.worktree, "checkout", "-q", allocation.branch]);
+    cleanupRuntimeResources(allocation.allocationId, options);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("runtime roots reject symlink and repository overlap before allocation", async () => {

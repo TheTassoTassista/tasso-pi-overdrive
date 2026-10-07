@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-07 — D6-WINDOWS-PRECREATE-INTEGRATION-001 (user-supplied Φ Main decision)
+
+Decision: **IMPLEMENT_SMALLER / MERGE** within Campaign 1 only. Classify each failing Scout→Planner fixture as a legitimate protected root or an intentional unsafe-root negative; reuse the production protected-artifact primitive without adding ACL principals or weakening validation. Attribute the Windows `resumeRuntimeResources()` Git-worktree representation mismatch before accepting a fix. Prove the intended logical Git registration with existing canonical filesystem/Git identity checks, and fail closed on wrong, unknown or ambiguous identity; a new physical-identity/security abstraction requires STOP for Main. Focused deterministic checks and structured ZERO_EGRESS_REVIEW precede at most two focused native pre-CREATE runs, followed by exactly one ordinary CREATE only if the entire pre-CREATE block is green. No full Campaign certification, provider/model call, retry of unchanged failures or restart of the closed D6 stability qualification. D6 remains PARTIAL and Windows autonomy BLOCKED until separately established.
+
 ## 2026-10-07 — D6-WINDOWS-PROCESS-IDENTITY-001 (user-supplied Φ Main decision)
 
 Decision: **IMPLEMENT_SMALLER / MERGE**. Preserve Linux `{pid,bootId,startTicks}` generation semantics, including untagged legacy records. On Windows reuse `ScopeRecovery.ProcessCreation()`/`GetProcessTimes` as a lossless, exact process-generation string paired with PID. New identities require an explicit platform kind/version. Missing, malformed or unqueryable generation is UNKNOWN and cannot mean owner dead or grant recovery/publication. Version the enclosing durable evidence where an older reader might misinterpret a new Windows identity; do not change V6 publication-journal semantics. Native liveness/compatibility proof remains a separate gate.

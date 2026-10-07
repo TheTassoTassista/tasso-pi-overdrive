@@ -171,7 +171,7 @@ test("Scout to Planner durable admission is identical across 100 fresh runs", ()
   try {
     const signatures = [];
     for (let index = 0; index < 100; index += 1) {
-      const run = createEvidenceRun({ root });
+      const run = createEvidenceRun({ root: path.join(root, "evidence") });
       const store = openRoleReceiptStore(run);
       const scout = receipt(run);
       const reference = writeRoleReceipt(store, scout);
@@ -187,7 +187,7 @@ test("actual controller admits Planner after a durable Scout receipt in 100 of 1
   try {
     const signatures = [];
     for (let runIndex = 0; runIndex < 100; runIndex += 1) {
-      const run = createEvidenceRun({ root });
+      const run = createEvidenceRun({ root: path.join(root, "evidence") });
       const store = openRoleReceiptStore(run);
       const ownerRunId = `controller-${runIndex}`;
       const admitted = new Set();
