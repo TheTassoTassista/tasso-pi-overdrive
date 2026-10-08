@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## STOP — D6-WINDOWS-PRECREATE-INTEGRATION-001 A2 red
+
+Both new focused pre-CREATE runs are consumed: A1 `37637450595` FAIL 27/24 PASS/2 FAIL/1 skip, A2 `37639777800` FAIL 27/25 PASS/1 FAIL/1 skip. Valid Scout→Planner protected roots, unsafe-root rejection, native process identity and protected ACL pass. A2 proves the Git-worktree paths are physically identical despite unequal raw/canonical text, and runtime resume plus wrong-branch refusal pass. The remaining A2 failure is a two-process role-receipt writer with child exits `[0,1]`; child error was not published, exact cause UNKNOWN. No LSP/Pi/ordinary CREATE, Worker, V6, grant or project publication was reached. No A3 or ordinary CREATE under this decision. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; stability qualification BLOCKED/CLOSED and clone runtime gate NOT YET NATIVE VERIFIED. Global Phi-owned Job/pipe/process census UNKNOWN; no provider call.
+
 ## STOP — focused Windows Run 2 red before ordinary CREATE
 
 Both authorized focused Windows ordinary-CREATE runs are consumed. The final [CI37634476513](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37634476513) on `a0c64e4` passed native process identity, strict ACL and protected workflow receipt primitives but failed the new regression step 25/21 PASS/3 FAIL/1 skip. Two remaining receipt fixtures use an unprotected existing root; runtime resume rejected a Git worktree registration via exact path text comparison (precise Windows mismatch unknown). LSP/Pi/ordinary CREATE never ran; no publication or project mutation credit. No third run or fix is authorized under this packet. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; stability qualification BLOCKED/CLOSED, clone runtime gate NOT YET NATIVE VERIFIED.

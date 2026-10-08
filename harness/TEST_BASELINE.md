@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Final pre-CREATE A2 — terminal FAIL, no CREATE credit
+
+[CI37639777800](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37639777800), functional `a75c8ba`, focused Windows block **27 total / 25 PASS / 1 FAIL / 1 skip** in 8m35s. The valid protected roots, unsafe-root negative, runtime resume and wrong-branch checks PASS. Native worktree observation: raw/canonical path strings unequal, physical `dev`+`ino` equal; normalized and case-folded forms still unequal. The one FAIL is receipt-protocol test15: concurrent child writer exits `[0,1]` rather than `[0,0]`; child stderr is not published by that assertion, so exact cause UNKNOWN. The same test passed in A1, which does not negate A2's red outcome. LSP/Pi/CREATE skipped; Phi-owned global residual/Job/pipe status UNKNOWN. Both A1/A2 are consumed. Pre-CREATE FAIL, ordinary CREATE NOT REACHED, no full Campaign certification or autonomy promotion.
+
 ## D6-WINDOWS-PRECREATE-INTEGRATION-001 — A1 native evidence and A2 boundary
 
 [CI37637450595](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37637450595), functional `d980b76`, Windows focused block: **27 total / 24 PASS / 2 FAIL / 1 skip**, job 12m10s. Both 100-run Scout→Planner fixtures PASS; explicitly permissive root rejected; process identity and protected ACL tests PASS. The only failures are runtime resume and wrong-branch negative test because Git-reported and Node allocation roots remain textually unequal even after `realpathSync`. Native metadata shows Git `/`, Node `\`; physical dev/ino equality and exact residual spelling subtype were not logged. LSP/Pi/CREATE skipped. A2 is allowed only for the implementation-local physical-identity correction and must run the same 27-test block. If red, no CREATE. Native Job/pipe/global residual-process census was not part of A1 and is UNKNOWN, not PASS.
