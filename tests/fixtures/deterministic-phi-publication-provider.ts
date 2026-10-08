@@ -69,6 +69,16 @@ function stream(model: Model<any>, context: Context, options?: SimpleStreamOptio
 }
 
 export default function register(pi: ExtensionAPI): void {
+  pi.events.on("pi-overdrive:execution-metadata", (value) => {
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if (record.backend !== "windows-lpac-broker" || !["EDIT", "LSP_READ_ONLY", "TEST"].includes(String(record.profile))) return;
+    audit({ kind: "owned_execution", profile: record.profile,
+      jobAttested: record.jobAttested === true,
+      jobEmptyVerified: record.jobEmptyVerified === true,
+      cleanup: record.cleanup === "PASS" ? "PASS" : "NOT_PASS",
+      exitCode: typeof record.exitCode === "number" && Number.isSafeInteger(record.exitCode) ? record.exitCode : null });
+  });
   pi.events.on("pi-overdrive:create-stage-metadata", (value) => {
     if (!value || typeof value !== "object") return;
     const record = value as Record<string, unknown>;

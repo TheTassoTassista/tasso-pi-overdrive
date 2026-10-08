@@ -9,6 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
 import { readEvidenceReceipt } from '../lib/workflow-evidence.mjs';
+import { captureProcessIdentity, inspectProcessIdentity } from '../lib/process-identity.mjs';
+import { createOwnedProcessGraphEvidence } from '../lib/phi-certification-evidence.mjs';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
@@ -29,6 +31,11 @@ let report = { status: 'FAIL', platform: process.platform, normalTool: false, ex
 let child;
 let childClosed;
 let childExitStatus = null;
+let childIdentity = null;
+let stdoutDrained = false;
+let stderrDrained = false;
+let receiptReadback = null;
+let ownedGraph = null;
 try {
   fs.mkdirSync(project);
   fs.mkdirSync(path.join(agentDir, 'agents'), { recursive: true, mode: 0o700 });
@@ -84,7 +91,10 @@ try {
       try { events.push(JSON.parse(line)); } catch { events.push({ type: 'invalid_json' }); }
     }
   });
+  child.stdout.once('end', () => { stdoutDrained = true; });
   child.stderr.on('data', chunk => { stderr = `${stderr}${chunk.toString('utf8')}`.slice(-4000); });
+  child.stderr.once('end', () => { stderrDrained = true; });
+  childIdentity = captureProcessIdentity(child.pid);
   child.stdin.write(`${JSON.stringify({ id: 'bounded', type: 'prompt', message: task })}\n`);
   const started = Date.now();
   while (!events.some(event => event.type === 'agent_settled') && child.exitCode === null && Date.now() - started < 10 * 60 * 1000)
@@ -107,6 +117,7 @@ try {
   const auditRows = fs.existsSync(auditFile) ? fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
   const turns = auditRows.filter(row => row.kind === 'local_model_turn');
   const stages = auditRows.filter(row => row.kind === 'create_stage');
+  const ownedExecutions = auditRows.filter(row => row.kind === 'owned_execution');
   const userShape = auditRows.find(row => row.kind === 'controller_user_shape');
   const publications = details?.evidence?.publications ?? [];
   const expectedPublished = process.platform === 'win32';
@@ -122,6 +133,35 @@ try {
   assert.equal(tool.isError, false, 'normal workflow tool failed');
   assert.equal(details.status, 'PASS');
   assert.equal(cleanup?.status, 'PASS');
+  assert.equal(childExitStatus, 0, 'Pi RPC child did not exit successfully');
+  assert.equal(stdoutDrained && stderrDrained, true, 'Pi RPC pipes did not drain');
+  assert.equal(inspectProcessIdentity(childIdentity).alive, false, 'Pi RPC child remains alive');
+  if (process.platform === 'win32') {
+    ownedGraph = createOwnedProcessGraphEvidence({ childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
+      stdoutDrained, stderrDrained, executions: ownedExecutions });
+    assert.equal(ownedGraph.status, 'PASS', 'Phi-owned process graph cleanup is unverified');
+  }
+  const finalEvidence = readEvidenceReceipt({ root: evidenceRoot, runId: details.runId, taskDigest: details.taskDigest });
+  assert.equal(finalEvidence.receipt.status, 'PASS');
+  assert.equal(finalEvidence.receipt.runId, details.runId);
+  assert.equal(finalEvidence.receipt.taskDigest, details.taskDigest);
+  assert.equal(finalEvidence.execution.runId, details.runId);
+  assert.equal(finalEvidence.execution.taskDigest, details.taskDigest);
+  assert.equal(finalEvidence.execution.status, 'PASS');
+  assert.equal(finalEvidence.receipt.executionStatus, 'PASS');
+  assert.equal(finalEvidence.receipt.cleanupStatus, 'PASS');
+  assert.equal(finalEvidence.receipt.evidenceStatus, 'PASS');
+  assert.equal(finalEvidence.receipt.finalVerdict?.run_id, details.runId);
+  assert.equal(finalEvidence.receipt.finalVerdict?.task_id, details.taskDigest);
+  assert.equal(finalEvidence.receipt.finalVerdict?.status, 'PASS');
+  assert.equal(finalEvidence.receipt.finalVerdict?.cleanup_status, 'PASS');
+  assert.deepEqual(finalEvidence.receipt.evidence?.publications, finalEvidence.execution.evidence?.publications);
+  assert.deepEqual(finalEvidence.receipt.evidence?.publications, publications);
+  if (process.platform === 'win32') {
+    assert.equal(finalEvidence.receipt.evidence.publications.length, 1);
+    assert.match(finalEvidence.receipt.evidence.publications[0].transactionId, /^[0-9a-f]{32}$/u);
+  }
+  receiptReadback = { schema: 'PASS', protectedAcl: 'PASS', terminal: 'PASS', binding: 'PASS' };
   assert.equal(turns.every(turn => turn.provider === 'openai-codex'), true);
   assert.deepEqual({ branchArray: userShape?.branchArray, singleText: userShape?.singleText, exactTaskMatch: userShape?.exactTaskMatch },
     { branchArray: true, singleText: true, exactTaskMatch: true });
@@ -132,12 +172,39 @@ try {
     assert.equal(publications[0].operation, 'CREATE');
     assert.equal(publications[0].journalVersion, 6);
     assert.match(publications[0].intentDigest, /^[0-9a-f]{64}$/u);
+    const names = stages.map(row => row.stage);
+    const required = ['WORKFLOW_ADMITTED', 'EVIDENCE_RUN_CREATED', 'JOURNAL_CREATED', 'RUNTIME_ALLOCATED',
+      'ENVELOPE_ESTABLISHED', 'WORKER_RESERVED', 'WORKER_RESULT', 'WORKER_REVOKED',
+      'CONTROLLER_VALIDATION_START', 'CREATE_INTENT_AND_V6_READY', 'NATIVE_PUBLICATION_CALL_ENTERED',
+      'NATIVE_RESULT_OBSERVED', 'PHYSICAL_POSTVERIFY_COMPLETE', 'PRE_CLEANUP_PHYSICAL_SNAPSHOT',
+      'FINAL_RECEIPT_WRITTEN', 'TERMINAL_STATUS_COMMITTED'];
+    let previous = -1;
+    for (const name of required) {
+      const index = names.indexOf(name, previous + 1);
+      assert.ok(index > previous, `required CREATE stage missing or unordered: ${name}`);
+      previous = index;
+    }
+    const physical = stages.findLast(row => row.stage === 'PRE_CLEANUP_PHYSICAL_SNAPSHOT');
+    const ready = stages.findLast(row => row.stage === 'CREATE_INTENT_AND_V6_READY');
+    const nativeResult = stages.findLast(row => row.stage === 'NATIVE_RESULT_OBSERVED');
+    const postverify = stages.findLast(row => row.stage === 'PHYSICAL_POSTVERIFY_COMPLETE');
+    assert.deepEqual({ targetState: physical.targetState, digestMatch: physical.digestMatch,
+      identityMatch: physical.identityMatch, v6Phase: physical.v6Phase,
+      v6Observed: physical.v6Observed, transactionEstablished: ready.transactionEstablished,
+      grantIssued: ready.grantIssued, published: nativeResult.published,
+      grantConsumed: postverify.grantConsumed },
+    { targetState: 'PRESENT', digestMatch: true, identityMatch: true, v6Phase: 'CLEANED',
+      v6Observed: 'NEW_COMPLETE_OBSERVED', transactionEstablished: true,
+      grantIssued: true, published: true, grantConsumed: true });
   }
   assert.equal(fs.existsSync(path.join(project, 'created.txt')), false, 'original Git project must remain untouched');
   report = { status: 'PASS', platform: process.platform, normalTool: true, workflowStatus: details.status,
     workerCalls: turns.filter(turn => turn.lane === 'worker').length, controllerCalls: turns.filter(turn => turn.lane === 'controller').length,
     publicationCount: publications.length, publicationOperation: publications[0]?.operation ?? null,
     journalVersion: publications[0]?.journalVersion ?? null, cleanup: cleanup?.status, externalRequests: 0 };
+  report.receiptReadback = receiptReadback;
+  report.ownedExecution = process.platform === 'win32' ? { count: ownedExecutions.length, profiles: [...new Set(ownedExecutions.map(row => row.profile))].sort(),
+    ...ownedGraph } : { status: 'NOT_NATIVE_WINDOWS' };
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);
 } finally {
@@ -161,15 +228,23 @@ try {
           workerStatus: category(state.worker_status), evidenceStatus: category(state.evidence_status), cleanupStatus: category(state.cleanup_status) };
       } catch { journal = { status: 'UNREADABLE' }; }
     }
+    const childAlive = childIdentity ? inspectProcessIdentity(childIdentity).alive : null;
     report.preFixtureCleanup = { childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null, childExitStatus,
+      childAlive, piPipesDrained: stdoutDrained && stderrDrained, receiptReadback,
       originalTargetExists: fs.existsSync(path.join(project, 'created.txt')),
       evidenceRunCount: runIds.length, journal, executionExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'execution.json'))),
       receiptExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'receipt.json'))),
       stages: diagnosticRows.filter(row => row.kind === 'create_stage').slice(-64),
       runtimeRootExists: fs.existsSync(path.join(temp, 'runtime')), worktreeRootExists: fs.existsSync(path.join(temp, 'worktrees')),
-      ownedResidualProcesses: null, jobEmptyVerified: null, pipesDrained: null };
-  } catch { report.preFixtureCleanup = { status: 'UNKNOWN', childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null }; }
-  fs.rmSync(temp, { recursive: true, force: true });
+      trackedResidualProcesses: ownedGraph?.ownedResidualProcesses ?? null,
+      ownedResidualProcesses: ownedGraph?.ownedResidualProcesses ?? null,
+      jobEmptyVerified: report.ownedExecution?.jobsEmpty ?? null, pipesDrained: stdoutDrained && stderrDrained };
+    if (childAlive !== false || !stdoutDrained || !stderrDrained ||
+      process.platform === 'win32' && report.preFixtureCleanup.ownedResidualProcesses !== 0)
+      report.status = 'FAIL';
+  } catch { report.status = 'FAIL'; report.preFixtureCleanup = { status: 'UNKNOWN', childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null }; }
+  try { fs.rmSync(temp, { recursive: true, force: true }); }
+  catch { report.status = 'FAIL'; report.fixtureRemoval = 'FAIL'; }
   report.temporaryRemoved = !fs.existsSync(temp);
   if (!report.temporaryRemoved) report.status = 'FAIL';
 }

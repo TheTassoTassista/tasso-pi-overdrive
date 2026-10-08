@@ -3,6 +3,14 @@ on:
   push:
   workflow_dispatch:
     inputs:
+      integrated-certification-only:
+        description: One-shot D6 certification of the exact immutable certified_sha; no diagnostic jobs
+        type: boolean
+        default: false
+      certified_sha:
+        description: Exact 40-character candidate commit for the integrated certification
+        type: string
+        default: ''
       lsp-diagnostic-only:
         description: Compare owned independent-clone LSP installation on runner temp volumes; no full gate
         type: boolean
@@ -40,6 +48,106 @@ on:
 permissions:
   contents: read
 jobs:
+  integrated-ubuntu:
+    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only']
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Pin exact certification source
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          [[ "$CERTIFIED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Linux foundation bootstrap
+        run: sh bootstrap/linux.sh
+      - name: Complete Linux regression with exact corpus accounting
+        run: node scripts/phi-owned-main-suite.mjs
+      - name: Indexed source audit
+        run: node scripts/phi-repository-audit.mjs
+  integrated-windows:
+    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only']
+    needs: integrated-ubuntu
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Pin exact certification source
+        shell: pwsh
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          if ($env:CERTIFIED_SHA -notmatch '^[0-9a-f]{40}$') { exit 1 }
+          if ((git rev-parse HEAD).Trim() -ne $env:CERTIFIED_SHA) { exit 1 }
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Windows foundation bootstrap
+        shell: pwsh
+        run: ./bootstrap/windows.ps1
+      - name: Build trusted native Windows process owner
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
+      - name: Install pinned LSP runtime for native tests
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Complete Windows main suite inside existing owned Job
+        run: node scripts/phi-owned-main-suite.mjs
+      - name: Post-main fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Independent clean-room Git clone and LSP under existing limits
+        env:
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+        run: node scripts/phi-clean-room.mjs
+      - name: Post-clone fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Install isolated pinned Pi and subagents (no auth or lifecycle scripts)
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          npm install --prefix $workerTestPrefix --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 pi-subagents@0.66.0
+          exit $LASTEXITCODE
+      - name: Three deterministic real Pi smokes in required order
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-worker-pi-smoke.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/phi-worker-pi-smoke.mjs --revocation
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/phi-worker-pi-smoke.mjs --lsp
+          exit $LASTEXITCODE
+      - name: Post-smoke fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: One ordinary Pi secure workflow CREATE and protected receipt readback
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs
+          exit $LASTEXITCODE
+      - name: Post-CREATE fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Final fixed-scope ownership baseline even after failure
+        if: always()
+        run: node scripts/phi-owned-scope-baseline.mjs
   ordinary-create-finalization-diagnostic:
     if: github.event_name == 'workflow_dispatch' && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context' || inputs['precreate-regression-only'] || inputs['two-writer-only'])
     runs-on: windows-latest
@@ -227,7 +335,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
     strategy:
       fail-fast: false
       matrix:
