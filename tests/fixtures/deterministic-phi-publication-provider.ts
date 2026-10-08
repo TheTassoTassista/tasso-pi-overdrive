@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import {
   type AssistantMessage, type AssistantMessageEventStream, type Context,
   createAssistantMessageEventStream, type Model, type SimpleStreamOptions,
@@ -74,10 +75,19 @@ export default function register(pi: ExtensionAPI): void {
     const record = value as Record<string, unknown>;
     if (record.backend !== "windows-lpac-broker" || !["EDIT", "LSP_READ_ONLY", "TEST"].includes(String(record.profile))) return;
     audit({ kind: "owned_execution", profile: record.profile,
-      jobAttested: record.jobAttested === true,
-      jobEmptyVerified: record.jobEmptyVerified === true,
+      operation: ["safe-exec", "lsp", "verification"].includes(String(record.operation)) ? record.operation : null,
+      role: ["worker", "tester"].includes(String(record.role)) ? record.role : null,
+      scopeDigest: typeof record.scopeId === "string" && /^[0-9a-f]{32}$/u.test(record.scopeId)
+        ? createHash("sha256").update(record.scopeId).digest("hex") : null,
+      targetStarted: typeof record.targetStarted === "boolean" ? record.targetStarted : null,
+      jobAttested: typeof record.jobAttested === "boolean" ? record.jobAttested : null,
+      jobEmptyVerified: typeof record.jobEmptyVerified === "boolean" ? record.jobEmptyVerified : null,
+      brokerHelperClosed: typeof record.brokerHelperClosed === "boolean" ? record.brokerHelperClosed : null,
+      brokerPipesDrained: typeof record.brokerPipesDrained === "boolean" ? record.brokerPipesDrained : null,
       cleanup: record.cleanup === "PASS" ? "PASS" : "NOT_PASS",
-      exitCode: typeof record.exitCode === "number" && Number.isSafeInteger(record.exitCode) ? record.exitCode : null });
+      exitCode: typeof record.exitCode === "number" && Number.isSafeInteger(record.exitCode) ? record.exitCode : null,
+      securityFailure: record.securityFailure === null ? null : "PRESENT_OR_UNKNOWN",
+      timedOut: typeof record.timedOut === "boolean" ? record.timedOut : null });
   });
   pi.events.on("pi-overdrive:create-stage-metadata", (value) => {
     if (!value || typeof value !== "object") return;

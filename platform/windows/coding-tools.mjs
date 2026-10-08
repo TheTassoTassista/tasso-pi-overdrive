@@ -98,6 +98,7 @@ async function runSnapshot(input, context, intent, snapshot, worker) {
   const failureReason = codingFailureReason(result.receipt);
   const draftSnapshot = worker && result.code === 0 ? validateWindowsSnapshot(result.draftSnapshot) : null;
   return { ...result, draftSnapshot, metadata: Object.freeze({ ...result.receipt, productionPath: context.operation === 'safe-exec' ? 'safe_exec' : 'verification',
+    brokerHelperClosed: result.brokerHelperClosed === true, brokerPipesDrained: result.brokerPipesDrained === true,
     snapshotDigest: snapshot.digest, publicationState: failureReason === null ? 'VERIFIED' : result.receipt.cleanup === 'PASS' ? 'ROLLED_BACK' : 'FAILED', projectPublished: false,
     failureReason, ...(worker ? { workerAuthority: worker.metadata } : {}) }) };
 }

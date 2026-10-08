@@ -30,13 +30,63 @@ test('fixed-scope baseline never converts missing ownership or active scopes to 
   assert.equal(fixedScopeBaselineEvidence({ ...clear, stdout: 'not-json' }).status, 'UNKNOWN');
 });
 
-test('ordinary CREATE ownership graph requires exact jobs, closed Pi child and drained pipes', () => {
-  const executions = ['EDIT', 'LSP_READ_ONLY', 'LSP_READ_ONLY', 'TEST'].map(profile => ({ profile,
-    jobAttested: true, jobEmptyVerified: true, cleanup: 'PASS', exitCode: 0 }));
-  const input = { childExitStatus: 0, childAlive: false, stdoutDrained: true, stderrDrained: true, executions };
-  assert.equal(createOwnedProcessGraphEvidence(input).ownedResidualProcesses, 0);
-  assert.equal(createOwnedProcessGraphEvidence({ ...input, childAlive: null }).ownedResidualProcesses, null);
-  assert.equal(createOwnedProcessGraphEvidence({ ...input, stderrDrained: false }).status, 'UNKNOWN');
-  assert.equal(createOwnedProcessGraphEvidence({ ...input, executions: executions.slice(1) }).status, 'UNKNOWN');
-  assert.equal(createOwnedProcessGraphEvidence({ ...input, executions: executions.map((row, i) => i === 1 ? { ...row, jobEmptyVerified: null } : row) }).status, 'UNKNOWN');
+const createRoles = [
+  { profile: 'EDIT', operation: 'safe-exec', role: 'worker' },
+  { profile: 'LSP_READ_ONLY', operation: 'lsp', role: 'worker' },
+  { profile: 'TEST', operation: 'verification', role: 'tester' },
+].map((value, index) => ({ ...value, scopeDigest: String(index + 1).repeat(64), targetStarted: true,
+  jobAttested: true, jobEmptyVerified: true, brokerHelperClosed: true, brokerPipesDrained: true,
+  cleanup: 'PASS', exitCode: 0, securityFailure: null, timedOut: false }));
+const createStages = [
+  { stage: 'WORKER_STARTED' }, { stage: 'WORKER_RESULT', result: 'COMPLETED' }, { stage: 'WORKER_REVOKED' },
+  { stage: 'NATIVE_RESULT_OBSERVED', published: true }, { stage: 'PHYSICAL_POSTVERIFY_COMPLETE', grantConsumed: true },
+];
+const createInput = { childIdentity: { kind: 'windows-process-creation', version: 1, pid: 123, creationTime: 'a'.repeat(16) },
+  childExitStatus: 0, childAlive: false, stdoutDrained: true, stderrDrained: true,
+  executions: createRoles, stages: createStages, baseline: { status: 'PASS', active: 0, stale: 0, quarantined: 0,
+    owner: { jobAttested: true, jobEmptyVerified: true, pipesDrained: true, residualOwnedProcesses: 0 } } };
+const graph = input => createOwnedProcessGraphEvidence({ ...createInput, ...input });
+
+test('ordinary CREATE graph attests exact three Job roles, in-process Worker and synchronous publisher', () => {
+  const clean = graph({});
+  assert.equal(clean.status, 'PASS');
+  assert.equal(clean.reason, 'GRAPH_COMPLETE');
+  assert.equal(clean.ownedResidualProcesses, 0);
+  assert.equal(clean.jobsEmpty, true);
+  assert.deepEqual(clean.roles.map(role => role.id), ['PI_ROOT', 'WORKER_SESSION', 'SYNCHRONOUS_PUBLISHER',
+    'WORKER_EDIT', 'WORKER_SEMANTIC_NAV', 'TESTER_VERIFICATION']);
+  assert.equal(clean.roles.every(role => role.terminal !== 'UNVERIFIED'), true);
+  assert.equal(graph({ childAlive: true }).reason, 'EXPECTED_NODE_STILL_LIVE');
+  assert.equal(graph({ childIdentity: null }).reason, 'EXPECTED_NODE_IDENTITY_UNKNOWN');
+  assert.equal(graph({ childAlive: 'dead' }).reason, 'EXPECTED_NODE_IDENTITY_UNKNOWN');
+  assert.equal(graph({ executions: createRoles.slice(1) }).reason, 'CHILD_NOT_REGISTERED');
+  assert.equal(graph({ executions: [...createRoles, { ...createRoles[0], scopeDigest: 'f'.repeat(64) }] }).reasons.includes('UNEXPECTED_OWNED_NODE'), true);
+  assert.equal(graph({ executions: createRoles.map((row, i) => i === 1 ? { ...row, scopeDigest: null } : row) }).reason, 'OWNERSHIP_RECORD_MISSING');
+  assert.equal(graph({ executions: createRoles.map((row, i) => i === 1 ? { ...row, scopeDigest: createRoles[0].scopeDigest } : row) }).reason, 'UNEXPECTED_OWNED_NODE');
+  assert.equal(graph({ stages: createStages.slice(1) }).reason, 'OWNERSHIP_RECORD_MISSING');
+  assert.equal(graph({ stages: createStages.slice(0, -1) }).reason, 'OWNERSHIP_RECORD_MISSING');
+  assert.equal(graph({ baseline: { status: 'FAIL' } }).reason, 'BASELINE_MISMATCH');
+  assert.equal(graph({ baseline: { status: 'PASS' } }).reason, 'BASELINE_MISMATCH');
+  const change = (index, key, value) => createRoles.map((row, i) => i === index ? { ...row, [key]: value } : row);
+  assert.equal(graph({ executions: change(0, 'jobAttested', null) }).reason, 'JOB_MEMBERSHIP_UNKNOWN');
+  assert.equal(graph({ executions: change(0, 'jobEmptyVerified', false) }).reason, 'JOB_NOT_EMPTY');
+  assert.equal(graph({ executions: change(0, 'jobEmptyVerified', null) }).reason, 'JOB_MEMBERSHIP_UNKNOWN');
+  assert.equal(graph({ executions: change(1, 'brokerPipesDrained', null) }).reason, 'PIPE_STATE_UNKNOWN');
+  assert.equal(graph({ executions: change(1, 'brokerPipesDrained', false) }).reason, 'PIPE_NOT_DRAINED');
+  assert.equal(graph({ stderrDrained: null }).reason, 'PIPE_STATE_UNKNOWN');
+  assert.equal(graph({ stderrDrained: false }).reason, 'PIPE_NOT_DRAINED');
+  assert.equal(graph({ executions: change(2, 'exitCode', null) }).reason, 'CHILD_EXIT_UNKNOWN');
+  assert.equal(graph({ executions: change(2, 'brokerHelperClosed', null) }).reason, 'CHILD_EXIT_UNKNOWN');
+  assert.equal(graph({ childExitStatus: null }).reason, 'CHILD_EXIT_UNKNOWN');
+  assert.equal(graph({ childExitStatus: 2 }).reason, 'CHILD_EXIT_NONZERO');
+  assert.equal(graph({ executions: change(0, 'cleanup', 'NOT_PASS') }).reason, 'OWNED_CLEANUP_FAILED');
+  assert.equal(graph({ executions: change(0, 'targetStarted', null) }).reason, 'JOB_MEMBERSHIP_UNKNOWN');
+  assert.equal(graph({ executions: null }).reason, 'ATTESTATION_UNAVAILABLE');
+  assert.equal(graph({ childIdentity: { get pid() { throw new Error('fixture'); } } }).reason, 'VERIFIER_INTERNAL_ERROR');
+  for (const input of [{ childAlive: null }, { executions: [] }, { baseline: null }]) {
+    const result = graph(input);
+    assert.notEqual(result.status, 'PASS');
+    assert.notEqual(result.reason, 'UNKNOWN');
+    assert.equal(result.ownedResidualProcesses, null);
+  }
 });

@@ -27,6 +27,7 @@ export async function executeWindowsLsp(cwd, parameters, context) {
     const success = result.code === 0 && !settled.cancelled;
     if(!settled.cancelled)worker.recordLsp(parameters.path,result.lspResult?.diagnostics,success);
     const receipt = Object.freeze({...result.receipt,productionPath:'semantic_nav',workerAuthority:worker.metadata,draftBefore:worker.before,draft:settled.draft,
+      brokerHelperClosed:result.brokerHelperClosed===true,brokerPipesDrained:result.brokerPipesDrained===true,
       jobEmptyVerified:result.jobEmptyVerified??null,projectPublished:false,runtimeDigest:runtime.digest,runtimeFiles:runtime.fileCount,
       initialized:result.lspResult?.initialized??false,shutdown:result.lspResult?.shutdown??false,onWrite:context.onWrite===true});
     const entries = success ? result.lspResult.diagnostics.map(d=>({path:parameters.path,severity:({1:'Error',2:'Warning',3:'Information',4:'Hint'})[d.severity]??'Information',

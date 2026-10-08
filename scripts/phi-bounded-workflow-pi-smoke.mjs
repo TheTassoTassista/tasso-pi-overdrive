@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
 import { readEvidenceReceipt } from '../lib/workflow-evidence.mjs';
 import { captureProcessIdentity, inspectProcessIdentity } from '../lib/process-identity.mjs';
-import { createOwnedProcessGraphEvidence } from '../lib/phi-certification-evidence.mjs';
+import { createOwnedProcessGraphEvidence, fixedScopeBaselineEvidence } from '../lib/phi-certification-evidence.mjs';
+import { runValidationCommand } from '../platform/windows/validation-process.mjs';
+import { ownedWindowsHelper } from '../platform/windows/process.mjs';
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
@@ -36,6 +38,7 @@ let stdoutDrained = false;
 let stderrDrained = false;
 let receiptReadback = null;
 let ownedGraph = null;
+let ownedScopeBaseline = null;
 try {
   fs.mkdirSync(project);
   fs.mkdirSync(path.join(agentDir, 'agents'), { recursive: true, mode: 0o700 });
@@ -137,11 +140,6 @@ try {
   assert.equal(childExitStatus, 0, 'Pi RPC child did not exit successfully');
   assert.equal(stdoutDrained && stderrDrained, true, 'Pi RPC pipes did not drain');
   assert.equal(inspectProcessIdentity(childIdentity).alive, false, 'Pi RPC child remains alive');
-  if (process.platform === 'win32') {
-    ownedGraph = createOwnedProcessGraphEvidence({ childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
-      stdoutDrained, stderrDrained, executions: ownedExecutions });
-    assert.equal(ownedGraph.status, 'PASS', 'Phi-owned process graph cleanup is unverified');
-  }
   const finalEvidence = readEvidenceReceipt({ root: evidenceRoot, runId: details.runId, taskDigest: details.taskDigest });
   assert.equal(finalEvidence.receipt.status, 'PASS');
   assert.equal(finalEvidence.receipt.runId, details.runId);
@@ -163,6 +161,7 @@ try {
     assert.match(finalEvidence.receipt.evidence.publications[0].transactionId, /^[0-9a-f]{32}$/u);
   }
   receiptReadback = { schema: 'PASS', protectedAcl: 'PASS', terminal: 'PASS', binding: 'PASS' };
+  report.receiptReadback = receiptReadback;
   assert.equal(turns.every(turn => turn.provider === 'openai-codex'), true);
   assert.deepEqual({ branchArray: userShape?.branchArray, singleText: userShape?.singleText, exactTaskMatch: userShape?.exactTaskMatch },
     { branchArray: true, singleText: true, exactTaskMatch: true });
@@ -199,11 +198,25 @@ try {
       grantIssued: true, published: true, grantConsumed: true });
   }
   assert.equal(fs.existsSync(path.join(project, 'created.txt')), false, 'original Git project must remain untouched');
+  if (process.platform === 'win32') {
+    let baseline = { status: 'UNKNOWN' };
+    try {
+      const observed = await runValidationCommand(ownedWindowsHelper(), ['--scope-recovery-status'], { cwd: sourceRoot });
+      baseline = fixedScopeBaselineEvidence(observed);
+    } catch { /* The graph reports BASELINE_MISMATCH; no recovery action is taken. */ }
+    ownedScopeBaseline = baseline;
+    report.ownedScopeBaseline = baseline;
+    ownedGraph = createOwnedProcessGraphEvidence({ childIdentity, childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
+      stdoutDrained, stderrDrained, executions: ownedExecutions, stages, baseline });
+    report.ownedExecution = { count: ownedExecutions.length, ...ownedGraph };
+    assert.equal(ownedGraph.status, 'PASS', `Phi-owned process graph cleanup is unverified: ${ownedGraph.reason}`);
+  }
   report = { status: 'PASS', platform: process.platform, normalTool: true, workflowStatus: details.status,
     workerCalls: turns.filter(turn => turn.lane === 'worker').length, controllerCalls: turns.filter(turn => turn.lane === 'controller').length,
     publicationCount: publications.length, publicationOperation: publications[0]?.operation ?? null,
     journalVersion: publications[0]?.journalVersion ?? null, cleanup: cleanup?.status, externalRequests: 0 };
   report.receiptReadback = receiptReadback;
+  report.ownedScopeBaseline = ownedScopeBaseline;
   report.ownedExecution = process.platform === 'win32' ? { count: ownedExecutions.length, profiles: [...new Set(ownedExecutions.map(row => row.profile))].sort(),
     ...ownedGraph } : { status: 'NOT_NATIVE_WINDOWS' };
 } catch (error) {

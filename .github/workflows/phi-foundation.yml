@@ -176,6 +176,9 @@ jobs:
       - name: Install pinned LSP runtime
         if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Focused CREATE process-graph reason regression
+        if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
+        run: node --test tests/integrated-certification-evidence.test.mjs
       - name: Install isolated pinned Pi and subagents (no auth or lifecycle scripts)
         if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
         shell: pwsh
@@ -205,6 +208,9 @@ jobs:
           $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
           node scripts/phi-bounded-workflow-pi-smoke.mjs
           exit $LASTEXITCODE
+      - name: Focused final fixed-scope ownership baseline even after CREATE failure
+        if: ${{ always() && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context') }}
+        run: node scripts/phi-owned-scope-baseline.mjs
   corrupt-journal-ready-diagnostic:
     if: github.event_name == 'workflow_dispatch' && (inputs['corrupt-journal-ready-mode'] == 'isolated' || inputs['corrupt-journal-ready-mode'] == 'ordered-prefix')
     runs-on: windows-latest
