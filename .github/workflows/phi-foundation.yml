@@ -60,7 +60,7 @@ jobs:
         shell: powershell
         run: ./scripts/build-windows-process.ps1
       - name: Focused process identity and protected workflow evidence regression
-        if: ${{ !inputs['two-writer-only'] }}
+        if: inputs['precreate-regression-only']
         run: node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/receipt-protocol.test.mjs tests/runtime-isolation.test.mjs
       - name: Isolated concurrent receipt writer diagnostic
         if: inputs['two-writer-only']

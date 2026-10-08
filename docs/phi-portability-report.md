@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## D6 two-writer diagnosis — current pre-CREATE green, ordinary CREATE pending
+
+At diagnostic source `9f8fc66`, isolated Windows [CI37781616197](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37781616197) passed 1/1 and context-preserving [CI37781875567](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37781875567) passed the full focused pre-CREATE block 27/26 PASS/0 FAIL/1 skip. Both child writers completed with protected cleanup, two sorted receipts and drained pipes. Existing ACL/process-identity, protected-root and worktree regressions passed. The old A2 exit1 remains unexplained CASE E/UNKNOWN; a later pass does not erase it. Neither run entered LSP/Pi/ordinary CREATE or proves global owned-process census. One focused ordinary CREATE is now authorized; no full Campaign or autonomy certification. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## D6-WINDOWS-PRECREATE-INTEGRATION-001 — bounded A1/A2 exhausted; STOP
 
 A1 [CI37637450595](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37637450595) failed 27/24 PASS/2 FAIL/1 skip on the raw/canonical Git-worktree text mismatch, while both 100-run protected-root fixtures and the permissive-root negative passed. A2 [CI37639777800](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37639777800) passed the worktree resume and wrong-branch cases using the existing nonzero device+inode identity check; its metadata proves the Git and Node spellings differ even after `realpathSync`, but identify the same physical directory. A2 still failed 27/25 PASS/1 FAIL/1 skip: one of two concurrent role-receipt child writers exited1; the child stderr was collected but not published, so cause UNKNOWN. This is not classified as harmless. LSP/Pi/ordinary CREATE were skipped in both runs. The A2-red STOP applies: no A3 or ordinary CREATE under this decision, no project publication or autonomy credit. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; global Phi-owned cleanup census UNKNOWN.

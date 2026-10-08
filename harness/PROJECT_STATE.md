@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## D6-WINDOWS-TWO-WRITER-RECEIPT-001 — pre-CREATE PASS, one ordinary CREATE pending
+
+Run 1 `37781616197` PASS isolated 1/1 and Run 2 `37781875567` PASS same-block 27/26 PASS/0 FAIL/1 skip at diagnostic `9f8fc66`. Both tracked child writers exited0/COMPLETE, pipes/temporary cleanup PASS, sorted ledger has two entries; protected fixture, ACL/process identity and worktree checks pass. Historical A2 exit1 remains unexplained CASE E/UNKNOWN, not classified as flaky. Pre-CREATE Windows regression block PASS at this candidate. A single focused ordinary CREATE is now authorized, but NOT YET RUN; CI step selection is being narrowed so it cannot repeat the consumed pre-CREATE block. Global Phi-owned process/Job census for the diagnostic runs remains UNKNOWN. Clone-runtime gate NOT YET NATIVE VERIFIED, stability qualification BLOCKED/CLOSED, D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED.
+
 ## STOP — D6-WINDOWS-PRECREATE-INTEGRATION-001 A2 red
 
 Both new focused pre-CREATE runs are consumed: A1 `37637450595` FAIL 27/24 PASS/2 FAIL/1 skip, A2 `37639777800` FAIL 27/25 PASS/1 FAIL/1 skip. Valid Scout→Planner protected roots, unsafe-root rejection, native process identity and protected ACL pass. A2 proves the Git-worktree paths are physically identical despite unequal raw/canonical text, and runtime resume plus wrong-branch refusal pass. The remaining A2 failure is a two-process role-receipt writer with child exits `[0,1]`; child error was not published, exact cause UNKNOWN. No LSP/Pi/ordinary CREATE, Worker, V6, grant or project publication was reached. No A3 or ordinary CREATE under this decision. D6 PARTIAL, D IN_PROGRESS, Windows autonomy BLOCKED; stability qualification BLOCKED/CLOSED and clone runtime gate NOT YET NATIVE VERIFIED. Global Phi-owned Job/pipe/process census UNKNOWN; no provider call.

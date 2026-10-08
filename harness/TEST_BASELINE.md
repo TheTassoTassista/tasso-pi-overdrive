@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## D6 two-writer diagnosis — current pre-CREATE gate PASS, historical cause UNKNOWN
+
+Diagnostic `9f8fc665f713a5b3e1a1c514c359c0918335bb51`: isolated Windows [CI37781616197](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37781616197) **1/1 PASS**; same focused pre-CREATE Windows [CI37781875567](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37781875567) **27 total / 26 PASS / 0 FAIL / 1 skip**. Each observed two-writer child exit0, stage COMPLETE, category PASS, cleanup PASS, pipes drained, exactly two candidate receipts and fixture removal PASS. Run 2 additionally passed the protected fixture roots, permissive-root negative, native process identity/ACL and worktree resume/wrong-branch tests. No LSP/Pi/CREATE in those runs; no global Phi-owned Job/process census. Historical A2's exit1 cause is CASE E/UNKNOWN. Local focused receipt/protected and `npm run check` PASS; indexed audit exit0/historical WARN. One ordinary CREATE run remains authorized, not executed.
+
 ## Final pre-CREATE A2 — terminal FAIL, no CREATE credit
 
 [CI37639777800](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/37639777800), functional `a75c8ba`, focused Windows block **27 total / 25 PASS / 1 FAIL / 1 skip** in 8m35s. The valid protected roots, unsafe-root negative, runtime resume and wrong-branch checks PASS. Native worktree observation: raw/canonical path strings unequal, physical `dev`+`ino` equal; normalized and case-folded forms still unequal. The one FAIL is receipt-protocol test15: concurrent child writer exits `[0,1]` rather than `[0,0]`; child stderr is not published by that assertion, so exact cause UNKNOWN. The same test passed in A1, which does not negate A2's red outcome. LSP/Pi/CREATE skipped; Phi-owned global residual/Job/pipe status UNKNOWN. Both A1/A2 are consumed. Pre-CREATE FAIL, ordinary CREATE NOT REACHED, no full Campaign certification or autonomy promotion.
