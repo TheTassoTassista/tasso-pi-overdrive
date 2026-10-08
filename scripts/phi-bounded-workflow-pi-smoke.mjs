@@ -133,6 +133,7 @@ try {
   assert.equal(tool.isError, false, 'normal workflow tool failed');
   assert.equal(details.status, 'PASS');
   assert.equal(cleanup?.status, 'PASS');
+  assert.equal(cleanup?.resourcesAbsent, true, 'disposable worktree/runtime resources remain');
   assert.equal(childExitStatus, 0, 'Pi RPC child did not exit successfully');
   assert.equal(stdoutDrained && stderrDrained, true, 'Pi RPC pipes did not drain');
   assert.equal(inspectProcessIdentity(childIdentity).alive, false, 'Pi RPC child remains alive');
