@@ -33,11 +33,15 @@ on:
         description: Run the ordinary CREATE preflight regression block only; no Pi or CREATE
         type: boolean
         default: false
+      two-writer-only:
+        description: Run only the isolated two-writer receipt diagnostic; no Pi or CREATE
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   ordinary-create-finalization-diagnostic:
-    if: github.event_name == 'workflow_dispatch' && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context' || inputs['precreate-regression-only'])
+    if: github.event_name == 'workflow_dispatch' && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context' || inputs['precreate-regression-only'] || inputs['two-writer-only'])
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -56,12 +60,16 @@ jobs:
         shell: powershell
         run: ./scripts/build-windows-process.ps1
       - name: Focused process identity and protected workflow evidence regression
+        if: ${{ !inputs['two-writer-only'] }}
         run: node --test tests/process-identity.test.mjs tests/protected-artifact.test.mjs tests/workflow-evidence.test.mjs tests/receipt-protocol.test.mjs tests/runtime-isolation.test.mjs
+      - name: Isolated concurrent receipt writer diagnostic
+        if: inputs['two-writer-only']
+        run: node --test --test-name-pattern="two process writers produce a deterministic sorted receipt ledger" tests/receipt-protocol.test.mjs
       - name: Install pinned LSP runtime
-        if: ${{ !inputs['precreate-regression-only'] }}
+        if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
       - name: Install isolated pinned Pi and subagents (no auth or lifecycle scripts)
-        if: ${{ !inputs['precreate-regression-only'] }}
+        if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
@@ -81,7 +89,7 @@ jobs:
           node scripts/phi-worker-pi-smoke.mjs --lsp
           exit $LASTEXITCODE
       - name: Focused genuine ordinary CREATE with pre-cleanup metadata snapshot
-        if: ${{ !inputs['precreate-regression-only'] }}
+        if: ${{ !inputs['precreate-regression-only'] && !inputs['two-writer-only'] }}
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
@@ -219,7 +227,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
     strategy:
       fail-fast: false
       matrix:

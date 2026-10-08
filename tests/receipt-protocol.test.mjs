@@ -57,13 +57,43 @@ function expected(value) {
   };
 }
 
-function childWrite(store, value) {
+const CHILD_STAGES = new Set([
+  "CHILD_START", "RECEIPT_VALIDATION_STARTED", "RECEIPT_VALIDATED", "ROOT_VALIDATION_STARTED", "ROOT_VALIDATED",
+  "TEMP_CREATE_STARTED", "TEMP_OPENED", "TEMP_WRITE_STARTED", "TEMP_SYNC_STARTED", "TEMP_SYNCED",
+  "TEMP_ACL_VALIDATION_STARTED", "TEMP_ACL_VALIDATED", "LINK_STARTED", "RECEIPT_PUBLISHED",
+  "DIRECTORY_SYNC_STARTED", "DIRECTORY_SYNCED", "DUPLICATE_CHECK_STARTED", "DUPLICATE_VALIDATED",
+  "TARGET_ACL_VALIDATION_STARTED", "TARGET_ACL_VALIDATED", "COMPLETE",
+]);
+const CHILD_CATEGORIES = new Set([
+  "PASS", "EACCES", "EPERM", "ENOENT", "EEXIST", "EBUSY", "EIO", "EINVAL", "ETIMEDOUT",
+  "PROTECTED_ARTIFACT_UNVERIFIED", "CONFLICTING_DUPLICATE", "RECEIPT_REJECTED", "UNCLASSIFIED",
+]);
+
+function childDiagnostic(stderr, ordinal) {
+  const prefix = "PHI_RECEIPT_CHILD_DIAGNOSTIC ";
+  const lines = stderr.split(/\r?\n/u).filter((line) => line.startsWith(prefix));
+  if (lines.length !== 1) return { ordinal, lastStage: "UNKNOWN", exitCategory: "DIAGNOSTIC_MISSING", cleanup: "UNKNOWN", elapsedMs: null };
+  try {
+    const value = JSON.parse(lines[0].slice(prefix.length));
+    if (value.ordinal !== ordinal || !CHILD_STAGES.has(value.lastStage) || !CHILD_CATEGORIES.has(value.exitCategory) || !["NOT_STARTED", "STARTED", "PASS", "FAIL"].includes(value.cleanup) || !Number.isSafeInteger(value.elapsedMs) || value.elapsedMs < 0 || Object.keys(value).sort().join(",") !== "cleanup,elapsedMs,exitCategory,lastStage,ordinal") throw new Error("invalid diagnostic");
+    return value;
+  } catch { return { ordinal, lastStage: "UNKNOWN", exitCategory: "DIAGNOSTIC_INVALID", cleanup: "UNKNOWN", elapsedMs: null }; }
+}
+
+function childWrite(store, value, ordinal) {
   const script = path.resolve("tests/fixtures/receipt-writer-child.mjs");
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [script, JSON.stringify(store), JSON.stringify(value)], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, [script, JSON.stringify(store), JSON.stringify(value), String(ordinal)], { stdio: ["ignore", "pipe", "pipe"] });
     let stderr = "";
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.on("close", (code) => resolve({ code, stderr }));
+    let stdoutDrained = false;
+    let stderrDrained = false;
+    let spawnError = false;
+    child.stdout.on("end", () => { stdoutDrained = true; });
+    child.stdout.resume();
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-8192); });
+    child.stderr.on("end", () => { stderrDrained = true; });
+    child.on("error", () => { spawnError = true; });
+    child.on("close", (code, signal) => resolve({ code, signal: signal === null ? "NONE" : "SIGNALLED", closed: true, pipesDrained: stdoutDrained && stderrDrained, spawnError, diagnostic: childDiagnostic(stderr, ordinal) }));
   });
 }
 
@@ -145,10 +175,18 @@ test("two process writers produce a deterministic sorted receipt ledger", async 
   try {
     const first = receipt(run, { sequence: 0 });
     const second = receipt(run, { sequence: 1, role: "planner", nodeId: "02-planner" });
-    const outcomes = await Promise.all([childWrite(store, second), childWrite(store, first)]);
+    const outcomes = await Promise.all([childWrite(store, second, 0), childWrite(store, first, 1)]);
+    let candidateEntries = null;
+    try { candidateEntries = fs.readdirSync(store.directory).filter((name) => /^\d{6}-[0-9a-f-]{36}\.json$/iu.test(name)).length; } catch {}
+    console.log(`# two-writer-diagnostic ${JSON.stringify({ children: outcomes, candidateEntries, lock: "NOT_APPLICABLE_PER_FILE_PUBLICATION", ledgerReadMerge: "NOT_APPLICABLE_PER_FILE_PUBLICATION" })}`);
     assert.deepEqual(outcomes.map((entry) => entry.code), [0, 0]);
+    assert.equal(outcomes.every((entry) => entry.closed && entry.pipesDrained && !entry.spawnError && entry.signal === "NONE" && entry.diagnostic.lastStage === "COMPLETE" && entry.diagnostic.exitCategory === "PASS" && entry.diagnostic.cleanup === "PASS"), true);
+    assert.equal(candidateEntries, 2);
     assert.deepEqual(listRoleReceipts(store).map((entry) => entry.receipt.sequence), [0, 1]);
-  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    console.log(`# two-writer-fixture-cleanup ${fs.existsSync(root) ? "FAIL" : "PASS"}`);
+  }
 });
 
 test("receipt must exist before the controller records completion or Planner admission", () => {
