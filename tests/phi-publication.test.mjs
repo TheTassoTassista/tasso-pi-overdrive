@@ -694,6 +694,42 @@ test('native bounded ordinary MODIFY V2 rejects concurrent user replacement afte
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
   } finally { item.close(); }
 });
+test('native bounded ordinary DELETE V3 binds target identity and one-use grant after Worker revocation', native, async () => {
+  const task = 'Delete file `remove.txt`';
+  const item = nativeFixture(task, 'delete', true, true);
+  try {
+    const verified = await nativeVerified(item);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /WORKER_NOT_REVOKED/u);
+    item.reservation.finishWorker();
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.deepEqual(ready.receipt.operations.map(op => [op.kind, op.path]), [['DELETE', 'remove.txt']]);
+    assert.equal(ready.receipt.operations[0].baseIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(ready.receipt.operations[0].baseDigest, item.publicationEnvelope.expectedDigest);
+    assert.match(ready.intentDigest, /^[0-9a-f]{64}$/u);
+    assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    const published = executePreparedWindowsPublication(ready.authority);
+    assert.equal(published.state, 'PUBLISHED');
+    assert.equal(published.publicationProof.journal.version, 3);
+    assert.equal(published.publicationProof.native.sourceIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(published.publicationProof.verifiedDigest, verified.verification.draft.contentDigest);
+    assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), false);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded ordinary DELETE V3 rejects replacement of the intended object after READY', native, async () => {
+  const task = 'Delete file `remove.txt`';
+  const item = nativeFixture(task, 'delete', true, true);
+  try {
+    await nativeVerified(item); item.reservation.finishWorker();
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    fs.renameSync(path.join(item.project, 'remove.txt'), path.join(item.project, 'previous.txt'));
+    fs.writeFileSync(path.join(item.project, 'remove.txt'), 'old-delete-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'remove.txt'), 'utf8'), 'old-delete-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
 test('native bounded CREATE envelope admits exact target only after Worker revocation', native, async () => {
   const task = 'Create file `created.txt` containing new-create-fixture';
   const item = nativeFixture(task, 'create', true, true);

@@ -34,12 +34,12 @@ test('operation-specific bounded publication never promotes the Windows full bac
   assert.equal(windowsPlatform.sandbox.implemented, false);
   assert.equal(windowsPlatform.sandbox.autonomousReady, false);
   assert.deepEqual(windowsPlatform.boundedPublication, {
-    CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2',
+    CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2', DELETE: 'NATIVE_VERIFIED_V3',
   });
   for (const operation of ['workflow', '__proto__', undefined]) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_OPERATION_INVALID/u);
   if (process.platform === 'win32') {
-    for (const operation of ['CREATE', 'MODIFY']) assert.equal(requireBoundedWindowsPublication(operation).operation, operation);
-    for (const operation of ['DELETE', 'RENAME']) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
+    for (const operation of ['CREATE', 'MODIFY', 'DELETE']) assert.equal(requireBoundedWindowsPublication(operation).operation, operation);
+    assert.throws(() => requireBoundedWindowsPublication('RENAME'), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
     assert.throws(() => requireCodingBackend('workflow'), denied);
   } else for (const operation of ['CREATE', 'MODIFY', 'DELETE', 'RENAME'])
     assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);

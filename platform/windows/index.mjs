@@ -13,5 +13,5 @@ export const windowsPlatform = Object.freeze({
   // Operation-specific journaled publication is narrower than full backend
   // readiness and grants no command/tool surface. Ordinary workflow admission
   // additionally requires an exact trusted task envelope for each operation.
-  boundedPublication: Object.freeze({ CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2' }),
+  boundedPublication: Object.freeze({ CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2', DELETE: 'NATIVE_VERIFIED_V3' }),
 });

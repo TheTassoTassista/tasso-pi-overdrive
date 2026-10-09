@@ -14,7 +14,7 @@ on:
       ordinary-operation-focused:
         description: Focused ordinary Windows operation validation; not Campaign certification
         type: choice
-        options: [none, modify]
+        options: [none, modify, delete]
         default: none
       lsp-diagnostic-only:
         description: Compare owned independent-clone LSP installation on runner temp volumes; no full gate
@@ -217,7 +217,7 @@ jobs:
         if: ${{ always() && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context') }}
         run: node scripts/phi-owned-scope-baseline.mjs
   ordinary-operation-focused:
-    if: github.event_name == 'workflow_dispatch' && inputs['ordinary-operation-focused'] == 'modify'
+    if: github.event_name == 'workflow_dispatch' && (inputs['ordinary-operation-focused'] == 'modify' || inputs['ordinary-operation-focused'] == 'delete')
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -237,21 +237,25 @@ jobs:
         run: ./scripts/build-windows-process.ps1
       - name: Install pinned LSP runtime
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
-      - name: Focused bounded MODIFY V2 grant and conflict regressions
-        run: node --test --test-name-pattern="native bounded ordinary MODIFY" tests/phi-publication.test.mjs
+      - name: Focused bounded ordinary operation grant and conflict regressions
+        shell: pwsh
+        run: |
+          $operation = '${{ inputs['ordinary-operation-focused'] }}'.ToUpperInvariant()
+          node --test "--test-name-pattern=native bounded ordinary $operation" tests/phi-publication.test.mjs
+          exit $LASTEXITCODE
       - name: Install isolated pinned Pi and subagents
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
           npm install --prefix $workerTestPrefix --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 pi-subagents@0.66.0
           exit $LASTEXITCODE
-      - name: Genuine ordinary Pi MODIFY V2 and protected receipt readback
+      - name: Genuine ordinary Pi operation and protected receipt readback
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
           $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
           $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
-          node scripts/phi-bounded-workflow-pi-smoke.mjs --modify
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --${{ inputs['ordinary-operation-focused'] }}
           exit $LASTEXITCODE
       - name: Final fixed-scope ownership baseline even after failure
         if: always()
@@ -386,7 +390,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && inputs['ordinary-operation-focused'] != 'modify' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
     strategy:
       fail-fast: false
       matrix:

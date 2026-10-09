@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline normal Pi tool entrypoint, deterministic local model transport only.
-// On Windows this must exercise the real bounded Worker/V6 publication lane.
+// On Windows this exercises the selected real bounded ordinary publication lane.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -28,12 +28,12 @@ const agentDir = path.join(temp, 'agent');
 const auditFile = path.join(temp, 'provider-audit.jsonl');
 const evidenceRoot = path.join(temp, 'evidence');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
-const operation = process.argv[2] === '--modify' ? 'MODIFY' : 'CREATE';
-if (process.argv.length > 3 || process.argv[2] && process.argv[2] !== '--modify') throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
-const task = operation === 'CREATE' ? 'Create file `created.txt` containing new-create-fixture' :
-  'Modify file `input.txt` to contain new-modify-fixture';
-const target = operation === 'CREATE' ? 'created.txt' : 'input.txt';
-const version = operation === 'CREATE' ? 6 : 2;
+const operation = { '--modify': 'MODIFY', '--delete': 'DELETE' }[process.argv[2]] ?? 'CREATE';
+if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
+const task = { CREATE: 'Create file `created.txt` containing new-create-fixture',
+  MODIFY: 'Modify file `input.txt` to contain new-modify-fixture', DELETE: 'Delete file `remove.txt`' }[operation];
+const target = { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt' }[operation];
+const version = { CREATE: 6, MODIFY: 2, DELETE: 3 }[operation];
 let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0 };
 let child;
 let childClosed;
@@ -63,15 +63,28 @@ try {
     'async: false', '---', 'Use only the offered tools for the exact assigned fixture. Never edit the host project directly.', '',
   ].join('\n');
   fs.writeFileSync(path.join(agentDir, 'agents', 'worker.md'), workerDefinition, { mode: 0o600 });
+  const scoutDefinition = [
+    '---', 'name: scout', 'description: Read-only offline bounded-publication Scout fixture.',
+    'tools: read, grep, find, ls', `subagentOnlyExtensions: ${fixtureProvider.replaceAll('\\', '/')}`,
+    'defaultContext: fresh', 'acceptanceRole: read-only', 'permission:', '  edit: deny', '  write: deny',
+    'inheritGlobalContext: false', 'inheritProjectContext: false', 'inheritSkills: false',
+    'async: false', '---', 'Inspect only the assigned fixture; never mutate it.', '',
+  ].join('\n');
+  fs.writeFileSync(path.join(agentDir, 'agents', 'scout.md'), scoutDefinition, { mode: 0o600 });
   fs.writeFileSync(path.join(project, 'config.json'), '{}');
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node test.cjs' } }));
   if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
-  fs.writeFileSync(path.join(project, 'edit.cjs'), operation === 'CREATE'
-    ? "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')"
-    : "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')");
-  fs.writeFileSync(path.join(project, 'test.cjs'), operation === 'CREATE'
-    ? "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')"
-    : "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')");
+  if (operation === 'DELETE') fs.writeFileSync(path.join(project, 'remove.txt'), 'old-delete-fixture');
+  fs.writeFileSync(path.join(project, 'edit.cjs'), {
+    CREATE: "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')",
+    MODIFY: "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')",
+    DELETE: "require('node:fs').unlinkSync('remove.txt');console.log('removed-in-private-draft')",
+  }[operation]);
+  fs.writeFileSync(path.join(project, 'test.cjs'), {
+    CREATE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')",
+    MODIFY: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')",
+    DELETE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);console.log('verified')",
+  }[operation]);
   for (const args of [['init', '--quiet'], ['add', '.'], ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'baseline']]) {
     const run = spawnSync('git', args, { cwd: project, shell: false, encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
@@ -191,7 +204,7 @@ try {
     let previous = -1;
     for (const name of required) {
       const index = names.indexOf(name, previous + 1);
-      assert.ok(index > previous, `required CREATE stage missing or unordered: ${name}`);
+      assert.ok(index > previous, `required ${operation} stage missing or unordered: ${name}`);
       previous = index;
     }
     const physical = stages.findLast(row => row.stage === 'PRE_CLEANUP_PHYSICAL_SNAPSHOT');
@@ -203,12 +216,14 @@ try {
       v6Observed: physical.v6Observed, transactionEstablished: ready.transactionEstablished,
       grantIssued: ready.grantIssued, published: nativeResult.published,
       grantConsumed: postverify.grantConsumed },
-    { targetState: 'PRESENT', digestMatch: true, identityMatch: true, v6Phase: 'CLEANED',
+    { targetState: operation === 'DELETE' ? 'ABSENT' : 'PRESENT', digestMatch: operation === 'DELETE' ? null : true,
+      identityMatch: operation === 'DELETE' ? null : true, v6Phase: 'CLEANED',
       v6Observed: 'NEW_COMPLETE_OBSERVED', transactionEstablished: true,
       grantIssued: true, published: true, grantConsumed: true });
   }
   assert.equal(operation === 'CREATE' ? fs.existsSync(path.join(project, target)) === false :
-    fs.readFileSync(path.join(project, target), 'utf8') === 'old-modify-fixture', true, 'original Git project must remain untouched');
+    fs.readFileSync(path.join(project, target), 'utf8') === (operation === 'DELETE' ? 'old-delete-fixture' : 'old-modify-fixture'),
+  true, 'original Git project must remain untouched');
   if (process.platform === 'win32') {
     let baseline = { status: 'UNKNOWN' };
     try {
