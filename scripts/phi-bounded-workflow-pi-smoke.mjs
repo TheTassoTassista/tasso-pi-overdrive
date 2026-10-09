@@ -28,12 +28,13 @@ const agentDir = path.join(temp, 'agent');
 const auditFile = path.join(temp, 'provider-audit.jsonl');
 const evidenceRoot = path.join(temp, 'evidence');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
-const operation = { '--modify': 'MODIFY', '--delete': 'DELETE' }[process.argv[2]] ?? 'CREATE';
-if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
+const operation = { '--modify': 'MODIFY', '--delete': 'DELETE', '--rename': 'RENAME' }[process.argv[2]] ?? 'CREATE';
+if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete', '--rename'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
 const task = { CREATE: 'Create file `created.txt` containing new-create-fixture',
-  MODIFY: 'Modify file `input.txt` to contain new-modify-fixture', DELETE: 'Delete file `remove.txt`' }[operation];
-const target = { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt' }[operation];
-const version = { CREATE: 6, MODIFY: 2, DELETE: 3 }[operation];
+  MODIFY: 'Modify file `input.txt` to contain new-modify-fixture', DELETE: 'Delete file `remove.txt`',
+  RENAME: 'Rename file `move.txt` to `moved.txt`' }[operation];
+const target = { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt', RENAME: 'moved.txt' }[operation];
+const version = { CREATE: 6, MODIFY: 2, DELETE: 3, RENAME: 4 }[operation];
 let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0 };
 let child;
 let childClosed;
@@ -75,15 +76,18 @@ try {
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node test.cjs' } }));
   if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
   if (operation === 'DELETE') fs.writeFileSync(path.join(project, 'remove.txt'), 'old-delete-fixture');
+  if (operation === 'RENAME') fs.writeFileSync(path.join(project, 'move.txt'), 'old-rename-fixture');
   fs.writeFileSync(path.join(project, 'edit.cjs'), {
     CREATE: "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')",
     MODIFY: "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')",
     DELETE: "require('node:fs').unlinkSync('remove.txt');console.log('removed-in-private-draft')",
+    RENAME: "const f=require('node:fs');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log('renamed-in-private-draft')",
   }[operation]);
   fs.writeFileSync(path.join(project, 'test.cjs'), {
     CREATE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')",
     MODIFY: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')",
     DELETE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);console.log('verified')",
+    RENAME: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'old-rename-fixture');console.log('verified')",
   }[operation]);
   for (const args of [['init', '--quiet'], ['add', '.'], ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'baseline']]) {
     const run = spawnSync('git', args, { cwd: project, shell: false, encoding: 'utf8' });
@@ -218,13 +222,15 @@ try {
       grantConsumed: postverify.grantConsumed },
     { targetState: operation === 'DELETE' ? 'ABSENT' : 'PRESENT', digestMatch: operation === 'DELETE' ? null : true,
       identityMatch: operation === 'DELETE' ? null : true, v6Phase: 'CLEANED',
-      v6Observed: operation === 'DELETE' ? 'DELETE_COMMITTED_CLEANUP_OBSERVED' : 'NEW_COMPLETE_OBSERVED',
+      v6Observed: { CREATE: 'NEW_COMPLETE_OBSERVED', MODIFY: 'NEW_COMPLETE_OBSERVED',
+        DELETE: 'DELETE_COMMITTED_CLEANUP_OBSERVED', RENAME: 'RENAME_COMMITTED_DESTINATION_RETAINED' }[operation],
       transactionEstablished: true,
       grantIssued: true, published: true, grantConsumed: true });
   }
-  assert.equal(operation === 'CREATE' ? fs.existsSync(path.join(project, target)) === false :
+  assert.equal(operation === 'CREATE' || operation === 'RENAME' ? fs.existsSync(path.join(project, target)) === false :
     fs.readFileSync(path.join(project, target), 'utf8') === (operation === 'DELETE' ? 'old-delete-fixture' : 'old-modify-fixture'),
   true, 'original Git project must remain untouched');
+  if (operation === 'RENAME') assert.equal(fs.readFileSync(path.join(project, 'move.txt'), 'utf8'), 'old-rename-fixture');
   if (process.platform === 'win32') {
     let baseline = { status: 'UNKNOWN' };
     try {

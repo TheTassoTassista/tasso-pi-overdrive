@@ -733,6 +733,80 @@ test('native bounded ordinary DELETE V3 rejects replacement of the intended obje
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
   } finally { item.close(); }
 });
+test('native bounded ordinary RENAME V4 binds exact source, destination and one-use grant after Worker revocation', native, async () => {
+  const task = 'Rename file `move.txt` to `moved.txt`';
+  const item = nativeFixture(task, 'rename', true, true);
+  const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+  try {
+    const verified = await nativeVerified(item);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), /WORKER_NOT_REVOKED/u);
+    item.reservation.finishWorker();
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true,
+      rename: { sourcePath: 'move.txt', destinationPath: 'elsewhere.txt' } }), /PUBLISH_AUTHORITY_DENIED/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    assert.deepEqual(ready.receipt.operations.map(op => [op.kind, op.sourcePath, op.path]), [['RENAME', 'move.txt', 'moved.txt']]);
+    assert.equal(ready.receipt.operations[0].baseIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(ready.receipt.operations[0].baseDigest, item.publicationEnvelope.expectedDigest);
+    assert.match(ready.intentDigest, /^[0-9a-f]{64}$/u);
+    assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    const published = executePreparedWindowsPublication(ready.authority);
+    assert.equal(published.state, 'PUBLISHED');
+    assert.equal(published.publicationProof.journal.version, 4);
+    assert.equal(published.publicationProof.native.destinationIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(published.publicationProof.verifiedDigest, verified.verification.draft.contentDigest);
+    assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), false);
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'unchanged-rename-fixture');
+    const observed = discoverWindowsTransactions({ cwd: item.project }).entries.find(entry => entry.transactionId === ready.receipt.transactionId);
+    assert.equal(observed?.phase, 'CLEANED');
+    assert.equal(observed?.observedStatus, 'RENAME_COMMITTED_DESTINATION_RETAINED');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded ordinary RENAME V4 denies a Worker-proposed destination absent from trusted task intent', native, async () => {
+  const task = 'Rename file `move.txt` to `other.txt`';
+  const item = nativeFixture(task, 'rename', true, true);
+  try {
+    await nativeVerified(item); item.reservation.finishWorker();
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true,
+      rename: { sourcePath: 'move.txt', destinationPath: 'moved.txt' } }), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true,
+      rename: { sourcePath: 'move.txt', destinationPath: 'other.txt' } }), /RENAME_INTENT_INVALID/u);
+    assert.equal(fs.existsSync(path.join(item.project, 'other.txt')), false);
+    assert.equal(fs.existsSync(path.join(item.project, 'moved.txt')), false);
+    assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
+  } finally { item.close(); }
+});
+test('native bounded ordinary RENAME V4 rejects a concurrent destination conflict and consumes the grant', native, async () => {
+  const task = 'Rename file `move.txt` to `moved.txt`';
+  const item = nativeFixture(task, 'rename', true, true);
+  try {
+    await nativeVerified(item); item.reservation.finishWorker();
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true,
+      rename: { sourcePath: 'move.txt', destinationPath: 'moved.txt' } });
+    fs.writeFileSync(path.join(item.project, 'moved.txt'), 'user-destination');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'user-destination');
+    assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded ordinary RENAME V4 rejects same-byte source recreation with a different identity', native, async () => {
+  const task = 'Rename file `move.txt` to `moved.txt`';
+  const item = nativeFixture(task, 'rename', true, true);
+  try {
+    await nativeVerified(item); item.reservation.finishWorker();
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true,
+      rename: { sourcePath: 'move.txt', destinationPath: 'moved.txt' } });
+    fs.renameSync(path.join(item.project, 'move.txt'), path.join(item.project, 'previous.txt'));
+    fs.writeFileSync(path.join(item.project, 'move.txt'), 'unchanged-rename-fixture');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
+    assert.equal(fs.existsSync(path.join(item.project, 'moved.txt')), false);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
 test('native bounded CREATE envelope admits exact target only after Worker revocation', native, async () => {
   const task = 'Create file `created.txt` containing new-create-fixture';
   const item = nativeFixture(task, 'create', true, true);

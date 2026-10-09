@@ -14,7 +14,7 @@ on:
       ordinary-operation-focused:
         description: Focused ordinary Windows operation validation; not Campaign certification
         type: choice
-        options: [none, modify, delete]
+        options: [none, modify, delete, rename]
         default: none
       lsp-diagnostic-only:
         description: Compare owned independent-clone LSP installation on runner temp volumes; no full gate
@@ -217,7 +217,7 @@ jobs:
         if: ${{ always() && (inputs['create-finalization-mode'] == 'isolated' || inputs['create-finalization-mode'] == 'predecessor-context') }}
         run: node scripts/phi-owned-scope-baseline.mjs
   ordinary-operation-focused:
-    if: github.event_name == 'workflow_dispatch' && (inputs['ordinary-operation-focused'] == 'modify' || inputs['ordinary-operation-focused'] == 'delete')
+    if: github.event_name == 'workflow_dispatch' && (inputs['ordinary-operation-focused'] == 'modify' || inputs['ordinary-operation-focused'] == 'delete' || inputs['ordinary-operation-focused'] == 'rename')
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
