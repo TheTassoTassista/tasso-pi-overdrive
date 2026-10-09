@@ -655,6 +655,45 @@ test('native single CREATE V6 preserves a user-created target and consumes the g
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
   } finally { item.close(); }
 });
+test('native bounded ordinary MODIFY V2 binds exact task, original identity and one-use controller grant after Worker revocation', native, async () => {
+  const task = 'Modify file `config.json` to contain {"changed":true}';
+  const item = nativeFixture(task, 'modify', true, true);
+  try {
+    assert.throws(() => reserveWindowsWorker({ executionId: randomUUID(), parentSessionId: randomUUID(), cwd: item.project,
+      task: 'Modify file `other.json` to contain {"changed":true}', taskPolicy: resolveTaskPolicy({ task }), retainForController: true,
+      publicationEnvelope: item.publicationEnvelope }), /PUBLICATION_ENVELOPE_DENIED/u);
+    const verified = await nativeVerified(item);
+    assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /WORKER_NOT_REVOKED/u);
+    item.reservation.finishWorker();
+    assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    assert.deepEqual(ready.receipt.operations.map(op => [op.kind, op.path]), [['REPLACE', 'config.json']]);
+    assert.match(ready.intentDigest, /^[0-9a-f]{64}$/u);
+    assert.equal(ready.receipt.operations[0].baseIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(ready.receipt.operations[0].baseDigest, item.publicationEnvelope.expectedDigest);
+    assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    const published = executePreparedWindowsPublication(ready.authority);
+    assert.equal(published.state, 'PUBLISHED');
+    assert.equal(published.publicationProof.journal.version, 2);
+    assert.equal(published.publicationProof.native.destinationIdentity, item.publicationEnvelope.expectedIdentity);
+    assert.equal(published.publicationProof.verifiedDigest, verified.verification.draft.contentDigest);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{"changed":true}');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
+test('native bounded ordinary MODIFY V2 rejects concurrent user replacement after READY and consumes the grant', native, async () => {
+  const task = 'Modify file `config.json` to contain {"changed":true}';
+  const item = nativeFixture(task, 'modify', true, true);
+  try {
+    await nativeVerified(item); item.reservation.finishWorker();
+    const ready = item.reservation.preparePublication({ approveProjectMutation: true });
+    fs.renameSync(path.join(item.project, 'config.json'), path.join(item.project, 'previous.json'));
+    fs.writeFileSync(path.join(item.project, 'config.json'), '{}');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{}');
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+  } finally { item.close(); }
+});
 test('native bounded CREATE envelope admits exact target only after Worker revocation', native, async () => {
   const task = 'Create file `created.txt` containing new-create-fixture';
   const item = nativeFixture(task, 'create', true, true);

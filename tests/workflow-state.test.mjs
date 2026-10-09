@@ -73,6 +73,18 @@ test("bounded publication is required after Worker receipt and before determinis
   assert.deepEqual(state.evidence.publications.map(({ operation, journalVersion, transactionId: id }) => [operation, journalVersion, id]), [['CREATE', 6, transactionId]]);
 });
 
+test("operation-specific bounded publication accepts only exact protocol pairs", async () => {
+  for (const [operation, journalVersion] of [['MODIFY', 2], ['DELETE', 3], ['RENAME', 4]]) {
+    const state = await runEnforcedWorkflow({ task: `bounded ${operation}`, allocation, modelPolicy,
+      delegate: async ({ agent, result }) => result.kind === 'structured' ? structuredResponse(agent) : textResponse(agent),
+      afterWorker: () => ({ status: 'PUBLISHED', operation, transactionId: 'a'.repeat(32), journalVersion, intentDigest: 'c'.repeat(64) }),
+      verify: async () => ({ status: 'PASS', processExitCode: 0 }),
+    });
+    assert.equal(state.status, 'PASS');
+    assert.deepEqual(state.evidence.publications.map(row => [row.operation, row.journalVersion]), [[operation, journalVersion]]);
+  }
+});
+
 test("missing or forged bounded publication fails before verification and reviewers", async () => {
   for (const publication of [null, { status: 'PUBLISHED', operation: 'MODIFY', transactionId: 'a'.repeat(32), journalVersion: 6, intentDigest: 'c'.repeat(64) }, { status: 'PUBLISHED', operation: 'CREATE', transactionId: 'bad', journalVersion: 6, intentDigest: 'c'.repeat(64) }, { status: 'PUBLISHED', operation: 'CREATE', transactionId: 'a'.repeat(32), journalVersion: 5, intentDigest: 'c'.repeat(64) }]) {
     const calls = [];

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { requireBoundedWindowsPublication, requireCodingBackend, sandboxInvocation } from '../platform/shared/coding-execution.mjs';
 import { windowsPlatform } from '../platform/windows/index.mjs';
-import { boundedCreateTaskTarget } from '../lib/phi-worker-authority.mjs';
+import { boundedCreateTaskTarget, boundedTaskPublicationIntent } from '../lib/phi-worker-authority.mjs';
 import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { EditEngine } from '../lib/edit-engine.mjs';
 import { DapEngine } from '../lib/dap-engine.mjs';
@@ -30,16 +30,19 @@ test('production capability dispatch uses the actual host and never treats fixed
   }
 });
 
-test('bounded CREATE admission never promotes the Windows full backend or other operations', () => {
+test('operation-specific bounded publication never promotes the Windows full backend', () => {
   assert.equal(windowsPlatform.sandbox.implemented, false);
   assert.equal(windowsPlatform.sandbox.autonomousReady, false);
-  assert.deepEqual(Object.keys(windowsPlatform.boundedPublication), ['CREATE']);
-  for (const operation of ['MODIFY', 'DELETE', 'RENAME']) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
+  assert.deepEqual(windowsPlatform.boundedPublication, {
+    CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2',
+  });
   for (const operation of ['workflow', '__proto__', undefined]) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_OPERATION_INVALID/u);
   if (process.platform === 'win32') {
-    assert.equal(requireBoundedWindowsPublication('CREATE').operation, 'CREATE');
+    for (const operation of ['CREATE', 'MODIFY']) assert.equal(requireBoundedWindowsPublication(operation).operation, operation);
+    for (const operation of ['DELETE', 'RENAME']) assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
     assert.throws(() => requireCodingBackend('workflow'), denied);
-  } else assert.throws(() => requireBoundedWindowsPublication('CREATE'), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
+  } else for (const operation of ['CREATE', 'MODIFY', 'DELETE', 'RENAME'])
+    assert.throws(() => requireBoundedWindowsPublication(operation), /PHI_PUBLICATION_CAPABILITY_UNAVAILABLE/u);
 });
 
 test('bounded CREATE target is anchored to exact direct-user task and mutating policy', () => {
@@ -54,6 +57,27 @@ test('bounded CREATE target is anchored to exact direct-user task and mutating p
   }
   const readOnly = resolveTaskPolicy({ task: 'Inspect `src/new.js` without changing it' });
   assert.throws(() => boundedCreateTaskTarget(task, task, readOnly), /PUBLICATION_ENVELOPE_DENIED/u);
+});
+
+test('ordinary operation intent comes only from the exact direct task and preserves operands', () => {
+  const cases = [
+    ['Create file `new.txt` containing fixture', { operation: 'CREATE', target: 'new.txt', source: null }],
+    ['Modify file `input.txt` to contain updated fixture', { operation: 'MODIFY', target: 'input.txt', source: null }],
+    ['Delete file `input.txt`', { operation: 'DELETE', target: 'input.txt', source: null }],
+    ['Rename file `input.txt` to `renamed.txt`', { operation: 'RENAME', target: 'renamed.txt', source: 'input.txt' }],
+  ];
+  for (const [task, expected] of cases) {
+    const policy = resolveTaskPolicy({ task });
+    assert.deepEqual(boundedTaskPublicationIntent(task, task, policy), expected);
+    assert.throws(() => boundedTaskPublicationIntent(task, task + ' ', policy), /PUBLICATION_ENVELOPE_DENIED/u);
+  }
+  for (const task of [
+    'Modify file `.env` to contain changed', 'Delete file `nested/.env`',
+    'Rename file `input.txt` to `elsewhere/output.txt`',
+    'Rename file `input.txt` to `INPUT.txt`',
+    'Rename file `input.txt` to `../outside.txt`',
+    'Rename file `input.txt` to `renamed.txt` and overwrite',
+  ]) assert.throws(() => boundedTaskPublicationIntent(task, task, resolveTaskPolicy({ task })), /PUBLICATION_ENVELOPE_DENIED/u);
 });
 
 test('unknown or inherited operation names cannot select a coding capability', () => {

@@ -27,7 +27,7 @@ import { buildLocalPrewalk } from "../lib/local-prewalk.mjs";
 import { constrainToolsForModelProfile, modelHarnessProfileMetadata, resolveModelHarnessProfile } from "../lib/model-harness-profile.mjs";
 import { WATCHDOG_ADVICE_EVENT, WATCHDOG_EVENT, validateWatchdogAdvice, watchdogObservationFromWorkflow } from "../lib/watchdog.mjs";
 import { requireBoundedWindowsPublication, requireCodingBackend } from "../platform/shared/coding-execution.mjs";
-import { boundedCreateTaskTarget, createWindowsPublicationEnvelope, executePreparedWindowsPublication, reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
+import { boundedTaskPublicationIntent, createWindowsPublicationEnvelope, executePreparedWindowsPublication, reserveWindowsWorker } from "../lib/phi-worker-authority.mjs";
 import { readWindowsProjectSnapshot } from "../platform/windows/coding-tools.mjs";
 import { discoverWindowsTransactions } from "../platform/windows/publication.mjs";
 
@@ -228,13 +228,14 @@ export default function (pi: ExtensionAPI) {
         availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
       });
       const trustedUserTask = process.platform === "win32" ? latestDirectUserTask(ctx) : null;
-      let boundedCreate = false;
+      let boundedOperation: "CREATE" | "MODIFY" | "DELETE" | "RENAME" | undefined;
       let boundedTarget: string | undefined;
       if (process.platform === "win32") {
         try {
-          boundedTarget = boundedCreateTaskTarget(params.task, trustedUserTask, activeTaskPolicy);
-          requireBoundedWindowsPublication("CREATE");
-          boundedCreate = true;
+          const intent = boundedTaskPublicationIntent(params.task, trustedUserTask, activeTaskPolicy);
+          requireBoundedWindowsPublication(intent.operation);
+          boundedOperation = intent.operation as "CREATE" | "MODIFY" | "DELETE" | "RENAME";
+          boundedTarget = intent.target;
         } catch { requireCodingBackend("workflow"); }
       } else requireCodingBackend("workflow");
       if (running) throw new WorkflowFailure("Another secure workflow is already active.");
@@ -275,7 +276,7 @@ export default function (pi: ExtensionAPI) {
       let boundedTransactionId: string | undefined;
       let lastDiagnosticStage = "WORKFLOW_ADMITTED";
       const diagnostic = (stage: string, fields: Record<string, unknown> = {}) => {
-        if (!boundedCreate) return;
+        if (!boundedOperation) return;
         lastDiagnosticStage = stage;
         try { pi.events.emit("pi-overdrive:create-stage-metadata", { stage, monotonicMs: Math.round(performance.now()), ...fields }); } catch {}
       };
@@ -572,7 +573,7 @@ export default function (pi: ExtensionAPI) {
           diagnostic("RUNTIME_ALLOCATED");
           checkpointJournal({ allocation_id: allocation.allocationId, current_phase: "RUNTIME_ALLOCATED" });
         }
-        if (boundedCreate) {
+        if (boundedOperation) {
           if (resumable) throw new Error("PHI_BOUNDED_PUBLICATION_RESUME_REQUIRES_MANUAL_INSPECTION");
           boundedEnvelope = createWindowsPublicationEnvelope({ task: params.task, trustedUserTask,
             cwd: allocation!.worktree, taskPolicy: activeTaskPolicy });
@@ -645,23 +646,32 @@ export default function (pi: ExtensionAPI) {
                   if (!reservation.status().workerRevoked) throw new Error("PHI_BOUNDED_WORKER_NOT_REVOKED");
                   diagnostic("WORKER_REVOKED");
                   diagnostic("CONTROLLER_VALIDATION_START");
-                  const ready = reservation.preparePublication({ approveProjectMutation: true });
+                  const expectedOperation = boundedEnvelope!.operation as "CREATE" | "MODIFY" | "DELETE" | "RENAME";
+                  const expectedKind = expectedOperation === "MODIFY" ? "REPLACE" : expectedOperation;
+                  const expectedVersion = { CREATE: 6, MODIFY: 2, DELETE: 3, RENAME: 4 }[expectedOperation];
+                  const ready = reservation.preparePublication(expectedOperation === "RENAME"
+                    ? { approveProjectMutation: true, rename: { sourcePath: boundedEnvelope!.source, destinationPath: boundedEnvelope!.target } }
+                    : { approveProjectMutation: true });
                   if (ready.receipt?.state !== "READY_TO_PUBLISH" || ready.receipt.operations?.length !== 1 ||
-                      ready.receipt.operations[0]?.kind !== "CREATE" || ready.receipt.operations[0].path !== boundedEnvelope!.target || !ready.authority)
+                      ready.receipt.operations[0]?.kind !== expectedKind || ready.receipt.operations[0].path !== boundedEnvelope!.target ||
+                      (expectedOperation === "RENAME" && ready.receipt.operations[0].sourcePath !== boundedEnvelope!.source) || !ready.authority)
                     throw new Error("PHI_BOUNDED_PUBLICATION_INTENT_DENIED");
-                  expectedCreatedDigest = ready.receipt.operations[0].newDigest;
+                  expectedCreatedDigest = ready.receipt.operations[0].newDigest ?? undefined;
+                  expectedCreatedIdentity = ready.receipt.operations[0].baseIdentity ?? undefined;
                   boundedTransactionId = ready.receipt.transactionId;
-                  diagnostic("CREATE_INTENT_AND_V6_READY", { transactionEstablished: true, grantIssued: true });
+                  if (expectedOperation === "CREATE") {
+                    diagnostic("CREATE_INTENT_AND_V6_READY", { transactionEstablished: true, grantIssued: true });
+                  } else diagnostic("OPERATION_INTENT_READY", { transactionEstablished: true, grantIssued: true, journalVersion: expectedVersion });
                   diagnostic("NATIVE_PUBLICATION_CALL_ENTERED");
                   const published = executePreparedWindowsPublication(ready.authority);
                   diagnostic("NATIVE_RESULT_OBSERVED", { published: published.state === "PUBLISHED" });
-                  if (published.state !== "PUBLISHED" || published.publicationProof?.journal?.version !== 6 || published.projectPublished !== true)
+                  if (published.state !== "PUBLISHED" || published.publicationProof?.journal?.version !== expectedVersion || published.projectPublished !== true)
                     throw new Error("PHI_BOUNDED_PUBLICATION_UNVERIFIED");
-                  expectedCreatedIdentity = published.publicationProof?.native?.createdIdentity;
-                  diagnostic("PHYSICAL_POSTVERIFY_COMPLETE", { grantConsumed: true, journalVersion: 6 });
+                  if (expectedOperation === "CREATE") expectedCreatedIdentity = published.publicationProof?.native?.createdIdentity;
+                  diagnostic("PHYSICAL_POSTVERIFY_COMPLETE", { grantConsumed: true, journalVersion: expectedVersion });
                   if (!/^[0-9a-f]{64}$/u.test(ready.intentDigest ?? "")) throw new Error("PHI_BOUNDED_INTENT_UNBOUND");
-                  return { status: "PUBLISHED", operation: "CREATE", transactionId: ready.receipt.transactionId,
-                    journalVersion: 6, intentDigest: ready.intentDigest };
+                  return { status: "PUBLISHED", operation: expectedOperation, transactionId: ready.receipt.transactionId,
+                    journalVersion: expectedVersion, intentDigest: ready.intentDigest };
                 } finally { reservation.revoke(); retainedWorkers.delete(executionId); }
               } } : {}),
               resumeState: resumable ? latestState : undefined,
@@ -694,7 +704,7 @@ export default function (pi: ExtensionAPI) {
           try { repositoryEvidence = snapshotWorktree(allocation.worktree); } catch {}
         }
       } finally {
-        if (boundedCreate) {
+        if (boundedOperation) {
           let targetState = "NOT_SAMPLED", digestMatch: boolean | null = null, identityMatch: boolean | null = null;
           if (!process.env.PHI_BOUNDED_TEST_AUDIT) targetState = "NOT_SAMPLED";
           else if (!allocation?.worktree || !fs.existsSync(allocation.worktree)) targetState = "NO_WORKTREE";

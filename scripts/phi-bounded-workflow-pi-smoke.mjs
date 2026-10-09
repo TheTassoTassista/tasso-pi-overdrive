@@ -28,7 +28,12 @@ const agentDir = path.join(temp, 'agent');
 const auditFile = path.join(temp, 'provider-audit.jsonl');
 const evidenceRoot = path.join(temp, 'evidence');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
-const task = 'Create file `created.txt` containing new-create-fixture';
+const operation = process.argv[2] === '--modify' ? 'MODIFY' : 'CREATE';
+if (process.argv.length > 3 || process.argv[2] && process.argv[2] !== '--modify') throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
+const task = operation === 'CREATE' ? 'Create file `created.txt` containing new-create-fixture' :
+  'Modify file `input.txt` to contain new-modify-fixture';
+const target = operation === 'CREATE' ? 'created.txt' : 'input.txt';
+const version = operation === 'CREATE' ? 6 : 2;
 let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0 };
 let child;
 let childClosed;
@@ -55,13 +60,18 @@ try {
     `subagentOnlyExtensions: ${childExtensions.join(', ')}`,
     'defaultContext: fresh', 'acceptanceRole: writer', 'permission:', '  edit: allow', '  write: allow',
     'inheritGlobalContext: false', 'inheritProjectContext: false', 'inheritSkills: false',
-    'async: false', '---', 'Use only the offered tools for the exact assigned CREATE fixture. Never edit the host project directly.', '',
+    'async: false', '---', 'Use only the offered tools for the exact assigned fixture. Never edit the host project directly.', '',
   ].join('\n');
   fs.writeFileSync(path.join(agentDir, 'agents', 'worker.md'), workerDefinition, { mode: 0o600 });
   fs.writeFileSync(path.join(project, 'config.json'), '{}');
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node test.cjs' } }));
-  fs.writeFileSync(path.join(project, 'edit.cjs'), "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')");
-  fs.writeFileSync(path.join(project, 'test.cjs'), "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')");
+  if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
+  fs.writeFileSync(path.join(project, 'edit.cjs'), operation === 'CREATE'
+    ? "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')"
+    : "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')");
+  fs.writeFileSync(path.join(project, 'test.cjs'), operation === 'CREATE'
+    ? "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')"
+    : "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')");
   for (const args of [['init', '--quiet'], ['add', '.'], ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'baseline']]) {
     const run = spawnSync('git', args, { cwd: project, shell: false, encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
@@ -169,13 +179,13 @@ try {
   assert.ok(turns.some(turn => turn.lane === 'worker'));
   assert.equal(publications.length, expectedPublished ? 1 : 0);
   if (expectedPublished) {
-    assert.equal(publications[0].operation, 'CREATE');
-    assert.equal(publications[0].journalVersion, 6);
+    assert.equal(publications[0].operation, operation);
+    assert.equal(publications[0].journalVersion, version);
     assert.match(publications[0].intentDigest, /^[0-9a-f]{64}$/u);
     const names = stages.map(row => row.stage);
     const required = ['WORKFLOW_ADMITTED', 'EVIDENCE_RUN_CREATED', 'JOURNAL_CREATED', 'RUNTIME_ALLOCATED',
       'ENVELOPE_ESTABLISHED', 'WORKER_RESERVED', 'WORKER_RESULT', 'WORKER_REVOKED',
-      'CONTROLLER_VALIDATION_START', 'CREATE_INTENT_AND_V6_READY', 'NATIVE_PUBLICATION_CALL_ENTERED',
+      'CONTROLLER_VALIDATION_START', operation === 'CREATE' ? 'CREATE_INTENT_AND_V6_READY' : 'OPERATION_INTENT_READY', 'NATIVE_PUBLICATION_CALL_ENTERED',
       'NATIVE_RESULT_OBSERVED', 'PHYSICAL_POSTVERIFY_COMPLETE', 'PRE_CLEANUP_PHYSICAL_SNAPSHOT',
       'FINAL_RECEIPT_WRITTEN', 'TERMINAL_STATUS_COMMITTED'];
     let previous = -1;
@@ -185,7 +195,7 @@ try {
       previous = index;
     }
     const physical = stages.findLast(row => row.stage === 'PRE_CLEANUP_PHYSICAL_SNAPSHOT');
-    const ready = stages.findLast(row => row.stage === 'CREATE_INTENT_AND_V6_READY');
+    const ready = stages.findLast(row => row.stage === (operation === 'CREATE' ? 'CREATE_INTENT_AND_V6_READY' : 'OPERATION_INTENT_READY'));
     const nativeResult = stages.findLast(row => row.stage === 'NATIVE_RESULT_OBSERVED');
     const postverify = stages.findLast(row => row.stage === 'PHYSICAL_POSTVERIFY_COMPLETE');
     assert.deepEqual({ targetState: physical.targetState, digestMatch: physical.digestMatch,
@@ -197,7 +207,8 @@ try {
       v6Observed: 'NEW_COMPLETE_OBSERVED', transactionEstablished: true,
       grantIssued: true, published: true, grantConsumed: true });
   }
-  assert.equal(fs.existsSync(path.join(project, 'created.txt')), false, 'original Git project must remain untouched');
+  assert.equal(operation === 'CREATE' ? fs.existsSync(path.join(project, target)) === false :
+    fs.readFileSync(path.join(project, target), 'utf8') === 'old-modify-fixture', true, 'original Git project must remain untouched');
   if (process.platform === 'win32') {
     let baseline = { status: 'UNKNOWN' };
     try {
@@ -245,7 +256,7 @@ try {
     const childAlive = childIdentity ? inspectProcessIdentity(childIdentity).alive : null;
     report.preFixtureCleanup = { childClosed: childExitStatus !== 'TIMEOUT' && childExitStatus !== null, childExitStatus,
       childAlive, piPipesDrained: stdoutDrained && stderrDrained, receiptReadback,
-      originalTargetExists: fs.existsSync(path.join(project, 'created.txt')),
+      originalTargetExists: fs.existsSync(path.join(project, target)),
       evidenceRunCount: runIds.length, journal, executionExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'execution.json'))),
       receiptExists: Boolean(runDirectory && fs.existsSync(path.join(runDirectory, 'receipt.json'))),
       stages: diagnosticRows.filter(row => row.kind === 'create_stage').slice(-64),

@@ -54,7 +54,9 @@ export function requireCodingBackend(operation) {
 export function requireBoundedWindowsPublication(operation) {
   if (typeof operation !== 'string' || !['CREATE', 'MODIFY', 'DELETE', 'RENAME'].includes(operation)) denied('PHI_PUBLICATION_OPERATION_INVALID');
   const adapter = platformAdapter();
-  if (adapter.id !== 'win32' || adapter.boundedPublication?.[operation] !== 'NATIVE_VERIFIED_V6') denied('PHI_PUBLICATION_CAPABILITY_UNAVAILABLE');
+  const required = { CREATE: 'NATIVE_VERIFIED_V6', MODIFY: 'NATIVE_VERIFIED_V2',
+    DELETE: 'NATIVE_VERIFIED_V3', RENAME: 'NATIVE_VERIFIED_V4' }[operation];
+  if (adapter.id !== 'win32' || adapter.boundedPublication?.[operation] !== required) denied('PHI_PUBLICATION_CAPABILITY_UNAVAILABLE');
   return Object.freeze({ platform: adapter.id, operation, evidence: adapter.boundedPublication[operation] });
 }
 
