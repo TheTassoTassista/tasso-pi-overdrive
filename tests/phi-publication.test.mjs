@@ -12,7 +12,7 @@ import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mjs';
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
-import { consumeWindowsPublicationProof, publishWindowsSingleOperation, windowsPublicationFailure } from '../platform/windows/publication.mjs';
+import { consumeWindowsPublicationProof, discoverWindowsTransactions, publishWindowsSingleOperation, windowsPublicationFailure } from '../platform/windows/publication.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 60000 };
 const rootIdentity = 'a'.repeat(16) + ':' + '1'.repeat(32);
@@ -714,6 +714,9 @@ test('native bounded ordinary DELETE V3 binds target identity and one-use grant 
     assert.equal(published.publicationProof.native.sourceIdentity, item.publicationEnvelope.expectedIdentity);
     assert.equal(published.publicationProof.verifiedDigest, verified.verification.draft.contentDigest);
     assert.equal(fs.existsSync(path.join(item.project, 'remove.txt')), false);
+    const observed = discoverWindowsTransactions({ cwd: item.project }).entries.find(entry => entry.transactionId === ready.receipt.transactionId);
+    assert.equal(observed?.phase, 'CLEANED');
+    assert.equal(observed?.observedStatus, 'DELETE_COMMITTED_CLEANUP_OBSERVED');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
   } finally { item.close(); }
 });

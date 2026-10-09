@@ -218,7 +218,8 @@ try {
       grantConsumed: postverify.grantConsumed },
     { targetState: operation === 'DELETE' ? 'ABSENT' : 'PRESENT', digestMatch: operation === 'DELETE' ? null : true,
       identityMatch: operation === 'DELETE' ? null : true, v6Phase: 'CLEANED',
-      v6Observed: 'NEW_COMPLETE_OBSERVED', transactionEstablished: true,
+      v6Observed: operation === 'DELETE' ? 'DELETE_COMMITTED_CLEANUP_OBSERVED' : 'NEW_COMPLETE_OBSERVED',
+      transactionEstablished: true,
       grantIssued: true, published: true, grantConsumed: true });
   }
   assert.equal(operation === 'CREATE' ? fs.existsSync(path.join(project, target)) === false :
