@@ -786,10 +786,12 @@ test('native bounded ordinary RENAME V4 rejects a concurrent destination conflic
     const ready = item.reservation.preparePublication({ approveProjectMutation: true,
       rename: { sourcePath: 'move.txt', destinationPath: 'moved.txt' } });
     fs.writeFileSync(path.join(item.project, 'moved.txt'), 'user-destination');
-    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
+    assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
     assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'user-destination');
     assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
+    fs.unlinkSync(path.join(item.project, 'moved.txt'));
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    assert.equal(fs.existsSync(path.join(item.project, 'moved.txt')), false);
   } finally { item.close(); }
 });
 test('native bounded ordinary RENAME V4 rejects same-byte source recreation with a different identity', native, async () => {
