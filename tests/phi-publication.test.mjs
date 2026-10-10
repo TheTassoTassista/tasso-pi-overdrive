@@ -13,6 +13,7 @@ import { executeBrokeredSafeExec } from '../platform/shared/safe-exec-handler.mj
 import { executeCodingTool, executeCodingLsp, verifyCodingProject } from '../platform/shared/coding-execution.mjs';
 import { ownedWindowsHelper, windowsRecoveryStatus } from '../platform/windows/process.mjs';
 import { consumeWindowsPublicationProof, discoverWindowsTransactions, publishWindowsSingleOperation, windowsPublicationFailure } from '../platform/windows/publication.mjs';
+import { diagnosticNativeBody, failureStage } from './phi-current-failure-diagnostic.mjs';
 
 const native = { skip: process.platform !== 'win32', timeout: 60000 };
 const rootIdentity = 'a'.repeat(16) + ':' + '1'.repeat(32);
@@ -324,13 +325,22 @@ function nativeFixture(task = 'Fix JSON configuration code and test diagnostics'
   return { project, reservation, token, sessionId, publicationEnvelope, context: { workerAuthority: token, sessionId, runtime: path.resolve(import.meta.dirname, '../runtime/lsp') },
     close: () => { reservation.revoke(); fs.rmSync(root, { recursive: true, force: true }); assert.equal(fs.existsSync(root), false); } };
 }
-async function nativeVerified(item) {
+async function nativeVerified(item, note = () => {}) {
+  let stage = 'WORKER_EDIT';
+  try {
   const edit = await executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 }, { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token });
   const boundedRenameFailure = /^PHI_MOVE_DRAFT:[A-Z0-9]+:[a-z]+$/u.test(edit.stderr?.trim() ?? '') ? edit.stderr.trim() : 'EDIT_NONZERO';
+  if (Number.isSafeInteger(edit.code) && edit.code >= 0 && edit.code <= 255) note('workerEditExit', edit.code);
+  if (edit.code !== 0) {
+    const code = /^PHI_MOVE_DRAFT:(EACCES|EPERM|EBUSY|ENOENT):[a-z]+$/u.exec(boundedRenameFailure)?.[1] ?? 'OTHER';
+    note('workerEditError', code);
+  }
   assert.equal(edit.code, 0, boundedRenameFailure); assert.equal(edit.metadata.profile, 'EDIT'); assert.equal(edit.metadata.cleanup, 'PASS');
   assert.throws(() => process.kill(Number(edit.stdout.trim()), 0), e => e.code === 'ESRCH');
+  stage = 'WORKER_LSP';
   const lsp = await executeCodingLsp(item.project, { operation: 'diagnostics', path: 'config.json' }, item.context);
   assert.equal(lsp.status, 'PASS'); assert.equal(lsp.count, 0); assert.equal(lsp.receipt.profile, 'LSP_READ_ONLY');
+  stage = 'WORKER_VERIFY';
   const verified = await verifyCodingProject({ cwd: item.project, workerAuthority: item.token, sessionId: item.sessionId });
   assert.equal(verified.status, 'PASS'); assert.equal(verified.draft.contentDigest, lsp.receipt.draft.contentDigest);
   for (const row of verified.results) {
@@ -338,6 +348,7 @@ async function nativeVerified(item) {
     if (row.name === 'test') assert.throws(() => process.kill(Number(row.output.trim()), 0), e => e.code === 'ESRCH');
   }
   return { edit: edit.metadata, lsp: lsp.receipt, verification: verified };
+  } catch (error) { throw failureStage(error, stage); }
 }
 test('native real draft EDIT/LSP/TEST reaches controller-only READY, stale/forged/re-analysis grants cannot publish', native, async () => {
   const item = nativeFixture();
@@ -465,24 +476,29 @@ test('native production Worker DELETE concurrent replacement after READY is pres
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_DELETE_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
   } finally { item.close(); }
 });
-test('native production Worker move intent/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', native, async () => {
+test('native production Worker move intent/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', native,
+  diagnosticNativeBody('native production Worker move intent/LSP/TEST/READY/V4 journal publishes only intended Git rename without TxF', 'PUBLICATION', import.meta.url, async (mark, note) => {
   const item = nativeFixture('Fix JSON code and rename obsolete fixture with tests', 'rename');
   const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
   try {
+    mark('GIT_BASELINE');
     assert.equal(spawnSync('git', ['-C', item.project, 'add', 'config.json', 'package.json', 'edit.cjs', 'test.cjs', 'move.txt'], { shell: false }).status, 0);
     assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'RENAME fixture baseline'], { shell: false }).status, 0);
-    const evidence = await nativeVerified(item), before = item.reservation.status().draft;
+    const evidence = await nativeVerified(item, note), before = item.reservation.status().draft;
     assert.equal(fs.existsSync(path.join(item.project, 'move.txt')), true);
     assert.equal(fs.existsSync(path.join(item.project, 'moved.txt')), false);
     for (const bad of [
       { approveProjectMutation: true, rename: null }, { approveProjectMutation: true, rename: { ...intent, runner: 'copy' } },
       { approveProjectMutation: true, rename: intent, runner: 'copy' },
     ]) assert.throws(() => item.reservation.preparePublication(bad), /PUBLISH_AUTHORITY_DENIED|RENAME_INTENT_INVALID/u);
+    mark('CONTROLLER_READY');
     const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
     assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
     assert.deepEqual(ready.receipt.operations.map(op => [op.sourcePath, op.path, op.kind]), [['move.txt', 'moved.txt', 'RENAME']]);
     assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
+    mark('NATIVE_PUBLISH');
     const publication = executePreparedWindowsPublication(ready.authority), proof = publication.publicationProof;
+    mark('POSTVERIFY');
     assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
     assert.deepEqual(publication.filesCommitted, ['moved.txt']); assert.equal(proof.scope, 'VERIFIED_WORKER_SINGLE_RENAME');
     assert.equal(proof.operation, 'RENAME'); assert.equal(proof.native.txfUsed, false);
@@ -504,26 +520,32 @@ test('native production Worker move intent/LSP/TEST/READY/V4 journal publishes o
     item.reservation.revoke(); assert.equal(item.reservation.status().draft.payloadCleared, true);
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_RENAME', receipts: [evidence.edit, evidence.lsp, ...evidence.verification.results.map(x => x.receipt)], publication,
       gitDiffOnlyIntendedRename: true, sourceWasUnchangedUntilCommit: true, publisherGone: true, authorityRevoked: true, payloadCleared: true, externalRequests: 0 }));
-  } finally { item.close(); }
-});
-test('native user change after READY RENAME is CONFLICT; user destination and verified draft survive', native, async () => {
+  } finally { try { item.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
+}));
+test('native user change after READY RENAME is CONFLICT; user destination and verified draft survive', native,
+  diagnosticNativeBody('native user change after READY RENAME is CONFLICT; user destination and verified draft survive', 'PUBLICATION', import.meta.url, async (mark, note) => {
   const item = nativeFixture('Fix JSON code and rename obsolete fixture with tests', 'rename');
   const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
   try {
-    await nativeVerified(item);
+    await nativeVerified(item, note);
+    mark('CONTROLLER_READY');
     const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), before = item.reservation.status().draft;
+    mark('USER_CONFLICT');
     fs.writeFileSync(path.join(item.project, 'moved.txt'), 'user-destination');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
     assert.equal(item.reservation.publicationStatus().state, 'CONFLICT'); assert.equal(item.reservation.publicationStatus().projectPublished, false);
     assert.equal(item.reservation.status().draft.contentDigest, before.contentDigest);
     assert.equal(fs.readFileSync(path.join(item.project, 'move.txt'), 'utf8'), 'unchanged-rename-fixture');
     assert.equal(fs.readFileSync(path.join(item.project, 'moved.txt'), 'utf8'), 'user-destination');
+    mark('REPLAY_DENIAL');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    mark('RECOVERY_CHECK');
     assert.equal(windowsRecoveryStatus().status, 'PASS');
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_SINGLE_RENAME_CONFLICT', publication: item.reservation.publicationStatus(), userPreserved: true, draftPreserved: true, replayDenied: true, externalRequests: 0 }));
-  } finally { item.close(); }
-});
-test('native V5 governed Worker to controller handoff publishes exact four-operation Git diff once', native, async () => {
+  } finally { try { item.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
+}));
+test('native V5 governed Worker to controller handoff publishes exact four-operation Git diff once', native,
+  diagnosticNativeBody('native V5 governed Worker to controller handoff publishes exact four-operation Git diff once', 'PUBLICATION', import.meta.url, async (mark, note) => {
   const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
   const item = nativeFixture(task, 'mixed');
   const hooks = new Map(); registerWindowsWorkerBoundary({ on: (event, hook) => hooks.set(event, hook) });
@@ -531,6 +553,7 @@ test('native V5 governed Worker to controller handoff publishes exact four-opera
   try {
     for (const name of ['config.json', 'package.json', 'edit.cjs', 'test.cjs', 'remove.txt', 'move.txt'])
       assert.equal(fs.existsSync(path.join(item.project, name)), true);
+    mark('GIT_BASELINE');
     assert.equal(spawnSync('git', ['-C', item.project, 'add', '.'], { shell: false }).status, 0);
     assert.equal(spawnSync('git', ['-C', item.project, '-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'V5 fixture baseline'], { shell: false }).status, 0);
     // The actual Worker extension hooks and registered safe_exec handler use
@@ -538,16 +561,21 @@ test('native V5 governed Worker to controller handoff publishes exact four-opera
     hooks.get('before_agent_start')({ prompt: `Task: ${task}` }, ctx);
     assert.equal(hooks.get('tool_call')({ toolName: 'safe_exec' }, ctx), undefined);
     assert.equal(hooks.get('tool_call')({ toolName: 'write' }, ctx).block, true);
+    mark('WORKER_EDIT');
     const edit = await executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'], timeoutMs: 8000 }, ctx);
+    if (Number.isSafeInteger(edit.code) && edit.code >= 0 && edit.code <= 255) note('workerEditExit', edit.code);
     assert.equal(edit.details.receipt.profile, 'EDIT'); assert.equal(edit.details.receipt.cleanup, 'PASS');
     assert.equal(edit.details.receipt.projectPublished, false);
+    mark('WORKER_LSP');
     const lsp = await executeCodingLsp(item.project, { operation: 'diagnostics', path: 'config.json' }, item.context);
     assert.equal(lsp.status, 'PASS'); assert.equal(lsp.count, 0);
+    mark('WORKER_VERIFY');
     const verified = await verifyCodingProject({ cwd: item.project, workerAuthority: item.token, sessionId: item.sessionId });
     assert.equal(verified.status, 'PASS');
     assert.equal(fs.readFileSync(path.join(item.project, 'config.json'), 'utf8'), '{}');
     assert.equal(fs.existsSync(path.join(item.project, 'created.txt')), false);
     const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
+    mark('CONTROLLER_READY');
     const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
     assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
     assert.deepEqual(ready.receipt.operations.map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'RENAME']);
@@ -555,7 +583,9 @@ test('native V5 governed Worker to controller handoff publishes exact four-opera
     assert.throws(() => executePreparedWindowsPublication(item.token), /PUBLISH_AUTHORITY_DENIED/u);
     assert.throws(() => executePreparedWindowsPublication(structuredClone(ready.authority)), /PUBLISH_AUTHORITY_DENIED/u);
     await assert.rejects(executeBrokeredSafeExec({ program: 'node', args: ['edit.cjs'], timeoutMs: 8000 }, ctx), /PUBLISH_HANDOFF_CLOSED/u);
+    mark('NATIVE_PUBLISH');
     const publication = executePreparedWindowsPublication(ready.authority);
+    mark('POSTVERIFY');
     assert.equal(publication.state, 'PUBLISHED'); assert.equal(publication.projectPublished, true); assert.equal(publication.cleanup, 'PASS');
     assert.deepEqual(publication.filesCommitted, ['config.json', 'created.txt', 'remove.txt', 'moved.txt']);
     assert.equal(publication.publicationProof.scope, 'VERIFIED_WORKER_MIXED');
@@ -580,16 +610,18 @@ test('native V5 governed Worker to controller handoff publishes exact four-opera
     assert.equal(item.reservation.status().draft.payloadCleared, true);
     console.log(JSON.stringify({ control: 'VERIFIED_WORKER_MIXED', edit: edit.details.receipt, lsp: lsp.receipt,
       verification: verified.status, publication, exactGitDiff: true, oneUseHandoff: true, workerAuthorityRevoked: true, externalRequests: 0 }));
-  } finally { item.close(); }
-});
-test('native V5 controller publishes after Worker revocation without restoring child authority', native, async () => {
+  } finally { try { item.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
+}));
+test('native V5 controller publishes after Worker revocation without restoring child authority', native,
+  diagnosticNativeBody('native V5 controller publishes after Worker revocation without restoring child authority', 'PUBLICATION', import.meta.url, async (mark, note) => {
   const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
   const item = nativeFixture(task, 'mixed', true);
   const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
   try {
-    const evidence = await nativeVerified(item);
+    const evidence = await nativeVerified(item, note);
     assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true, rename: intent }), /WORKER_NOT_REVOKED/u);
     const before = item.reservation.status().draft;
+    mark('WORKER_REVOKE');
     item.reservation.finishWorker();
     assert.equal(item.reservation.status().workerRevoked, true);
     assert.equal(item.reservation.status().revoked, false);
@@ -598,10 +630,13 @@ test('native V5 controller publishes after Worker revocation without restoring c
     assert.throws(() => windowsWorkerAuthority(item.sessionId), /AUTHORITY_UNAVAILABLE/u);
     await assert.rejects(executeCodingTool({ program: 'node', args: ['edit.cjs'], cwd: item.project, timeoutMs: 8000 },
       { operation: 'safe-exec', sessionId: item.sessionId, workerAuthority: item.token }), /AUTHORITY_UNAVAILABLE/u);
+    mark('CONTROLLER_READY');
     const ready = item.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
     assert.equal(ready.receipt.state, 'READY_TO_PUBLISH');
     assert.deepEqual(ready.receipt.operations.map(op => op.kind), ['REPLACE', 'CREATE', 'DELETE', 'RENAME']);
+    mark('NATIVE_PUBLISH');
     const publication = executePreparedWindowsPublication(ready.authority);
+    mark('POSTVERIFY');
     assert.equal(publication.state, 'PUBLISHED');
     assert.equal(publication.publicationProof.journal.version, 5);
     assert.equal(publication.publicationProof.journal.phase, 'CLEANED');
@@ -617,8 +652,8 @@ test('native V5 controller publishes after Worker revocation without restoring c
     assert.equal(item.reservation.status().draft.payloadCleared, true);
     console.log(JSON.stringify({ control: 'V5_POST_WORKER_REVOKE', workerRevokedBeforePublication: true,
       childAuthorityRestored: false, publication, externalRequests: 0 }));
-  } finally { item.close(); }
-});
+  } finally { try { item.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
+}));
 test('native single CREATE V6 publishes only the intended file after Worker revocation', native, async () => {
   const item = nativeFixture('Create one fixture and verify it', 'create', true);
   try {
@@ -844,23 +879,28 @@ test('native bounded CREATE rejects an otherwise verified Worker delta outside e
     assert.equal(fs.existsSync(path.join(item.project, 'other.txt')), false);
   } finally { item.close(); }
 });
-test('native V5 stale handoff and concurrent user destination never grant publication or replay', native, async () => {
+test('native V5 stale handoff and concurrent user destination never grant publication or replay', native,
+  diagnosticNativeBody('native V5 stale handoff and concurrent user destination never grant publication or replay', 'PUBLICATION', import.meta.url, async (mark, note) => {
   const task = 'Fix JSON code, create and remove a fixture, rename a fixture, then test all changes';
   const intent = { sourcePath: 'move.txt', destinationPath: 'moved.txt' };
   const stale = nativeFixture(task, 'mixed');
   try {
-    await nativeVerified(stale);
+    await nativeVerified(stale, note);
+    mark('CONTROLLER_READY');
     const ready = stale.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
     assert.equal(ready.receipt.operations.length, 4);
+    mark('WORKER_REVOKE');
     stale.reservation.revoke();
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
     assert.equal(fs.readFileSync(path.join(stale.project, 'config.json'), 'utf8'), '{}');
     assert.equal(fs.existsSync(path.join(stale.project, 'created.txt')), false);
-  } finally { stale.close(); }
+  } finally { try { stale.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
   const conflict = nativeFixture(task, 'mixed');
   try {
-    await nativeVerified(conflict);
+    await nativeVerified(conflict, note);
+    mark('CONTROLLER_READY');
     const ready = conflict.reservation.preparePublication({ approveProjectMutation: true, rename: intent });
+    mark('USER_CONFLICT');
     fs.writeFileSync(path.join(conflict.project, 'moved.txt'), 'concurrent-user-destination');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PHI_PUBLICATION_CONFLICT/u);
     assert.equal(conflict.reservation.publicationStatus().state, 'CONFLICT');
@@ -870,10 +910,12 @@ test('native V5 stale handoff and concurrent user destination never grant public
     assert.equal(fs.existsSync(path.join(conflict.project, 'created.txt')), false);
     assert.equal(fs.existsSync(path.join(conflict.project, 'remove.txt')), true);
     assert.equal(fs.existsSync(path.join(conflict.project, 'move.txt')), true);
+    mark('REPLAY_DENIAL');
     assert.throws(() => executePreparedWindowsPublication(ready.authority), /PUBLISH_AUTHORITY_DENIED/u);
+    mark('RECOVERY_CHECK');
     assert.equal(windowsRecoveryStatus().status, 'PASS');
-  } finally { conflict.close(); }
-});
+  } finally { try { conflict.close(); } catch (error) { throw failureStage(error, 'CLEANUP'); } }
+}));
 test('native controller approval cannot override read-only Task/Tool Governor policy', native, () => {
   const item = nativeFixture('Read a note');
   try { assert.throws(() => item.reservation.preparePublication({ approveProjectMutation: true }), /PUBLISH_AUTHORITY_DENIED/u); }

@@ -12,6 +12,7 @@ import { windowsJsonLspAssets, WINDOWS_JSON_LSP } from '../platform/windows/lsp-
 import { validateWindowsBrokerRequest, runWindowsSecureBroker } from '../platform/windows/secure-broker.mjs';
 import { draftContentDigest } from '../lib/phi-worker-draft.mjs';
 import { windowsRecoveryStatus } from '../platform/windows/process.mjs';
+import { diagnosticNativeBody } from './phi-current-failure-diagnostic.mjs';
 
 const runtime = path.resolve(import.meta.dirname,'../runtime/lsp');
 const native = { skip:process.platform!=='win32',timeout:60000 };
@@ -85,12 +86,17 @@ test('native LSP real file-schema reads only confined files; private schema deni
     assert.equal(denied.receipt.cleanup,'PASS');assert.equal(denied.jobEmptyVerified,true);
   }finally{item.close();}
 });
-test('native LSP timeout, real target crash and broker death retain failure and owned cleanup',native,async()=>{
+test('native LSP timeout, real target crash and broker death retain failure and owned cleanup',native,
+  diagnosticNativeBody('native LSP timeout, real target crash and broker death retain failure and owned cleanup','LSP_TIMEOUT',import.meta.url,async(mark,note)=>{
   for(const mode of['timeout','crash','broker']){
+    mark(mode==='timeout'?'LSP_TIMEOUT':mode==='crash'?'LSP_CRASH':'LSP_BROKER_DEATH');
     let target, crashIssued=false;
     const request=brokerRequest({'config.json':'{}'},mode==='timeout'?{timeoutMs:30}:{});
     const abort=new AbortController();
     const result=await runWindowsSecureBroker(request,{signal:abort.signal,onTargetStarted:row=>{target=row;if(mode==='crash'){process.kill(row.childPid,'SIGKILL');crashIssued=true;}if(mode==='broker')abort.abort();}});
+    mark(mode==='timeout'?'LSP_TIMEOUT_RESULT':mode==='crash'?'LSP_CRASH_RESULT':'LSP_BROKER_RESULT');
+    if(Number.isSafeInteger(result.code)&&result.code>=0&&result.code<=255)note('lspExit',result.code);
+    note('targetObserved',Boolean(target));note('jobEmptyVerified',result.jobEmptyVerified===true);note('cleanupPass',result.receipt?.cleanup==='PASS');
     // Never print server stdout/stderr, paths or draft contents. Preserve only
     // the native owner's fixed failure code/phase so 70 cannot masquerade as
     // timeout proof or discard the reason when the same control fails in-suite.
@@ -103,7 +109,7 @@ test('native LSP timeout, real target crash and broker death retain failure and 
     if(target)assert.throws(()=>process.kill(target.childPid,0),e=>e.code==='ESRCH');
     assert.equal(windowsRecoveryStatus().status,'PASS');
   }
-});
+}));
 test('native LSP revocation cannot replace prior edited draft or downgrade to host execution',native,async()=>{
   const item=fixture();try{
     const edit=await executeCodingTool({program:'node',args:['edit.cjs'],cwd:item.project,timeoutMs:8000},{operation:'safe-exec',sessionId:item.sessionId,workerAuthority:item.token});assert.equal(edit.code,0);

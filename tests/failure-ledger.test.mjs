@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { failureLedgerEvidence, mainSuiteEvidence } from '../lib/phi-certification-evidence.mjs';
+import { currentFailureStageEvidence } from '../lib/phi-current-failure-evidence.mjs';
 
 const reporter = new URL('../scripts/phi-runtime-reporter.mjs', import.meta.url).href;
 
@@ -105,4 +106,41 @@ test('diagnostic selector cannot start default foundation or integrated jobs and
   assert.match(defaultJob, /!inputs\['windows-main-failure-diagnostic-only'\]/u);
   const integrated = workflow.split('  integrated-ubuntu:\n')[1]?.split('  windows-main-failure-diagnostic:\n')[0];
   assert.match(integrated, /!inputs\['windows-main-failure-diagnostic-only'\]/u);
+});
+
+test('focused stage marker survives the reporter but publishes only fixed bounded metadata', () => {
+  const helper = new URL('./phi-current-failure-diagnostic.mjs', import.meta.url).href;
+  const run = fixture(`import assert from 'node:assert/strict';
+import test from 'node:test';
+import { diagnosticNativeBody } from ${JSON.stringify(helper)};
+test('selected bounded failure', {}, diagnosticNativeBody('selected bounded failure', 'PUBLICATION', import.meta.url, async (mark, note) => {
+  mark('NATIVE_PUBLISH');
+  note('workerEditExit', 5);
+  assert.equal('PRIVATE_SENTINEL_NEVER_IN_RESULT', 'different');
+}));`);
+  assert.equal(run.status, 1);
+  const ledger = failureLedgerEvidence(run.stdout, 1, run.status);
+  assert.equal(ledger.status, 'COMPLETE');
+  const stage = currentFailureStageEvidence(run.stdout, ledger.entries[0].testId, 'PUBLICATION', true);
+  assert.deepEqual(stage, { status: 'COMPLETE', stage: 'NATIVE_PUBLISH', category: 'ASSERTION', facts: { workerEditExit: 5 } });
+  assert.equal(JSON.stringify({ ledger, stage }).includes('PRIVATE_SENTINEL_NEVER_IN_RESULT'), false);
+  const malformed = run.stdout.replace('"stage":"NATIVE_PUBLISH"', '"stage":"PRIVATE_SENTINEL_NEVER_IN_RESULT"');
+  assert.equal(currentFailureStageEvidence(malformed, ledger.entries[0].testId, 'PUBLICATION', true).status, 'DIAGNOSTIC_INCOMPLETE');
+  const invalidFact = run.stdout.replace('"workerEditExit":5', '"workerEditExit":"PRIVATE_SENTINEL_NEVER_IN_RESULT"');
+  assert.equal(currentFailureStageEvidence(invalidFact, ledger.entries[0].testId, 'PUBLICATION', true).status, 'DIAGNOSTIC_INCOMPLETE');
+  assert.equal(currentFailureStageEvidence(run.stdout, '0'.repeat(64), 'PUBLICATION', true).status, 'DIAGNOSTIC_INCOMPLETE');
+  assert.equal(currentFailureStageEvidence(run.stdout, ledger.entries[0].testId, 'PUBLICATION', false).status, 'DIAGNOSTIC_INCOMPLETE');
+});
+
+test('seven-ID focused selector is isolated from full, clone, Pi and ordinary jobs', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const job = workflow.split('  current-failure-focused:\n')[1]?.split('  ordinary-create-finalization-diagnostic:\n')[0];
+  assert.ok(job);
+  assert.match(job, /node scripts\/phi-current-failures-focused\.mjs/u);
+  assert.match(job, /Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
+  assert.doesNotMatch(job, /phi-clean-room|phi-worker-pi-smoke|phi-bounded-workflow-pi-smoke|phi-owned-main-suite/u);
+  const defaultJob = workflow.split('  native-foundation:\n')[1]?.split('\n  [a-z][a-z-]+:\n')[0];
+  assert.match(defaultJob, /!inputs\['current-failure-focused-only'\]/u);
+  const integrated = workflow.split('  integrated-ubuntu:\n')[1]?.split('  windows-main-failure-diagnostic:\n')[0];
+  assert.match(integrated, /!inputs\['current-failure-focused-only'\]/u);
 });

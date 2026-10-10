@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { diagnosticNativeBody } from './phi-current-failure-diagnostic.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -195,19 +196,27 @@ test('native generic broker normal completion and timeout kill inherited-token d
     assert.equal(fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope)), false);
   }
 });
-test('native generic broker cancellation reuses scope recovery and removes observed process tree', native, async () => {
+test('native generic broker cancellation reuses scope recovery and removes observed process tree', native,
+  diagnosticNativeBody('native generic broker cancellation reuses scope recovery and removes observed process tree', 'BROKER_DELETION', import.meta.url, async (mark, note) => {
   const abort = new AbortController(); let scope;
+  mark('WAIT_CHILD_TREE');
   const running = runWindowsSecureBroker(request('worker', treeScript(false)), { signal: abort.signal, onAdmission: (value) => { scope = value.scopeId; } });
   let pids; const end = Date.now() + 10000;
   while (Date.now() < end) {
     try { if (scope) pids = JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope, 'scratch', 'Packages', 'Phi.Probe.' + scope, 'AC', 'Temp', 'pids.json'), 'utf8')); } catch {}
     if (pids?.length === 2 && pids.every(alive)) break; await delay(20);
   }
-  try { assert.ok(pids?.length === 2 && pids.every(alive)); }
+  note('scopeObserved', Boolean(scope)); note('childCount', Array.isArray(pids) ? Math.min(pids.length, 2) : 0);
+  try { assert.ok(pids?.length === 2 && pids.every(alive)); mark('CANCEL_BROKER'); }
   finally { abort.abort(); }
-  const result = await running; assert.equal(result.code, 125); assert.equal(result.receipt.securityFailure, 'CANCELLED'); assert.equal(result.receipt.cleanup, 'PASS');
+  mark('BROKER_RESULT');
+  const result = await running;
+  if (Number.isSafeInteger(result.code) && result.code >= 0 && result.code <= 255) note('brokerExit', result.code);
+  note('jobEmptyVerified', result.jobEmptyVerified === true); note('cleanupPass', result.receipt?.cleanup === 'PASS');
+  assert.equal(result.code, 125); assert.equal(result.receipt.securityFailure, 'CANCELLED'); assert.equal(result.receipt.cleanup, 'PASS');
+  mark('CHILD_GONE');
   await gone(pids); assert.equal(fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Phi', 'NativeScopesV1', scope)), false);
-});
+}));
 test('native generic broker supervisor crash preserves journal and recovers only its observed scope', native, async () => {
   const child = spawn(ownedWindowsHelper(), ['--lpac-broker'], { shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
   let output = ''; child.stdout.setEncoding('utf8'); child.stdout.on('data', (chunk) => { output += chunk; }); child.stderr.resume();
