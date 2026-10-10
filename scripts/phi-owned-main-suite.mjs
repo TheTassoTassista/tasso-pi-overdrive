@@ -13,7 +13,7 @@ let report = { phase: process.platform === 'win32' ? 'WINDOWS_MAIN' : 'UBUNTU_RE
 try {
   const result = await runValidationCommand(command, args, {
     cwd: root, timeoutMs: validationCommandTimeout(command, args, root),
-    env: process.platform === 'win32' ? { ...process.env, PHI_CLONE_RUNTIME_OBSERVATION: '1' } : process.env,
+    env: { ...process.env, PHI_CLONE_RUNTIME_OBSERVATION: '1' },
   });
   report = mainSuiteEvidence(result, process.platform);
 } catch {
