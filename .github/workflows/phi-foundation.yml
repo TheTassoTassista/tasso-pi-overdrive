@@ -28,6 +28,10 @@ on:
         description: Bounded B/C intra-file predecessor diagnosis; no full corpus, clone or Pi
         type: boolean
         default: false
+      current-failure-cross-context-only:
+        description: One ordered seven-case cross-file context probe; no full corpus, clone or Pi
+        type: boolean
+        default: false
       lsp-diagnostic-only:
         description: Compare owned independent-clone LSP installation on runner temp volumes; no full gate
         type: boolean
@@ -66,7 +70,7 @@ permissions:
   contents: read
 jobs:
   integrated-ubuntu:
-    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -92,7 +96,7 @@ jobs:
       - name: Indexed source audit
         run: node scripts/phi-repository-audit.mjs
   integrated-windows:
-    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     needs: integrated-ubuntu
     runs-on: windows-latest
     timeout-minutes: 40
@@ -222,7 +226,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   current-failure-focused:
-    if: github.event_name == 'workflow_dispatch' && (inputs['current-failure-focused-only'] || inputs['current-failure-context-only']) && !inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only']
+    if: github.event_name == 'workflow_dispatch' && (inputs['current-failure-focused-only'] || inputs['current-failure-context-only'] || inputs['current-failure-cross-context-only']) && !inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only']
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -242,8 +246,8 @@ jobs:
         run: ./scripts/build-windows-process.ps1
       - name: Install pinned LSP runtime for selected native tests
         run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
-      - name: Exact seven-ID focus or B/C file context under unchanged owned 120-second limit
-        run: node scripts/phi-current-failures-focused.mjs ${{ inputs['current-failure-context-only'] && '--context' || '' }}
+      - name: Exact seven-ID focus or bounded context under unchanged owned 120-second limit
+        run: node scripts/phi-current-failures-focused.mjs ${{ inputs['current-failure-cross-context-only'] && '--cross-context' || (inputs['current-failure-context-only'] && '--context' || '') }}
       - name: Final fixed-scope ownership baseline even after failure
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
@@ -484,7 +488,7 @@ jobs:
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
     strategy:
       fail-fast: false
       matrix:

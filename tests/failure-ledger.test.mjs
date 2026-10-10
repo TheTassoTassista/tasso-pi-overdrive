@@ -161,3 +161,20 @@ test('B/C contextual diagnosis preserves native file order, exact corpus size an
   const integrated = workflow.split('  integrated-ubuntu:\n')[1]?.split('  windows-main-failure-diagnostic:\n')[0];
   assert.match(integrated, /!inputs\['current-failure-context-only'\]/u);
 });
+
+test('cross-file seven-case diagnosis remains bounded and excludes certifying jobs', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const job = workflow.split('  current-failure-focused:\n')[1]?.split('  ordinary-create-finalization-diagnostic:\n')[0];
+  const script = fs.readFileSync(new URL('../scripts/phi-current-failures-focused.mjs', import.meta.url), 'utf8');
+  assert.match(job, /inputs\['current-failure-cross-context-only'\]/u);
+  assert.match(job, /'--cross-context'/u);
+  assert.doesNotMatch(job, /phi-clean-room|phi-worker-pi-smoke|phi-bounded-workflow-pi-smoke|phi-owned-main-suite/u);
+  assert.match(script, /'tests\/phi-publication\.test\.mjs', 'tests\/phi-windows-broker\.test\.mjs', 'tests\/phi-windows-lsp\.test\.mjs'/u);
+  assert.match(script, /files\.map\(file => path\.join\(root, file\)\)\], \{ cwd: root, timeoutMs: 120000 \}/u);
+  assert.match(script, /counts\.tests === 91 && counts\.pass \+ counts\.fail === 7/u);
+  assert.match(script, /jobEmptyVerified === true && owner\.pipesDrained === true/u);
+  const defaultJob = workflow.split('  native-foundation:\n')[1];
+  assert.match(defaultJob, /!inputs\['current-failure-cross-context-only'\]/u);
+  const integrated = workflow.split('  integrated-ubuntu:\n')[1]?.split('  windows-main-failure-diagnostic:\n')[0];
+  assert.match(integrated, /!inputs\['current-failure-cross-context-only'\]/u);
+});

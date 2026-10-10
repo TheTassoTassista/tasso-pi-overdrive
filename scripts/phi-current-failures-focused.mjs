@@ -30,13 +30,62 @@ function summary(output) {
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
 const contextMode = process.argv.length === 3 && process.argv[2] === '--context';
-if (process.platform !== 'win32' || process.argv.length !== (contextMode ? 3 : 2)) {
+const crossMode = process.argv.length === 3 && process.argv[2] === '--cross-context';
+if (process.platform !== 'win32' || process.argv.length !== (contextMode || crossMode ? 3 : 2)) {
   console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_FOCUS', status: 'USAGE_DENIED' }));
   process.exit(1);
 }
 const reporter = pathToFileURL(path.join(root, 'scripts', 'phi-runtime-reporter.mjs')).href;
 let allPassed = true;
-if (contextMode) {
+if (crossMode) {
+  // One native coordinator, three source files in the original main-corpus
+  // order, exactly seven selected tests. This preserves shared runner/file
+  // sequencing without starting the full Windows-main qualification.
+  const files = ['tests/phi-publication.test.mjs', 'tests/phi-windows-broker.test.mjs', 'tests/phi-windows-lsp.test.mjs'];
+  const sourceVerified = cases.every(([sourceFile, name, , testId]) => {
+    try {
+      const source = fs.readFileSync(path.join(root, sourceFile), 'utf8');
+      const actualId = createHash('sha256').update('PHI_TEST_ID_V1\0').update(sourceFile).update('\0').update(name).digest('hex');
+      return actualId === testId && source.includes(`test('${name}'`) && source.includes(`diagnosticNativeBody('${name}'`);
+    } catch { return false; }
+  });
+  if (!sourceVerified) {
+    console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CROSS_CONTEXT', status: 'SOURCE_UNVERIFIED' }));
+    process.exitCode = 1;
+  } else {
+    let result;
+    try {
+      const pattern = `^(?:${cases.map(row => escapeRegex(row[1])).join('|')})$`;
+      result = await runValidationCommand(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter', reporter,
+        `--test-name-pattern=${pattern}`, ...files.map(file => path.join(root, file))], { cwd: root, timeoutMs: 120000 });
+    } catch {
+      console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CROSS_CONTEXT', status: 'OWNER_UNVERIFIED' }));
+      process.exitCode = 1;
+    }
+    if (result) {
+      const counts = summary(result.stdout ?? '');
+      const ledger = failureLedgerEvidence(result.stdout ?? '', counts.fail, result.status);
+      const targetDiagnostics = cases.map(([, , cluster, testId]) => {
+        const failed = ledger.status === 'COMPLETE' && ledger.entries.some(row => row.testId === testId);
+        return { testId, cluster, result: failed ? 'FAIL' : ledger.status === 'NONE' ? 'PASS' : 'UNKNOWN',
+          diagnostic: currentFailureStageEvidence(result.stdout ?? '', testId, cluster, failed) };
+      });
+      const owner = result.receipt ? { jobAttested: result.receipt.jobAttested, jobEmptyVerified: result.receipt.jobEmptyVerified,
+        pipesDrained: result.receipt.pipesDrained, residualOwnedProcesses: result.receipt.residualOwnedProcesses,
+        timedOut: result.receipt.timedOut, exitCode: result.receipt.primaryExitCode } : null;
+      const owned = owner?.jobAttested === true && owner.jobEmptyVerified === true && owner.pipesDrained === true &&
+        owner.residualOwnedProcesses === 0 && owner.timedOut === false;
+      const complete = counts.tests === 91 && counts.pass + counts.fail === 7 &&
+        counts.tests === counts.pass + counts.fail + counts.skipped &&
+        (counts.fail === 0 ? ledger.status === 'NONE' : ledger.status === 'COMPLETE');
+      const status = owned && complete && result.status === 0 && counts.pass === 7 && counts.fail === 0 &&
+        targetDiagnostics.every(row => row.diagnostic.status === 'NONE') ? 'PASS' : 'FAIL';
+      console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CROSS_CONTEXT', status, tests: counts,
+        failureLedger: ledger, targetDiagnostics, owner }));
+      if (status !== 'PASS') process.exitCode = 1;
+    }
+  }
+} else if (contextMode) {
   // The prior full corpus failed B/C, while two isolated focused executions
   // passed. Preserve each source file's native intra-file predecessor order;
   // this is diagnostic only, never a replacement full-suite qualification.
