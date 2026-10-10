@@ -6,7 +6,7 @@ import { tap } from 'node:test/reporters';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
-function boundedFailure(event) {
+function boundedIdentity(event) {
   const name = event.data?.name;
   const file = event.data?.file;
   if (typeof name !== 'string' || name.length === 0 || name.length > 4096 ||
@@ -14,6 +14,12 @@ function boundedFailure(event) {
   const relative = path.relative(process.cwd(), file).replaceAll('\\', '/');
   if (!/^tests\/phi-[^/]+\.test\.mjs$/u.test(relative)) return null;
   const testId = createHash('sha256').update('PHI_TEST_ID_V1\0').update(relative).update('\0').update(name).digest('hex');
+  return { testId, sourceFile: relative };
+}
+
+function boundedFailure(event) {
+  const identity = boundedIdentity(event);
+  if (!identity) return null;
   const error = event.data?.details?.error;
   const failureType = error?.failureType;
   const category = failureType === 'testCodeFailure' ? 'TEST_CODE_FAILURE' :
@@ -22,7 +28,7 @@ function boundedFailure(event) {
     failureType === 'testTimeoutFailure' ? 'TEST_TIMEOUT' : 'TEST_FAILURE_UNKNOWN';
   const assertionCategory = error?.code === 'ERR_ASSERTION' || error?.cause?.code === 'ERR_ASSERTION' ?
     'ASSERTION' : 'UNKNOWN';
-  return { testId, sourceFile: relative, category, assertionCategory };
+  return { ...identity, category, assertionCategory };
 }
 
 export default async function* runtimeReporter(source) {
@@ -39,6 +45,7 @@ export default async function* runtimeReporter(source) {
         completed++;
         yield observation('completion', { ordinal: event.data.testNumber, completed,
           durationMs: event.data.details?.duration_ms ?? null, failed: event.type === 'test:fail',
+          identity: boundedIdentity(event),
           ...(event.type === 'test:fail' ? { failure: boundedFailure(event) } : {}) });
       }
     }

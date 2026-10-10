@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { failureLedgerEvidence, mainSuiteEvidence } from '../lib/phi-certification-evidence.mjs';
+import { focusedCorpusEvidence } from '../lib/phi-focused-corpus-evidence.mjs';
 import { currentFailureStageEvidence } from '../lib/phi-current-failure-evidence.mjs';
 
 const reporter = new URL('../scripts/phi-runtime-reporter.mjs', import.meta.url).href;
 
-function fixture(source) {
+function fixture(source, pattern = null) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-ledger-'));
   try {
     const tests = path.join(root, 'tests');
@@ -18,7 +20,8 @@ function fixture(source) {
     fs.writeFileSync(file, source);
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
-    const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter', reporter, file],
+    const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter', reporter,
+      ...(pattern ? [`--test-name-pattern=${pattern}`] : []), file],
       { cwd: root, encoding: 'utf8', timeout: 30000, env });
     assert.equal(result.error, undefined);
     return result;
@@ -36,6 +39,13 @@ test('stable assertion identity', () => assert.equal(1, 2));
 test('stable exception identity', () => { throw new Error('UNSTRUCTURED_CANARY_DO_NOT_PUBLISH'); });
 test('passing control', () => assert.equal(1, 1));
 `;
+const testId = name => createHash('sha256').update('PHI_TEST_ID_V1\0').update('tests/phi-ledger-fixture.test.mjs')
+  .update('\0').update(name).digest('hex');
+const countsOf = output => Object.fromEntries(['tests', 'pass', 'fail', 'skipped'].map(key =>
+  [key, Number(new RegExp(`^# ${key} (\\d+)$`, 'mu').exec(output)?.[1] ?? -1)]));
+const selectedSeven = Array.from({ length: 7 }, (_, index) => `selected ${index + 1}`);
+const filteredSource = `import test from 'node:test';\n${[...selectedSeven, 'unselected control']
+  .map(name => `test(${JSON.stringify(name)}, () => {});`).join('\n')}\n`;
 
 test('one real reporter failure yields one bounded stable ledger entry', () => {
   const first = fixture(oneFailure);
@@ -79,10 +89,10 @@ test('missing, malformed, duplicate and aggregate-mismatched failure rows fail c
   const missing = run.stdout.split(/\r?\n/u).filter(line =>
     !(line.startsWith('# PHI_RUNTIME ') && line.includes('"failed":true') && line.includes('"ordinal":2'))).join('\n');
   assert.equal(failureLedgerEvidence(missing, 2, run.status).status, 'FAILURE_LEDGER_INCOMPLETE');
-  const malformed = run.stdout.replace(/"testId":"[0-9a-f]{64}"/u, '"testId":null');
+  const malformed = run.stdout.replace(/("failure":\{"testId":")[0-9a-f]{64}/u, '$1invalid');
   assert.equal(failureLedgerEvidence(malformed, 2, run.status).status, 'FAILURE_LEDGER_INCOMPLETE');
   const id = failureLedgerEvidence(run.stdout, 2, run.status).entries[0].testId;
-  const duplicate = run.stdout.replace(/("ordinal":2[^\n]*"testId":")[0-9a-f]{64}/u, `$1${id}`);
+  const duplicate = run.stdout.replace(/("ordinal":2[^\n]*"failure":\{"testId":")[0-9a-f]{64}/u, `$1${id}`);
   assert.equal(failureLedgerEvidence(duplicate, 2, run.status).status, 'FAILURE_LEDGER_INCOMPLETE');
 });
 
@@ -94,6 +104,65 @@ test('zero failures do not fabricate entries; contradictory TAP fails closed', (
   assert.equal(failureLedgerEvidence(run.stdout.replace('ok 1 - passing', 'not ok 1 - passing'), 0, run.status).status,
     'FAILURE_LEDGER_INCOMPLETE');
 });
+
+function verifyFilteredCorpus() {
+  const run = fixture(filteredSource, '^selected [1-7]$');
+  assert.equal(run.status, 0);
+  const counts = countsOf(run.stdout);
+  assert.deepEqual(counts, { tests: 7, pass: 7, fail: 0, skipped: 0 });
+  const ledger = failureLedgerEvidence(run.stdout, counts.fail, run.status);
+  assert.deepEqual(focusedCorpusEvidence(run.stdout, counts, ledger,
+    { expectedTests: 7, selectedIds: selectedSeven.map(testId) }),
+  { status: 'PASS', reason: 'EXACT_SCOPE', expectedTests: 7 });
+  assert.equal(focusedCorpusEvidence(run.stdout, counts, ledger, { expectedTests: 8 }).status, 'FAIL');
+}
+
+function verifyFilteredRejections() {
+  const run = fixture(filteredSource, '^selected [1-7]$');
+  const counts = countsOf(run.stdout), ledger = failureLedgerEvidence(run.stdout, 0, run.status);
+  const options = { expectedTests: 7, selectedIds: selectedSeven.map(testId) };
+  const completionLines = run.stdout.split(/\r?\n/u).filter(line => line.startsWith('# PHI_RUNTIME ') && line.includes('"kind":"completion"'));
+  assert.equal(completionLines.length, 7);
+  const missing = run.stdout.replace(`${completionLines[0]}\n`, '');
+  assert.equal(focusedCorpusEvidence(missing, counts, ledger, options).status, 'FAIL');
+  const duplicate = run.stdout.replace(completionLines[6], completionLines[0]);
+  assert.equal(focusedCorpusEvidence(duplicate, counts, ledger, options).status, 'FAIL');
+  const unexpected = run.stdout.replace(testId('selected 7'), testId('unselected control'));
+  assert.equal(focusedCorpusEvidence(unexpected, counts, ledger, options).status, 'FAIL');
+  assert.equal(focusedCorpusEvidence(run.stdout, counts, ledger,
+    { expectedTests: 7, selectedIds: [...selectedSeven.slice(0, 6).map(testId), testId('unselected control')] }).status, 'FAIL');
+}
+
+function verifyUnfilteredCorpus() {
+  const pass = fixture(filteredSource);
+  const passCounts = countsOf(pass.stdout);
+  assert.equal(focusedCorpusEvidence(pass.stdout, passCounts,
+    failureLedgerEvidence(pass.stdout, 0, pass.status), { expectedTests: 8 }).status, 'PASS');
+  const fail = fixture(twoFailures);
+  const failCounts = countsOf(fail.stdout);
+  const failLedger = failureLedgerEvidence(fail.stdout, failCounts.fail, fail.status);
+  assert.equal(fail.status, 1);
+  assert.equal(focusedCorpusEvidence(fail.stdout, failCounts, failLedger, { expectedTests: 3 }).status, 'PASS');
+  assert.equal(focusedCorpusEvidence(fail.stdout, failCounts,
+    failureLedgerEvidence(fail.stdout, 1, fail.status), { expectedTests: 3 }).status, 'FAIL');
+  assert.equal(focusedCorpusEvidence(fail.stdout, { ...failCounts, fail: 1 }, failLedger,
+    { expectedTests: 3 }).status, 'FAIL');
+  const skip = fixture("import test from 'node:test'; test('pass', () => {}); test('skip', { skip: true }, () => {});");
+  assert.equal(focusedCorpusEvidence(skip.stdout, countsOf(skip.stdout),
+    failureLedgerEvidence(skip.stdout, 0, skip.status), { expectedTests: 2 }).status, 'PASS');
+}
+
+function verifyFilteredFailureLedger() {
+  const run = fixture(twoFailures, '^stable assertion identity$');
+  const counts = countsOf(run.stdout), ledger = failureLedgerEvidence(run.stdout, counts.fail, run.status);
+  assert.equal(run.status, 1);
+  assert.deepEqual(counts, { tests: 1, pass: 0, fail: 1, skipped: 0 });
+  assert.equal(ledger.status, 'COMPLETE');
+  assert.equal(focusedCorpusEvidence(run.stdout, counts, ledger,
+    { expectedTests: 1, selectedIds: [testId('stable assertion identity')] }).status, 'PASS');
+  assert.equal(focusedCorpusEvidence(run.stdout, counts, { ...ledger, observed: 0 },
+    { expectedTests: 1, selectedIds: [testId('stable assertion identity')] }).status, 'FAIL');
+}
 
 test('diagnostic selector cannot start default foundation or integrated jobs and has no clone/Pi steps', () => {
   const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
@@ -154,7 +223,7 @@ test('B/C contextual diagnosis preserves native file order, exact corpus size an
   assert.doesNotMatch(job, /phi-clean-room|phi-worker-pi-smoke|phi-bounded-workflow-pi-smoke|phi-owned-main-suite/u);
   assert.match(script, /\[\.\.\.cases\[5\], 20\], \[\.\.\.cases\[6\], 8\]/u);
   assert.match(script, /path\.join\(root, sourceFile\)\], \{ cwd: root, timeoutMs: 120000 \}/u);
-  assert.match(script, /counts\.tests === expected/u);
+  assert.match(script, /focusedCorpusEvidence\(result\.stdout \?\? '', counts, ledger, \{ expectedTests: expected \}\)/u);
   assert.match(script, /jobEmptyVerified === true && owner\.pipesDrained === true/u);
   const defaultJob = workflow.split('  native-foundation:\n')[1]?.split('\n  [a-z][a-z-]+:\n')[0];
   assert.match(defaultJob, /!inputs\['current-failure-context-only'\]/u);
@@ -163,6 +232,10 @@ test('B/C contextual diagnosis preserves native file order, exact corpus size an
 });
 
 test('cross-file seven-case diagnosis remains bounded and excludes certifying jobs', () => {
+  verifyFilteredCorpus();
+  verifyFilteredRejections();
+  verifyUnfilteredCorpus();
+  verifyFilteredFailureLedger();
   const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
   const job = workflow.split('  current-failure-focused:\n')[1]?.split('  ordinary-create-finalization-diagnostic:\n')[0];
   const script = fs.readFileSync(new URL('../scripts/phi-current-failures-focused.mjs', import.meta.url), 'utf8');
@@ -171,7 +244,7 @@ test('cross-file seven-case diagnosis remains bounded and excludes certifying jo
   assert.doesNotMatch(job, /phi-clean-room|phi-worker-pi-smoke|phi-bounded-workflow-pi-smoke|phi-owned-main-suite/u);
   assert.match(script, /'tests\/phi-publication\.test\.mjs', 'tests\/phi-windows-broker\.test\.mjs', 'tests\/phi-windows-lsp\.test\.mjs'/u);
   assert.match(script, /files\.map\(file => path\.join\(root, file\)\)\], \{ cwd: root, timeoutMs: 120000 \}/u);
-  assert.match(script, /counts\.tests === 91 && counts\.pass \+ counts\.fail === 7/u);
+  assert.match(script, /expectedTests: cases\.length, selectedIds: cases\.map\(row => row\[3\]\)/u);
   assert.match(script, /jobEmptyVerified === true && owner\.pipesDrained === true/u);
   const defaultJob = workflow.split('  native-foundation:\n')[1];
   assert.match(defaultJob, /!inputs\['current-failure-cross-context-only'\]/u);

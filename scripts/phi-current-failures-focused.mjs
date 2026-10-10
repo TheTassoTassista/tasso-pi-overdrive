@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { runValidationCommand } from '../platform/windows/validation-process.mjs';
 import { failureLedgerEvidence } from '../lib/phi-certification-evidence.mjs';
+import { focusedCorpusEvidence } from '../lib/phi-focused-corpus-evidence.mjs';
 import { currentFailureStageEvidence } from '../lib/phi-current-failure-evidence.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -75,13 +76,12 @@ if (crossMode) {
         timedOut: result.receipt.timedOut, exitCode: result.receipt.primaryExitCode } : null;
       const owned = owner?.jobAttested === true && owner.jobEmptyVerified === true && owner.pipesDrained === true &&
         owner.residualOwnedProcesses === 0 && owner.timedOut === false;
-      const complete = counts.tests === 91 && counts.pass + counts.fail === 7 &&
-        counts.tests === counts.pass + counts.fail + counts.skipped &&
-        (counts.fail === 0 ? ledger.status === 'NONE' : ledger.status === 'COMPLETE');
-      const status = owned && complete && result.status === 0 && counts.pass === 7 && counts.fail === 0 &&
+      const corpus = focusedCorpusEvidence(result.stdout ?? '', counts, ledger,
+        { expectedTests: cases.length, selectedIds: cases.map(row => row[3]) });
+      const status = owned && corpus.status === 'PASS' && result.status === 0 && counts.pass === cases.length && counts.fail === 0 &&
         targetDiagnostics.every(row => row.diagnostic.status === 'NONE') ? 'PASS' : 'FAIL';
       console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CROSS_CONTEXT', status, tests: counts,
-        failureLedger: ledger, targetDiagnostics, owner }));
+        corpus, failureLedger: ledger, targetDiagnostics, owner }));
       if (status !== 'PASS') process.exitCode = 1;
     }
   }
@@ -118,11 +118,10 @@ if (crossMode) {
       timedOut: result.receipt.timedOut, exitCode: result.receipt.primaryExitCode } : null;
     const owned = owner?.jobAttested === true && owner.jobEmptyVerified === true && owner.pipesDrained === true &&
       owner.residualOwnedProcesses === 0 && owner.timedOut === false;
-    const complete = counts.tests === expected && counts.tests === counts.pass + counts.fail + counts.skipped &&
-      (counts.fail === 0 ? ledger.status === 'NONE' : ledger.status === 'COMPLETE');
-    const status = owned && complete && result.status === 0 && counts.fail === 0 && stage.status === 'NONE' ? 'PASS' : 'FAIL';
+    const corpus = focusedCorpusEvidence(result.stdout ?? '', counts, ledger, { expectedTests: expected });
+    const status = owned && corpus.status === 'PASS' && result.status === 0 && counts.fail === 0 && stage.status === 'NONE' ? 'PASS' : 'FAIL';
     console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CONTEXT', testId, cluster, status, tests: counts,
-      targetResult: targetFailed ? 'FAIL' : ledger.status === 'NONE' ? 'PASS' : 'UNKNOWN',
+      corpus, targetResult: targetFailed ? 'FAIL' : ledger.status === 'NONE' ? 'PASS' : 'UNKNOWN',
       failureLedger: ledger, diagnostic: stage, owner }));
     if (status !== 'PASS') allPassed = false;
     if (!owned) { process.exitCode = 1; break; }
@@ -158,14 +157,14 @@ for (const [sourceFile, name, cluster, testId] of cases) {
     timedOut: result.receipt.timedOut, exitCode: result.receipt.primaryExitCode } : null;
   const owned = owner?.jobAttested === true && owner.jobEmptyVerified === true && owner.pipesDrained === true &&
     owner.residualOwnedProcesses === 0 && owner.timedOut === false;
-  const selected = counts.pass + counts.fail === 1 && Number.isSafeInteger(counts.tests) &&
-    counts.tests === counts.pass + counts.fail + counts.skipped;
+  const corpus = focusedCorpusEvidence(result.stdout ?? '', counts, ledger,
+    { expectedTests: 1, selectedIds: [testId] });
   const expectedLedger = counts.fail === 0 ? ledger.status === 'NONE' : counts.fail === 1 && ledger.status === 'COMPLETE' &&
     ledger.entries.length === 1 && ledger.entries[0].testId === testId;
-  const status = owned && selected && expectedLedger && result.status === 0 && counts.pass === 1 &&
+  const status = owned && corpus.status === 'PASS' && expectedLedger && result.status === 0 && counts.pass === 1 &&
     counts.fail === 0 && stage.status === 'NONE' ? 'PASS' : 'FAIL';
   console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_FOCUS', testId, cluster, status, tests: counts,
-    failureLedger: ledger, diagnostic: stage, owner }));
+    corpus, failureLedger: ledger, diagnostic: stage, owner }));
   if (status !== 'PASS') allPassed = false;
   if (!owned) { process.exitCode = 1; break; }
 }
