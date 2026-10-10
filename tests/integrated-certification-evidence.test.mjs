@@ -1,22 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createOwnedProcessGraphEvidence, fixedScopeBaselineEvidence, mainSuiteEvidence } from '../lib/phi-certification-evidence.mjs';
+
+test('integrated Windows certification runs all four ordinary operations in order with ownership baselines', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const integrated = workflow.split('  integrated-windows:\n')[1]?.split('  ordinary-create-finalization-diagnostic:\n')[0];
+  assert.ok(integrated);
+  let previous = -1;
+  for (const [operation, flag, version] of [
+    ['CREATE', '', 'V6'], ['MODIFY', ' --modify', 'V2'],
+    ['DELETE', ' --delete', 'V3'], ['RENAME', ' --rename', 'V4'],
+  ]) {
+    const name = `- name: Ordinary Pi secure workflow ${operation} ${version} and protected receipt readback`;
+    const start = integrated.indexOf(name);
+    const command = integrated.indexOf(`node scripts/phi-bounded-workflow-pi-smoke.mjs${flag}\n`, start);
+    const baseline = integrated.indexOf(`- name: Post-${operation} fixed-scope ownership baseline`, command);
+    assert.ok(start > previous && command > start && baseline > command, `${operation} must execute and clean up in order`);
+    previous = baseline;
+  }
+  assert.match(integrated, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
+});
 
 const owner = { jobAttested: true, jobEmptyVerified: true, pipesDrained: true,
   residualOwnedProcesses: 0, primaryExitCode: 0, timedOut: false,
-  progress: { started: true, ended: true, completed: 491, failed: 0, invalid: false, stalled: false } };
+  progress: { started: true, ended: true, completed: 500, failed: 0, invalid: false, stalled: false } };
 
 test('integrated main suite requires exact corpus and native ownership evidence', () => {
-  const ordinals = Array.from({ length: 491 }, (_, index) => `ok ${index + 1} - fixture`).join('\n');
-  const windows = { status: 0, stdout: `${ordinals}\n# tests 491\n# pass 479\n# fail 0\n# skipped 12\n`, receipt: owner };
+  const ordinals = Array.from({ length: 500 }, (_, index) => `ok ${index + 1} - fixture`).join('\n');
+  const windows = { status: 0, stdout: `${ordinals}\n# tests 500\n# pass 488\n# fail 0\n# skipped 12\n`, receipt: owner };
   assert.equal(mainSuiteEvidence(windows, 'win32').status, 'PASS');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: undefined }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, jobEmptyVerified: null } }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, pipesDrained: false } }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, progress: null } }, 'win32').status, 'FAIL');
-  assert.equal(mainSuiteEvidence({ ...windows, stdout: windows.stdout.replace('491', '490') }, 'win32').status, 'FAIL');
+  assert.equal(mainSuiteEvidence({ ...windows, stdout: windows.stdout.replace('500', '499') }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, status: 124, error: { code: 'ETIMEDOUT' } }, 'win32').status, 'FAIL');
-  assert.equal(mainSuiteEvidence({ status: 0, stdout: `${ordinals}\n# tests 491\n# pass 168\n# fail 0\n# skipped 323\n` }, 'linux').status, 'PASS');
+  assert.equal(mainSuiteEvidence({ status: 0, stdout: `${ordinals}\n# tests 500\n# pass 169\n# fail 0\n# skipped 331\n` }, 'linux').status, 'PASS');
 });
 
 test('fixed-scope baseline never converts missing ownership or active scopes to PASS', () => {

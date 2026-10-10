@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { cloneFoundationGate, finalizeCloneFoundationGate } from '../lib/phi-validation-evidence.mjs';
 import { runValidationCommand } from '../platform/windows/validation-process.mjs';
 
-function corpus({ total = 491, failed = 0, lastOrdinal = total } = {}) {
+function corpus({ total = 500, failed = 0, lastOrdinal = total } = {}) {
   const utc = '2026-01-01T00:00:00.000Z';
   const event = row => `# PHI_RUNTIME ${JSON.stringify({ ...row, elapsedMs: 1, utc })}`;
   return [event({ kind: 'start' }), ...Array.from({ length: lastOrdinal }, (_, index) =>
@@ -17,7 +17,7 @@ function corpus({ total = 491, failed = 0, lastOrdinal = total } = {}) {
 }
 function receipt(overrides = {}) {
   return { jobEmptyVerified: true, pipesDrained: true, residualOwnedProcesses: 0, timedOut: false, stallTimedOut: false, outerTimedOut: false,
-    progress: { scope: 'FIXED_SUITE_PROGRESS_ONLY', started: true, ended: true, completed: 491, failed: 0,
+    progress: { scope: 'FIXED_SUITE_PROGRESS_ONLY', started: true, ended: true, completed: 500, failed: 0,
       invalid: false, stalled: false, lastProgressMs: 1, longestObservedGapMs: 1, stallThresholdMs: 150000 }, ...overrides };
 }
 test('fixed corpus, numeric reporter and native owned observations jointly certify', () => {
@@ -38,9 +38,9 @@ test('Gate A waits for every post-suite check, clone removal and zero owned resi
 });
 test('incomplete ordinals, count mismatch, failed tests and invalid reporter fail closed', () => {
   for (const result of [
-    { stdout: corpus({ lastOrdinal: 490 }), status: 0, receipt: receipt() },
-    { stdout: corpus({ total: 490, lastOrdinal: 490 }), status: 0, receipt: receipt() },
-    { stdout: corpus(), status: 0, receipt: receipt({ progress: { ...receipt().progress, completed: 490 } }) },
+    { stdout: corpus({ lastOrdinal: 499 }), status: 0, receipt: receipt() },
+    { stdout: corpus({ total: 499, lastOrdinal: 499 }), status: 0, receipt: receipt() },
+    { stdout: corpus(), status: 0, receipt: receipt({ progress: { ...receipt().progress, completed: 499 } }) },
     { stdout: corpus(), status: 0, receipt: receipt({ progress: { ...receipt().progress, invalid: true } }) },
     { stdout: corpus().replace('# PHI_RUNTIME {', '# PHI_RUNTIME {bad'), status: 0, receipt: receipt() },
     { stdout: corpus().replace('ok 2 - synthetic', `${corpus().split('\n').find(line => line.includes('"ordinal":1'))}\nok 2 - synthetic`), status: 0, receipt: receipt() },

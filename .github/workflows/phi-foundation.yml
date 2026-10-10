@@ -140,7 +140,7 @@ jobs:
           exit $LASTEXITCODE
       - name: Post-smoke fixed-scope ownership baseline
         run: node scripts/phi-owned-scope-baseline.mjs
-      - name: One ordinary Pi secure workflow CREATE and protected receipt readback
+      - name: Ordinary Pi secure workflow CREATE V6 and protected receipt readback
         shell: pwsh
         run: |
           $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
@@ -149,6 +149,36 @@ jobs:
           node scripts/phi-bounded-workflow-pi-smoke.mjs
           exit $LASTEXITCODE
       - name: Post-CREATE fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Ordinary Pi secure workflow MODIFY V2 and protected receipt readback
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --modify
+          exit $LASTEXITCODE
+      - name: Post-MODIFY fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Ordinary Pi secure workflow DELETE V3 and protected receipt readback
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --delete
+          exit $LASTEXITCODE
+      - name: Post-DELETE fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Ordinary Pi secure workflow RENAME V4 and protected receipt readback
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --rename
+          exit $LASTEXITCODE
+      - name: Post-RENAME fixed-scope ownership baseline
         run: node scripts/phi-owned-scope-baseline.mjs
       - name: Final fixed-scope ownership baseline even after failure
         if: always()
