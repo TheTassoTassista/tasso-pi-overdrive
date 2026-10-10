@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 2 D acceptance opening baseline (2026-10-10)
+
+`D-ACCEPTANCE-RATIFICATION-001` ratifies the current D-01..D-18 inventory in `docs/phi-d-required-gates.md`; the historical D eighteen-item inventory remains UNKNOWN. Campaign-1 CI38049409731/CI38050311443 on `c53e430` is accepted for four isolated ordinary V6/V2/V3/V4 lanes and their protected readback/cleanup, but **not** for a dependent D-wide sequence. No new D-wide local or native test is credited at this evidence-mapping checkpoint. Current Linux/Windows regression qualification, dependent happy path and native restart are pending a new Campaign-2 candidate. D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## Main-accepted Campaign-1 baseline (2026-10-10)
 
 `CAMPAIGN-1-D6-CLOSURE-001` accepts the existing immutable `c53e430e41963887cc853fb6a4984b24e7c613ee` evidence below: D6 **COMPLETE / MAIN CERTIFIED**, Campaign 1 **COMPLETE / MAIN CERTIFIED**. CI38049409731 and CI38050311443 are not freshness rerun targets. D-level new behavior and D-wide production E2E remain unqualified; Windows autonomy stays BLOCKED. The earlier “proposed/pending” paragraphs below are historical pre-acceptance snapshots.

@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 2 ratified D contract (2026-10-10)
+
+Φ Main decision `D-ACCEPTANCE-RATIFICATION-001` replaces the immediately following historical D-wide scope STOP with a ratified current contract. `HISTORICAL_D_ACCEPTANCE_INVENTORY = UNKNOWN`; `CURRENT_D_ACCEPTANCE_CONTRACT_V1 = 18 RATIFIED CRITERIA` in `docs/phi-d-required-gates.md`. D-wide evidence must use four dependent normal Windows single-operation workflows on one disposable project, CREATE/V6 → MODIFY/V2 → RENAME/V4 → DELETE/V3, with fresh authority for each task, independently durable published prefix, operation-specific recovery and no global rollback or suffix auto-run. V5 remains `LEGACY_COMPOSITE`. Campaign 1/D6 remain MAIN CERTIFIED on `c53e430` and CI38050311443; D IN_PROGRESS and Windows autonomy BLOCKED. The current D ledger distinguishes accepted isolated-operation evidence from unproved dependent E2E/restart evidence. No Campaign-1 gate was rerun for this documentation/evidence-mapping checkpoint.
+
 ## Current — Campaign 2 / D completion (2026-10-10)
 
 Φ Main decision `CAMPAIGN-1-D6-CLOSURE-001` accepts Campaign 1 and D6 as **COMPLETE / MAIN CERTIFIED** on functional `c53e430e41963887cc853fb6a4984b24e7c613ee` (Windows-main CI38049409731; final integrated CI38050311443). D is **IN_PROGRESS** and Windows autonomy remains **BLOCKED**. Current D-level gate status and evidence gaps are in `docs/phi-d-required-gates.md`. Prior sections are historical checkpoint records; their pending-Main wording is superseded only for Campaign 1. V5 remains legacy composite; historical UNKNOWNs and power-loss limitations are not reclassified.
