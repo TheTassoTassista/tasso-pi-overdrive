@@ -29,12 +29,57 @@ function summary(output) {
 }
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
-if (process.platform !== 'win32' || process.argv.length !== 2) {
+const contextMode = process.argv.length === 3 && process.argv[2] === '--context';
+if (process.platform !== 'win32' || process.argv.length !== (contextMode ? 3 : 2)) {
   console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_FOCUS', status: 'USAGE_DENIED' }));
   process.exit(1);
 }
 const reporter = pathToFileURL(path.join(root, 'scripts', 'phi-runtime-reporter.mjs')).href;
 let allPassed = true;
+if (contextMode) {
+  // The prior full corpus failed B/C, while two isolated focused executions
+  // passed. Preserve each source file's native intra-file predecessor order;
+  // this is diagnostic only, never a replacement full-suite qualification.
+  for (const [sourceFile, name, cluster, testId, expected] of [
+    [...cases[5], 20], [...cases[6], 8],
+  ]) {
+    const actualId = createHash('sha256').update('PHI_TEST_ID_V1\0').update(sourceFile).update('\0').update(name).digest('hex');
+    let source;
+    try { source = fs.readFileSync(path.join(root, sourceFile), 'utf8'); } catch { source = null; }
+    if (actualId !== testId || !source?.includes(`test('${name}'`) || !source.includes(`diagnosticNativeBody('${name}'`)) {
+      console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CONTEXT', testId, cluster, status: 'SOURCE_UNVERIFIED' }));
+      process.exitCode = 1;
+      break;
+    }
+    let result;
+    try {
+      result = await runValidationCommand(process.execPath, ['--test', '--test-concurrency=1', '--test-reporter', reporter,
+        path.join(root, sourceFile)], { cwd: root, timeoutMs: 120000 });
+    } catch {
+      console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CONTEXT', testId, cluster, status: 'OWNER_UNVERIFIED' }));
+      process.exitCode = 1;
+      break;
+    }
+    const counts = summary(result.stdout ?? '');
+    const ledger = failureLedgerEvidence(result.stdout ?? '', counts.fail, result.status);
+    const targetFailed = ledger.status === 'COMPLETE' && ledger.entries.some(row => row.testId === testId);
+    const stage = currentFailureStageEvidence(result.stdout ?? '', testId, cluster, targetFailed);
+    const owner = result.receipt ? { jobAttested: result.receipt.jobAttested, jobEmptyVerified: result.receipt.jobEmptyVerified,
+      pipesDrained: result.receipt.pipesDrained, residualOwnedProcesses: result.receipt.residualOwnedProcesses,
+      timedOut: result.receipt.timedOut, exitCode: result.receipt.primaryExitCode } : null;
+    const owned = owner?.jobAttested === true && owner.jobEmptyVerified === true && owner.pipesDrained === true &&
+      owner.residualOwnedProcesses === 0 && owner.timedOut === false;
+    const complete = counts.tests === expected && counts.tests === counts.pass + counts.fail + counts.skipped &&
+      (counts.fail === 0 ? ledger.status === 'NONE' : ledger.status === 'COMPLETE');
+    const status = owned && complete && result.status === 0 && counts.fail === 0 && stage.status === 'NONE' ? 'PASS' : 'FAIL';
+    console.log(JSON.stringify({ phase: 'CURRENT_FAILURE_CONTEXT', testId, cluster, status, tests: counts,
+      targetResult: targetFailed ? 'FAIL' : ledger.status === 'NONE' ? 'PASS' : 'UNKNOWN',
+      failureLedger: ledger, diagnostic: stage, owner }));
+    if (status !== 'PASS') allPassed = false;
+    if (!owned) { process.exitCode = 1; break; }
+  }
+  if (!allPassed) process.exitCode = 1;
+} else {
 for (const [sourceFile, name, cluster, testId] of cases) {
   let source, actualId;
   try {
@@ -76,3 +121,4 @@ for (const [sourceFile, name, cluster, testId] of cases) {
   if (!owned) { process.exitCode = 1; break; }
 }
 if (!allPassed) process.exitCode = 1;
+}
