@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 2 local D-wide candidate (2026-10-10)
+
+Functional `fc5bad0`: deterministic D prefix and disposable Git handoff tests 6/6 PASS. `npm run check` PASS including syntax, TypeScript and package validation; indexed source audit exit0 with historical WARN only. Native Windows dependent production-path result NOT RUN at this checkpoint. Prior Campaign-1 accepted native baselines remain on `c53e430`; they do not certify this D candidate. No provider/model call is part of the new local tests or publication protocol.
+
 ## Campaign 2 D acceptance opening baseline (2026-10-10)
 
 `D-ACCEPTANCE-RATIFICATION-001` ratifies the current D-01..D-18 inventory in `docs/phi-d-required-gates.md`; the historical D eighteen-item inventory remains UNKNOWN. Campaign-1 CI38049409731/CI38050311443 on `c53e430` is accepted for four isolated ordinary V6/V2/V3/V4 lanes and their protected readback/cleanup, but **not** for a dependent D-wide sequence. No new D-wide local or native test is credited at this evidence-mapping checkpoint. Current Linux/Windows regression qualification, dependent happy path and native restart are pending a new Campaign-2 candidate. D IN_PROGRESS; Windows autonomy BLOCKED.
