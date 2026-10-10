@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 2 native dependent focus (2026-10-10)
+
+Non-certifying CI38062848731 at `58208761c258b808fa6bbd2948ba282d328530c1`: Windows prefix tests6/6 PASS; four dependent normal Pi calls CREATE/V6, MODIFY/V2, RENAME/V4, DELETE/V3 PASS, distinct journals/receipts, physical PREFIX_0..4, Worker revoked and grant consumed, per-call process graph PASS/residual0, final owned baseline PASS active/stale/quarantined0 and residual0. Pinned LSP install23s. Local full `npm run check` PASS. This is not the full Windows regression gate or D-18 final certification, and the physical worktree-identity wording of D-09 remains unresolved. No provider/model egress; offline local fixture turns only.
+
 ## Campaign 2 local D-wide candidate (2026-10-10)
 
 Functional `fc5bad0`: deterministic D prefix and disposable Git handoff tests 6/6 PASS. `npm run check` PASS including syntax, TypeScript and package validation; indexed source audit exit0 with historical WARN only. Native Windows dependent production-path result NOT RUN at this checkpoint. Prior Campaign-1 accepted native baselines remain on `c53e430`; they do not certify this D candidate. No provider/model call is part of the new local tests or publication protocol.

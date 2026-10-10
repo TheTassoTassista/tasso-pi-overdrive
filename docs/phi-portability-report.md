@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 native dependent focused evidence (2026-10-10)
+
+Non-certifying CI38062848731 on `5820876` passed four ordered normal Windows Pi single-operation publications (V6/V2/V4/V3), protected receipt readback, native journal/physical prefix classification and final owned cleanup/residual0. This extends accepted isolated Campaign-1 evidence but does not close D: the harness uses successive managed worktrees of one logical disposable project, not a literal single physical worktree, and native D-13 restart plus full current-candidate/final gates remain pending. D-09 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED. No provider egress.
+
 ## Campaign 2 opening state — Main-accepted D6 baseline (2026-10-10)
 
 Φ Main decision `CAMPAIGN-1-D6-CLOSURE-001` accepts D6 and Campaign 1 as **COMPLETE / MAIN CERTIFIED** on functional `c53e430e41963887cc853fb6a4984b24e7c613ee`, Windows-main CI38049409731 and integrated CI38050311443. The “technical completion proposed” section below is historical pre-acceptance text. D remains **IN_PROGRESS**, Windows autonomy **BLOCKED**, V5 `LEGACY_COMPOSITE`. Campaign-2 D gate status is tracked in `docs/phi-d-required-gates.md`; no D-wide production E2E or later autonomy certificate is implied by the D6 evidence.
