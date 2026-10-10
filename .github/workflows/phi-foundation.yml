@@ -66,6 +66,10 @@ on:
         description: Run only the isolated two-writer receipt diagnostic; no Pi or CREATE
         type: boolean
         default: false
+      d-wide-focused-only:
+        description: Campaign-2 dependent four-task Windows production-path focus; not final D certification
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -487,8 +491,44 @@ jobs:
         run: |
           Write-Output 'C1=${{ steps.c1.outcome }} D=${{ steps.d.outcome }} C2=${{ steps.c2.outcome }}'
           if ('${{ steps.c1.outcome }}' -ne 'success' -or '${{ steps.d.outcome }}' -ne 'success' -or '${{ steps.c2.outcome }}' -ne 'success') { exit 1 }
+  d-wide-focused:
+    if: github.event_name == 'workflow_dispatch' && inputs['d-wide-focused-only'] && !inputs['integrated-certification-only']
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Windows foundation bootstrap
+        shell: pwsh
+        run: ./bootstrap/windows.ps1
+      - name: Build trusted native Windows process owner
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
+      - name: Install pinned LSP runtime
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: D-wide deterministic prefix and ownership controls
+        run: node --test tests/d-prefix.test.mjs
+      - name: Four dependent normal Pi workflows with protected readback
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          npm install --prefix $workerTestPrefix --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 pi-subagents@0.66.0
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-d-wide-pi-smoke.mjs
+          exit $LASTEXITCODE
+      - name: Final fixed-scope ownership baseline even after failure
+        if: always()
+        run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'])
     strategy:
       fail-fast: false
       matrix:
