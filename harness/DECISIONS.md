@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-11 — CAMPAIGN-2-D-CLOSURE-001 (user-supplied Φ Main decision)
+
+Decision: **COMPLETE / ACCEPTED**. Φ Main certifies D and Campaign 2 as **COMPLETE / MAIN CERTIFIED** on frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`, accepted D-17 CI38123299671 and one-shot D-18 CI38124988636. The ratified D-01…D-18 evidence is accepted without rerun; Campaign 1 remains COMPLETE / MAIN CERTIFIED. V5 stays `LEGACY_COMPOSITE`; historical UNKNOWNs and power-loss limitations are not reclassified. Windows autonomy remains **BLOCKED** and PHI PORTABILITY COMPLETE is **NOT CERTIFIED**. This closure does **not** authorize E1, E2, E3, a Windows-autonomy readiness change, Campaign-3 native CI or final portability certification. Campaign-3 semantics, authority and acceptance require a separate explicit Main contract.
+
 ## 2026-10-11 — D17-CI-ACCESS-BLOCK-001 (user-supplied Φ Main decision)
 
 Decision: **DEFER / EVIDENCE-ONLY RESUMPTION**. Keep D-17 PARTIAL/UNKNOWN while existing CI38123299671 on frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` is inaccessible or incomplete. Inspect that same run and its original attempt; do not launch replacement D17, D-09, D-13 or Campaign-1 evidence. A full exact-candidate Ubuntu/Windows corpus, complete failure observability, empty owned Jobs/drained pipes/zero residuals and final baseline may close D-17. Only then may one D-18 integrated certification run on the unchanged functional candidate. First genuine D17/D18 failure or incomplete terminal evidence stops for Main; no automatic replacement. This decision grants no functional change, provider call, Windows autonomy or Campaign-3 authority.

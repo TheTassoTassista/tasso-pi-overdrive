@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 2 Main-accepted baseline (2026-10-11)
+
+`CAMPAIGN-2-D-CLOSURE-001` accepts D-01…D-18 and the existing frozen-functional D-17 CI38123299671/D-18 CI38124988636 evidence below: **D COMPLETE; Campaign 2 COMPLETE / MAIN CERTIFIED**. No test or native CI was rerun for this documentation-only closure. Campaign 1 stays MAIN CERTIFIED; Windows autonomy stays BLOCKED; PHI PORTABILITY COMPLETE is NOT CERTIFIED. The D-18 section's pending-Main wording is historical. E1/E2/E3 and a final Windows-autonomy gate have no credited tests or execution authority from this decision.
+
 ## D-18 one-shot integrated certification (2026-10-11)
 
 [CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636), attempt1, exact functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`: owned Ubuntu500/169 PASS/0 FAIL/331 skips, completed ordinal500, ledger NONE; owned Windows500/488 PASS/0 FAIL/12 skips, completed ordinal500, ledger NONE, native Job empty/pipes drained/residual0. Independent Windows clone500/488/0/12, 500 reporter/native ordinals, Gate A/B PASS/C RUNTIME_RECORDED; pinned LSP20,533 ms <120,000, suite738,348 ms inside existing outer ceiling, cleanup one attempt/PASS/clone removed/residual0. Three offline Pi controls PASS/external requests0; ordinary CREATE/V6, MODIFY/V2, DELETE/V3, RENAME/V4 all PASS/protected readback/process graph/cleanup. Dependent D-wide normal CREATE→MODIFY→RENAME→DELETE PASS/PREFIX_4, same logical Git lineage, unique operation journals, zero external requests/residuals. Integrated D13 restart PASS: PREFIX_1 preserved, V2 TEMP_CREATED→ROLLED_BACK with PASS_RECOVERED/projectMutations0, suffix not started. Post-phase and final always-on fixed-scope baselines PASS with active/stale/quarantined0, owned Job empty/pipes drained/residual0. No replacement D18. D-01…D-18 technical evidence COMPLETE; Main status decision pending.

@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 Main closure (2026-10-11)
+
+Φ Main `CAMPAIGN-2-D-CLOSURE-001` accepts the frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` and D-17 CI38123299671 / D-18 CI38124988636: **D COMPLETE; Campaign 2 COMPLETE / MAIN CERTIFIED**. Campaign 1 remains MAIN CERTIFIED. The D-18 pending-Main text below is historical; its test/cleanup evidence is unchanged and was not rerun. **Windows autonomy BLOCKED; PHI PORTABILITY COMPLETE NOT CERTIFIED.** Campaign 3 is NOT YET AUTHORIZED FOR EXECUTION: E1/E2/E3 and the final autonomy gate still need explicit Main semantics, authority and acceptance criteria. No Campaign-3 implementation or CI is claimed.
+
 ## Campaign 2 D-18 integrated technical certificate PASS (2026-10-11)
 
 Single [CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636) on exact functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` passed full owned Ubuntu500/169/0/331 and Windows500/488/0/12 with ledgers NONE, native Windows Job empty/pipes drained/residual0. Independent Windows clone passed exact500/488/0/12, Gate A/B, LSP20,533 ms under120 s and one-attempt removal/residual0. Three offline Pi controls, four isolated ordinary V6/V2/V3/V4 publications, dependent logical-project D-wide PREFIX_0→4 and CREATE-prefix/interrupted V2 fresh-start rollback all PASS with protected readback/physical verification, zero external requests and final fixed-scope baseline PASS. D-01…D-18 have technical COMPLETE evidence. D and Campaign 2 remain IN_PROGRESS pending Φ Main closure; Windows autonomy remains BLOCKED. V5 legacy and historical/power-loss limitations remain. This is not a Windows-autonomy or full-portability certificate.

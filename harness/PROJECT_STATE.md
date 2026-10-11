@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 2 COMPLETE / Main certified; Campaign 3 authority pending (2026-10-11)
+
+`CAMPAIGN-2-D-CLOSURE-001` accepts frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`, D-17 CI38123299671 and one-shot D-18 CI38124988636: **D COMPLETE; Campaign 2 COMPLETE / MAIN CERTIFIED**. Campaign 1 remains COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; PHI PORTABILITY COMPLETE NOT CERTIFIED.** The D-18 pending-Main section below is a historical checkpoint, superseded only for D/Campaign-2 closure. Live Campaign-3 sources provide E1/E2/E3 labels and a Main-only final transition, but no explicit E1/E2/E3 execution/acceptance authority or final certification contract. **Campaign 3 NOT YET AUTHORIZED FOR EXECUTION; STOP → Φ Main.** No E implementation, CI or provider call; accepted D evidence and historical UNKNOWNs unchanged.
+
 ## Current — Campaign 2 D-18 technical PASS; Main certification pending (2026-10-11)
 
 One-shot [CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636), attempt1, certified frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`, completed SUCCESS. Ubuntu500/169/0/331 and owned Windows500/488/0/12 with failure ledgers NONE/owned cleanup PASS; independent Windows clone500/488/0/12, Gate A/B PASS, LSP20,533 ms <120s, clone removed/residual0. Three real-Pi controls, four isolated ordinary V6/V2/V3/V4 operations, dependent normal D-wide PREFIX_0→4 and integrated CREATE-prefix/interrupted V2 fresh-start ROLLBACK all PASS with protected receipts, zero external provider requests and final Job-empty/pipes-drained/residual0 baseline. D-01…D-18 technically COMPLETE; D and Campaign 2 remain IN_PROGRESS until Φ Main certifies closure. Windows autonomy BLOCKED. V5 LEGACY_COMPOSITE and historical unknowns unchanged; no Campaign 3 started.

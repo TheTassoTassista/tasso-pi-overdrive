@@ -2,6 +2,12 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## 2026-10-11 — Campaign 2 Main closure accepted; Campaign 3 authority discovery
+
+Φ Main decision `CAMPAIGN-2-D-CLOSURE-001` accepts D and Campaign 2 as **COMPLETE / MAIN CERTIFIED** on functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`, D-17 CI38123299671 and one-shot D-18 CI38124988636. The D-01…D-18 technical evidence below is unchanged; no gate was rerun. Campaign 1 remains COMPLETE / MAIN CERTIFIED. **Windows autonomy remains BLOCKED; PHI PORTABILITY COMPLETE is NOT CERTIFIED.** The preceding D-18 entry's pending-Main wording is historical and superseded only by this decision.
+
+Campaign 3 is **NOT YET AUTHORIZED FOR EXECUTION**. Live `harness/ROADMAP.md` and `harness/PHI_HISTORY.md` name E1 full production Windows autonomous coding E2E, E2 real security-denial E2E and E3 production failure/crash E2E, but no live Main decision specifies their exact scenarios, authority, acceptance gates or final Windows-autonomy certification. Existing D evidence is reusable foundation only, not E1/E2/E3 completion. **STOP → Φ Main** for one explicit Campaign-3 authority/acceptance contract. No Campaign-3 implementation, native CI, provider call or autonomy-readiness change was made. Do-not-redo accepted D-17/D-18 or Campaign-1 gates merely for freshness; preserve historical UNKNOWNs.
+
 ## 2026-10-11 — D-18 one-shot technical PASS; Main closure pending
 
 The same single [CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636) completed SUCCESS, attempt1/no replacement, on frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`; exact-SHA checkout pin passed. Owned Ubuntu: **500/169 PASS/0 FAIL/331 skips**, ledger NONE. Owned Windows main: **500/488 PASS/0 FAIL/12 skips**, ledger NONE, Job empty/pipes drained/owned residual0 and post-main baseline PASS. Independent Windows clone: same **500/488/0/12**, all 500 reporter/native ordinals, Gate A/B PASS and C RUNTIME_RECORDED, pinned LSP **20,533 ms <120,000 ms**, suite738,348 ms within existing outer ceiling, one-attempt cleanup PASS/clone removed/owned residual0. Three real-Pi offline smokes PASS/provider requests0. Four isolated ordinary CREATE/V6, MODIFY/V2, DELETE/V3 and RENAME/V4 smokes PASS with protected receipt readback, physical postverification, owned graph and cleanup.
