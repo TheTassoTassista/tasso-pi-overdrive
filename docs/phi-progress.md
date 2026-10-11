@@ -2,6 +2,10 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## 2026-10-11 — Campaign 3 authorized; E1 production-path inspection active
+
+New Φ Main decision `WINDOWS-AUTONOMY-CAMPAIGN-001` is durable in `harness/DECISIONS.md`, with E1–E4/readiness status in `docs/phi-campaign-3-gates.md`. Campaign 3 is AUTHORIZED / IN_PROGRESS. E1 is PARTIAL (architecture/fixture/native proof pending); E2 and E3 are BLOCKED on prior gates; E4 is BLOCKED on E1+E2+E3 and current-candidate regressions. Native budgets remain E1 0/2, E2 0/2, E3 0/2, E4 0/1; no Campaign-3 CI or provider request has run. `secure_coding_workflow` is the existing production orchestration tool and its Windows bounded-publication lane is already D-certified for explicit single-operation trusted tasks. Its narrow pre-delegation intent grammar and the global `requireCodingBackend` gate are being inspected for the minimum E1 seam; no readiness bypass, code change or autonomous publication authority has yet been introduced. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** Exact next action: inspect the Worker tool/fixture and real routing path, then implement only the smallest E1 qualification that uses the production orchestrator and produces a real source correction without a prebuilt patch. Do-not-redo accepted Campaign-1/2 native evidence or historical UNKNOWNs.
+
 ## 2026-10-11 — Campaign 2 Main closure accepted; Campaign 3 authority discovery
 
 Φ Main decision `CAMPAIGN-2-D-CLOSURE-001` accepts D and Campaign 2 as **COMPLETE / MAIN CERTIFIED** on functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`, D-17 CI38123299671 and one-shot D-18 CI38124988636. The D-01…D-18 technical evidence below is unchanged; no gate was rerun. Campaign 1 remains COMPLETE / MAIN CERTIFIED. **Windows autonomy remains BLOCKED; PHI PORTABILITY COMPLETE is NOT CERTIFIED.** The preceding D-18 entry's pending-Main wording is historical and superseded only by this decision.

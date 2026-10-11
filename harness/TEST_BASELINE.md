@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 opening baseline (2026-10-11)
+
+`WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes E1/E2/E3 and conditional one-shot E4 but no Campaign-3 technical gate has run. Native budgets used: E1 0/2, E2 0/2, E3 0/2, E4 0/1. The accepted D-17/D-18 results below remain the foundation, not E1/E2/E3 credit. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. Current-candidate full regressions are required only after functional E gates and before E4, not as an intermediate freshness rerun.
+
 ## Campaign 2 Main-accepted baseline (2026-10-11)
 
 `CAMPAIGN-2-D-CLOSURE-001` accepts D-01…D-18 and the existing frozen-functional D-17 CI38123299671/D-18 CI38124988636 evidence below: **D COMPLETE; Campaign 2 COMPLETE / MAIN CERTIFIED**. No test or native CI was rerun for this documentation-only closure. Campaign 1 stays MAIN CERTIFIED; Windows autonomy stays BLOCKED; PHI PORTABILITY COMPLETE is NOT CERTIFIED. The D-18 section's pending-Main wording is historical. E1/E2/E3 and a final Windows-autonomy gate have no credited tests or execution authority from this decision.

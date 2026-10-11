@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 opening (2026-10-11)
+
+`WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes bounded technical qualification of the Windows autonomous control plane: E1 real production source-repair E2E, E2 actual out-of-scope Worker filesystem denial, E3 full autonomous-root crash with existing V2 recovery, then current-candidate regressions and exactly one conditional E4. No E gate has native evidence yet; see `docs/phi-campaign-3-gates.md`. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. D evidence is not silently promoted; no provider-backed call or readiness activation is authorized.
+
 ## Campaign 2 Main closure (2026-10-11)
 
 Φ Main `CAMPAIGN-2-D-CLOSURE-001` accepts the frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` and D-17 CI38123299671 / D-18 CI38124988636: **D COMPLETE; Campaign 2 COMPLETE / MAIN CERTIFIED**. Campaign 1 remains MAIN CERTIFIED. The D-18 pending-Main text below is historical; its test/cleanup evidence is unchanged and was not rerun. **Windows autonomy BLOCKED; PHI PORTABILITY COMPLETE NOT CERTIFIED.** Campaign 3 is NOT YET AUTHORIZED FOR EXECUTION: E1/E2/E3 and the final autonomy gate still need explicit Main semantics, authority and acceptance criteria. No Campaign-3 implementation or CI is claimed.
