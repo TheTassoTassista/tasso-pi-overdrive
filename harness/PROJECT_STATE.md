@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — logical-project continuity ratified (2026-10-11)
+
+`D-LOGICAL-PROJECT-CONTINUITY-001` accepts D-wide continuity through one disposable Git project lineage and fresh managed worktrees W1–W4; physical-worktree persistence is rejected. Main accepts native CI38062848731 for D-09 COMPLETE without rerun. Deterministic failure-after-prefix tests already close D-10 COMPLETE; D-11/D-12 remain COMPLETE. D-13 native CREATE-prefix plus interrupted MODIFY/V2 restart is next. The immediately following Main-boundary STOP is historical and superseded on worktree interpretation only. Campaign 1/D6 remain MAIN CERTIFIED; D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## Current — Campaign 2 D-wide focus native PASS, Main contract boundary (2026-10-10)
 
 Non-certifying CI38062848731 on `5820876` passed four dependent ordinary native Windows Pi workflows (CREATE/V6, MODIFY/V2, RENAME/V4, DELETE/V3), protected receipt/journal readbacks, Worker revocation before controller publication, physical PREFIX_0..4 and final owned cleanup/residual0. D-11 deterministic classification and D-12 accepted per-protocol crash/restart classification are COMPLETE. D-09 is PARTIAL: one disposable logical Git project used sequential managed worktrees, not one immutable physical worktree identity. The ordinary controller always creates a fresh managed worktree; satisfying literal reuse would be a new runtime/control-plane behavior. STOP for Main interpretation/authority before changing that architecture. D-13 native prefix-plus-in-flight restart, D-10 native failure-after-prefix, D-14/15/16 interrupted state, D-17 current-candidate full qualification and D-18 final certification remain incomplete. Campaign 1/D6 remain MAIN CERTIFIED; D IN_PROGRESS; Windows autonomy BLOCKED.

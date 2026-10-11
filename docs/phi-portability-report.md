@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 logical-project continuity decision (2026-10-11)
+
+Φ Main `D-LOGICAL-PROJECT-CONTINUITY-001` accepts one disposable Git project lineage through fresh managed worktrees, not one persistent physical worktree. Accepted CI38062848731 closes D-09 without rerun; existing deterministic failure-after-prefix cases close D-10. D-11/D-12 remain COMPLETE, while D-13 native prefix-plus-interrupted-V2 restart and later D gates remain open. This is no Windows-autonomy or D-completion certificate.
+
 ## Campaign 2 native dependent focused evidence (2026-10-10)
 
 Non-certifying CI38062848731 on `5820876` passed four ordered normal Windows Pi single-operation publications (V6/V2/V4/V3), protected receipt readback, native journal/physical prefix classification and final owned cleanup/residual0. This extends accepted isolated Campaign-1 evidence but does not close D: the harness uses successive managed worktrees of one logical disposable project, not a literal single physical worktree, and native D-13 restart plus full current-candidate/final gates remain pending. D-09 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED. No provider egress.

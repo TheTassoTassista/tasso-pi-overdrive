@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 2 evidence reconciliation (2026-10-11)
+
+Decision `D-LOGICAL-PROJECT-CONTINUITY-001` accepts CI38062848731 without rerun for D-09 logical-project continuity. Existing `tests/d-prefix.test.mjs` failure-after-PREFIX_1/2/3 assertions passed 6/6 focused locally at the new checkpoint and are sufficient for D-10 deterministic prefix preservation. No new native test is claimed; D-13 and full current-candidate D-17 qualification remain pending.
+
 ## Campaign 2 native dependent focus (2026-10-10)
 
 Non-certifying CI38062848731 at `58208761c258b808fa6bbd2948ba282d328530c1`: Windows prefix tests6/6 PASS; four dependent normal Pi calls CREATE/V6, MODIFY/V2, RENAME/V4, DELETE/V3 PASS, distinct journals/receipts, physical PREFIX_0..4, Worker revoked and grant consumed, per-call process graph PASS/residual0, final owned baseline PASS active/stale/quarantined0 and residual0. Pinned LSP install23s. Local full `npm run check` PASS. This is not the full Windows regression gate or D-18 final certification, and the physical worktree-identity wording of D-09 remains unresolved. No provider/model egress; offline local fixture turns only.
