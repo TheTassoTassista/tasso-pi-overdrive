@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, unlinkSync } from 'node:
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { classifyDPrefix, D_OPERATIONS, runDSequence } from '../scripts/phi-d-prefix.mjs';
+import { canReclaimDWorktreeJournal, classifyDPrefix, D_OPERATIONS, runDSequence, verifyDPrefixBridge, verifyDNextBase } from '../scripts/phi-d-prefix.mjs';
 import { assertUniqueManagedWorktreeRecord, cleanupRuntimeResources, createRuntimeWorktree } from '../lib/runtime-isolation.mjs';
 
 const created = 'created-state', modified = 'modified-state';
@@ -53,6 +53,22 @@ test('D prefix classifier fails closed on mixed physical or invalid durable stat
   assert.equal(classify(root, [receipt(0), receipt(1), receipt(2)]).status, 'AMBIGUOUS');
 }));
 
+test('D fixture cleanup retains interrupted or ambiguous journals', () => {
+  const terminal = { status: 'PASS_READ_ONLY_DISCOVERY', rootIdentityVerified: true,
+    projectPublished: false, actionPerformed: false, projectTransactions: 1,
+    entries: [{ phase: 'ROLLED_BACK', classification: 'TERMINAL_RETAINED' }] };
+  assert.equal(canReclaimDWorktreeJournal(terminal), true);
+  assert.equal(canReclaimDWorktreeJournal({ ...terminal, entries: [{ phase: 'CLEANED', classification: 'TERMINAL_RETAINED' }] }), true);
+  for (const variant of [
+    { ...terminal, entries: [{ phase: 'TEMP_CREATED', classification: 'RECOVERY_REQUIRED' }] },
+    { ...terminal, entries: [{ phase: 'CONFLICT', classification: 'CONFLICT' }] },
+    { ...terminal, rootIdentityVerified: false },
+    { ...terminal, projectTransactions: 2 },
+    { ...terminal, status: 'UNKNOWN' },
+    { ...terminal, entries: [] },
+  ]) assert.equal(canReclaimDWorktreeJournal(variant), false);
+});
+
 test('failure after each published prefix stops suffix without rolling prefix back', async () => {
   for (const failAt of [1, 2, 3]) await fixture(async root => {
     put(root, null, null);
@@ -97,6 +113,7 @@ test('disposable Git fixture can base the next independent worktree on an alread
   writeFileSync(path.join(project, 'config.json'), '{}');
   git(project, ['add', '.']);
   git(project, ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'baseline']);
+  const baselineHead = git(project, ['rev-parse', 'HEAD']).trim();
   const firstRoots = { shareRoot: path.join(root, 'first-worktrees'), stateRoot: path.join(root, 'first-runtime') };
   const secondRoots = { shareRoot: path.join(root, 'second-worktrees'), stateRoot: path.join(root, 'second-runtime') };
   const first = await createRuntimeWorktree(project, firstRoots);
@@ -105,9 +122,26 @@ test('disposable Git fixture can base the next independent worktree on an alread
     // This simulates only the test fixture's Git handoff; native publication
     // itself is not credited by this local infrastructure test.
     writeFileSync(path.join(first.worktree, 'a.txt'), created);
+    const bridge = () => verifyDPrefixBridge({ sourceRoot: project, candidateRoot: first.worktree,
+      priorHead: baselineHead, prefix: 1, receipts: [receipt(0)], created, modified });
+    assert.equal(bridge().status, 'PASS');
+    writeFileSync(path.join(first.worktree, 'unrelated.txt'), 'unrelated');
+    assert.throws(bridge, /D_BRIDGE_STATE_MISMATCH/u);
+    unlinkSync(path.join(first.worktree, 'unrelated.txt'));
+    assert.equal(bridge().unrelatedDelta, 'NONE');
     git(first.worktree, ['add', 'a.txt']);
     git(first.worktree, ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'accepted published fixture state']);
+    assert.equal(verifyDPrefixBridge({ sourceRoot: project, candidateRoot: first.worktree,
+      priorHead: baselineHead, prefix: 1, receipts: [receipt(0)], created, modified, committed: true }).status, 'PASS');
     second = await createRuntimeWorktree(first.worktree, secondRoots);
+    assert.equal(git(second.worktree, ['rev-parse', 'HEAD']).trim(), git(first.worktree, ['rev-parse', 'HEAD']).trim());
+    const nextHead = git(first.worktree, ['rev-parse', 'HEAD']).trim();
+    const nextBase = () => verifyDNextBase({ sourceRoot: first.worktree, candidateRoot: second.worktree,
+      priorHead: nextHead, prefix: 1, receipts: [receipt(0)], created, modified });
+    assert.equal(nextBase().exactBase, true);
+    writeFileSync(path.join(second.worktree, 'unrelated.txt'), 'unrelated');
+    assert.throws(nextBase, /D_NEXT_BASE_MISMATCH/u);
+    unlinkSync(path.join(second.worktree, 'unrelated.txt'));
     assert.equal(classify(second.worktree, [receipt(0)]).status, 'PREFIX_1');
     assert.notEqual(first.worktree, second.worktree);
     assert.notEqual(first.port, second.port);

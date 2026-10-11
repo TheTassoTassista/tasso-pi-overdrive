@@ -737,6 +737,22 @@ namespace Phi.Native {
     }
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     static void CloseNative(IntPtr handle) { if (handle != IntPtr.Zero && handle != new IntPtr(-1)) CloseHandle(handle); }
+    // D-13 native integration fixture only: a fail-closed publisher death at
+    // an already-durable V2 phase. This never grants publication or recovery.
+    static bool D13FixtureInterruptsV2Temp(string project) {
+      if (Environment.GetEnvironmentVariable("PHI_D13_V2_TEMP_FAILPOINT") != "1" ||
+          Environment.GetEnvironmentVariable("PHI_BOUNDED_TEST_KEY") != "offline-fixture-not-a-credential") return false;
+      string share = Environment.GetEnvironmentVariable("PI_OVERDRIVE_WORKTREE_ROOT");
+      if (String.IsNullOrEmpty(share)) return false;
+      try {
+        string canonicalShare = Path.GetFullPath(share).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string canonicalProject = Path.GetFullPath(project);
+        string step = Path.GetFileName(Path.GetDirectoryName(canonicalShare));
+        string fixture = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(canonicalShare)));
+        return step == "step-2" && fixture.StartsWith("phi-d-restart-", StringComparison.Ordinal) &&
+          canonicalProject.StartsWith(canonicalShare + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+      } catch { return false; }
+    }
     internal static int RunSingleModify(Stream input) {
       PublicationJournal journal = null; object result = null; string phase = "REQUEST";
       try {
@@ -759,9 +775,14 @@ namespace Phi.Native {
         if (!alive) throw new InvalidDataException(); ValidateHeader(header, header["transactionId"] as string);
         Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
         if (value.Length != (int)op["newBytes"] || Hash(value) != (string)op["newDigest"]) throw new InvalidDataException();
+        bool d13FixtureInterrupt = D13FixtureInterruptsV2Temp(project);
         OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 30000), delegate(Action live) {
           phase = "ADMISSION"; journal = Begin(project, header); phase = "PREPARED";
-          result = journal.PublishSingleModify(value, delegate(string observed) { phase = observed; live(); });
+          result = journal.PublishSingleModify(value, delegate(string observed) {
+            phase = observed; live();
+            if (d13FixtureInterrupt && observed == "temp" && (string)journal.last["phase"] == "TEMP_CREATED")
+              Environment.Exit(76);
+          });
         });
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_MODIFY", receipt = result,
           retention = journal.ReclamationMetadata, projectPublished = false, externalRequests = 0 })); return 0;
