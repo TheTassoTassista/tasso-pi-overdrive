@@ -126,7 +126,7 @@ test('disposable Git fixture can base the next independent worktree on an alread
       priorHead: baselineHead, prefix: 1, receipts: [receipt(0)], created, modified });
     assert.equal(bridge().status, 'PASS');
     writeFileSync(path.join(first.worktree, 'unrelated.txt'), 'unrelated');
-    assert.throws(bridge, /D_BRIDGE_STATE_MISMATCH/u);
+    assert.throws(bridge, /D_BRIDGE_STATE_MISMATCH:CANDIDATE_DELTA/u);
     unlinkSync(path.join(first.worktree, 'unrelated.txt'));
     assert.equal(bridge().unrelatedDelta, 'NONE');
     git(first.worktree, ['add', 'a.txt']);
@@ -140,7 +140,7 @@ test('disposable Git fixture can base the next independent worktree on an alread
       priorHead: nextHead, prefix: 1, receipts: [receipt(0)], created, modified });
     assert.equal(nextBase().exactBase, true);
     writeFileSync(path.join(second.worktree, 'unrelated.txt'), 'unrelated');
-    assert.throws(nextBase, /D_NEXT_BASE_MISMATCH/u);
+    assert.throws(nextBase, /D_NEXT_BASE_MISMATCH:CANDIDATE_DIRTY/u);
     unlinkSync(path.join(second.worktree, 'unrelated.txt'));
     assert.equal(classify(second.worktree, [receipt(0)]).status, 'PREFIX_1');
     assert.notEqual(first.worktree, second.worktree);

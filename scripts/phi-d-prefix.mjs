@@ -88,49 +88,51 @@ function commonGitDir(cwd) {
   return fs.realpathSync(path.resolve(cwd, reported));
 }
 export function verifyDNextBase({ sourceRoot, candidateRoot, priorHead, prefix, receipts, created, modified }) {
-  const fail = () => { throw new Error('D_NEXT_BASE_MISMATCH'); };
+  const fail = reason => { throw new Error(`D_NEXT_BASE_MISMATCH:${reason}`); };
   if (typeof sourceRoot !== 'string' || typeof candidateRoot !== 'string' ||
       !path.isAbsolute(sourceRoot) || !path.isAbsolute(candidateRoot) ||
       !/^[0-9a-f]{40}$/u.test(priorHead ?? '') || !Number.isSafeInteger(prefix) || prefix < 0 || prefix > 3 ||
-      !Array.isArray(receipts) || receipts.length !== prefix) fail();
+      !Array.isArray(receipts) || receipts.length !== prefix) fail('INPUT');
   try {
-    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot) ||
-        bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead ||
-        bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim() !== priorHead ||
-        bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']) !== '' ||
-        classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts }).status !== `PREFIX_${prefix}`) fail();
+    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot)) fail('LINEAGE');
+    if (bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('SOURCE_HEAD');
+    if (bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('CANDIDATE_HEAD');
+    if (bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']) !== '') fail('CANDIDATE_DIRTY');
+    const physical = classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts });
+    if (physical.status !== `PREFIX_${prefix}`) fail(`PHYSICAL_${physical.reason ?? 'OTHER'}`);
   } catch (error) {
-    if (error?.message === 'D_NEXT_BASE_MISMATCH') throw error;
-    fail();
+    if (error?.message?.startsWith('D_NEXT_BASE_MISMATCH:')) throw error;
+    fail('GIT_OR_IO_UNCONFIRMED');
   }
   return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage: 'SAME_COMMON_GIT_DIR', exactBase: true };
 }
 export function verifyDPrefixBridge({ sourceRoot, candidateRoot, priorHead, prefix, receipts,
   created, modified, committed = false }) {
-  const fail = () => { throw new Error('D_BRIDGE_STATE_MISMATCH'); };
+  const fail = reason => { throw new Error(`D_BRIDGE_STATE_MISMATCH:${reason}`); };
   if (typeof sourceRoot !== 'string' || typeof candidateRoot !== 'string' ||
       !path.isAbsolute(sourceRoot) || !path.isAbsolute(candidateRoot) ||
       !/^[0-9a-f]{40}$/u.test(priorHead ?? '') || !Number.isSafeInteger(prefix) || prefix < 1 || prefix > 4 ||
-      !Array.isArray(receipts) || receipts.length !== prefix) fail();
+      !Array.isArray(receipts) || receipts.length !== prefix) fail('INPUT');
   try {
-    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot) ||
-        bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead ||
-        classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts }).status !== `PREFIX_${prefix}`) fail();
+    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot)) fail('LINEAGE');
+    if (bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('SOURCE_HEAD');
+    const physical = classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts });
+    if (physical.status !== `PREFIX_${prefix}`) fail(`PHYSICAL_${physical.reason ?? 'OTHER'}`);
     if (!committed) {
-      if (bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail();
+      if (bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('CANDIDATE_HEAD');
       const actual = bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']).split('\n').filter(Boolean).sort();
-      if (JSON.stringify(actual) !== JSON.stringify([...bridgeStatus[prefix - 1]].sort())) fail();
+      if (JSON.stringify(actual) !== JSON.stringify([...bridgeStatus[prefix - 1]].sort())) fail('CANDIDATE_DELTA');
     } else {
       const head = bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim();
       if (head === priorHead || bridgeGit(candidateRoot, ['rev-parse', 'HEAD^']).trim() !== priorHead ||
-          bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']) !== '') fail();
+          bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']) !== '') fail('COMMITTED_HEAD_OR_DIRTY');
       const actual = bridgeGit(candidateRoot, ['diff-tree', '--no-commit-id', '--name-status', '-r', '--no-renames', 'HEAD'])
         .split('\n').filter(Boolean).sort();
-      if (JSON.stringify(actual) !== JSON.stringify([...bridgeDelta[prefix - 1]].sort())) fail();
+      if (JSON.stringify(actual) !== JSON.stringify([...bridgeDelta[prefix - 1]].sort())) fail('COMMITTED_DELTA');
     }
   } catch (error) {
-    if (error?.message === 'D_BRIDGE_STATE_MISMATCH') throw error;
-    fail();
+    if (error?.message?.startsWith('D_BRIDGE_STATE_MISMATCH:')) throw error;
+    fail('GIT_OR_IO_UNCONFIRMED');
   }
   return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage: 'SAME_COMMON_GIT_DIR',
     exactBase: true, unrelatedDelta: 'NONE', committed };

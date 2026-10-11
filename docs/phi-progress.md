@@ -2,6 +2,10 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## 2026-10-11 — D-13 first focused run fails in deterministic bridge preflight
+
+Non-certifying native [CI38122639868](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38122639868) on exact `f863c19ad68908a6ec45c3e563f9c425cab22db6` is **FAIL**. Checkout, pinned source dependencies, native bootstrap/build and LSP installation PASS. Windows D-prefix controls are **6 PASS / 1 FAIL**: the first `verifyDPrefixBridge` call in the disposable Git worktree throws `D_BRIDGE_STATE_MISMATCH` before the Pi CREATE/restart step, which is SKIPPED. Final fixed-scope ownership baseline PASS. Root cause category is **UNKNOWN**: the combined bridge condition did not distinguish lineage, source HEAD or physical-prefix classification. Do not credit D-13 or call this a recovery failure. Scoped diagnostic-only change now emits fixed categorical failure reasons without paths or relaxed predicates; local focused7/7 PASS. Next: run the same focused Windows preflight with this instrumentation, inspect the exact reason, then make only an evidence-backed correction. No D-wide/complete gate retry, D-18, provider call or change to accepted D-09. D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## 2026-10-11 — D-13 native restart candidate; Windows evidence pending
 
 After Main accepted logical project continuity, scoped functional `a8a31b57968977e4068ec426fa9a19b09a5bd84a` adds exact same-Git-lineage/accepted-prefix bridge checks, a fixture-only V2 `TEMP_CREATED` publisher-death hook, and a non-certifying native Windows focus. The normal workflow first publishes CREATE/V6; a fresh normal MODIFY/V2 call is interrupted after durable `TEMP_CREATED`; a fresh process invokes the existing Windows startup recovery path. The gate requires PREFIX_1 unchanged, no suffix, FAIL receipt for the interrupted operation, bounded V2 rollback, owned process closure, and terminal-only fixture reclamation. An ambiguous journal is retained, not force-removed. This is test instrumentation, not new publication/recovery authority or a provider call.
