@@ -2,6 +2,14 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 D-18 integrated technical certificate PASS (2026-10-11)
+
+Single [CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636) on exact functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` passed full owned Ubuntu500/169/0/331 and Windows500/488/0/12 with ledgers NONE, native Windows Job empty/pipes drained/residual0. Independent Windows clone passed exact500/488/0/12, Gate A/B, LSP20,533 ms under120 s and one-attempt removal/residual0. Three offline Pi controls, four isolated ordinary V6/V2/V3/V4 publications, dependent logical-project D-wide PREFIX_0→4 and CREATE-prefix/interrupted V2 fresh-start rollback all PASS with protected readback/physical verification, zero external requests and final fixed-scope baseline PASS. D-01…D-18 have technical COMPLETE evidence. D and Campaign 2 remain IN_PROGRESS pending Φ Main closure; Windows autonomy remains BLOCKED. V5 legacy and historical/power-loss limitations remain. This is not a Windows-autonomy or full-portability certificate.
+
+## Campaign 2 D-17 current-candidate qualification PASS (2026-10-11)
+
+Original-attempt CI38123299671 on frozen functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a` passed Ubuntu500/169/0/331 and Windows500/488/0/12. The independent Windows clone passed 500/488/0/12 with exact500 ordinals, Gate A/B, pinned LSP10,211 ms under120 s, Job empty/pipes drained/owned residual0 and clone removal. Three isolated real-Pi smokes plus ordinary CREATE/V6 passed with zero external requests; protected readback, owned graph, fixed-scope baseline and fixture cleanup PASS. D-17 is COMPLETE; D-18 one-shot is not yet run. D IN_PROGRESS; Windows autonomy BLOCKED. This qualification is not final D completion or Windows-autonomy proof.
+
 ## Campaign 2 D-13 native restart PASS (2026-10-11)
 
 CI38122945303 on `f46a92c` passed the real Windows normal CREATE/V6 committed prefix followed by interrupted MODIFY/V2 at durable TEMP_CREATED and fresh-process safe ROLLBACK. PREFIX_1 persisted, suffix did not start, projectMutations0, owned worktree/temp cleanup and final residual0. D-14/15/16 reconcile from this and accepted recovery/retention/ownership evidence; D-17 current-candidate Linux/Windows regression and D-18 one-shot certification are still open. D IN_PROGRESS; Windows autonomy BLOCKED.

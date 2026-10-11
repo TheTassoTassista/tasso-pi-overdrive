@@ -1,5 +1,13 @@
 # Phi — Test Baseline
 
+## D-18 one-shot integrated certification (2026-10-11)
+
+[CI38124988636](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38124988636), attempt1, exact functional `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`: owned Ubuntu500/169 PASS/0 FAIL/331 skips, completed ordinal500, ledger NONE; owned Windows500/488 PASS/0 FAIL/12 skips, completed ordinal500, ledger NONE, native Job empty/pipes drained/residual0. Independent Windows clone500/488/0/12, 500 reporter/native ordinals, Gate A/B PASS/C RUNTIME_RECORDED; pinned LSP20,533 ms <120,000, suite738,348 ms inside existing outer ceiling, cleanup one attempt/PASS/clone removed/residual0. Three offline Pi controls PASS/external requests0; ordinary CREATE/V6, MODIFY/V2, DELETE/V3, RENAME/V4 all PASS/protected readback/process graph/cleanup. Dependent D-wide normal CREATE→MODIFY→RENAME→DELETE PASS/PREFIX_4, same logical Git lineage, unique operation journals, zero external requests/residuals. Integrated D13 restart PASS: PREFIX_1 preserved, V2 TEMP_CREATED→ROLLED_BACK with PASS_RECOVERED/projectMutations0, suffix not started. Post-phase and final always-on fixed-scope baselines PASS with active/stale/quarantined0, owned Job empty/pipes drained/residual0. No replacement D18. D-01…D-18 technical evidence COMPLETE; Main status decision pending.
+
+## D-17 native current-candidate qualification (2026-10-11)
+
+[CI38123299671](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38123299671), original attempt1, exact `4d612b9dfe13eda108f32e6c5a63a10a71e4da4a`: Ubuntu Phi corpus500/169 PASS/0 FAIL/331 skips; Windows main Phi corpus500/488 PASS/0 FAIL/12 skips, complete TAP footer/empty failure set; independent Windows clone same500/488/0/12 with 500 completed reporter/native ordinals, Gate A/B PASS/C RUNTIME_RECORDED. Clone pinned LSP10,211 ms <120,000 ms, Job empty/pipes drained/owned residual0, cleanup one attempt/PASS/directory removed. Three offline Pi smokes and ordinary CREATE/V6 PASS; external requests0, protected receipt readback PASS, final fixed-scope baseline PASS/owned residual0 and fixture removed. Indexed source audit exit0 with known historical WARN only. D-17 COMPLETE; D-18 not run; no replacement qualification.
+
 ## D-17 pre-native Linux qualification candidate (2026-10-11)
 
 After D-14 ambiguous-after-prefix regression and final one-shot workflow wiring: local D-prefix8/8 PASS; `npm run check:phi` exact Linux corpus500/169 PASS/0 FAIL/331 Windows-only skips; `npm run check` PASS including package validation and installed-Pi TypeScript. Native Windows current-candidate D-17 remains UNRUN. The accepted D-13 run CI38122945303 is not a substitute for D-17 full regression.
