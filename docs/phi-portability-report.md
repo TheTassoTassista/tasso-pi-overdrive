@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E1 first native attempt (2026-10-11)
+
+Focused Windows CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02` ended FAIL because the E1 evidence graph reused CREATE's three-job expectation although the real source-repair workflow launched EDIT+TEST only; graph UNKNOWN `CHILD_NOT_REGISTERED`. Actual normal Pi source correction, Worker revocation, controller V2 publication/physical postverify, protected receipt and final ownership baseline PASS/residual0, but they do not override the terminal E1 FAIL. A narrow fail-closed two-job E1 graph and regressions are locally green; corrected native Run 2 is pending, budget1/2. Windows autonomy remains BLOCKED/false; no provider call or readiness activation.
+
 ## Campaign 3 E1 local preparation (2026-10-11)
 
 The offline normal-Pi `secure_coding_workflow` fixture now repairs a small real source defect from observed failing assertions without a prebuilt patch. Local Linux E1 smoke, existing MODIFY smoke, inference controls and full `npm run check` PASS, including protected receipt/fixture cleanup; this does **not** establish native Windows E1 publication or owned Job state. E1 PARTIAL/native0/2; E2/E3/E4 BLOCKED. Structured ZERO_EGRESS_REVIEW PASS is recorded in the Campaign-3 gate ledger. Windows autonomy BLOCKED and `windowsAutonomousReady=false`; no external provider requests or readiness activation.

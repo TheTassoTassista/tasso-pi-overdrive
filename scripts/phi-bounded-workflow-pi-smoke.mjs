@@ -280,7 +280,8 @@ try {
     } catch { /* The graph reports BASELINE_MISMATCH; no recovery action is taken. */ }
     ownedScopeBaseline = baseline;
     report.ownedScopeBaseline = baseline;
-    ownedGraph = createOwnedProcessGraphEvidence({ childIdentity, childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
+    ownedGraph = createOwnedProcessGraphEvidence({ graphKind: e1 ? 'E1_SOURCE_REPAIR_NO_LSP' : 'ORDINARY_CREATE',
+      childIdentity, childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
       stdoutDrained, stderrDrained, executions: ownedExecutions, stages, baseline });
     report.ownedExecution = { count: ownedExecutions.length, ...ownedGraph };
     assert.equal(ownedGraph.status, 'PASS', `Phi-owned process graph cleanup is unverified: ${ownedGraph.reason}`);

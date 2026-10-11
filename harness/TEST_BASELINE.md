@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E1 Run 1 and graph correction (2026-10-11)
+
+CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02`: native E1 terminal **FAIL**, graph UNKNOWN `CHILD_NOT_REGISTERED`; actual workflow/native V2 publication/receipt and final fixed-scope baseline PASS. Corrected E1 two-job graph exactness regressions plus inference controls **7/7 PASS**. First post-fix full `npm run check` had one unrelated browser open timeout (root cause UNKNOWN); isolated browser **4/4 PASS**, then full `npm run check` **PASS** including syntax, installed-Pi TypeScript and package validation. No timeout or product safety change. E1 budget1/2, next corrected native run pending; E2/E3/E4 unrun and Windows autonomy BLOCKED.
+
 ## Campaign 3 E1 local preparation (2026-10-11)
 
 Offline deterministic inference controls **2/2 PASS**; normal Pi E1 source-repair smoke **PASS on Linux** with initial fixture test FAIL, source-only correction, production verification/receipt PASS and cleanup; existing normal MODIFY smoke **PASS**. Full `npm run check` **PASS** including package structure, syntax and installed-Pi TypeScript. This is local preparation only: E1 native Windows **0/2**, publication/owned graph not yet proven for the E1 scenario. ZERO_EGRESS_REVIEW PASS is recorded in `docs/phi-campaign-3-gates.md`; external provider requests 0. No D-17/D-18 rerun or Windows autonomy activation.

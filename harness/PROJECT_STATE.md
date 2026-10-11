@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E1 first native run not certified (2026-10-11)
+
+CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02` proved the actual Windows source-repair/V2 publication path and clean fixed-scope baseline, but E1 scenario terminal FAIL because its process-graph evidence template incorrectly expected a nonexistent LSP job. The exact two-job E1 graph correction and fail-closed regressions are locally green; corrected native Run 2 remains unrun. E1 PARTIAL/native1/2, E2/E3/E4 BLOCKED. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; no external provider calls or readiness activation.
+
 ## Current — Campaign 3 E1 local candidate; native proof pending (2026-10-11)
 
 `WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes bounded E1, E2, E3 and one conditional E4 technical certification, tracked in `docs/phi-campaign-3-gates.md`. E1 PARTIAL/native0/2; E2 BLOCKED/native0/2; E3 BLOCKED/native0/2; E4 BLOCKED/native0/1. A local offline normal-Pi `secure_coding_workflow` E1 fixture now demonstrates high-level source repair from observed failing assertions, source-only managed-draft change, production verification, protected receipt and cleanup; native Windows publication/ownership evidence remains pending and is not inferred. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** No Campaign-3 native execution/provider request or readiness activation has occurred. The following prior Campaign-3 authority STOP is historical and superseded only by this new Main decision.

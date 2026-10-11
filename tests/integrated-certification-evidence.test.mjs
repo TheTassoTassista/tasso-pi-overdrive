@@ -110,3 +110,20 @@ test('ordinary CREATE graph attests exact three Job roles, in-process Worker and
     assert.equal(result.ownedResidualProcesses, null);
   }
 });
+
+test('E1 source-repair graph requires exactly its EDIT and TEST jobs without inventing an LSP job', () => {
+  const e1 = input => graph({ graphKind: 'E1_SOURCE_REPAIR_NO_LSP', executions: [createRoles[0], createRoles[2]], ...input });
+  const clean = e1({});
+  assert.equal(clean.status, 'PASS');
+  assert.equal(clean.jobsEmpty, true);
+  assert.equal(clean.pipesDrained, true);
+  assert.equal(clean.ownedResidualProcesses, 0);
+  assert.deepEqual(clean.roles.map(role => role.id), ['PI_ROOT', 'WORKER_SESSION', 'SYNCHRONOUS_PUBLISHER',
+    'WORKER_EDIT', 'TESTER_VERIFICATION']);
+  assert.equal(graph({ graphKind: 'ORDINARY_CREATE', executions: [createRoles[0], createRoles[2]] }).reason, 'CHILD_NOT_REGISTERED');
+  assert.equal(e1({ executions: [createRoles[0]] }).reason, 'CHILD_NOT_REGISTERED');
+  assert.equal(e1({ executions: [createRoles[2]] }).reason, 'CHILD_NOT_REGISTERED');
+  assert.equal(e1({ executions: createRoles }).reason, 'UNEXPECTED_OWNED_NODE');
+  assert.equal(e1({ executions: [createRoles[0], { ...createRoles[2], jobEmptyVerified: false }] }).reason, 'JOB_NOT_EMPTY');
+  assert.equal(graph({ graphKind: 'UNKNOWN_GRAPH', executions: [createRoles[0], createRoles[2]] }).status, 'FAIL');
+});
