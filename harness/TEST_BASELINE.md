@@ -1,5 +1,13 @@
 # Phi — Test Baseline
 
+## D-17 pre-native Linux qualification candidate (2026-10-11)
+
+After D-14 ambiguous-after-prefix regression and final one-shot workflow wiring: local D-prefix8/8 PASS; `npm run check:phi` exact Linux corpus500/169 PASS/0 FAIL/331 Windows-only skips; `npm run check` PASS including package validation and installed-Pi TypeScript. Native Windows current-candidate D-17 remains UNRUN. The accepted D-13 run CI38122945303 is not a substitute for D-17 full regression.
+
+## D-13 native restart focus (2026-10-11)
+
+CI38122945303 on `f46a92c`: native Windows D-prefix7/7 PASS; normal CREATE/V6 protected receipt/PREFIX_1/owned graph PASS, interrupted MODIFY/V2 at durable TEMP_CREATED, fresh-process startup PASS_RECOVERED/ROLLBACK with projectMutations0, prefix retained, suffix unstarted, terminal V2 journal and fixture cleanup PASS. Final fixed-scope baseline active/stale/quarantined0, owned residual0. This focus is not D-17 complete current-candidate regression or D-18 final certification. New local ambiguous-after-prefix regression makes D-prefix8/8 PASS; full check on that later candidate pending.
+
 ## D-13 pre-native candidate (2026-10-11)
 
 Functional `a8a31b5`: D-prefix/bridge/terminal-only cleanup controls7/7 PASS. Nearby reconstruction/startup/V2 portable tests16 PASS,0 FAIL,43 Windows-only skips. Full `npm run check` PASS (tests, syntax, TypeScript, package validation). Indexed security audit exit0 with historical WARN only; scoped diff whitespace PASS; ZERO_EGRESS_REVIEW PASS without external model/provider call. Native Windows focused D-13 and current-candidate D-17 gates are UNRUN; no native proof is inferred from Linux skips.

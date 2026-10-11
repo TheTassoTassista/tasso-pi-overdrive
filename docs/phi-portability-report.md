@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 D-13 native restart PASS (2026-10-11)
+
+CI38122945303 on `f46a92c` passed the real Windows normal CREATE/V6 committed prefix followed by interrupted MODIFY/V2 at durable TEMP_CREATED and fresh-process safe ROLLBACK. PREFIX_1 persisted, suffix did not start, projectMutations0, owned worktree/temp cleanup and final residual0. D-14/15/16 reconcile from this and accepted recovery/retention/ownership evidence; D-17 current-candidate Linux/Windows regression and D-18 one-shot certification are still open. D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## Campaign 2 D-13 pre-native candidate (2026-10-11)
 
 The bounded `a8a31b5` fixture exercises normal CREATE/V6 followed by a native interrupted MODIFY/V2 and a fresh-process startup recovery; it checks logical Git continuity, prior prefix preservation, no suffix, protected failure evidence and owned cleanup. Only local focused/full checks have passed. Native Windows D-13 is pending and cannot yet close D-13/14/15/16 or unblock Windows autonomy; D-17 and D-18 remain open. No provider egress or new production authority is introduced.

@@ -204,6 +204,26 @@ jobs:
           exit $LASTEXITCODE
       - name: Post-RENAME fixed-scope ownership baseline
         run: node scripts/phi-owned-scope-baseline.mjs
+      - name: D-wide four dependent normal workflows on one logical disposable Git project
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-d-wide-pi-smoke.mjs
+          exit $LASTEXITCODE
+      - name: Post-D-wide fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: D-wide CREATE prefix and interrupted V2 MODIFY fresh-start recovery
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-d-wide-pi-smoke.mjs --restart-v2
+          exit $LASTEXITCODE
+      - name: Post-D-restart fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
       - name: Final fixed-scope ownership baseline even after failure
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs

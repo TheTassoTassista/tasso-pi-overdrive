@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -103,6 +103,26 @@ test('ambiguous prestate or failed poststate never advances the suffix', async (
   result = await runDSequence({ inspect, invoke: async () => { calls++; return { status: 'PASS', receipt: receipt(0) }; } });
   assert.equal(result.reason, 'POSTSTATE_AMBIGUOUS');
   assert.equal(calls, 1);
+}));
+
+test('ambiguous in-flight MODIFY after published CREATE retains user state and stops suffix', async () => fixture(async root => {
+  put(root, null, null);
+  const invoked = [];
+  const result = await runDSequence({ inspect: receipts => classify(root, receipts),
+    invoke: async (step, index) => {
+      invoked.push(step.operation);
+      if (index === 0) {
+        put(root, created, null);
+        return { status: 'PASS', receipt: receipt(0) };
+      }
+      put(root, 'unrelated-user-content', null);
+      return { status: 'FAIL' };
+    } });
+  assert.deepEqual({ status: result.status, reason: result.reason, completed: result.completed,
+    inFlight: result.inFlight, invoked },
+  { status: 'FAIL', reason: 'POSTFAIL_AMBIGUOUS', completed: 1, inFlight: 'MODIFY', invoked: ['CREATE', 'MODIFY'] });
+  assert.equal(classify(root, [receipt(0)]).status, 'AMBIGUOUS');
+  assert.equal(readFileSync(path.join(root, 'a.txt'), 'utf8'), 'unrelated-user-content');
 }));
 
 test('disposable Git fixture can base the next independent worktree on an already committed published state', async () => fixture(async root => {

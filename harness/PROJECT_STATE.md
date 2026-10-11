@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — D-13/14/15/16 complete; D-17 qualification next (2026-10-11)
+
+Native Windows CI38122945303 proves normal committed CREATE prefix plus interrupted V2 MODIFY and fresh-process bounded rollback with prior prefix/suffix invariants, owned cleanup and residual0. D-13 is COMPLETE; accepted native recovery/retention evidence and local D-wide fail-closed/terminal-only negatives close D-14/15/16. The next gate is current-candidate Linux and Windows regression D-17; D-18 one-shot remains blocked until D-01..D-17 are COMPLETE and the candidate is frozen. D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## Current — D-13 native candidate pending (2026-10-11)
 
 D-09/D-10/D-11/D-12 are COMPLETE under `D-LOGICAL-PROJECT-CONTINUITY-001`. Functional `a8a31b5` adds a normal-workflow Windows V2 interrupted-restart fixture, with exact logical Git-lineage bridge, fail-closed cleanup and no new recovery/publication authority. Local checks PASS; native D-13 focus has not yet run and remains PARTIAL. D-14/15/16 reconciliation, D-17 current regression and one conditional D-18 final certification remain open. D IN_PROGRESS; Windows autonomy BLOCKED. Ordinary Windows publication reachable does not verify Windows autonomy.
