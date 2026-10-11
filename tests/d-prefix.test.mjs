@@ -125,6 +125,13 @@ test('disposable Git fixture can base the next independent worktree on an alread
     const bridge = () => verifyDPrefixBridge({ sourceRoot: project, candidateRoot: first.worktree,
       priorHead: baselineHead, prefix: 1, receipts: [receipt(0)], created, modified });
     assert.equal(bridge().status, 'PASS');
+    const foreign = path.join(root, 'foreign');
+    mkdirSync(foreign);
+    git(foreign, ['init', '-q']);
+    writeFileSync(path.join(foreign, 'a.txt'), created);
+    assert.throws(() => verifyDPrefixBridge({ sourceRoot: project, candidateRoot: foreign,
+      priorHead: baselineHead, prefix: 1, receipts: [receipt(0)], created, modified }),
+    /D_BRIDGE_STATE_MISMATCH:LINEAGE_DISTINCT_OR_UNCONFIRMED/u);
     writeFileSync(path.join(first.worktree, 'unrelated.txt'), 'unrelated');
     assert.throws(bridge, /D_BRIDGE_STATE_MISMATCH:CANDIDATE_DELTA/u);
     unlinkSync(path.join(first.worktree, 'unrelated.txt'));

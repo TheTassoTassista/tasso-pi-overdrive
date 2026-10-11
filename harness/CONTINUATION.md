@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## CURRENT — D-13 Windows common-Git-directory identity correction
+
+Native [CI38122789956](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38122789956) on `08969f7` confirmed a `LINEAGE` **string mismatch** at first D bridge check; normal Pi restart stayed SKIPPED and fixed-scope baseline passed. Physical common-directory identity was not measured, so exact pathname cause remains UNKNOWN. Scoped correction now requires exact same nonzero BigInt device/inode identity when canonical path strings differ; distinct/unavailable objects still fail closed. Independent-repository negative regression, focused7/7 and full local check PASS. Exact next action: commit/push only this correction plus state, dispatch one `d-restart-focused-only` run and inspect the SAME exact-SHA run. Do not rerun D-09, D-18, Campaign-1 evidence, or use provider calls. D-13 PARTIAL; D IN_PROGRESS; Windows autonomy BLOCKED.
+
 ## CURRENT — D-13 bridge diagnostic after first native preflight failure
 
 First D-13 focused [CI38122639868](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38122639868) on `f863c19ad68908a6ec45c3e563f9c425cab22db6` failed Windows prefix preflight6 PASS/1 FAIL at first bridge assertion; Pi/restart was SKIPPED. Native build/LSP and final fixed-scope ownership baseline PASS. The exact failing predicate is UNKNOWN. A local scoped diagnostic change now reports only fixed `LINEAGE`/`SOURCE_HEAD`/`PHYSICAL_*`/delta categories, preserving fail-closed behavior; local tests7/7 PASS. Exact next action: commit/push diagnostic-only candidate to same private branch, run ONE focused native Windows diagnostic of the same D13 preflight, inspect SAME run for exact reason; no blind full rerun. Do not credit D13, launch D18, modify protected audit/user files or use provider calls. D IN_PROGRESS; Windows autonomy BLOCKED.

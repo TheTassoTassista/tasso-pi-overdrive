@@ -87,6 +87,17 @@ function commonGitDir(cwd) {
   const reported = bridgeGit(cwd, ['rev-parse', '--git-common-dir']).trim();
   return fs.realpathSync(path.resolve(cwd, reported));
 }
+function sameCommonGitDir(sourceRoot, candidateRoot) {
+  const source = commonGitDir(sourceRoot), candidate = commonGitDir(candidateRoot);
+  if (source === candidate) return 'SAME_COMMON_GIT_DIR';
+  // Windows can spell one directory differently through Git's worktree path
+  // and its main-worktree path. Never credit case folding alone: require the
+  // same actual filesystem object, with nonzero 64-bit identity on one device.
+  const first = fs.statSync(source, { bigint: true }), second = fs.statSync(candidate, { bigint: true });
+  if (first.isDirectory() && second.isDirectory() && first.ino > 0n && first.dev === second.dev && first.ino === second.ino)
+    return 'SAME_COMMON_GIT_DIR_FILE_ID';
+  throw new Error(first.ino === 0n || second.ino === 0n ? 'D_BRIDGE_LINEAGE_ID_UNAVAILABLE' : 'D_BRIDGE_LINEAGE_DISTINCT_OBJECT');
+}
 export function verifyDNextBase({ sourceRoot, candidateRoot, priorHead, prefix, receipts, created, modified }) {
   const fail = reason => { throw new Error(`D_NEXT_BASE_MISMATCH:${reason}`); };
   if (typeof sourceRoot !== 'string' || typeof candidateRoot !== 'string' ||
@@ -94,17 +105,19 @@ export function verifyDNextBase({ sourceRoot, candidateRoot, priorHead, prefix, 
       !/^[0-9a-f]{40}$/u.test(priorHead ?? '') || !Number.isSafeInteger(prefix) || prefix < 0 || prefix > 3 ||
       !Array.isArray(receipts) || receipts.length !== prefix) fail('INPUT');
   try {
-    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot)) fail('LINEAGE');
+    let lineage;
+    try { lineage = sameCommonGitDir(sourceRoot, candidateRoot); }
+    catch (error) { fail(error?.message === 'D_BRIDGE_LINEAGE_ID_UNAVAILABLE' ? 'LINEAGE_ID_UNAVAILABLE' : 'LINEAGE_DISTINCT_OR_UNCONFIRMED'); }
     if (bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('SOURCE_HEAD');
     if (bridgeGit(candidateRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('CANDIDATE_HEAD');
     if (bridgeGit(candidateRoot, ['status', '--porcelain', '--untracked-files=all']) !== '') fail('CANDIDATE_DIRTY');
     const physical = classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts });
     if (physical.status !== `PREFIX_${prefix}`) fail(`PHYSICAL_${physical.reason ?? 'OTHER'}`);
+    return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage, exactBase: true };
   } catch (error) {
     if (error?.message?.startsWith('D_NEXT_BASE_MISMATCH:')) throw error;
     fail('GIT_OR_IO_UNCONFIRMED');
   }
-  return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage: 'SAME_COMMON_GIT_DIR', exactBase: true };
 }
 export function verifyDPrefixBridge({ sourceRoot, candidateRoot, priorHead, prefix, receipts,
   created, modified, committed = false }) {
@@ -114,7 +127,9 @@ export function verifyDPrefixBridge({ sourceRoot, candidateRoot, priorHead, pref
       !/^[0-9a-f]{40}$/u.test(priorHead ?? '') || !Number.isSafeInteger(prefix) || prefix < 1 || prefix > 4 ||
       !Array.isArray(receipts) || receipts.length !== prefix) fail('INPUT');
   try {
-    if (commonGitDir(sourceRoot) !== commonGitDir(candidateRoot)) fail('LINEAGE');
+    let lineage;
+    try { lineage = sameCommonGitDir(sourceRoot, candidateRoot); }
+    catch (error) { fail(error?.message === 'D_BRIDGE_LINEAGE_ID_UNAVAILABLE' ? 'LINEAGE_ID_UNAVAILABLE' : 'LINEAGE_DISTINCT_OR_UNCONFIRMED'); }
     if (bridgeGit(sourceRoot, ['rev-parse', 'HEAD']).trim() !== priorHead) fail('SOURCE_HEAD');
     const physical = classifyDPrefix({ projectRoot: candidateRoot, created, modified, receipts });
     if (physical.status !== `PREFIX_${prefix}`) fail(`PHYSICAL_${physical.reason ?? 'OTHER'}`);
@@ -130,12 +145,12 @@ export function verifyDPrefixBridge({ sourceRoot, candidateRoot, priorHead, pref
         .split('\n').filter(Boolean).sort();
       if (JSON.stringify(actual) !== JSON.stringify([...bridgeDelta[prefix - 1]].sort())) fail('COMMITTED_DELTA');
     }
+    return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage,
+      exactBase: true, unrelatedDelta: 'NONE', committed };
   } catch (error) {
     if (error?.message?.startsWith('D_BRIDGE_STATE_MISMATCH:')) throw error;
     fail('GIT_OR_IO_UNCONFIRMED');
   }
-  return { status: 'PASS', prefix: `PREFIX_${prefix}`, lineage: 'SAME_COMMON_GIT_DIR',
-    exactBase: true, unrelatedDelta: 'NONE', committed };
 }
 
 // Test-only sequencing: no task is launched from a predecessor's receipt.
