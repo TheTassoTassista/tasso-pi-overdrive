@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 2 D-13 pre-native candidate (2026-10-11)
+
+The bounded `a8a31b5` fixture exercises normal CREATE/V6 followed by a native interrupted MODIFY/V2 and a fresh-process startup recovery; it checks logical Git continuity, prior prefix preservation, no suffix, protected failure evidence and owned cleanup. Only local focused/full checks have passed. Native Windows D-13 is pending and cannot yet close D-13/14/15/16 or unblock Windows autonomy; D-17 and D-18 remain open. No provider egress or new production authority is introduced.
+
 ## Campaign 2 logical-project continuity decision (2026-10-11)
 
 Φ Main `D-LOGICAL-PROJECT-CONTINUITY-001` accepts one disposable Git project lineage through fresh managed worktrees, not one persistent physical worktree. Accepted CI38062848731 closes D-09 without rerun; existing deterministic failure-after-prefix cases close D-10. D-11/D-12 remain COMPLETE, while D-13 native prefix-plus-interrupted-V2 restart and later D gates remain open. This is no Windows-autonomy or D-completion certificate.

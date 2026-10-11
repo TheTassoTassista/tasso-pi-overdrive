@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — D-13 native candidate pending (2026-10-11)
+
+D-09/D-10/D-11/D-12 are COMPLETE under `D-LOGICAL-PROJECT-CONTINUITY-001`. Functional `a8a31b5` adds a normal-workflow Windows V2 interrupted-restart fixture, with exact logical Git-lineage bridge, fail-closed cleanup and no new recovery/publication authority. Local checks PASS; native D-13 focus has not yet run and remains PARTIAL. D-14/15/16 reconciliation, D-17 current regression and one conditional D-18 final certification remain open. D IN_PROGRESS; Windows autonomy BLOCKED. Ordinary Windows publication reachable does not verify Windows autonomy.
+
 ## Current — logical-project continuity ratified (2026-10-11)
 
 `D-LOGICAL-PROJECT-CONTINUITY-001` accepts D-wide continuity through one disposable Git project lineage and fresh managed worktrees W1–W4; physical-worktree persistence is rejected. Main accepts native CI38062848731 for D-09 COMPLETE without rerun. Deterministic failure-after-prefix tests already close D-10 COMPLETE; D-11/D-12 remain COMPLETE. D-13 native CREATE-prefix plus interrupted MODIFY/V2 restart is next. The immediately following Main-boundary STOP is historical and superseded on worktree interpretation only. Campaign 1/D6 remain MAIN CERTIFIED; D IN_PROGRESS; Windows autonomy BLOCKED.

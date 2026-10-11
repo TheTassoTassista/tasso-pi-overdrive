@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## D-13 pre-native candidate (2026-10-11)
+
+Functional `a8a31b5`: D-prefix/bridge/terminal-only cleanup controls7/7 PASS. Nearby reconstruction/startup/V2 portable tests16 PASS,0 FAIL,43 Windows-only skips. Full `npm run check` PASS (tests, syntax, TypeScript, package validation). Indexed security audit exit0 with historical WARN only; scoped diff whitespace PASS; ZERO_EGRESS_REVIEW PASS without external model/provider call. Native Windows focused D-13 and current-candidate D-17 gates are UNRUN; no native proof is inferred from Linux skips.
+
 ## Campaign 2 evidence reconciliation (2026-10-11)
 
 Decision `D-LOGICAL-PROJECT-CONTINUITY-001` accepts CI38062848731 without rerun for D-09 logical-project continuity. Existing `tests/d-prefix.test.mjs` failure-after-PREFIX_1/2/3 assertions passed 6/6 focused locally at the new checkpoint and are sufficient for D-10 deterministic prefix preservation. No new native test is claimed; D-13 and full current-candidate D-17 qualification remain pending.
