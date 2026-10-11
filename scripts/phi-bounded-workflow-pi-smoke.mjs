@@ -2,6 +2,7 @@
 // Offline normal Pi tool entrypoint, deterministic local model transport only.
 // On Windows this exercises the selected real bounded ordinary publication lane.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,14 +29,19 @@ const agentDir = path.join(temp, 'agent');
 const auditFile = path.join(temp, 'provider-audit.jsonl');
 const evidenceRoot = path.join(temp, 'evidence');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
-const operation = { '--modify': 'MODIFY', '--delete': 'DELETE', '--rename': 'RENAME' }[process.argv[2]] ?? 'CREATE';
-if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete', '--rename'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
-const task = { CREATE: 'Create file `created.txt` containing new-create-fixture',
+const e1 = process.argv[2] === '--e1';
+const candidateSha = e1 ? spawnSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, shell: false, encoding: 'utf8' }).stdout.trim() : null;
+if (e1) assert.match(candidateSha, /^[0-9a-f]{40}$/u, 'E1 candidate SHA unavailable');
+const operation = e1 ? 'MODIFY' : { '--modify': 'MODIFY', '--delete': 'DELETE', '--rename': 'RENAME' }[process.argv[2]] ?? 'CREATE';
+if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete', '--rename', '--e1'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
+const task = e1 ? 'Modify file `calc.js` to contain a correct add implementation so the existing failing tests pass without changing them.' : { CREATE: 'Create file `created.txt` containing new-create-fixture',
   MODIFY: 'Modify file `input.txt` to contain new-modify-fixture', DELETE: 'Delete file `remove.txt`',
   RENAME: 'Rename file `move.txt` to `moved.txt`' }[operation];
-const target = { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt', RENAME: 'moved.txt' }[operation];
+const target = e1 ? 'calc.js' : { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt', RENAME: 'moved.txt' }[operation];
 const version = { CREATE: 6, MODIFY: 2, DELETE: 3, RENAME: 4 }[operation];
-let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0 };
+let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0,
+  ...(e1 ? { candidateSha, scenarioId: 'CAMPAIGN3_E1_SOURCE_REPAIR', modelBackend: 'DETERMINISTIC_LOCAL',
+    productionEntrypoint: 'secure_coding_workflow' } : {}) };
 let child;
 let childClosed;
 let childExitStatus = null;
@@ -72,23 +78,46 @@ try {
     'async: false', '---', 'Inspect only the assigned fixture; never mutate it.', '',
   ].join('\n');
   fs.writeFileSync(path.join(agentDir, 'agents', 'scout.md'), scoutDefinition, { mode: 0o600 });
-  fs.writeFileSync(path.join(project, 'config.json'), '{}');
+  if (!e1) fs.writeFileSync(path.join(project, 'config.json'), '{}');
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node test.cjs' } }));
-  if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
-  if (operation === 'DELETE') fs.writeFileSync(path.join(project, 'remove.txt'), 'old-delete-fixture');
-  if (operation === 'RENAME') fs.writeFileSync(path.join(project, 'move.txt'), 'old-rename-fixture');
-  fs.writeFileSync(path.join(project, 'edit.cjs'), {
-    CREATE: "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')",
-    MODIFY: "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')",
-    DELETE: "require('node:fs').unlinkSync('remove.txt');console.log('removed-in-private-draft')",
-    RENAME: "const f=require('node:fs');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log('renamed-in-private-draft')",
-  }[operation]);
-  fs.writeFileSync(path.join(project, 'test.cjs'), {
-    CREATE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')",
-    MODIFY: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')",
-    DELETE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);console.log('verified')",
-    RENAME: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'old-rename-fixture');console.log('verified')",
-  }[operation]);
+  if (e1) {
+    fs.writeFileSync(path.join(project, 'calc.js'), 'function add(a, b) { return a - b; }\nmodule.exports = { add };\n');
+    fs.writeFileSync(path.join(project, 'edit.cjs'), [
+      "const fs = require('node:fs');",
+      "const [file, oldText, newText] = process.argv.slice(2);",
+      "if (!file || !oldText || newText === undefined || oldText === newText) throw new Error('EDIT_INPUT_INVALID');",
+      "const before = fs.readFileSync(file, 'utf8');",
+      "if (before.split(oldText).length !== 2) throw new Error('EDIT_NOT_UNIQUE');",
+      "fs.writeFileSync(file, before.replace(oldText, newText));",
+      "console.log('one-exact-replacement-in-private-draft');",
+    ].join('\n'));
+    fs.writeFileSync(path.join(project, 'test.cjs'), [
+      "const assert = require('node:assert/strict');",
+      "const { add } = require('./calc.js');",
+      "assert.equal(add(2, 3), 5);",
+      "assert.equal(add(-2, 3), 1);",
+      "console.log('verified');",
+    ].join('\n'));
+    const failing = spawnSync(process.execPath, ['test.cjs'], { cwd: project, shell: false, windowsHide: true, encoding: 'utf8' });
+    assert.notEqual(failing.status, 0, 'E1 fixture test must fail before autonomous work');
+    report.e1InitialTest = 'FAIL_EXPECTED';
+  } else {
+    if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
+    if (operation === 'DELETE') fs.writeFileSync(path.join(project, 'remove.txt'), 'old-delete-fixture');
+    if (operation === 'RENAME') fs.writeFileSync(path.join(project, 'move.txt'), 'old-rename-fixture');
+    fs.writeFileSync(path.join(project, 'edit.cjs'), {
+      CREATE: "require('node:fs').writeFileSync('created.txt','new-create-fixture',{flag:'wx'});console.log('created-in-private-draft')",
+      MODIFY: "require('node:fs').writeFileSync('input.txt','new-modify-fixture');console.log('modified-in-private-draft')",
+      DELETE: "require('node:fs').unlinkSync('remove.txt');console.log('removed-in-private-draft')",
+      RENAME: "const f=require('node:fs');f.writeFileSync('moved.txt',f.readFileSync('move.txt'),{flag:'wx'});f.unlinkSync('move.txt');console.log('renamed-in-private-draft')",
+    }[operation]);
+    fs.writeFileSync(path.join(project, 'test.cjs'), {
+      CREATE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('created.txt','utf8'),'new-create-fixture');console.log('verified')",
+      MODIFY: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.readFileSync('input.txt','utf8'),'new-modify-fixture');console.log('verified')",
+      DELETE: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('remove.txt'),false);console.log('verified')",
+      RENAME: "const f=require('node:fs'),a=require('node:assert/strict');a.equal(f.existsSync('move.txt'),false);a.equal(f.readFileSync('moved.txt','utf8'),'old-rename-fixture');console.log('verified')",
+    }[operation]);
+  }
   for (const args of [['init', '--quiet'], ['add', '.'], ['-c', 'user.name=Phi fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'baseline']]) {
     const run = spawnSync('git', args, { cwd: project, shell: false, encoding: 'utf8' });
     assert.equal(run.status, 0, run.stderr);
@@ -101,7 +130,7 @@ try {
     '--tools', 'secure_coding_workflow'];
   child = spawn(process.execPath, args, { cwd: project, shell: false, windowsHide: true,
     env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PHI_BOUNDED_TEST_KEY: 'offline-fixture-not-a-credential',
-      PHI_BOUNDED_TEST_AUDIT: auditFile, PI_OVERDRIVE_EVIDENCE_ROOT: evidenceRoot,
+      PHI_BOUNDED_TEST_AUDIT: auditFile, ...(e1 ? { PHI_CAMPAIGN3_E1: '1' } : {}), PI_OVERDRIVE_EVIDENCE_ROOT: evidenceRoot,
       PI_OVERDRIVE_RUNTIME_ROOT: path.join(temp, 'runtime'), PI_OVERDRIVE_WORKTREE_ROOT: path.join(temp, 'worktrees'),
       PI_OVERDRIVE_MEMORY_ROOT: path.join(temp, 'memory'), PI_OVERDRIVE_CLEANUP_WORKFLOW: '1',
       XDG_CONFIG_HOME: path.join(temp, 'config'), XDG_STATE_HOME: path.join(temp, 'state'),
@@ -129,7 +158,7 @@ try {
   const started = Date.now();
   while (!events.some(event => event.type === 'agent_settled') && child.exitCode === null && Date.now() - started < 10 * 60 * 1000)
     await new Promise(resolve => setTimeout(resolve, 50));
-  if (!events.some(event => event.type === 'agent_settled')) throw new Error(`PHI_BOUNDED_TEST_NOT_SETTLED:${stderr}`);
+  if (!events.some(event => event.type === 'agent_settled')) throw new Error(e1 ? 'PHI_BOUNDED_TEST_NOT_SETTLED' : `PHI_BOUNDED_TEST_NOT_SETTLED:${stderr}`);
   child.stdin.end();
   const exit = await Promise.race([childClosed, new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 10000))]);
   childExitStatus = exit;
@@ -154,12 +183,13 @@ try {
   const cleanup = details?.cleanup;
   report.diagnostics = { toolError: tool?.isError ?? null, workflowStatus: details?.status ?? durable?.receipt?.status ?? null,
     durableError, evidenceRuns: fs.existsSync(evidenceRoot) ? fs.readdirSync(evidenceRoot).length : 0,
-    toolText: tool?.result?.content?.filter(part => part.type === 'text').map(part => part.text).join('\n').slice(0, 1200) ?? null,
-    failure: details?.failure ?? durable?.execution?.failure ?? null,
-    attempts: (details?.delegationAttempts ?? durable?.execution?.delegationAttempts ?? []).map(({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls }) => ({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls })),
-    lastTransition: durable?.execution?.evidence?.transitions?.at(-1) ?? null,
-    turns, stages, userShape, eventTypes: events.map(event => event.type).slice(-12), stderr };
-  assert.ok(tool, `normal secure_coding_workflow did not run: ${stderr}`);
+    toolText: e1 ? null : tool?.result?.content?.filter(part => part.type === 'text').map(part => part.text).join('\n').slice(0, 1200) ?? null,
+    failure: e1 ? (details?.failure?.category ?? durable?.execution?.failure?.category ?? null) : details?.failure ?? durable?.execution?.failure ?? null,
+    attempts: (details?.delegationAttempts ?? durable?.execution?.delegationAttempts ?? []).map(({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls }) => ({ agent, status, failureCategory, failureReason: e1 ? null : failureReason, errorDigest, exitCode, launchStatus, modelCalls })),
+    lastTransition: e1 ? null : durable?.execution?.evidence?.transitions?.at(-1) ?? null,
+    turns, stages, userShape, eventTypes: events.map(event => event.type).slice(-12),
+    stderr: e1 ? { present: stderr.length > 0, sha256: stderr ? createHash('sha256').update(stderr).digest('hex') : null } : stderr };
+  assert.ok(tool, e1 ? 'normal secure_coding_workflow did not run' : `normal secure_coding_workflow did not run: ${stderr}`);
   assert.equal(tool.isError, false, 'normal workflow tool failed');
   assert.equal(details.status, 'PASS');
   assert.equal(cleanup?.status, 'PASS');
@@ -192,6 +222,17 @@ try {
   assert.equal(turns.every(turn => turn.provider === 'openai-codex'), true);
   assert.deepEqual({ branchArray: userShape?.branchArray, singleText: userShape?.singleText, exactTaskMatch: userShape?.exactTaskMatch },
     { branchArray: true, singleText: true, exactTaskMatch: true });
+  if (e1) {
+    const decision = auditRows.find(row => row.kind === 'e1_repair_decision');
+    assert.deepEqual({ assertions: decision?.assertionCount, source: decision?.sourceObserved, test: decision?.testObserved },
+      { assertions: 2, source: true, test: true }, 'Worker did not derive its repair from observed source and tests');
+    assert.deepEqual(details.repositoryEvidence?.changedFiles?.map(row => row.path), ['calc.js'], 'E1 must change only source, never the test or editor');
+    assert.equal(details.evidence?.verifications?.at(-1)?.status, 'PASS', 'production verification did not pass');
+    assert.equal(details.evidence?.roles?.some(row => row.agent === 'worker' && row.status === 'completed'), true);
+    assert.equal(details.evidence?.verifications?.length > 0, true);
+    report.e1 = { initialTest: 'FAIL_EXPECTED', sourceCorrection: 'DERIVED_FROM_OBSERVED_ASSERTIONS',
+      sourceOnlyChange: true, finalProductionVerification: 'PASS', testUnchanged: true };
+  }
   assert.ok(turns.some(turn => turn.lane === 'controller'));
   assert.ok(turns.some(turn => turn.lane === 'worker'));
   assert.equal(publications.length, expectedPublished ? 1 : 0);
@@ -228,7 +269,7 @@ try {
       grantIssued: true, published: true, grantConsumed: true });
   }
   assert.equal(operation === 'CREATE' || operation === 'RENAME' ? fs.existsSync(path.join(project, target)) === false :
-    fs.readFileSync(path.join(project, target), 'utf8') === (operation === 'DELETE' ? 'old-delete-fixture' : 'old-modify-fixture'),
+    fs.readFileSync(path.join(project, target), 'utf8') === (e1 ? 'function add(a, b) { return a - b; }\nmodule.exports = { add };\n' : operation === 'DELETE' ? 'old-delete-fixture' : 'old-modify-fixture'),
   true, 'original Git project must remain untouched');
   if (operation === 'RENAME') assert.equal(fs.readFileSync(path.join(project, 'move.txt'), 'utf8'), 'old-rename-fixture');
   if (process.platform === 'win32') {
@@ -248,12 +289,28 @@ try {
     workerCalls: turns.filter(turn => turn.lane === 'worker').length, controllerCalls: turns.filter(turn => turn.lane === 'controller').length,
     publicationCount: publications.length, publicationOperation: publications[0]?.operation ?? null,
     journalVersion: publications[0]?.journalVersion ?? null, cleanup: cleanup?.status, externalRequests: 0 };
+  if (e1) report.e1 = { initialTest: 'FAIL_EXPECTED', sourceCorrection: 'DERIVED_FROM_OBSERVED_ASSERTIONS',
+    sourceOnlyChange: true, finalProductionVerification: 'PASS', testUnchanged: true,
+    candidateSha, scenarioId: 'CAMPAIGN3_E1_SOURCE_REPAIR', taskId: details.taskDigest,
+    productionEntrypoint: 'secure_coding_workflow', modelBackend: 'DETERMINISTIC_LOCAL',
+    selectedRoutes: details.evidence.roles.filter(row => row.status === 'completed').map(({ agent, provider, model, thinking }) => ({ agent, provider, model, thinking })),
+    externalProviderRequests: 0,
+    roleLifecycle: details.evidence.roles.map(({ agent, status }) => ({ agent, status })),
+    workerAuthority: { started: stages.some(row => row.stage === 'WORKER_RESERVED'),
+      revokedBeforePublication: stages.findIndex(row => row.stage === 'WORKER_REVOKED') < stages.findIndex(row => row.stage === 'NATIVE_PUBLICATION_CALL_ENTERED') },
+    transactionId: publications[0]?.transactionId ?? null,
+    physicalMutation: publications.length === 1 ? { operation: publications[0].operation,
+      targetState: stages.findLast(row => row.stage === 'PRE_CLEANUP_PHYSICAL_SNAPSHOT')?.targetState ?? null,
+      digestMatch: stages.findLast(row => row.stage === 'PRE_CLEANUP_PHYSICAL_SNAPSHOT')?.digestMatch ?? null } : null,
+    receiptStatus: finalEvidence.receipt.status };
   report.receiptReadback = receiptReadback;
   report.ownedScopeBaseline = ownedScopeBaseline;
   report.ownedExecution = process.platform === 'win32' ? { count: ownedExecutions.length, profiles: [...new Set(ownedExecutions.map(row => row.profile))].sort(),
     ...ownedGraph } : { status: 'NOT_NATIVE_WINDOWS' };
 } catch (error) {
-  report.failure = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  report.failure = e1 ? { category: /^PHI_[A-Z_]+/u.exec(message)?.[0] ?? 'E1_ASSERTION_OR_RUNTIME_FAILURE',
+    digest: createHash('sha256').update(message).digest('hex') } : message;
 } finally {
   try {
     if (child && child.exitCode === null) child.kill();

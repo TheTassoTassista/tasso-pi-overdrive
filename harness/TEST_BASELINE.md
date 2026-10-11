@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E1 local preparation (2026-10-11)
+
+Offline deterministic inference controls **2/2 PASS**; normal Pi E1 source-repair smoke **PASS on Linux** with initial fixture test FAIL, source-only correction, production verification/receipt PASS and cleanup; existing normal MODIFY smoke **PASS**. Full `npm run check` **PASS** including package structure, syntax and installed-Pi TypeScript. This is local preparation only: E1 native Windows **0/2**, publication/owned graph not yet proven for the E1 scenario. ZERO_EGRESS_REVIEW PASS is recorded in `docs/phi-campaign-3-gates.md`; external provider requests 0. No D-17/D-18 rerun or Windows autonomy activation.
+
 ## Campaign 3 opening baseline (2026-10-11)
 
 `WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes E1/E2/E3 and conditional one-shot E4 but no Campaign-3 technical gate has run. Native budgets used: E1 0/2, E2 0/2, E3 0/2, E4 0/1. The accepted D-17/D-18 results below remain the foundation, not E1/E2/E3 credit. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. Current-candidate full regressions are required only after functional E gates and before E4, not as an intermediate freshness rerun.

@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { providerTools } from "./provider-context-compat.ts";
+import { inferOperatorRepair } from "./phi-autonomy-repair.mjs";
 
 const modelIds = ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra"];
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -36,6 +37,17 @@ function stream(model: Model<any>, context: Context, options?: SimpleStreamOptio
       events.push({ type: "start", partial: output });
       let call: { name: string; arguments: object } | undefined;
       if (topLevel && results.length === 0) call = { name: "secure_coding_workflow", arguments: { task, includeOracle: false, includeSecurity: false } };
+      else if (process.env.PHI_CAMPAIGN3_E1 === "1" && !topLevel && tools.has("safe_exec") && results.length < 4) {
+        if (!tools.has("read") || !tools.has("verification_gate")) throw new Error("PHI_E1_PRODUCTION_TOOLS_UNAVAILABLE");
+        if (results.length === 0) call = { name: "read", arguments: { path: "calc.js" } };
+        else if (results.length === 1) call = { name: "read", arguments: { path: "test.cjs" } };
+        else if (results.length === 2) {
+          if (results.some((result: any) => result.isError === true)) throw new Error("PHI_E1_READ_FAILED");
+          const repair = inferOperatorRepair(textOf(results[0]), textOf(results[1]));
+          audit({ kind: "e1_repair_decision", assertionCount: repair.assertionCount, operation: repair.operation, sourceObserved: true, testObserved: true });
+          call = { name: "safe_exec", arguments: { program: "node", args: ["edit.cjs", "calc.js", repair.oldText, repair.newText] } };
+        } else call = { name: "verification_gate", arguments: { mode: "full" } };
+      }
       else if (!topLevel && tools.has("safe_exec") && results.length < 3) {
         call = results.length === 0 ? { name: "safe_exec", arguments: { program: "node", args: ["edit.cjs"] } }
           : results.length === 1 ? { name: "semantic_nav", arguments: { operation: "diagnostics", path: "config.json" } }

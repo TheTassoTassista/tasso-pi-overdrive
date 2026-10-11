@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E1 local preparation (2026-10-11)
+
+The offline normal-Pi `secure_coding_workflow` fixture now repairs a small real source defect from observed failing assertions without a prebuilt patch. Local Linux E1 smoke, existing MODIFY smoke, inference controls and full `npm run check` PASS, including protected receipt/fixture cleanup; this does **not** establish native Windows E1 publication or owned Job state. E1 PARTIAL/native0/2; E2/E3/E4 BLOCKED. Structured ZERO_EGRESS_REVIEW PASS is recorded in the Campaign-3 gate ledger. Windows autonomy BLOCKED and `windowsAutonomousReady=false`; no external provider requests or readiness activation.
+
 ## Campaign 3 opening (2026-10-11)
 
 `WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes bounded technical qualification of the Windows autonomous control plane: E1 real production source-repair E2E, E2 actual out-of-scope Worker filesystem denial, E3 full autonomous-root crash with existing V2 recovery, then current-candidate regressions and exactly one conditional E4. No E gate has native evidence yet; see `docs/phi-campaign-3-gates.md`. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. D evidence is not silently promoted; no provider-backed call or readiness activation is authorized.

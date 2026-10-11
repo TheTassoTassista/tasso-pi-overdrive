@@ -1,8 +1,8 @@
 # Phi — Current Project State
 
-## Current — Campaign 3 authorized; E1 preparation (2026-10-11)
+## Current — Campaign 3 E1 local candidate; native proof pending (2026-10-11)
 
-`WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes bounded E1, E2, E3 and one conditional E4 technical certification, tracked in `docs/phi-campaign-3-gates.md`. E1 PARTIAL/native0/2; E2 BLOCKED/native0/2; E3 BLOCKED/native0/2; E4 BLOCKED/native0/1. The D-certified normal `secure_coding_workflow` orchestrator and Windows operation-specific publication lane are reusable foundation, not E1 proof. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** No Campaign-3 native execution/provider request or readiness activation has occurred. The following prior Campaign-3 authority STOP is historical and superseded only by this new Main decision.
+`WINDOWS-AUTONOMY-CAMPAIGN-001` authorizes bounded E1, E2, E3 and one conditional E4 technical certification, tracked in `docs/phi-campaign-3-gates.md`. E1 PARTIAL/native0/2; E2 BLOCKED/native0/2; E3 BLOCKED/native0/2; E4 BLOCKED/native0/1. A local offline normal-Pi `secure_coding_workflow` E1 fixture now demonstrates high-level source repair from observed failing assertions, source-only managed-draft change, production verification, protected receipt and cleanup; native Windows publication/ownership evidence remains pending and is not inferred. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** No Campaign-3 native execution/provider request or readiness activation has occurred. The following prior Campaign-3 authority STOP is historical and superseded only by this new Main decision.
 
 ## Current — Campaign 2 COMPLETE / Main certified; Campaign 3 authority pending (2026-10-11)
 
