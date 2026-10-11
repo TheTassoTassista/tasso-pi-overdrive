@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E1 technical gate complete (2026-10-11)
+
+Native Windows CI38154541489 on `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad` passed normal-Pi offline source repair, Worker revocation before controller V2 publication, protected receipt/physical state, exact two-job process graph, final fixed-scope baseline, fixture cleanup and owned residual0. External provider requests0. E1 technical COMPLETE/budget2/2; E2 security-denial is next/native0/2, E3/E4 blocked. This is **not** Windows-autonomy activation: `windowsAutonomousReady=false`, Windows autonomy BLOCKED and PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E1 first native attempt (2026-10-11)
 
 Focused Windows CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02` ended FAIL because the E1 evidence graph reused CREATE's three-job expectation although the real source-repair workflow launched EDIT+TEST only; graph UNKNOWN `CHILD_NOT_REGISTERED`. Actual normal Pi source correction, Worker revocation, controller V2 publication/physical postverify, protected receipt and final ownership baseline PASS/residual0, but they do not override the terminal E1 FAIL. A narrow fail-closed two-job E1 graph and regressions are locally green; corrected native Run 2 is pending, budget1/2. Windows autonomy remains BLOCKED/false; no provider call or readiness activation.

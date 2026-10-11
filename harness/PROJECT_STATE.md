@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E1 technical COMPLETE; E2 pending (2026-10-11)
+
+Native Windows CI38154541489 on `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad` proves normal Pi source-repair, Worker revoke→controller V2 publication, physical postverification, protected receipt and exact EDIT+TEST owned Job graph/cleanup PASS with provider requests0. E1 COMPLETE/budget2/2. E2 PARTIAL/native0/2, E3/E4 BLOCKED. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** No readiness activation or external provider call.
+
 ## Current — Campaign 3 E1 first native run not certified (2026-10-11)
 
 CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02` proved the actual Windows source-repair/V2 publication path and clean fixed-scope baseline, but E1 scenario terminal FAIL because its process-graph evidence template incorrectly expected a nonexistent LSP job. The exact two-job E1 graph correction and fail-closed regressions are locally green; corrected native Run 2 remains unrun. E1 PARTIAL/native1/2, E2/E3/E4 BLOCKED. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; no external provider calls or readiness activation.

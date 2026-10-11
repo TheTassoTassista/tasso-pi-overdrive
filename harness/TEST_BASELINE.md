@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E1 native technical PASS (2026-10-11)
+
+Corrected focused [CI38154541489](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38154541489), exact `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad`: Windows E1 PASS with real Pi autonomous source correction, V2 MODIFY protected receipt/physical postverify, exact two owned broker Jobs empty, Pi child/pipes closed, residual0 and final always-on fixed-scope baseline PASS. Inference controls PASS; external provider requests0. Earlier Run 1 CI38154077270 remains FAIL (harness graph expectation); E1 budget2/2, no additional E1. E2 native0/2 pending, E3/E4 blocked, Windows autonomy not activated.
+
 ## Campaign 3 E1 Run 1 and graph correction (2026-10-11)
 
 CI38154077270 on `759bbfb8efa6feb1edc037e0b969019e73833c02`: native E1 terminal **FAIL**, graph UNKNOWN `CHILD_NOT_REGISTERED`; actual workflow/native V2 publication/receipt and final fixed-scope baseline PASS. Corrected E1 two-job graph exactness regressions plus inference controls **7/7 PASS**. First post-fix full `npm run check` had one unrelated browser open timeout (root cause UNKNOWN); isolated browser **4/4 PASS**, then full `npm run check` **PASS** including syntax, installed-Pi TypeScript and package validation. No timeout or product safety change. E1 budget1/2, next corrected native run pending; E2/E3/E4 unrun and Windows autonomy BLOCKED.
