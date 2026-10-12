@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E3 local candidate, native proof pending (2026-10-12)
+
+E1/E2 COMPLETE with native budgets2/2 each. E3 local normal-Pi fixture and regression candidate is green (focused13 PASS/0 FAIL/3 Windows skips; full `npm run check` PASS; ZERO_EGRESS_REVIEW PASS), but live Windows autonomous-root death, fresh normal Phi V2 rollback and owned cleanup remain **UNVERIFIED**; E3 PARTIAL/native0/2. E4 BLOCKED pending E3 and current-candidate Linux/Windows regressions. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; no external provider requests or readiness activation.
+
 ## Current — Campaign 3 E1/E2 complete, E3 next (2026-10-12)
 
 E2 corrected native CI38260258518 on `bc74281d50eed7f62f52e0badf72a2bb96709c6b` proves real Windows LPAC `EPERM` denial of Worker out-of-scope sentinel write, unchanged sentinel, no publication/grant, terminal FAIL_CLOSED, protected receipt and both actual Scout/Worker routes, one owned EDIT Job empty/pipes drained/residual0 and final cleanup/baseline PASS; external provider requests0. E2 COMPLETE/budget2/2 exhausted. E1 COMPLETE/budget2/2. Campaign 1 and Campaign 2/D MAIN CERTIFIED. E3 PARTIAL/native0/2, E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. No provider call/readiness activation.

@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E3 local candidate, not native certified (2026-10-12)
+
+The disposable normal-Pi fixture now prepares actual autonomous-root termination after a durable V2 MODIFY `TEMP_CREATED` marker, followed by a fresh ordinary Phi startup using existing rollback. Local focused 13 PASS/0 FAIL/3 Windows-only skips, full `npm run check` PASS and ZERO_EGRESS_REVIEW PASS; no production publication/recovery authority, timeout, retry, provider route or autonomy-readiness change. Native Windows crash, rollback, no replay, owned Job/pipe and cleanup evidence remain pending. E1/E2 COMPLETE with exhausted native budgets; E3 PARTIAL/native0/2, E4 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E2 native security-denial complete (2026-10-12)
 
 Corrected [CI38260258518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38260258518) on `bc74281d50eed7f62f52e0badf72a2bb96709c6b` passed real normal-Windows-Pi Worker LPAC `EPERM`/exit73 against a fixture-owned external sentinel, unchanged identity/digest, no publication/grant, terminal FAIL_CLOSED, protected receipt, actual Scout Luna:low/Worker Sol:medium route evidence, one EDIT Job empty/pipes drained/residual0 and final baseline/fixture removal. External provider requests0. E2 COMPLETE/budget2/2; E1 COMPLETE. E3 autonomous-root crash/recovery and E4 remain unverified; Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.

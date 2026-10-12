@@ -10,16 +10,17 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canReclaimDWorktreeJournal, classifyDPrefix, D_OPERATIONS, runDSequence, verifyDPrefixBridge, verifyDNextBase } from './phi-d-prefix.mjs';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
-import { readEvidenceReceipt } from '../lib/workflow-evidence.mjs';
+import { readEvidenceReceipt, openEvidenceRun, readWorkflowJournal, recoverInterruptedWorkflowRuns } from '../lib/workflow-evidence.mjs';
 import { captureProcessIdentity, inspectProcessIdentity } from '../lib/process-identity.mjs';
 import { createOwnedProcessGraphEvidence, fixedScopeBaselineEvidence } from '../lib/phi-certification-evidence.mjs';
 import { discoverWindowsTransactions } from '../platform/windows/publication.mjs';
-import { assertUniqueManagedWorktreeRecord, listRuntimeAllocations } from '../lib/runtime-isolation.mjs';
+import { assertUniqueManagedWorktreeRecord, listRuntimeAllocations, recoverStaleRuntimeAllocations } from '../lib/runtime-isolation.mjs';
 import { runValidationCommand } from '../platform/windows/validation-process.mjs';
 import { ownedWindowsHelper } from '../platform/windows/process.mjs';
 
 if (process.platform !== 'win32') throw new Error('PHI_D_WIDE_REQUIRES_NATIVE_WINDOWS');
-const restartMode = process.argv.length === 3 && process.argv[2] === '--restart-v2';
+const autonomyCrashMode = process.argv.length === 3 && process.argv[2] === '--autonomy-crash-v2';
+const restartMode = process.argv.length === 3 && (process.argv[2] === '--restart-v2' || autonomyCrashMode);
 if (!restartMode && process.argv.length !== 2) throw new Error('PHI_D_WIDE_USAGE');
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const piRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
@@ -30,7 +31,7 @@ const subagentManifest = JSON.parse(fs.readFileSync(path.join(subagentRoot, 'pac
 assert.equal(piManifest.version, '0.87.1');
 assert.equal(subagentManifest.version, '0.66.0');
 
-const temp = fs.mkdtempSync(path.join(os.tmpdir(), restartMode ? 'phi-d-restart-' : 'phi-d-wide-'));
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), autonomyCrashMode ? 'phi-e3-crash-' : restartMode ? 'phi-d-restart-' : 'phi-d-wide-'));
 const project = path.join(temp, 'project');
 const agentDir = path.join(temp, 'agent');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
@@ -44,7 +45,7 @@ const expectedStatus = [
   ['?? a.txt'], [' M a.txt'], [' D a.txt', '?? b.txt'], [' D b.txt'],
 ];
 const retained = [];
-const summary = { status: 'FAIL', runKind: restartMode ? 'D13_NORMAL_WORKFLOW_RESTART' : 'D_WIDE_NORMAL_WORKFLOW', operations: [], externalRequests: 0,
+const summary = { status: 'FAIL', runKind: autonomyCrashMode ? 'CAMPAIGN3_E3_AUTONOMOUS_ROOT_CRASH_V2' : restartMode ? 'D13_NORMAL_WORKFLOW_RESTART' : 'D_WIDE_NORMAL_WORKFLOW', operations: [], externalRequests: 0,
   prefix: 'PREFIX_0', inFlight: null, cleanup: 'UNKNOWN', residualOwnedProcesses: null };
 let current = project;
 let child = null;
@@ -267,7 +268,7 @@ async function runInterruptedModify(completedReceipts) {
   const evidenceRoot = path.join(stepRoot, 'evidence');
   const auditFile = path.join(stepRoot, 'provider-audit.jsonl');
   child = spawn(process.execPath, piArgs(), { cwd: current, shell: false, windowsHide: true,
-    env: piEnvironment(stepRoot, evidenceRoot, auditFile, { PHI_D13_V2_TEMP_FAILPOINT: '1' }),
+    env: piEnvironment(stepRoot, evidenceRoot, auditFile, autonomyCrashMode ? { PHI_E3_V2_TEMP_WAIT: '1' } : { PHI_D13_V2_TEMP_FAILPOINT: '1' }),
     stdio: ['pipe', 'pipe', 'pipe'] });
   childClosed = new Promise(resolve => child.once('close', code => resolve(code)));
   childIdentity = captureProcessIdentity(child.pid);
@@ -289,6 +290,11 @@ async function runInterruptedModify(completedReceipts) {
   child.stdin.on('error', () => {});
   child.stdin.write(`${JSON.stringify({ id: 'd13-modify', type: 'prompt', message: tasks[1] })}\n`);
   const started = Date.now();
+  if (autonomyCrashMode) {
+    await runAutonomousCrashAtTemp({ stepRoot, evidenceRoot, auditFile, completedReceipts, priorHead,
+      started, stdoutDrained: () => stdoutDrained, stderrDrained: () => stderrDrained, events });
+    return;
+  }
   while (!events.some(event => event.type === 'agent_settled') && child.exitCode === null && Date.now() - started < 10 * 60 * 1000)
     await new Promise(resolve => setTimeout(resolve, 50));
   assert.ok(events.some(event => event.type === 'agent_settled'), 'D13_PI_NOT_SETTLED');
@@ -386,6 +392,111 @@ async function runInterruptedModify(completedReceipts) {
     recovery: recovery.reason, recoveryStatus: recovery.status, recoveryProjectMutations: 0,
     prefixAfter: 'PREFIX_1', suffixStarted: false, piRootClosed: true, piPipesDrained: true,
     ownedBrokersClosed: 3, ownedBaseline: baseline.status, ownedResidualProcesses: 0 };
+  summary.inFlight = null;
+}
+
+async function runAutonomousCrashAtTemp({ stepRoot, evidenceRoot, auditFile, completedReceipts, priorHead,
+  started, stdoutDrained, stderrDrained, events }) {
+  const marker = path.join(stepRoot, 'e3-temp-ready');
+  while (!fs.existsSync(marker) && child.exitCode === null && Date.now() - started < 10 * 60 * 1000)
+    await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(fs.lstatSync(marker).isFile(), true, 'E3_DURABLE_TEMP_MARKER_MISSING');
+  assert.equal(fs.readFileSync(marker, 'utf8'), 'TEMP_CREATED', 'E3_DURABLE_TEMP_MARKER_INVALID');
+  assert.equal(events.some(event => event.type === 'agent_settled'), false, 'E3_AUTONOMOUS_ROOT_ALREADY_SETTLED');
+  const roots = { shareRoot: path.join(stepRoot, 'worktrees'), stateRoot: path.join(stepRoot, 'runtime') };
+  const allocations = listRuntimeAllocations(roots);
+  assert.equal(allocations.length, 1, 'E3_ALLOCATION_NOT_UNIQUE');
+  const allocation = allocations[0];
+  assert.ok(allocation.status === 'active' && underOwnedTemp(allocation.worktree) &&
+    fs.realpathSync(allocation.worktree) === allocation.worktree, 'E3_ALLOCATION_NOT_OWNED');
+  retained.push({ allocation, source: current, stepRoot });
+  assert.equal(inspectProcessIdentity(childIdentity).alive, true, 'E3_AUTONOMOUS_ROOT_NOT_LIVE');
+  assert.equal(child.kill('SIGKILL'), true, 'E3_OWNED_ROOT_TERMINATION_FAILED');
+  child.stdin.end();
+  const exit = await Promise.race([childClosed, new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 10000))]);
+  assert.notEqual(exit, 'TIMEOUT', 'E3_ROOT_EXIT_UNCONFIRMED');
+  assert.notEqual(exit, 0, 'E3_ROOT_EXIT_WAS_SUCCESS');
+  assert.equal(inspectProcessIdentity(childIdentity).alive, false, 'E3_ROOT_STILL_LIVE');
+  assert.equal(stdoutDrained() && stderrDrained(), true, 'E3_PI_PIPES_UNDRAINED');
+  let before;
+  const waited = Date.now();
+  while (Date.now() - waited < 10000) {
+    try {
+      const observed = discoverWindowsTransactions({ cwd: allocation.worktree });
+      if (observed.entries.length === 1 && observed.entries[0].phase === 'TEMP_CREATED' &&
+          observed.entries[0].classification === 'RECOVERY_REQUIRED') { before = observed; break; }
+    } catch { /* Native publisher guardian may still be terminating; no state is accepted yet. */ }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.ok(before, 'E3_V2_TEMP_CREATED_OWNER_DEATH_UNPROVEN');
+  const inFlight = before.entries[0];
+  assert.equal(inFlight.journalVersion, 2);
+  assert.equal(inFlight.observedStatus, 'OLD_COMPLETE_OBSERVED');
+  const runIds = fs.readdirSync(evidenceRoot).filter(name => /^[0-9a-f-]{36}$/u.test(name));
+  assert.equal(runIds.length, 1, 'E3_WORKFLOW_RUN_NOT_UNIQUE');
+  const run = openEvidenceRun({ root: evidenceRoot, runId: runIds[0] });
+  assert.equal(fs.existsSync(run.receiptFile), false, 'E3_CRASHED_WORKFLOW_HAS_TERMINAL_RECEIPT');
+  assert.equal(readWorkflowJournal(run).status, 'RUNNING', 'E3_WORKFLOW_NOT_INTERRUPTED_IN_FLIGHT');
+  const auditBefore = fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+  const stages = auditBefore.filter(row => row.kind === 'create_stage').map(row => row.stage);
+  assert.equal(stages.includes('WORKER_REVOKED') && stages.includes('NATIVE_PUBLICATION_CALL_ENTERED'), true);
+  assert.equal(stages.includes('NATIVE_RESULT_OBSERVED') || stages.includes('TERMINAL_STATUS_COMMITTED'), false,
+    'E3_INTERRUPTED_TASK_FALSIFIED_AS_SUCCESS');
+  const fresh = await runValidationCommand(process.execPath, [path.join(sourceRoot, 'bin', 'phi.mjs')], {
+    cwd: allocation.worktree, env: piEnvironment(stepRoot, evidenceRoot, auditFile) });
+  const line = fresh.stderr.split(/\r?\n/u).find(row => row.startsWith('PHI_STARTUP_RECOVERY '));
+  assert.ok(line, 'E3_NORMAL_PHI_STARTUP_RECOVERY_MISSING');
+  const recovery = JSON.parse(line.slice('PHI_STARTUP_RECOVERY '.length));
+  assert.deepEqual({ status: recovery.status, reason: recovery.reason, journalVersion: recovery.journalVersion,
+    transactionId: recovery.transactionId, projectMutations: recovery.projectMutations,
+    projectPublished: recovery.projectPublished, externalRequests: recovery.externalRequests },
+  { status: 'PASS_RECOVERED', reason: 'ROLLBACK', journalVersion: 2, transactionId: inFlight.transactionId,
+    projectMutations: 0, projectPublished: false, externalRequests: 0 });
+  assert.notEqual(fresh.status, 0, 'E3_NORMAL_PHI_BYPASSED_AUTONOMY_GATE');
+  assert.ok(fresh.receipt?.jobAttested === true && fresh.receipt.jobEmptyVerified === true &&
+    fresh.receipt.pipesDrained === true && fresh.receipt.residualOwnedProcesses === 0,
+  'E3_FRESH_PHI_PROCESS_NOT_CLOSED');
+  const after = discoverWindowsTransactions({ cwd: allocation.worktree });
+  assert.equal(after.entries.length, 1);
+  assert.equal(after.entries[0].transactionId, inFlight.transactionId);
+  assert.equal(after.entries[0].phase, 'ROLLED_BACK');
+  assert.equal(after.entries[0].classification, 'TERMINAL_RETAINED');
+  assert.equal(classifyDPrefix({ projectRoot: allocation.worktree, created: 'created-state', modified: 'modified-state',
+    receipts: completedReceipts }).status, 'PREFIX_1');
+  const base = verifyDNextBase({ sourceRoot: current, candidateRoot: allocation.worktree, priorHead,
+    prefix: 1, receipts: completedReceipts, created: 'created-state', modified: 'modified-state' });
+  assert.equal(base.status, 'PASS', 'E3_RECOVERED_BASE_UNVERIFIED');
+  assert.equal(fs.existsSync(path.join(allocation.worktree, 'b.txt')), false, 'E3_SUFFIX_STARTED');
+  assert.equal(git(allocation.worktree, ['status', '--porcelain']).trim(), '', 'E3_PROJECT_CHANGED');
+  const workflowRecovery = recoverInterruptedWorkflowRuns({ root: evidenceRoot });
+  assert.equal(workflowRecovery.recovered.length, 1);
+  assert.equal(workflowRecovery.recovered[0].status, 'INTERRUPTED');
+  assert.equal(workflowRecovery.active.length + workflowRecovery.unknown.length + workflowRecovery.inconsistent.length, 0);
+  assert.equal(fs.existsSync(run.receiptFile), false, 'E3_ABANDONED_TASK_REPORTED_SUCCESS');
+  const runtimeRecovery = recoverStaleRuntimeAllocations(roots);
+  assert.equal(runtimeRecovery.recovered.length, 1);
+  assert.equal(runtimeRecovery.active.length + runtimeRecovery.unknown.length + runtimeRecovery.invalidAllocations.length +
+    runtimeRecovery.orphanWorktrees.length, 0);
+  assert.equal(fs.existsSync(allocation.portReservation), false, 'E3_PORT_RESERVATION_SURVIVED');
+  const auditAfter = fs.readFileSync(auditFile, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+  assert.equal(auditAfter.filter(row => row.kind === 'local_model_turn').length,
+    auditBefore.filter(row => row.kind === 'local_model_turn').length, 'E3_ABANDONED_MODEL_TURN_REPLAYED');
+  const owned = auditAfter.filter(row => row.kind === 'owned_execution');
+  assert.equal(owned.length, 3, 'E3_OWNED_BROKER_GRAPH_INCOMPLETE');
+  assert.equal(owned.every(row => row.targetStarted === true && row.jobAttested === true &&
+    row.jobEmptyVerified === true && row.brokerHelperClosed === true && row.brokerPipesDrained === true &&
+    row.cleanup === 'PASS' && row.exitCode === 0 && row.securityFailure === null && row.timedOut === false), true,
+  'E3_OWNED_BROKER_NOT_CLOSED');
+  const baseline = fixedScopeBaselineEvidence(await runValidationCommand(ownedWindowsHelper(), ['--scope-recovery-status'], { cwd: sourceRoot }));
+  assert.equal(baseline.status, 'PASS', 'E3_OWNED_BASELINE_NOT_PASS');
+  summary.restart = { status: 'PASS', autonomousRootTerminated: true, normalPhiStartup: true,
+    createPrefix: 'PREFIX_1', exactNextBase: base.status, interruptedOperation: 'MODIFY', journalVersion: 2,
+    transactionId: inFlight.transactionId, failpoint: 'V2_TEMP_CREATED', phaseBefore: inFlight.phase,
+    phaseAfter: after.entries[0].phase, recovery: recovery.reason, recoveryStatus: recovery.status,
+    recoveryProjectMutations: 0, abandonedWorkflow: 'INTERRUPTED', abandonedTurnReplay: false,
+    prefixAfter: 'PREFIX_1', suffixStarted: false, piRootClosed: true, piPipesDrained: true,
+    ownedBrokersClosed: owned.length, freshPhiJobEmpty: true, ownedBaseline: baseline.status,
+    ownedResidualProcesses: 0, externalRequests: 0 };
   summary.inFlight = null;
 }
 

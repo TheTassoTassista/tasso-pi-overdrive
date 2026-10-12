@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E3 pre-native local baseline (2026-10-12)
+
+Focused D-prefix and startup-recovery tests: **13 PASS / 0 FAIL / 3 Windows-only skips**. Full `npm run check`: **PASS**, including syntax, installed-Pi TypeScript and pinned package validation. Scoped diff whitespace: PASS. A fixture-confined V2 `TEMP_CREATED` marker/root-kill/ordinary-Phi-startup test path is prepared but **not executable as native Windows proof on Linux**; native C# compile, recovery, Job/pipes and cleanup are pending E3 Run 1. E1/E2 native COMPLETE/budgets exhausted. No provider/model calls were made by this local preparation. E3 PARTIAL/native0/2, E4 BLOCKED, Windows autonomy not activated.
+
 ## Campaign 3 E2 corrected native PASS (2026-10-12)
 
 [CI38260258518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38260258518) on exact `bc74281d50eed7f62f52e0badf72a2bb96709c6b`: Windows E2 PASS, one native owned EDIT Job exits73 after LPAC `EPERM` denial, target sentinel unchanged, no grant/publication, workflow FAIL_CLOSED with protected receipt, Scout/Worker provider/model/thinking in structured report, graph/Job/pipes/residual0 and final fixed-scope baseline/fixture cleanup PASS, external provider requests0. Local focused graph7/7, offline E2 smoke and full `npm run check` PASS; CI graph regressions7/7 PASS. Run 1 CI38259537138 remains partial route-report evidence. E2 budget2/2 exhausted, E3 native0/2 next, E4 blocked and Windows autonomy not activated.

@@ -753,6 +753,24 @@ namespace Phi.Native {
           canonicalProject.StartsWith(canonicalShare + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
       } catch { return false; }
     }
+    // Campaign-3 E3 fixture only: hold an already-durable V2 TEMP_CREATED
+    // boundary until the test owner terminates its own autonomous Pi root.
+    // The existing publication guardian then terminates this publisher; no
+    // production recovery/publication authority is added.
+    static bool E3FixtureWaitsAtV2Temp(string project) {
+      if (Environment.GetEnvironmentVariable("PHI_E3_V2_TEMP_WAIT") != "1" ||
+          Environment.GetEnvironmentVariable("PHI_BOUNDED_TEST_KEY") != "offline-fixture-not-a-credential") return false;
+      string share = Environment.GetEnvironmentVariable("PI_OVERDRIVE_WORKTREE_ROOT");
+      if (String.IsNullOrEmpty(share)) return false;
+      try {
+        string canonicalShare = Path.GetFullPath(share).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string canonicalProject = Path.GetFullPath(project);
+        string step = Path.GetFileName(Path.GetDirectoryName(canonicalShare));
+        string fixture = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(canonicalShare)));
+        return step == "step-2" && fixture.StartsWith("phi-e3-crash-", StringComparison.Ordinal) &&
+          canonicalProject.StartsWith(canonicalShare + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+      } catch { return false; }
+    }
     internal static int RunSingleModify(Stream input) {
       PublicationJournal journal = null; object result = null; string phase = "REQUEST";
       try {
@@ -776,12 +794,24 @@ namespace Phi.Native {
         Dictionary<string, object> op = (Dictionary<string, object>)Operations(header)[0];
         if (value.Length != (int)op["newBytes"] || Hash(value) != (string)op["newDigest"]) throw new InvalidDataException();
         bool d13FixtureInterrupt = D13FixtureInterruptsV2Temp(project);
+        bool e3FixtureWait = E3FixtureWaitsAtV2Temp(project);
         OwnedProcess.WithPublicationGuardian(Number(request, "guardianPid", 1, Int32.MaxValue), Number(request, "timeoutMs", 1, 30000), delegate(Action live) {
           phase = "ADMISSION"; journal = Begin(project, header); phase = "PREPARED";
           result = journal.PublishSingleModify(value, delegate(string observed) {
             phase = observed; live();
             if (d13FixtureInterrupt && observed == "temp" && (string)journal.last["phase"] == "TEMP_CREATED")
               Environment.Exit(76);
+            if (e3FixtureWait && observed == "temp" && (string)journal.last["phase"] == "TEMP_CREATED") {
+              string share = Environment.GetEnvironmentVariable("PI_OVERDRIVE_WORKTREE_ROOT");
+              string marker = Path.Combine(Path.GetDirectoryName(share), "e3-temp-ready");
+              using (FileStream signal = new FileStream(marker, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+                byte[] markerBytes = Encoding.ASCII.GetBytes("TEMP_CREATED");
+                signal.Write(markerBytes, 0, markerBytes.Length); signal.Flush(true);
+              }
+              using (Process owner = Process.GetProcessById(Number(request, "guardianPid", 1, Int32.MaxValue)))
+                if (!owner.WaitForExit(Number(request, "timeoutMs", 1, 30000))) Environment.Exit(77);
+              Environment.Exit(76);
+            }
           });
         });
         Console.WriteLine(Serializer().Serialize(new { version = 1, status = "PASS_NATIVE_SINGLE_MODIFY", receipt = result,

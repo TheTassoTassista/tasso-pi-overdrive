@@ -22,6 +22,7 @@ test('startup selection ignores only terminal journals and never treats an advis
   assert.equal(planWindowsStartupRecovery(inventory(entry('RENAME_INTENT'))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('DELETE_INTENT', 'RECOVERY_REQUIRED', 3))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('COMMIT_STARTED', 'RECOVERY_REQUIRED', 2))).kind, 'RECOVER');
+  assert.equal(planWindowsStartupRecovery(inventory(entry('TEMP_CREATED', 'RECOVERY_REQUIRED', 2))).kind, 'RECOVER');
   assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'RECOVERY_REQUIRED', 1))).kind, 'BLOCKED_UNSUPPORTED_VERSION');
   assert.equal(planWindowsStartupRecovery(inventory(entry('PREPARED', 'MANUAL_RECOVERY_REQUIRED', 5))).kind, 'BLOCKED_MANUAL_RECOVERY_REQUIRED');
   assert.equal(planWindowsStartupRecovery(inventory(entry('CLEANUP_STARTED', 'RECOVERY_REQUIRED', 5))).kind, 'RECOVER');
@@ -32,6 +33,23 @@ test('startup selection ignores only terminal journals and never treats an advis
     'BLOCKED_MULTIPLE_PENDING');
   assert.throws(() => planWindowsStartupRecovery({ ...inventory(), projectTransactions: 1 }), /RECOVERY_UNCONFIRMED/u);
   assert.throws(() => planWindowsStartupRecovery({ ...inventory(), projectPublished: true }), /RECOVERY_UNCONFIRMED/u);
+});
+
+test('E3 fixture waits only at a durable V2 boundary for its owned root and invokes normal Phi startup', () => {
+  const native = fs.readFileSync(new URL('../platform/windows/native/PublicationJournal.cs', import.meta.url), 'utf8');
+  const fixture = fs.readFileSync(new URL('../scripts/phi-d-wide-pi-smoke.mjs', import.meta.url), 'utf8');
+  const workflow = fs.readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  assert.match(native, /PHI_E3_V2_TEMP_WAIT/u);
+  assert.match(native, /fixture\.StartsWith\("phi-e3-crash-"/u);
+  assert.match(native, /observed == "temp" && \(string\)journal\.last\["phase"\] == "TEMP_CREATED"/u);
+  assert.match(native, /owner\.WaitForExit\(Number\(request, "timeoutMs", 1, 30000\)\)/u);
+  assert.match(fixture, /child\.kill\('SIGKILL'\)/u);
+  assert.match(fixture, /runValidationCommand\(process\.execPath, \[path\.join\(sourceRoot, 'bin', 'phi\.mjs'\)\]/u);
+  assert.match(fixture, /recoverInterruptedWorkflowRuns\(\{ root: evidenceRoot \}\)/u);
+  assert.match(fixture, /recoverStaleRuntimeAllocations\(roots\)/u);
+  assert.match(fixture, /verifyDNextBase\(\{ sourceRoot: current, candidateRoot: allocation\.worktree, priorHead/u);
+  assert.match(workflow, /campaign3-e3-focused:[\s\S]*?node scripts\/phi-d-wide-pi-smoke\.mjs --autonomy-crash-v2/u);
+  assert.match(workflow, /Final fixed-scope ownership baseline even after failure/u);
 });
 
 test('V5 recovery receipt certifies an observation without cleanup provenance or publication authority', () => {
