@@ -127,3 +127,39 @@ test('E1 source-repair graph requires exactly its EDIT and TEST jobs without inv
   assert.equal(e1({ executions: [createRoles[0], { ...createRoles[2], jobEmptyVerified: false }] }).reason, 'JOB_NOT_EMPTY');
   assert.equal(graph({ graphKind: 'UNKNOWN_GRAPH', executions: [createRoles[0], createRoles[2]] }).status, 'FAIL');
 });
+
+test('E2 denied host write graph requires one denied EDIT Job, revoked Worker and no publisher', () => {
+  const deniedJob = { ...createRoles[0], exitCode: 73 };
+  const stages = [{ stage: 'WORKER_RESERVED' }, ...createStages.slice(0, 3)];
+  const e2 = input => graph({ graphKind: 'E2_HOST_WRITE_DENIED', executions: [deniedJob], stages, ...input });
+  const clean = e2({});
+  assert.equal(clean.status, 'PASS');
+  assert.equal(clean.jobsEmpty, true);
+  assert.equal(clean.pipesDrained, true);
+  assert.equal(clean.ownedResidualProcesses, 0);
+  assert.equal(clean.roles.find(role => role.id === 'SYNCHRONOUS_PUBLISHER')?.terminal, 'NOT_STARTED');
+  assert.equal(clean.roles.find(role => role.id === 'WORKER_DENIED_HOST_WRITE')?.exit, 'EXPECTED_DENIAL_EXIT_73');
+  assert.equal(e2({ executions: [] }).status, 'FAIL');
+  assert.equal(e2({ executions: [deniedJob, createRoles[2]] }).reason, 'UNEXPECTED_OWNED_NODE');
+  assert.equal(e2({ executions: [{ ...deniedJob, exitCode: 0 }] }).reason, 'CHILD_EXIT_UNEXPECTED');
+  assert.equal(e2({ executions: [{ ...deniedJob, jobEmptyVerified: false }] }).reason, 'JOB_NOT_EMPTY');
+  assert.equal(e2({ executions: [{ ...deniedJob, brokerPipesDrained: false }] }).reason, 'PIPE_NOT_DRAINED');
+  assert.equal(e2({ stages: [...stages, { stage: 'OPERATION_INTENT_READY' }] }).reason, 'UNEXPECTED_PUBLICATION');
+  assert.equal(e2({ stages: [...stages, { stage: 'CREATE_INTENT_AND_V6_READY' }] }).reason, 'UNEXPECTED_PUBLICATION');
+  assert.equal(e2({ stages: [...stages, ...createStages.slice(3)] }).reason, 'UNEXPECTED_PUBLICATION');
+  assert.equal(e2({ stages: stages.slice(0, 2) }).reason, 'OWNERSHIP_RECORD_MISSING');
+  assert.equal(e2({ stages: createStages.slice(0, 3) }).reason, 'OWNERSHIP_RECORD_MISSING');
+  assert.equal(e2({ baseline: { ...createInput.baseline, owner: { ...createInput.baseline.owner, residualOwnedProcesses: 1 } } }).reason, 'BASELINE_MISMATCH');
+  assert.notEqual(graph({ graphKind: 'E1_SOURCE_REPAIR_NO_LSP', executions: [deniedJob, createRoles[2]] }).status, 'PASS');
+  assert.notEqual(graph({ graphKind: 'ORDINARY_CREATE', executions: [deniedJob, createRoles[1], createRoles[2]] }).status, 'PASS');
+});
+
+test('E2 native focus runs the normal Pi denial path with an always-on cleanup baseline', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const e2 = workflow.split('\n  campaign3-e2-focused:\n')[1]?.split('\n  corrupt-journal-ready-diagnostic:\n')[0];
+  assert.ok(e2);
+  assert.match(e2, /node --test tests\/integrated-certification-evidence\.test\.mjs/u);
+  assert.match(e2, /node scripts\/phi-bounded-workflow-pi-smoke\.mjs --e2/u);
+  assert.match(e2, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
+  assert.match(workflow, /!inputs\['campaign3-e1-focused'\] && !inputs\['campaign3-e2-focused'\]/u);
+});

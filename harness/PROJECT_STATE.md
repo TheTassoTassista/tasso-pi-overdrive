@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E2 local denial path prepared (2026-10-12)
+
+E1 remains COMPLETE from native CI38154541489, budget2/2 exhausted. E2 has local Linux normal-Pi `secure_coding_workflow` security-denial evidence: real Worker `safe_exec` write attempt against a separate fixture-owned sentinel outside its project, OS/sandbox denial `ENOENT`, sentinel identity/digest unchanged, no controller grant/publication, terminal FAIL and protected receipt/cleanup PASS. Exact E2 native Windows one-Job/no-publisher attestation and negative controls are implemented and locally green; **native E2 Run 1 has not run**, budget0/2. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. E2 PARTIAL, E3/E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. No external provider call or readiness activation.
+
 ## Current — Campaign 3 E1 technical COMPLETE; E2 pending (2026-10-11)
 
 Native Windows CI38154541489 on `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad` proves normal Pi source-repair, Worker revoke→controller V2 publication, physical postverification, protected receipt and exact EDIT+TEST owned Job graph/cleanup PASS with provider requests0. E1 COMPLETE/budget2/2. E2 PARTIAL/native0/2, E3/E4 BLOCKED. Campaign 1 and Campaign 2/D remain COMPLETE / MAIN CERTIFIED. **Windows autonomy BLOCKED; `windowsAutonomousReady=false`; PHI PORTABILITY COMPLETE NOT CERTIFIED.** No readiness activation or external provider call.

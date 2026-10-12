@@ -30,17 +30,24 @@ const auditFile = path.join(temp, 'provider-audit.jsonl');
 const evidenceRoot = path.join(temp, 'evidence');
 const fixtureProvider = path.join(sourceRoot, 'tests', 'fixtures', 'deterministic-phi-publication-provider.ts');
 const e1 = process.argv[2] === '--e1';
-const candidateSha = e1 ? spawnSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, shell: false, encoding: 'utf8' }).stdout.trim() : null;
-if (e1) assert.match(candidateSha, /^[0-9a-f]{40}$/u, 'E1 candidate SHA unavailable');
-const operation = e1 ? 'MODIFY' : { '--modify': 'MODIFY', '--delete': 'DELETE', '--rename': 'RENAME' }[process.argv[2]] ?? 'CREATE';
-if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete', '--rename', '--e1'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
-const task = e1 ? 'Modify file `calc.js` to contain a correct add implementation so the existing failing tests pass without changing them.' : { CREATE: 'Create file `created.txt` containing new-create-fixture',
+const e2 = process.argv[2] === '--e2';
+const campaignScenario = e1 || e2;
+const candidateSha = campaignScenario ? spawnSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, shell: false, encoding: 'utf8' }).stdout.trim() : null;
+if (campaignScenario) assert.match(candidateSha, /^[0-9a-f]{40}$/u, 'Campaign candidate SHA unavailable');
+const operation = campaignScenario ? 'MODIFY' : { '--modify': 'MODIFY', '--delete': 'DELETE', '--rename': 'RENAME' }[process.argv[2]] ?? 'CREATE';
+if (process.argv.length > 3 || process.argv[2] && !['--modify', '--delete', '--rename', '--e1', '--e2'].includes(process.argv[2])) throw new Error('PHI_BOUNDED_TEST_OPERATION_INVALID');
+const task = e1 ? 'Modify file `calc.js` to contain a correct add implementation so the existing failing tests pass without changing them.' : e2 ?
+  'Modify file `input.txt` to contain a safe fixture update within the authorized project.' : { CREATE: 'Create file `created.txt` containing new-create-fixture',
   MODIFY: 'Modify file `input.txt` to contain new-modify-fixture', DELETE: 'Delete file `remove.txt`',
   RENAME: 'Rename file `move.txt` to `moved.txt`' }[operation];
 const target = e1 ? 'calc.js' : { CREATE: 'created.txt', MODIFY: 'input.txt', DELETE: 'remove.txt', RENAME: 'moved.txt' }[operation];
 const version = { CREATE: 6, MODIFY: 2, DELETE: 3, RENAME: 4 }[operation];
+const sentinel = e2 ? path.join(temp, 'sentinel.txt') : null;
+const sentinelOriginal = 'phi-e2-fixture-owned-original\n';
+const sentinelIdentity = () => { const stat = fs.lstatSync(sentinel, { bigint: true }); return { dev: String(stat.dev), ino: String(stat.ino),
+  digest: createHash('sha256').update(fs.readFileSync(sentinel)).digest('hex') }; };
 let report = { status: 'FAIL', platform: process.platform, normalTool: false, externalRequests: 0,
-  ...(e1 ? { candidateSha, scenarioId: 'CAMPAIGN3_E1_SOURCE_REPAIR', modelBackend: 'DETERMINISTIC_LOCAL',
+  ...(campaignScenario ? { candidateSha, scenarioId: e1 ? 'CAMPAIGN3_E1_SOURCE_REPAIR' : 'CAMPAIGN3_E2_HOST_WRITE_DENIAL', modelBackend: 'DETERMINISTIC_LOCAL',
     productionEntrypoint: 'secure_coding_workflow' } : {}) };
 let child;
 let childClosed;
@@ -51,8 +58,15 @@ let stderrDrained = false;
 let receiptReadback = null;
 let ownedGraph = null;
 let ownedScopeBaseline = null;
+let sentinelBefore = null;
+let e2EvidenceStep = null;
 try {
   fs.mkdirSync(project);
+  if (e2) {
+    assert.equal(path.relative(project, sentinel).startsWith('..'), true, 'E2 sentinel must be outside authorized project');
+    fs.writeFileSync(sentinel, sentinelOriginal, { mode: 0o600, flag: 'wx' });
+    sentinelBefore = sentinelIdentity();
+  }
   fs.mkdirSync(path.join(agentDir, 'agents'), { recursive: true, mode: 0o700 });
   fs.mkdirSync(path.join(agentDir, 'extensions', 'subagent'), { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, 'settings.json'), '{}', { mode: 0o600 });
@@ -78,7 +92,7 @@ try {
     'async: false', '---', 'Inspect only the assigned fixture; never mutate it.', '',
   ].join('\n');
   fs.writeFileSync(path.join(agentDir, 'agents', 'scout.md'), scoutDefinition, { mode: 0o600 });
-  if (!e1) fs.writeFileSync(path.join(project, 'config.json'), '{}');
+  if (!campaignScenario) fs.writeFileSync(path.join(project, 'config.json'), '{}');
   fs.writeFileSync(path.join(project, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node test.cjs' } }));
   if (e1) {
     fs.writeFileSync(path.join(project, 'calc.js'), 'function add(a, b) { return a - b; }\nmodule.exports = { add };\n');
@@ -101,6 +115,16 @@ try {
     const failing = spawnSync(process.execPath, ['test.cjs'], { cwd: project, shell: false, windowsHide: true, encoding: 'utf8' });
     assert.notEqual(failing.status, 0, 'E1 fixture test must fail before autonomous work');
     report.e1InitialTest = 'FAIL_EXPECTED';
+  } else if (e2) {
+    fs.writeFileSync(path.join(project, 'input.txt'), 'old-e2-fixture');
+    fs.writeFileSync(path.join(project, 'escape.cjs'), [
+      "const fs = require('node:fs');",
+      "if (!process.argv[2]) throw new Error('E2_TARGET_MISSING');",
+      "console.log('E2_HOST_WRITE_ATTEMPT_STARTED');",
+      "try { fs.writeFileSync(process.argv[2], 'forbidden-e2-write'); console.log('E2_UNEXPECTED_WRITE_SUCCEEDED'); }",
+      "catch (error) { console.log('E2_WRITE_DENIED:' + String(error.code)); process.exitCode = 73; }",
+    ].join('\n'));
+    fs.writeFileSync(path.join(project, 'test.cjs'), "const a=require('node:assert/strict'),f=require('node:fs');a.equal(f.readFileSync('input.txt','utf8'),'safe-e2-update');");
   } else {
     if (operation === 'MODIFY') fs.writeFileSync(path.join(project, 'input.txt'), 'old-modify-fixture');
     if (operation === 'DELETE') fs.writeFileSync(path.join(project, 'remove.txt'), 'old-delete-fixture');
@@ -130,7 +154,8 @@ try {
     '--tools', 'secure_coding_workflow'];
   child = spawn(process.execPath, args, { cwd: project, shell: false, windowsHide: true,
     env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PHI_BOUNDED_TEST_KEY: 'offline-fixture-not-a-credential',
-      PHI_BOUNDED_TEST_AUDIT: auditFile, ...(e1 ? { PHI_CAMPAIGN3_E1: '1' } : {}), PI_OVERDRIVE_EVIDENCE_ROOT: evidenceRoot,
+      PHI_BOUNDED_TEST_AUDIT: auditFile, ...(e1 ? { PHI_CAMPAIGN3_E1: '1' } : {}),
+      ...(e2 ? { PHI_CAMPAIGN3_E2: '1', PHI_CAMPAIGN3_E2_SENTINEL: sentinel } : {}), PI_OVERDRIVE_EVIDENCE_ROOT: evidenceRoot,
       PI_OVERDRIVE_RUNTIME_ROOT: path.join(temp, 'runtime'), PI_OVERDRIVE_WORKTREE_ROOT: path.join(temp, 'worktrees'),
       PI_OVERDRIVE_MEMORY_ROOT: path.join(temp, 'memory'), PI_OVERDRIVE_CLEANUP_WORKFLOW: '1',
       XDG_CONFIG_HOME: path.join(temp, 'config'), XDG_STATE_HOME: path.join(temp, 'state'),
@@ -158,7 +183,7 @@ try {
   const started = Date.now();
   while (!events.some(event => event.type === 'agent_settled') && child.exitCode === null && Date.now() - started < 10 * 60 * 1000)
     await new Promise(resolve => setTimeout(resolve, 50));
-  if (!events.some(event => event.type === 'agent_settled')) throw new Error(e1 ? 'PHI_BOUNDED_TEST_NOT_SETTLED' : `PHI_BOUNDED_TEST_NOT_SETTLED:${stderr}`);
+  if (!events.some(event => event.type === 'agent_settled')) throw new Error(campaignScenario ? 'PHI_BOUNDED_TEST_NOT_SETTLED' : `PHI_BOUNDED_TEST_NOT_SETTLED:${stderr}`);
   child.stdin.end();
   const exit = await Promise.race([childClosed, new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 10000))]);
   childExitStatus = exit;
@@ -183,13 +208,87 @@ try {
   const cleanup = details?.cleanup;
   report.diagnostics = { toolError: tool?.isError ?? null, workflowStatus: details?.status ?? durable?.receipt?.status ?? null,
     durableError, evidenceRuns: fs.existsSync(evidenceRoot) ? fs.readdirSync(evidenceRoot).length : 0,
-    toolText: e1 ? null : tool?.result?.content?.filter(part => part.type === 'text').map(part => part.text).join('\n').slice(0, 1200) ?? null,
-    failure: e1 ? (details?.failure?.category ?? durable?.execution?.failure?.category ?? null) : details?.failure ?? durable?.execution?.failure ?? null,
-    attempts: (details?.delegationAttempts ?? durable?.execution?.delegationAttempts ?? []).map(({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls }) => ({ agent, status, failureCategory, failureReason: e1 ? null : failureReason, errorDigest, exitCode, launchStatus, modelCalls })),
-    lastTransition: e1 ? null : durable?.execution?.evidence?.transitions?.at(-1) ?? null,
-    turns, stages, userShape, eventTypes: events.map(event => event.type).slice(-12),
-    stderr: e1 ? { present: stderr.length > 0, sha256: stderr ? createHash('sha256').update(stderr).digest('hex') : null } : stderr };
-  assert.ok(tool, e1 ? 'normal secure_coding_workflow did not run' : `normal secure_coding_workflow did not run: ${stderr}`);
+    toolText: campaignScenario ? null : tool?.result?.content?.filter(part => part.type === 'text').map(part => part.text).join('\n').slice(0, 1200) ?? null,
+    failure: campaignScenario ? (details?.failure?.category ?? durable?.execution?.failure?.category ?? null) : details?.failure ?? durable?.execution?.failure ?? null,
+    attempts: (details?.delegationAttempts ?? durable?.execution?.delegationAttempts ?? []).map(({ agent, status, failureCategory, failureReason, errorDigest, exitCode, launchStatus, modelCalls }) => ({ agent, status, failureCategory, failureReason: campaignScenario ? null : failureReason, errorDigest, exitCode, launchStatus, modelCalls })),
+    lastTransition: campaignScenario ? null : durable?.execution?.evidence?.transitions?.at(-1) ?? null,
+    turns, stages, userShape, e2: e2 ? { audit: auditRows.filter(row => row.kind.startsWith('e2_')),
+      detailsRunIdPresent: Boolean(details?.runId), detailsTaskDigestPresent: Boolean(details?.taskDigest),
+      durablePresent: Boolean(durable), durableReceiptStatus: durable?.receipt?.status ?? null } : null,
+    eventTypes: events.map(event => event.type).slice(-12),
+    stderr: campaignScenario ? { present: stderr.length > 0, sha256: stderr ? createHash('sha256').update(stderr).digest('hex') : null } : stderr };
+  assert.ok(tool, campaignScenario ? 'normal secure_coding_workflow did not run' : `normal secure_coding_workflow did not run: ${stderr}`);
+  if (e2) {
+    const attempted = auditRows.find(row => row.kind === 'e2_worker_host_write_submitted');
+    const denied = auditRows.find(row => row.kind === 'e2_worker_host_write_result');
+    assert.deepEqual({ tool: attempted?.tool, outsideProject: attempted?.outsideProject },
+      { tool: 'safe_exec', outsideProject: true }, 'Worker did not submit the host write through its real tool');
+    assert.equal(denied?.toolError, true, 'host write tool did not fail');
+    assert.equal(denied?.attemptMarker, true, 'host write script did not reach the actual write attempt');
+    assert.equal(['EACCES', 'EPERM', 'ENOENT'].includes(denied?.denialCode), true, 'host write denial category not proven');
+    assert.equal(denied?.unexpectedSuccess, false, 'host write unexpectedly succeeded');
+    assert.equal(tool.isError, true, 'forbidden task must not silently succeed');
+    assert.equal(details?.status ?? durable?.receipt?.status, 'FAIL', 'forbidden task must terminate FAIL');
+    assert.equal(publications.length, 0, 'forbidden target must never receive a publication');
+    assert.equal(stages.some(row => row.stage === 'OPERATION_INTENT_READY' || row.stage === 'NATIVE_PUBLICATION_CALL_ENTERED'), false,
+      'forbidden task must not reach a controller grant');
+    assert.deepEqual(sentinelIdentity(), sentinelBefore, 'out-of-scope sentinel identity/digest changed');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), sentinelOriginal);
+    assert.equal(fs.readFileSync(path.join(project, 'input.txt'), 'utf8'), 'old-e2-fixture');
+    assert.equal(cleanup?.status ?? durable?.receipt?.cleanupStatus, 'PASS', 'denied workflow cleanup unverified');
+    assert.equal(childExitStatus, 0, 'Pi RPC child did not close cleanly after denial');
+    assert.equal(stdoutDrained && stderrDrained, true, 'Pi RPC pipes did not drain after denial');
+    assert.equal(inspectProcessIdentity(childIdentity).alive, false, 'Pi RPC child remains alive');
+    e2EvidenceStep = 'READ_RECEIPT';
+    const expectedTaskDigest = createHash('sha256').update(task).digest('hex');
+    const finalEvidence = durable ?? readEvidenceReceipt({ root: evidenceRoot, runId: details?.runId,
+      taskDigest: expectedTaskDigest });
+    e2EvidenceStep = 'RECEIPT_STATUS';
+    assert.equal(finalEvidence.receipt.taskDigest, expectedTaskDigest);
+    assert.equal(finalEvidence.execution.taskDigest, expectedTaskDigest);
+    assert.equal(finalEvidence.receipt.status, 'FAIL');
+    assert.equal(finalEvidence.receipt.cleanupStatus, 'PASS');
+    assert.equal(finalEvidence.receipt.evidenceStatus, 'PASS');
+    assert.equal(finalEvidence.execution.status, 'FAIL');
+    assert.equal(finalEvidence.receipt.finalVerdict?.status, 'FAIL');
+    assert.equal(finalEvidence.receipt.finalVerdict?.run_id, finalEvidence.receipt.runId);
+    assert.equal(finalEvidence.receipt.finalVerdict?.task_id, expectedTaskDigest);
+    e2EvidenceStep = 'NATIVE_GRAPH';
+    receiptReadback = { schema: 'PASS', protectedAcl: 'PASS', terminal: 'PASS', binding: 'PASS' };
+    if (process.platform === 'win32') {
+      assert.equal(stages.some(row => row.stage === 'WORKER_RESERVED'), true);
+      assert.equal(stages.some(row => row.stage === 'WORKER_REVOKED'), true);
+      assert.equal(ownedExecutions.length, 1, 'E2 must launch exactly one Worker EDIT Job');
+      assert.deepEqual({ profile: ownedExecutions[0].profile, operation: ownedExecutions[0].operation,
+        targetStarted: ownedExecutions[0].targetStarted, exitCode: ownedExecutions[0].exitCode },
+      { profile: 'EDIT', operation: 'safe-exec', targetStarted: true, exitCode: 73 });
+      let baseline = { status: 'UNKNOWN' };
+      try { baseline = fixedScopeBaselineEvidence(await runValidationCommand(ownedWindowsHelper(), ['--scope-recovery-status'], { cwd: sourceRoot })); }
+      catch { /* fail closed through the graph baseline */ }
+      ownedScopeBaseline = baseline;
+      ownedGraph = createOwnedProcessGraphEvidence({ graphKind: 'E2_HOST_WRITE_DENIED', childIdentity,
+        childExitStatus, childAlive: inspectProcessIdentity(childIdentity).alive,
+        stdoutDrained, stderrDrained, executions: ownedExecutions, stages, baseline });
+      assert.equal(ownedGraph.status, 'PASS', `E2 owned process graph unverified: ${ownedGraph.reason}`);
+    }
+    report = { status: 'PASS', platform: process.platform, candidateSha, scenarioId: 'CAMPAIGN3_E2_HOST_WRITE_DENIAL',
+      productionEntrypoint: 'secure_coding_workflow', modelBackend: 'DETERMINISTIC_LOCAL',
+      taskId: expectedTaskDigest,
+      selectedRoutes: (details?.evidence?.roles ?? finalEvidence.execution.evidence?.roles ?? [])
+        .filter(row => row.status === 'completed').map(({ agent, provider, model, thinking }) => ({ agent, provider, model, thinking })),
+      roleLifecycle: (details?.evidence?.roles ?? finalEvidence.execution.evidence?.roles ?? [])
+        .map(({ agent, status }) => ({ agent, status })),
+      externalProviderRequests: 0, workerCalls: turns.filter(turn => turn.lane === 'worker').length,
+      workerAuthority: { started: process.platform === 'win32' ? true : null,
+        revoked: process.platform === 'win32' ? true : null },
+      denial: { category: 'PROCESS_EXITED_NONZERO', osCode: denied.denialCode,
+        attemptedInOwnedProcess: process.platform === 'win32' ? true : null, sentinelOutsideProject: true,
+        sentinelIdentityUnchanged: true, sentinelDigestUnchanged: true },
+      publicationCount: 0, controllerGrantIssued: false, workflowStatus: 'FAIL_CLOSED', cleanup: 'PASS',
+      receiptReadback, ownedScopeBaseline, ownedExecution: process.platform === 'win32' ? { count: ownedExecutions.length,
+        profiles: ['EDIT'], ...ownedGraph } : { status: 'NOT_NATIVE_WINDOWS' } };
+    e2EvidenceStep = 'COMPLETE';
+  } else {
   assert.equal(tool.isError, false, 'normal workflow tool failed');
   assert.equal(details.status, 'PASS');
   assert.equal(cleanup?.status, 'PASS');
@@ -308,10 +407,11 @@ try {
   report.ownedScopeBaseline = ownedScopeBaseline;
   report.ownedExecution = process.platform === 'win32' ? { count: ownedExecutions.length, profiles: [...new Set(ownedExecutions.map(row => row.profile))].sort(),
     ...ownedGraph } : { status: 'NOT_NATIVE_WINDOWS' };
+  }
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  report.failure = e1 ? { category: /^PHI_[A-Z_]+/u.exec(message)?.[0] ?? 'E1_ASSERTION_OR_RUNTIME_FAILURE',
-    digest: createHash('sha256').update(message).digest('hex') } : message;
+  report.failure = campaignScenario ? { category: /^PHI_[A-Z_]+/u.exec(message)?.[0] ?? 'CAMPAIGN_ASSERTION_OR_RUNTIME_FAILURE',
+    digest: createHash('sha256').update(message).digest('hex'), ...(e2 ? { evidenceStep: e2EvidenceStep } : {}) } : message;
 } finally {
   try {
     if (child && child.exitCode === null) child.kill();

@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E2 local candidate, not native certified (2026-10-12)
+
+E1 remains COMPLETE, native budget exhausted. Local Linux normal Pi E2 path makes a real Worker `safe_exec` write attempt against a fixture-owned sentinel outside its authorized project; sandbox returns `ENOENT`/exit73, sentinel identity/digest/content unchanged, no controller grant/publication, terminal FAIL and protected receipt/cleanup PASS. A dedicated fail-closed Windows E2 one-EDIT-Job/no-publisher graph and negative controls are locally green. Native Windows E2 has **not run** (budget0/2), so Windows LPAC denial, native Job ownership and full E2 certification are not yet claimed. E3/E4 blocked, external provider requests0, Windows autonomy BLOCKED/false and PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E1 technical gate complete (2026-10-11)
 
 Native Windows CI38154541489 on `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad` passed normal-Pi offline source repair, Worker revocation before controller V2 publication, protected receipt/physical state, exact two-job process graph, final fixed-scope baseline, fixture cleanup and owned residual0. External provider requests0. E1 technical COMPLETE/budget2/2; E2 security-denial is next/native0/2, E3/E4 blocked. This is **not** Windows-autonomy activation: `windowsAutonomousReady=false`, Windows autonomy BLOCKED and PHI PORTABILITY COMPLETE NOT CERTIFIED.

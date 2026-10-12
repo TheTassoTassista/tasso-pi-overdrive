@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E2 pre-native local baseline (2026-10-12)
+
+Normal Pi offline E2 Linux smoke PASS: real Worker `safe_exec` out-of-project write attempt receives `ENOENT`/exit73; fixture sentinel identity/digest/content unchanged; workflow FAIL with protected failure receipt and cleanup PASS; external provider requests0. E2 process graph and E1/CREATE isolation regressions **7/7 PASS**: exact one denied EDIT Job required; missing/extra/wrong-exit/nonempty/undrained/unreserved/unrevoked/unexpected publisher and nonzero residual cases fail closed. `npm run check` PASS after final graph-negative additions, with syntax, installed-Pi TypeScript and package validation. Native Windows E2 remains **UNRUN / PARTIAL**, budget0/2; E3/E4 blocked and Windows autonomy not activated.
+
 ## Campaign 3 E1 native technical PASS (2026-10-11)
 
 Corrected focused [CI38154541489](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38154541489), exact `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad`: Windows E1 PASS with real Pi autonomous source correction, V2 MODIFY protected receipt/physical postverify, exact two owned broker Jobs empty, Pi child/pipes closed, residual0 and final always-on fixed-scope baseline PASS. Inference controls PASS; external provider requests0. Earlier Run 1 CI38154077270 remains FAIL (harness graph expectation); E1 budget2/2, no additional E1. E2 native0/2 pending, E3/E4 blocked, Windows autonomy not activated.
