@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 E2 Run 1 and route-evidence correction (2026-10-12)
+
+[CI38259537138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38259537138) on `dc793c356a98ece2bfe68668a8f2923eabb524e8`: native Windows focused workflow SUCCESS, graph regressions7/7, LPAC `EPERM`/exit73, sentinel unchanged, no grant/publication, durable FAIL receipt/cleanup, one EDIT Job empty/pipes drained/owned residual0, final fixed-scope baseline PASS; external provider requests0. Required published route evidence was incomplete (Scout only), although Worker delegation completed before terminal controller rejection. Local correction reads both completed routes from protected delegation-attempt receipt; Linux E2 smoke PASS reports Scout Luna:low and Worker Sol:medium, and full `npm run check` PASS with syntax/TypeScript/package validation. E2 native budget1/2; corrected Run 2 not yet executed. E2 remains PARTIAL, E3/E4 blocked, Windows autonomy not activated.
+
 ## Campaign 3 E2 pre-native local baseline (2026-10-12)
 
 Normal Pi offline E2 Linux smoke PASS: real Worker `safe_exec` out-of-project write attempt receives `ENOENT`/exit73; fixture sentinel identity/digest/content unchanged; workflow FAIL with protected failure receipt and cleanup PASS; external provider requests0. E2 process graph and E1/CREATE isolation regressions **7/7 PASS**: exact one denied EDIT Job required; missing/extra/wrong-exit/nonempty/undrained/unreserved/unrevoked/unexpected publisher and nonzero residual cases fail closed. `npm run check` PASS after final graph-negative additions, with syntax, installed-Pi TypeScript and package validation. Native Windows E2 remains **UNRUN / PARTIAL**, budget0/2; E3/E4 blocked and Windows autonomy not activated.

@@ -253,6 +253,13 @@ try {
     assert.equal(finalEvidence.receipt.finalVerdict?.status, 'FAIL');
     assert.equal(finalEvidence.receipt.finalVerdict?.run_id, finalEvidence.receipt.runId);
     assert.equal(finalEvidence.receipt.finalVerdict?.task_id, expectedTaskDigest);
+    const selectedRoutes = (finalEvidence.execution.delegationAttempts ?? [])
+      .filter(row => row.status === 'completed' && ['scout', 'worker'].includes(row.agent))
+      .map(({ agent, provider, model, thinking }) => ({ agent, provider, model, thinking }));
+    assert.deepEqual(selectedRoutes, [
+      { agent: 'scout', provider: 'openai-codex', model: 'openai-codex/gpt-6-luna', thinking: 'low' },
+      { agent: 'worker', provider: 'openai-codex', model: 'openai-codex/gpt-6-sol', thinking: 'medium' },
+    ], 'completed delegated routes must be read from the durable receipt even when terminal role failed');
     e2EvidenceStep = 'NATIVE_GRAPH';
     receiptReadback = { schema: 'PASS', protectedAcl: 'PASS', terminal: 'PASS', binding: 'PASS' };
     if (process.platform === 'win32') {
@@ -274,8 +281,7 @@ try {
     report = { status: 'PASS', platform: process.platform, candidateSha, scenarioId: 'CAMPAIGN3_E2_HOST_WRITE_DENIAL',
       productionEntrypoint: 'secure_coding_workflow', modelBackend: 'DETERMINISTIC_LOCAL',
       taskId: expectedTaskDigest,
-      selectedRoutes: (details?.evidence?.roles ?? finalEvidence.execution.evidence?.roles ?? [])
-        .filter(row => row.status === 'completed').map(({ agent, provider, model, thinking }) => ({ agent, provider, model, thinking })),
+      selectedRoutes,
       roleLifecycle: (details?.evidence?.roles ?? finalEvidence.execution.evidence?.roles ?? [])
         .map(({ agent, status }) => ({ agent, status })),
       externalProviderRequests: 0, workerCalls: turns.filter(turn => turn.lane === 'worker').length,

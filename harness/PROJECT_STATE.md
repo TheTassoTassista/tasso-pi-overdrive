@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E2 first native denial succeeds, receipt-route evidence pending (2026-10-12)
+
+Native E2 Run 1 CI38259537138 on `dc793c356a98ece2bfe68668a8f2923eabb524e8` proved real Windows Worker LPAC `EPERM` denial, unchanged out-of-scope fixture sentinel, no publication/grant, terminal FAIL and protected receipt, one owned EDIT Job empty/pipes drained/residual0, final cleanup/baseline PASS; external provider requests0. The success report omitted Worker provider/model/thinking despite its completed delegation receipt because final Worker role status is failed after intentional controller denial. A narrow local receipt-based report correction is green; E2 **PARTIAL/native1/2** until its corrected native evidence is produced. E1 COMPLETE/budget2/2, E3/E4 BLOCKED, Campaign 1 and Campaign 2/D MAIN CERTIFIED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Current — Campaign 3 E2 local denial path prepared (2026-10-12)
 
 E1 remains COMPLETE from native CI38154541489, budget2/2 exhausted. E2 has local Linux normal-Pi `secure_coding_workflow` security-denial evidence: real Worker `safe_exec` write attempt against a separate fixture-owned sentinel outside its project, OS/sandbox denial `ENOENT`, sentinel identity/digest unchanged, no controller grant/publication, terminal FAIL and protected receipt/cleanup PASS. Exact E2 native Windows one-Job/no-publisher attestation and negative controls are implemented and locally green; **native E2 Run 1 has not run**, budget0/2. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. E2 PARTIAL, E3/E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. No external provider call or readiness activation.

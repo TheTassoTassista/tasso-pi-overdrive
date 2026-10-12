@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E2 first native run — security pass, report evidence partial (2026-10-12)
+
+Native [CI38259537138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38259537138) on `dc793c356a98ece2bfe68668a8f2923eabb524e8` passed real Worker LPAC denial (`EPERM`/exit73), fixture sentinel identity/digest unchanged, no publication/grant, terminal FAIL/protected receipt, one owned EDIT Job empty/pipes drained/residual0 and final fixed-scope/fixture cleanup. External provider requests0. The structured report omitted Worker route because it used final role status after controller denial rather than completed delegation attempts; route-evidence fix is local PASS but not yet native verified. E2 PARTIAL/native1/2; E3/E4 blocked, Windows autonomy BLOCKED/false and PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E2 local candidate, not native certified (2026-10-12)
 
 E1 remains COMPLETE, native budget exhausted. Local Linux normal Pi E2 path makes a real Worker `safe_exec` write attempt against a fixture-owned sentinel outside its authorized project; sandbox returns `ENOENT`/exit73, sentinel identity/digest/content unchanged, no controller grant/publication, terminal FAIL and protected receipt/cleanup PASS. A dedicated fail-closed Windows E2 one-EDIT-Job/no-publisher graph and negative controls are locally green. Native Windows E2 has **not run** (budget0/2), so Windows LPAC denial, native Job ownership and full E2 certification are not yet claimed. E3/E4 blocked, external provider requests0, Windows autonomy BLOCKED/false and PHI PORTABILITY COMPLETE NOT CERTIFIED.
