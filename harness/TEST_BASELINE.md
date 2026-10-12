@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 pre-E4-workflow native Windows main PASS (2026-10-12)
+
+[CI38263762303](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38263762303) on `b96ae39f39f9627f9aeafa7fbba8b9f6c174e88c`: complete Windows main **503 total / 491 PASS / 0 FAIL / 12 skips**, ordinals503, ledger NONE; owned Job attested/empty, pipes drained, timeout false, progress completed503/failed0, residual0. Always-on fixed-scope baseline active/stale/quarantined0, Job empty/pipes drained/residual0. Local Linux main 503/172/0/331 and full `npm run check` PASS. New dedicated E4 workflow YAML and static same-SHA/order assertions PASS, but final E4 candidate is not frozen or natively requalified; E4 not run.
+
 ## Campaign 3 current-candidate Linux full-suite classifier correction (2026-10-12)
 
 Pre-fix local owned main emitted **503 total / 172 PASS / 0 FAIL / 331 skips**, 503 contiguous ordinals and failure ledger NONE but certifier FAIL because it demanded 500; this failed evidence is preserved. After updating only exact-corpus expectations, focused integrated/clone classifiers **12 PASS / 0 FAIL / 3 Windows-only skips**, including old-corpus rejection; local `node scripts/phi-owned-main-suite.mjs` **PASS** with 503/172/0/331, ordinals503, ledger NONE. Full `npm run check` PASS including syntax/TypeScript/package validation. Current native Windows 503-case suite and ownership baseline pending; E4 still blocked. E1/E2/E3 technical native evidence is unchanged.

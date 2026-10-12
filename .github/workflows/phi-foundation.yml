@@ -86,6 +86,10 @@ on:
         description: Campaign-3 E3 owned autonomous-root crash and V2 startup recovery focus; not E4 certification
         type: boolean
         default: false
+      campaign3-e4-certification:
+        description: One-shot Campaign-3 E4 exact-SHA Linux/Windows and E1/E2/E3 technical certification
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -541,6 +545,113 @@ jobs:
       - name: Final fixed-scope ownership baseline even after failure
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
+  campaign3-e4-ubuntu:
+    if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only']
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Pin immutable E4 candidate
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          [[ "$CERTIFIED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Linux foundation bootstrap
+        run: sh bootstrap/linux.sh
+      - name: Install pinned LSP runtime for TypeScript validation
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Install isolated pinned Pi for TypeScript validation without auth
+        run: npm install --prefix "$RUNNER_TEMP/phi-e4-pi-runtime" --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1
+      - name: Full Linux regression with syntax, TypeScript and package validation
+        env:
+          PI_PACKAGE_ROOT: ${{ runner.temp }}/phi-e4-pi-runtime/node_modules/@earendil-works/pi-coding-agent
+        run: npm run check
+      - name: Exact Linux corpus and failure-ledger accounting
+        run: node scripts/phi-owned-main-suite.mjs
+      - name: Indexed source and secret heuristic audit
+        run: node scripts/phi-repository-audit.mjs
+  campaign3-e4-windows:
+    if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only']
+    needs: campaign3-e4-ubuntu
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Pin immutable E4 candidate
+        shell: pwsh
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          if ($env:CERTIFIED_SHA -notmatch '^[0-9a-f]{40}$') { exit 1 }
+          if ((git rev-parse HEAD).Trim() -ne $env:CERTIFIED_SHA) { exit 1 }
+      - name: Install source-only dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Native Windows foundation bootstrap
+        shell: pwsh
+        run: ./bootstrap/windows.ps1
+      - name: Build trusted native Windows process owner
+        shell: powershell
+        run: ./scripts/build-windows-process.ps1
+      - name: Install pinned LSP runtime
+        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
+      - name: Full Windows main corpus and bounded failure ledger
+        run: node scripts/phi-owned-main-suite.mjs
+      - name: Post-main fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Install isolated pinned Pi and subagents without auth
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          npm install --prefix $workerTestPrefix --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1 pi-subagents@0.66.0
+          exit $LASTEXITCODE
+      - name: E1 normal autonomous source repair, publication and protected evidence
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --e1
+          exit $LASTEXITCODE
+      - name: Post-E1 fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: E2 real Worker host-write denial and protected fail-closed evidence
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-bounded-workflow-pi-smoke.mjs --e2
+          exit $LASTEXITCODE
+      - name: Post-E2 fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: E3 owned autonomous-root crash and fresh normal Phi V2 recovery
+        shell: pwsh
+        run: |
+          $workerTestPrefix = Join-Path $env:RUNNER_TEMP 'phi-worker-pi-runtime'
+          $env:PHI_WORKER_TEST_PI_ROOT = Join-Path $workerTestPrefix 'node_modules/@earendil-works/pi-coding-agent'
+          $env:PHI_WORKER_TEST_SUBAGENT_ROOT = Join-Path $workerTestPrefix 'node_modules/pi-subagents'
+          node scripts/phi-d-wide-pi-smoke.mjs --autonomy-crash-v2
+          exit $LASTEXITCODE
+      - name: Post-E3 fixed-scope ownership baseline
+        run: node scripts/phi-owned-scope-baseline.mjs
+      - name: Final fixed-scope ownership baseline even after failure
+        if: always()
+        run: node scripts/phi-owned-scope-baseline.mjs
   corrupt-journal-ready-diagnostic:
     if: github.event_name == 'workflow_dispatch' && (inputs['corrupt-journal-ready-mode'] == 'isolated' || inputs['corrupt-journal-ready-mode'] == 'ordered-prefix')
     runs-on: windows-latest
@@ -743,7 +854,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'])
     strategy:
       fail-fast: false
       matrix:

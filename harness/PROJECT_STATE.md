@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 current regression PASS on prior SHA; final E4 candidate pending (2026-10-12)
+
+Pre-E4-workflow `b96ae39…` passed local full Linux 503/172/0/331 and native Windows main CI38263762303 503/491/0/12, both failure-ledger NONE with exact ordinals, Windows owned Job/pipe/residual0 and fixed-scope baseline PASS. E1/E2/E3 technical COMPLETE. A CI-only dedicated same-SHA E4 job is locally green but unrun; its commit will change the candidate, so current-candidate qualification remains PARTIAL pending exact-final-SHA regression. E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED, external provider requests0.
+
 ## Current — Campaign 3 E1/E2/E3 complete; current regression PARTIAL (2026-10-12)
 
 Local current-candidate Linux full owned main suite is PASS after a narrow stale-corpus certifier correction: 503 tests/172 PASS/0 FAIL/331 skips, 503 contiguous ordinals, failure ledger NONE; full `npm run check` PASS. The pre-fix false FAIL was a KNOWN 500-case Campaign-2 evidence pin, not a test failure. Windows exact 503-case main suite and owned cleanup remain unverified on the updated classifier; E4 BLOCKED. E1/E2/E3 native technical gates remain COMPLETE without rerun. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED, provider requests0.

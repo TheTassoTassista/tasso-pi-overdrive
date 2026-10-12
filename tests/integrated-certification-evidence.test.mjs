@@ -21,6 +21,24 @@ test('integrated Windows certification runs all four ordinary operations in orde
     previous = baseline;
   }
   assert.match(integrated, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
+  const e4Linux = workflow.split('  campaign3-e4-ubuntu:\n')[1]?.split('  campaign3-e4-windows:\n')[0];
+  const e4Windows = workflow.split('  campaign3-e4-windows:\n')[1]?.split('  corrupt-journal-ready-diagnostic:\n')[0];
+  assert.ok(e4Linux && e4Windows, 'E4 must use dedicated same-candidate jobs, not the D-18 replay');
+  assert.match(e4Linux, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
+  assert.match(e4Linux, /node scripts\/phi-owned-main-suite\.mjs/u);
+  assert.match(e4Windows, /needs: campaign3-e4-ubuntu/u);
+  assert.match(e4Windows, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
+  let e4Previous = e4Windows.indexOf('Full Windows main corpus and bounded failure ledger');
+  assert.ok(e4Previous >= 0);
+  for (const [role, command] of [['E1', 'node scripts/phi-bounded-workflow-pi-smoke.mjs --e1'],
+    ['E2', 'node scripts/phi-bounded-workflow-pi-smoke.mjs --e2'],
+    ['E3', 'node scripts/phi-d-wide-pi-smoke.mjs --autonomy-crash-v2']]) {
+    const step = e4Windows.indexOf(command, e4Previous);
+    const baseline = e4Windows.indexOf(`Post-${role} fixed-scope ownership baseline`, step);
+    assert.ok(step > e4Previous && baseline > step, `${role} must run and clean up in E4 order`);
+    e4Previous = baseline;
+  }
+  assert.match(e4Windows, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
 });
 
 const owner = { jobAttested: true, jobEmptyVerified: true, pipesDrained: true,

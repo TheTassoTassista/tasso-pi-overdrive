@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 current Windows main passes; E4 final candidate pending (2026-10-12)
+
+Pre-E4-workflow [CI38263762303](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38263762303) on `b96ae39f39f9627f9aeafa7fbba8b9f6c174e88c` passed 503/491/0/12 Windows main, ordinals503, ledger NONE, owned Job/pipes/residual0 and final fixed-scope baseline PASS. Local Linux main 503/172/0/331 and full check PASS. A CI-only E4 path to certify Linux, Windows, E1/E2/E3 on one immutable SHA is prepared but NOT RUN. Its new SHA still needs exact-current regression and freeze before one E4. Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 current-candidate regression qualification underway (2026-10-12)
 
 Local full Linux owned main suite now passes 503/172/0/331 with 503 ordinals and failure ledger NONE after correcting a deterministic stale 500-case evidence pin (the pre-fix false FAIL remains recorded). Focused classifier negatives and full `npm run check` PASS; no security/product behavior, timeout, retry or provider route changed. E1/E2/E3 remain native COMPLETE. Current Windows main and owned baseline are pending; E4 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
