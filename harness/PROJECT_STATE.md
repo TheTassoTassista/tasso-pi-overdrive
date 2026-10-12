@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E1/E2/E3 technical complete, E4 blocked on current regressions (2026-10-12)
+
+E3 native focused CI38262459923 on `3b7e040b0b219d98c498f8c117e1cca2b46b9301` passed the real root-death V2 TEMP_CREATED → fresh ordinary Phi PASS_RECOVERED/ROLLBACK path, protected interrupted evidence, unchanged CREATE prefix/no replay/suffix, native owned Job/pipes/residual0 and fixture/final-baseline cleanup; provider requests0. E3 COMPLETE/native1/2, no confidence rerun. E1/E2 remain COMPLETE with budgets2/2 exhausted. Current-candidate full Linux/Windows regression qualification is pending; E4 BLOCKED. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; Main alone may authorize activation.
+
 ## Current — Campaign 3 E3 local candidate, native proof pending (2026-10-12)
 
 E1/E2 COMPLETE with native budgets2/2 each. E3 local normal-Pi fixture and regression candidate is green (focused13 PASS/0 FAIL/3 Windows skips; full `npm run check` PASS; ZERO_EGRESS_REVIEW PASS), but live Windows autonomous-root death, fresh normal Phi V2 rollback and owned cleanup remain **UNVERIFIED**; E3 PARTIAL/native0/2. E4 BLOCKED pending E3 and current-candidate Linux/Windows regressions. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; no external provider requests or readiness activation.
