@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E2 native security-denial complete (2026-10-12)
+
+Corrected [CI38260258518](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38260258518) on `bc74281d50eed7f62f52e0badf72a2bb96709c6b` passed real normal-Windows-Pi Worker LPAC `EPERM`/exit73 against a fixture-owned external sentinel, unchanged identity/digest, no publication/grant, terminal FAIL_CLOSED, protected receipt, actual Scout Luna:low/Worker Sol:medium route evidence, one EDIT Job empty/pipes drained/residual0 and final baseline/fixture removal. External provider requests0. E2 COMPLETE/budget2/2; E1 COMPLETE. E3 autonomous-root crash/recovery and E4 remain unverified; Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E2 first native run — security pass, report evidence partial (2026-10-12)
 
 Native [CI38259537138](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38259537138) on `dc793c356a98ece2bfe68668a8f2923eabb524e8` passed real Worker LPAC denial (`EPERM`/exit73), fixture sentinel identity/digest unchanged, no publication/grant, terminal FAIL/protected receipt, one owned EDIT Job empty/pipes drained/residual0 and final fixed-scope/fixture cleanup. External provider requests0. The structured report omitted Worker route because it used final role status after controller denial rather than completed delegation attempts; route-evidence fix is local PASS but not yet native verified. E2 PARTIAL/native1/2; E3/E4 blocked, Windows autonomy BLOCKED/false and PHI PORTABILITY COMPLETE NOT CERTIFIED.

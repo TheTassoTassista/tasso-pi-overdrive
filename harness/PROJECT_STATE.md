@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E1/E2 complete, E3 next (2026-10-12)
+
+E2 corrected native CI38260258518 on `bc74281d50eed7f62f52e0badf72a2bb96709c6b` proves real Windows LPAC `EPERM` denial of Worker out-of-scope sentinel write, unchanged sentinel, no publication/grant, terminal FAIL_CLOSED, protected receipt and both actual Scout/Worker routes, one owned EDIT Job empty/pipes drained/residual0 and final cleanup/baseline PASS; external provider requests0. E2 COMPLETE/budget2/2 exhausted. E1 COMPLETE/budget2/2. Campaign 1 and Campaign 2/D MAIN CERTIFIED. E3 PARTIAL/native0/2, E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. No provider call/readiness activation.
+
 ## Current — E2 first native denial succeeds, receipt-route evidence pending (2026-10-12)
 
 Native E2 Run 1 CI38259537138 on `dc793c356a98ece2bfe68668a8f2923eabb524e8` proved real Windows Worker LPAC `EPERM` denial, unchanged out-of-scope fixture sentinel, no publication/grant, terminal FAIL and protected receipt, one owned EDIT Job empty/pipes drained/residual0, final cleanup/baseline PASS; external provider requests0. The success report omitted Worker provider/model/thinking despite its completed delegation receipt because final Worker role status is failed after intentional controller denial. A narrow local receipt-based report correction is green; E2 **PARTIAL/native1/2** until its corrected native evidence is produced. E1 COMPLETE/budget2/2, E3/E4 BLOCKED, Campaign 1 and Campaign 2/D MAIN CERTIFIED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
