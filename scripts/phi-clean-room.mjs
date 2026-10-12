@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate, finalizeCloneFoundationGate, test206DiagnosticEvidence } from '../lib/phi-validation-evidence.mjs';
+import { PHI_TEST_CORPUS, validationFailureEvidence, validationExceptionEvidence, tapRuntimeEvidence, runtimeObservations, cloneFoundationGate, finalizeCloneFoundationGate, test206DiagnosticEvidence } from '../lib/phi-validation-evidence.mjs';
 import { windowsBuildEnvironment } from '../platform/windows/toolchain.mjs';
 import { runValidationCommand, validationCommandTimeout } from '../platform/windows/validation-process.mjs';
 import { cloneIdentity, cleanupClone, combineValidationResults } from '../lib/phi-clone-cleanup.mjs';
@@ -98,13 +98,13 @@ try {
     test206Diagnostic.nativeExit !== 0 || test206Diagnostic.lastStage !== 'COMPLETE' || test206Diagnostic.failureStage !== null))
     throw new Error('PHI_CLEAN_ROOM_TEST206_DIAGNOSTIC_INVALID');
   // a22bcd1 added one metadata-only regression to the 490-case source corpus.
-  // Keep the diagnostic pinned to the now-observed 500-case version; a future
+  // Keep the diagnostic pinned to the current observed corpus; a future
   // corpus edit requires an explicit baseline update, never silent acceptance.
-  if (diagnosticOnly && (testCount !== 500 || passed !== 488 || skipped !== 12)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
+  if (diagnosticOnly && (testCount !== PHI_TEST_CORPUS.total || passed !== PHI_TEST_CORPUS.windowsPassed || skipped !== PHI_TEST_CORPUS.windowsSkipped)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_CORPUS_MISMATCH');
   if (process.platform === 'win32' && fullCertification && foundationGate?.classification !== 'SUCCESS') throw new Error('PHI_CLEAN_ROOM_FOUNDATION_GATE_FAILED');
   const tapRuntime = diagnosticOnly ? tapRuntimeEvidence(tests) : null;
-  if (diagnosticOnly && (tapRuntime.completed !== 500 || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
-  if (diagnosticOnly && (commands.at(-1).runtime.completed !== 500 || !commands.at(-1).runtime.contiguous || commands.at(-1).runtime.rows.at(-1)?.kind !== 'end')) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_TIMING_INCOMPLETE');
+  if (diagnosticOnly && (tapRuntime.completed !== PHI_TEST_CORPUS.total || !tapRuntime.contiguous)) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_PROGRESS_INVALID');
+  if (diagnosticOnly && (commands.at(-1).runtime.completed !== PHI_TEST_CORPUS.total || !commands.at(-1).runtime.contiguous || commands.at(-1).runtime.rows.at(-1)?.kind !== 'end')) throw new Error('PHI_CLEAN_ROOM_DIAGNOSTIC_TIMING_INCOMPLETE');
   let recoveryAfterTests = 'NOT_NATIVE_WINDOWS';
   if (process.platform === 'win32') {
     stage = 'post-test-recovery';

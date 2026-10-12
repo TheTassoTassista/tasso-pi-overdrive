@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 current-candidate regression qualification underway (2026-10-12)
+
+Local full Linux owned main suite now passes 503/172/0/331 with 503 ordinals and failure ledger NONE after correcting a deterministic stale 500-case evidence pin (the pre-fix false FAIL remains recorded). Focused classifier negatives and full `npm run check` PASS; no security/product behavior, timeout, retry or provider route changed. E1/E2/E3 remain native COMPLETE. Current Windows main and owned baseline are pending; E4 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Campaign 3 E3 native crash/recovery complete (2026-10-12)
 
 Focused [CI38262459923](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38262459923) on `3b7e040b0b219d98c498f8c117e1cca2b46b9301` proved actual normal-Pi root termination after durable V2 TEMP_CREATED and fresh ordinary Phi startup rollback to unchanged accepted CREATE prefix. V2 terminal ROLLED_BACK, no abandoned model replay or suffix, protected interrupted evidence, owned Job/pipes/residual0 and final baseline/fixture cleanup PASS; external provider requests0. E1/E2/E3 now technically COMPLETE. Current-candidate Linux/Windows main regressions and one conditional E4 remain. Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED; no Main activation inferred.

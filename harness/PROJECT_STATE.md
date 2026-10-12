@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E1/E2/E3 complete; current regression PARTIAL (2026-10-12)
+
+Local current-candidate Linux full owned main suite is PASS after a narrow stale-corpus certifier correction: 503 tests/172 PASS/0 FAIL/331 skips, 503 contiguous ordinals, failure ledger NONE; full `npm run check` PASS. The pre-fix false FAIL was a KNOWN 500-case Campaign-2 evidence pin, not a test failure. Windows exact 503-case main suite and owned cleanup remain unverified on the updated classifier; E4 BLOCKED. E1/E2/E3 native technical gates remain COMPLETE without rerun. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED, provider requests0.
+
 ## Current — Campaign 3 E1/E2/E3 technical complete, E4 blocked on current regressions (2026-10-12)
 
 E3 native focused CI38262459923 on `3b7e040b0b219d98c498f8c117e1cca2b46b9301` passed the real root-death V2 TEMP_CREATED → fresh ordinary Phi PASS_RECOVERED/ROLLBACK path, protected interrupted evidence, unchanged CREATE prefix/no replay/suffix, native owned Job/pipes/residual0 and fixture/final-baseline cleanup; provider requests0. E3 COMPLETE/native1/2, no confidence rerun. E1/E2 remain COMPLETE with budgets2/2 exhausted. Current-candidate full Linux/Windows regression qualification is pending; E4 BLOCKED. Campaign 1 and Campaign 2/D remain MAIN CERTIFIED. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED; Main alone may authorize activation.

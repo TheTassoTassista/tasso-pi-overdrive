@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createOwnedProcessGraphEvidence, fixedScopeBaselineEvidence, mainSuiteEvidence } from '../lib/phi-certification-evidence.mjs';
+import { PHI_TEST_CORPUS } from '../lib/phi-validation-evidence.mjs';
 
 test('integrated Windows certification runs all four ordinary operations in order with ownership baselines', () => {
   const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
@@ -24,19 +25,22 @@ test('integrated Windows certification runs all four ordinary operations in orde
 
 const owner = { jobAttested: true, jobEmptyVerified: true, pipesDrained: true,
   residualOwnedProcesses: 0, primaryExitCode: 0, timedOut: false,
-  progress: { started: true, ended: true, completed: 500, failed: 0, invalid: false, stalled: false } };
+  progress: { started: true, ended: true, completed: 503, failed: 0, invalid: false, stalled: false } };
 
 test('integrated main suite requires exact corpus and native ownership evidence', () => {
-  const ordinals = Array.from({ length: 500 }, (_, index) => `ok ${index + 1} - fixture`).join('\n');
-  const windows = { status: 0, stdout: `${ordinals}\n# tests 500\n# pass 488\n# fail 0\n# skipped 12\n`, receipt: owner };
+  assert.deepEqual(PHI_TEST_CORPUS, { total: 503, windowsPassed: 491, windowsSkipped: 12,
+    linuxPassed: 172, linuxSkipped: 331 });
+  const ordinals = Array.from({ length: 503 }, (_, index) => `ok ${index + 1} - fixture`).join('\n');
+  const windows = { status: 0, stdout: `${ordinals}\n# tests 503\n# pass 491\n# fail 0\n# skipped 12\n`, receipt: owner };
   assert.equal(mainSuiteEvidence(windows, 'win32').status, 'PASS');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: undefined }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, jobEmptyVerified: null } }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, pipesDrained: false } }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, receipt: { ...owner, progress: null } }, 'win32').status, 'FAIL');
-  assert.equal(mainSuiteEvidence({ ...windows, stdout: windows.stdout.replace('500', '499') }, 'win32').status, 'FAIL');
+  assert.equal(mainSuiteEvidence({ ...windows, stdout: windows.stdout.replace('503', '502') }, 'win32').status, 'FAIL');
+  assert.equal(mainSuiteEvidence({ ...windows, stdout: windows.stdout.replace('# pass 491', '# pass 488') }, 'win32').status, 'FAIL');
   assert.equal(mainSuiteEvidence({ ...windows, status: 124, error: { code: 'ETIMEDOUT' } }, 'win32').status, 'FAIL');
-  assert.equal(mainSuiteEvidence({ status: 0, stdout: `${ordinals}\n# tests 500\n# pass 169\n# fail 0\n# skipped 331\n` }, 'linux').status, 'PASS');
+  assert.equal(mainSuiteEvidence({ status: 0, stdout: `${ordinals}\n# tests 503\n# pass 172\n# fail 0\n# skipped 331\n` }, 'linux').status, 'PASS');
 });
 
 test('fixed-scope baseline never converts missing ownership or active scopes to PASS', () => {
