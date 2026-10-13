@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 recovery authorized but stopped at exact runner toolchain (2026-10-13)
+
+Main authorizes dependency repair, up to two Ubuntu preflights and one conditional replacement E4 under `E4-RUNNER-PREPARATION-RECOVERY-001`; none has run. Original E4 CI38398838331 remains FAIL/CLOSED. `pi-subagents@0.66.0` declares `jiti@2.7.0`, but E4 Ubuntu omits its installation; local pre-existing hoisting masked the first failure. The same original logs also show pinned `/usr/bin/git` digest mismatch and DAP adapters unavailable on the clean Ubuntu runner. Restoring the unweakened full gate requires an exact-toolchain/environment decision beyond the narrow dependency repair; STOP for Main. E1/E2/E3 COMPLETE, Campaign 3 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
+
 ## Current — Campaign 3 E4 failed; Main boundary (2026-10-13)
 
 Pre-E4 frozen `9407238b22020e04a4dd19126a0262807e8bd1fa` has accepted E1/E2/E3 COMPLETE and exact-SHA current Windows main CI38265696139 PASS 503/491/0/12 with full ledger/ownership/baseline; local Linux main/full check PASS. One-shot E4 CI38398838331 failed at Ubuntu `npm run check`, first `MODULE_NOT_FOUND: jiti` from expected `pi-subagents` path, TAP1090/702 PASS/50 FAIL/338 skips. E4 Windows and integrated scenarios never ran. E4 BLOCKED/budget1/1, no replacement under current authority. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. Return to Main; no product/security/routing change or E1/E2/E3 redo.

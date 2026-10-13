@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 recovery boundary: clean Ubuntu lacks more than jiti (2026-10-13)
+
+`E4-RUNNER-PREPARATION-RECOVERY-001` conditionally authorizes one replacement, but none has run. The first original E4 failure is an omitted declared `pi-subagents`/`jiti` installation, masked locally by pre-existing Pi packages. The original E4 logs also demonstrate the runner's `/usr/bin/git` does not match Phi's mandatory binary digest and the exact DAP adapters are unavailable. Installing `jiti` alone cannot satisfy the unweakened full check. No dependency, CI, security or product change was made; no Ubuntu preflight or replacement E4 was launched. STOP for Main to decide reproducible exact-toolchain preparation; Windows autonomy remains BLOCKED/false, portability NOT CERTIFIED.
+
 ## Campaign 3 E4 one-shot failed before Windows (2026-10-13)
 
 Exact frozen `9407238b22020e04a4dd19126a0262807e8bd1fa` passed current Windows main CI38265696139 with 503/491/0/12, full ordinal/failure-ledger and owned cleanup/final baseline PASS; the local Linux main/full check was green. One-shot E4 CI38398838331 failed on clean Ubuntu at `npm run check` (first `pi-subagents`/`jiti` MODULE_NOT_FOUND, TAP1090/702 PASS/50 FAIL/338 skips). Dependent E4 Windows and integrated E1/E2/E3 were skipped; no E4 Windows ownership/process-graph or provider-route evidence exists. Campaign 3 stays BLOCKED, `windowsAutonomousReady=false`, Windows autonomy BLOCKED, PHI PORTABILITY COMPLETE NOT CERTIFIED. No replacement E4 authorized; return failure to Main.

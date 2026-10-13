@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 recovery static attribution; no new test or CI (2026-10-13)
+
+Original E4 CI38398838331 remains Ubuntu `npm run check` FAIL, TAP1090/702 PASS/50 FAIL/338 skips. First `jiti` failure is attributable to E4 omitting declared `pi-subagents@0.66.0` dependencies; local Pi's pre-existing hoisted `jiti@2.7.0` is not clean-runner evidence. Existing same-run logs independently record `resource_git_binary_digest_mismatch` and `DAP_ADAPTER_UNAVAILABLE`; other historical failure members are not fully classified. No code/package/CI correction or local full rerun was made. Ubuntu preflight budget0/2, replacement E4 budget0/1; Main must decide an exact host-toolchain strategy before preflight.
+
 ## Campaign 3 final-candidate qualification PASS; one-shot E4 FAIL (2026-10-13)
 
 Candidate `9407238b22020e04a4dd19126a0262807e8bd1fa`: prior local Linux owned main 503/172 PASS/0 FAIL/331 skips and full `npm run check` PASS; exact-SHA Windows main CI38265696139 503/491 PASS/0 FAIL/12 skips, ordinals503, ledger NONE, Job empty/pipes drained/residual0 and final fixed-scope baseline PASS. One-shot E4 CI38398838331 did not repeat that green Linux result on its clean Ubuntu runner: `npm run check` TAP1090/702 PASS/50 FAIL/338 skips, first failure `tests/agent-hub-control-bridge.test.mjs` from missing `jiti` under `pi-subagents`; exit1. E4 Linux owned corpus/audit skipped; Windows job skipped, so no E4 Windows or integrated E1/E2/E3 process/cleanup evidence. Do not substitute the pre-E4 focused PASS or retry E4.
