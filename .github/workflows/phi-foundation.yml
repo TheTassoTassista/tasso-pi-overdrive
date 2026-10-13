@@ -90,9 +90,27 @@ on:
         description: One-shot Campaign-3 E4 exact-SHA Linux/Windows and E1/E2/E3 technical certification
         type: boolean
         default: false
+      e4-image-feasibility-only:
+        description: Non-certifying pinned-base rootless namespace feasibility; no preflight or E4
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
+  e4-image-feasibility:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-feasibility-only'] && !inputs['campaign3-e4-certification']
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check rootless namespace operations inside pinned non-privileged base
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --user 1000:1000 \
+            docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0 \
+            /bin/sh -c 'command -v unshare; unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true'
   integrated-ubuntu:
     if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
@@ -854,7 +872,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-image-feasibility-only'])
     strategy:
       fail-fast: false
       matrix:

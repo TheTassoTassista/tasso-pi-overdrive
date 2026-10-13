@@ -41,6 +41,18 @@ test('integrated Windows certification runs all four ordinary operations in orde
   assert.match(e4Windows, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
 });
 
+test('E4 image namespace feasibility is non-certifying and cannot launch the default or E4 jobs', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
+  const diagnostic = workflow.split('  e4-image-feasibility:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+  const ordinary = workflow.split('  native-foundation:\n')[1];
+  assert.ok(diagnostic && ordinary);
+  assert.match(diagnostic, /inputs\['e4-image-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);
+  assert.match(diagnostic, /docker run --rm --network none --read-only --cap-drop ALL/u);
+  assert.match(diagnostic, /--security-opt no-new-privileges:true/u);
+  assert.doesNotMatch(diagnostic, /npm run check|phi-owned-main-suite|provider|preflight/iu);
+  assert.match(ordinary.split('\n')[0], /!inputs\['e4-image-feasibility-only'\]/u);
+});
+
 const owner = { jobAttested: true, jobEmptyVerified: true, pipesDrained: true,
   residualOwnedProcesses: 0, primaryExitCode: 0, timedOut: false,
   progress: { started: true, ended: true, completed: 503, failed: 0, invalid: false, stalled: false } };
