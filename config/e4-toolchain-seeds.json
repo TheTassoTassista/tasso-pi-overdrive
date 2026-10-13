@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "repository": "TheTassoTassista/tasso-pi-overdrive",
+  "release": {
+    "tag": "phi-cert-toolchain-seed-v1",
+    "id": 411800345,
+    "privateRepository": true,
+    "internalOnly": true
+  },
+  "extractionMethod": "bsdtar -xf into isolated stage",
+  "provenance": "CONTENT_IDENTITY_VERIFIED_UPSTREAM_REFETCHABILITY_UNAVAILABLE",
+  "assets": [
+    {
+      "logicalName": "git-2.55.0",
+      "assetId": 637362890,
+      "name": "git-2.55.0-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 8263212,
+      "sha256": "d5f1535417abc94399507dbc5f12eb3838fb22b9508e7250bd2944bc7620e3a8",
+      "extracted": [
+        {
+          "path": "usr/bin/git",
+          "sha256": "c1bc685bd9f3ebfe851771325c39aac9fdcf82b333bca693b98e48ce7c1dfa9b",
+          "installedPath": "/usr/bin/git"
+        }
+      ]
+    },
+    {
+      "logicalName": "gdb-17.2",
+      "assetId": 637362887,
+      "name": "gdb-17.2-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 9793873,
+      "sha256": "ba83c065ca0c21f31b812d7c56e6a156a650048e1d65a474cce48aa04bac8d35",
+      "extracted": [
+        {
+          "path": "usr/bin/gdb",
+          "sha256": "5a159b8868d53a85bee261bc35dc59437800b1d139d0389d83e4fdee5a24945d",
+          "installedPath": "/usr/bin/gdb"
+        }
+      ]
+    },
+    {
+      "logicalName": "gdb-common-17.2",
+      "assetId": 637362892,
+      "name": "gdb-common-17.2-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 123298,
+      "sha256": "c485b5e308b2d64d0f38ac4e4f5cfee2d6aac30ca7d4aa16ef7a8d7b7e530c12",
+      "extracted": [
+        {
+          "path": "usr/share/gdb/python/gdb/dap/__init__.py",
+          "sha256": "229e571529141e12b7b5fafaf5974a84923a5c85c6c9b0670b611b901c3b775d",
+          "installedPath": "/usr/share/gdb/python/gdb/dap/__init__.py"
+        }
+      ]
+    }
+  ]
+}

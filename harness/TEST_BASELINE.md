@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 seed release/readback source-identity check; no preflight (2026-10-13)
+
+Local isolated `bsdtar -xf` of the exact cached Git/GDB/GDB-common packages succeeded; extracted `usr/bin/git` and `usr/bin/gdb` equal the existing approved SHA-256 values, and `gdb-common` supplies `usr/share/gdb/python/gdb/dap/__init__.py`. Private release `411800345` assets `637362890`, `637362887`, `637362892` each have GitHub-reported and readback size/digest equal to local source. Manifest `config/e4-toolchain-seeds.json` records these. This is transport/source evidence only: **no certification image, self-check, full check, Ubuntu preflight or replacement E4 has run**. No product/security gate was weakened; original E4 remains FAIL/CLOSED.
+
 ## E4 hermetic source-artifact inventory; no new gate run (2026-10-13)
 
 Local extraction of cached CachyOS Git/GDB/Python/Node/prlimit package archives reproduces the exact approved binary SHA-256 values in the live policy. A package-lock-only resolution confirms `pi-subagents@0.66.0` declares `jiti@2.7.0`. These are **source-artifact checks**, not an image build, toolchain self-check, full check, preflight, native Windows test or E4 qualification. Ubuntu preflight0/2 and replacement E4 0/1; original E4 CI38398838331 stays FAIL/CLOSED. No tests or security gates were weakened.
