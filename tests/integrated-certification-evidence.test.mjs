@@ -47,8 +47,10 @@ test('E4 image namespace feasibility is non-certifying and cannot launch the def
   const ordinary = workflow.split('  native-foundation:\n')[1];
   assert.ok(diagnostic && ordinary);
   assert.match(diagnostic, /inputs\['e4-image-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);
-  assert.match(diagnostic, /docker run --rm --network none --read-only --cap-drop ALL/u);
-  assert.match(diagnostic, /--security-opt no-new-privileges:true/u);
+  assert.match(diagnostic, /docker run --rm --network none --read-only --tmpfs/u);
+  assert.match(diagnostic, /probe strict-full[^\n]*\n\s+--cap-drop ALL --security-opt no-new-privileges:true/u);
+  assert.match(diagnostic, /E4_NS_DIAGNOSTIC_ONLY; no variant is adopted as certification policy/u);
+  assert.match(diagnostic, /\n\s+exit 1\n/u);
   assert.doesNotMatch(diagnostic, /npm run check|phi-owned-main-suite|provider|preflight/iu);
   assert.match(ordinary.split('\n')[0], /!inputs\['e4-image-feasibility-only'\]/u);
 });

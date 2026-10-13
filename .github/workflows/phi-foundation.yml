@@ -106,11 +106,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm --network none --read-only --cap-drop ALL \
-            --security-opt no-new-privileges:true --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-            --user 1000:1000 \
-            docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0 \
-            /bin/sh -c 'command -v unshare; unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true'
+          image=docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
+          probe() {
+            label=$1
+            command=$2
+            shift 2
+            set +e
+            docker run --rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+              --user 1000:1000 "$@" "$image" /bin/sh -c "$command"
+            result=$?
+            set -e
+            echo "E4_NS_PROBE $label exit=$result"
+            return 0
+          }
+          probe strict-user 'unshare --user --map-root-user /usr/bin/true' \
+            --cap-drop ALL --security-opt no-new-privileges:true
+          probe strict-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true' \
+            --cap-drop ALL --security-opt no-new-privileges:true
+          probe default-cap-nnp-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true' \
+            --security-opt no-new-privileges:true
+          probe default-cap-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true'
+          echo 'E4_NS_DIAGNOSTIC_ONLY; no variant is adopted as certification policy'
+          exit 1
   integrated-ubuntu:
     if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
