@@ -2,7 +2,7 @@
 
 ## E4 seed release/readback source-identity check; no preflight (2026-10-13)
 
-Local isolated `bsdtar -xf` of the exact cached Git/GDB/GDB-common packages succeeded; extracted `usr/bin/git` and `usr/bin/gdb` equal the existing approved SHA-256 values, and `gdb-common` supplies `usr/share/gdb/python/gdb/dap/__init__.py`. Private release `411800345` assets `637362890`, `637362887`, `637362892` each have GitHub-reported and readback size/digest equal to local source. Manifest `config/e4-toolchain-seeds.json` records these. This is transport/source evidence only: **no certification image, self-check, full check, Ubuntu preflight or replacement E4 has run**. No product/security gate was weakened; original E4 remains FAIL/CLOSED.
+Local isolated `bsdtar -xf` of six exact cached Git/GDB/GDB-common/Python/Node/util-linux packages succeeded; extracted `usr/bin/git`, `usr/bin/gdb`, `usr/bin/python3.14`, `usr/bin/node` and `usr/bin/prlimit` equal the existing approved SHA-256 values, and `gdb-common` supplies `usr/share/gdb/python/gdb/dap/__init__.py`. Private release `411800345` assets `637362890`, `637362887`, `637362892`, `637372244`, `637372241`, `637372242` each have GitHub-reported and readback size/digest equal to local source. Manifest `config/e4-toolchain-seeds.json` records these. Local six-asset staging and focused `tests/e4-seed-transport.test.mjs` **3/3 PASS**; isolated Pi lock resolves `pi-subagents@0.66.0 → jiti@2.7.0`. This is transport/source evidence only: **no certification image, self-check, full check, Ubuntu preflight or replacement E4 has run**. No product/security gate was weakened; original E4 remains FAIL/CLOSED.
 
 ## E4 hermetic source-artifact inventory; no new gate run (2026-10-13)
 

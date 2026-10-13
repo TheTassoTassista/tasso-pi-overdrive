@@ -2,7 +2,7 @@
 
 ## Current — E4 toolchain seed transport verified; certification image unbuilt (2026-10-13)
 
-Main decision `E4-TOOLCHAIN-SEED-TRANSPORT-001` is durable. The only authorized private internal prerelease `phi-cert-toolchain-seed-v1` (release ID `411800345`) holds exact Git/GDB/GDB-common seed bytes; each asset's ID, GitHub digest/size and authenticated readback match local source bytes. `config/e4-toolchain-seeds.json` pins those identities and extracted runtime digests. This closes only the previous **transport** boundary; builder, full runtime attestation, image self-qualification, ZERO_EGRESS, Ubuntu preflight0/2 and replacement E4 0/1 remain pending. Original E4 CI38398838331 FAIL/CLOSED; E1/E2/E3 COMPLETE; Windows autonomy BLOCKED, `windowsAutonomousReady=false`, portability NOT CERTIFIED.
+Main decision `E4-TOOLCHAIN-SEED-TRANSPORT-001` is durable. The only authorized private internal prerelease `phi-cert-toolchain-seed-v1` (release ID `411800345`) holds exact Git/GDB/GDB-common plus three live-mandatory Python/Node/prlimit seed archives; all six asset IDs, GitHub digests/sizes and authenticated readbacks match local source bytes. `config/e4-toolchain-seeds.json` pins transport and extracted runtime identities; fail-closed staging has focused local proof. This closes only the previous **transport** boundary; non-privileged container namespace feasibility, builder, full runtime attestation, image self-qualification, ZERO_EGRESS, Ubuntu preflight0/2 and replacement E4 0/1 remain pending. Original E4 CI38398838331 FAIL/CLOSED; E1/E2/E3 COMPLETE; Windows autonomy BLOCKED, `windowsAutonomousReady=false`, portability NOT CERTIFIED.
 
 ## Current — E4 hermetic image authorized, artifact source BLOCKED (2026-10-13)
 

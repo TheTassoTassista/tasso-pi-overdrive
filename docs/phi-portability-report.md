@@ -4,7 +4,7 @@
 
 ## E4 controlled seed transport verified (2026-10-13)
 
-`E4-TOOLCHAIN-SEED-TRANSPORT-001` authorized a single internal private GitHub prerelease, **not** a product release. Release `phi-cert-toolchain-seed-v1`/ID `411800345` now contains the exact cached Git/GDB/GDB-common packages. Authenticated asset-ID readback reproduces local byte sizes and SHA-256, agreeing with GitHub metadata; the small `config/e4-toolchain-seeds.json` manifest binds asset IDs to extraction and approved runtime identities. No package archive entered Git. This closes only the previous binary **transport** boundary. Hermetic image build/self-qualification, ZERO_EGRESS, Ubuntu preflight (0/2) and replacement E4 (0/1) remain unexecuted; original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false and portability NOT CERTIFIED.
+`E4-TOOLCHAIN-SEED-TRANSPORT-001` authorized a single internal private GitHub prerelease, **not** a product release. Release `phi-cert-toolchain-seed-v1`/ID `411800345` now contains the exact cached Git/GDB/GDB-common packages plus three additional **live-mandatory** Python/Node/prlimit packages. Authenticated asset-ID readback for all six reproduces local byte sizes and SHA-256, agreeing with GitHub metadata; the small `config/e4-toolchain-seeds.json` manifest binds asset IDs to extraction and approved runtime identities. No package archive entered Git. This closes only the previous binary **transport** boundary. Hermetic image build/self-qualification, ZERO_EGRESS, Ubuntu preflight (0/2) and replacement E4 (0/1) remain unexecuted; original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false and portability NOT CERTIFIED.
 
 ## E4 hermetic image source-artifact boundary (2026-10-13)
 

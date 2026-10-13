@@ -8,10 +8,11 @@
     "internalOnly": true
   },
   "extractionMethod": "bsdtar -xf into isolated stage",
-  "provenance": "CONTENT_IDENTITY_VERIFIED_UPSTREAM_REFETCHABILITY_UNAVAILABLE",
+  "provenance": "CONTENT_IDENTITY_VERIFIED",
   "assets": [
     {
       "logicalName": "git-2.55.0",
+      "upstreamRefetchability": "UNAVAILABLE_IN_CHECKED_SOURCES",
       "assetId": 637362890,
       "name": "git-2.55.0-1.1-x86_64_v3.pkg.tar.zst",
       "size": 8263212,
@@ -26,6 +27,7 @@
     },
     {
       "logicalName": "gdb-17.2",
+      "upstreamRefetchability": "UNAVAILABLE_IN_CHECKED_SOURCES",
       "assetId": 637362887,
       "name": "gdb-17.2-1.1-x86_64_v3.pkg.tar.zst",
       "size": 9793873,
@@ -40,6 +42,7 @@
     },
     {
       "logicalName": "gdb-common-17.2",
+      "upstreamRefetchability": "UNAVAILABLE_IN_CHECKED_SOURCES",
       "assetId": 637362892,
       "name": "gdb-common-17.2-1.1-x86_64_v3.pkg.tar.zst",
       "size": 123298,
@@ -49,6 +52,51 @@
           "path": "usr/share/gdb/python/gdb/dap/__init__.py",
           "sha256": "229e571529141e12b7b5fafaf5974a84923a5c85c6c9b0670b611b901c3b775d",
           "installedPath": "/usr/share/gdb/python/gdb/dap/__init__.py"
+        }
+      ]
+    },
+    {
+      "logicalName": "python-3.14.7",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 637372244,
+      "name": "python-3.14.7-2-x86_64_v3.pkg.tar.zst",
+      "size": 14648126,
+      "sha256": "0e9a5d3e712ce85578a6eb452c74b0df898c2bb71b780a2b42f432a617e98043",
+      "extracted": [
+        {
+          "path": "usr/bin/python3.14",
+          "sha256": "dd65a07e8f535525443d63e2bd6dd10efbf22bf22e0b6d65e634266acc7ac976",
+          "installedPath": "/usr/bin/python3.14"
+        }
+      ]
+    },
+    {
+      "logicalName": "nodejs-26.8.2",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 637372241,
+      "name": "nodejs-26.8.2-1-x86_64_v3.pkg.tar.zst",
+      "size": 16445188,
+      "sha256": "bce6fdba6f3b8981254565c5136155e88513524dad1afeecc54bc2f4515a31ca",
+      "extracted": [
+        {
+          "path": "usr/bin/node",
+          "sha256": "5a353e52b64c67e8ac76e95e42531855f81177515d3bb608a96e341c90dbcf28",
+          "installedPath": "/usr/bin/node"
+        }
+      ]
+    },
+    {
+      "logicalName": "util-linux-2.42.4",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 637372242,
+      "name": "util-linux-2.42.4-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 6771604,
+      "sha256": "2efe05e26e64a900c69034be0c9b6960de138308c87cd88422ebf510755b6b10",
+      "extracted": [
+        {
+          "path": "usr/bin/prlimit",
+          "sha256": "84643075132b361f03d41228856d26e354e700eda4afe411428d366e256fa8a6",
+          "installedPath": "/usr/bin/prlimit"
         }
       ]
     }
