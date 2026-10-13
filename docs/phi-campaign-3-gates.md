@@ -2,6 +2,8 @@
 
 Authority: `WINDOWS-AUTONOMY-CAMPAIGN-001` in `harness/DECISIONS.md`. Campaign 1 and Campaign 2/D are `COMPLETE / MAIN CERTIFIED`. Campaign 3 is `AUTHORIZED / IN_PROGRESS`. Windows autonomy remains `BLOCKED`, `windowsAutonomousReady=false`, and PHI PORTABILITY COMPLETE is `NOT CERTIFIED`. This ledger tracks technical gates, not Main activation authority.
 
+Hermetic E4 update (2026-10-13): `E4-HERMETIC-LINUX-ENVIRONMENT-001` is durable; image build/freeze is BLOCKED at controlled distribution of the exact old Git/GDB package artifacts. Local cache bytes reproduce required digests, but checked public URLs fail and in-branch vendoring would fail the unchanged indexed audit. Preflight0/2, replacement E4 0/1; no CI/provider calls or readiness activation. See `docs/phi-progress.md` for evidence and Main STOP.
+
 | Gate | Status | Evidence | Candidate SHA | Limitations | Native budget used | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | E1 — production Windows autonomous coding E2E | COMPLETE | Native Run 2 [CI38154541489](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38154541489) on `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad`: real Pi source repair, V2 MODIFY, protected receipt, exact EDIT+TEST owned graph, final scope baseline and cleanup all PASS; Run 1 remains FAIL evidence | `0c7851aaee247b3e02f62b7893b55fbb8a2c25ad` | No autonomous readiness activation inferred | 2/2 | Continue E2 without rerunning E1 |

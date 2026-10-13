@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 hermetic image source-artifact boundary (2026-10-13)
+
+`E4-HERMETIC-LINUX-ENVIRONMENT-001` is recorded and preserves every exact tool digest. Local cached CachyOS archives reproduce approved Git/GDB/Python/Node/prlimit bytes, but checked old Git/GDB public package URLs are unavailable; local Docker is inaccessible and the existing indexed audit rejects committing those large archives into the candidate. No controlled immutable artifact transfer to a GHCR build has been accepted. No image, digest, preflight or replacement E4 was produced. STOP for Main's source-artifact distribution choice; original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false and portability NOT CERTIFIED remain.
+
 ## E4 recovery boundary: clean Ubuntu lacks more than jiti (2026-10-13)
 
 `E4-RUNNER-PREPARATION-RECOVERY-001` conditionally authorizes one replacement, but none has run. The first original E4 failure is an omitted declared `pi-subagents`/`jiti` installation, masked locally by pre-existing Pi packages. The original E4 logs also demonstrate the runner's `/usr/bin/git` does not match Phi's mandatory binary digest and the exact DAP adapters are unavailable. Installing `jiti` alone cannot satisfy the unweakened full check. No dependency, CI, security or product change was made; no Ubuntu preflight or replacement E4 was launched. STOP for Main to decide reproducible exact-toolchain preparation; Windows autonomy remains BLOCKED/false, portability NOT CERTIFIED.

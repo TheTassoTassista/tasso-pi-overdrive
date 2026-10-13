@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 hermetic image authorized, artifact source BLOCKED (2026-10-13)
+
+Main decision `E4-HERMETIC-LINUX-ENVIRONMENT-001` makes an immutable Phi image the Ubuntu E4 attestation boundary, while hosted Ubuntu is transport/runtime only. Exact host binary artifacts are present in the local CachyOS cache and reproduce policy digests, but a vetted immutable distribution route to the image builder is not established: checked old Git/GDB mirror/archive URLs are unavailable, local Docker access is denied, and committing >5 MiB archives fails the indexed audit. No image/digest, preflight or replacement E4 exists. Original CI38398838331 remains FAIL/CLOSED; E1/E2/E3 COMPLETE; Campaign 3 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED. STOP for Main source-artifact authority choice; do not weaken attestation/audit or activate readiness.
+
 ## Current — E4 recovery authorized but stopped at exact runner toolchain (2026-10-13)
 
 Main authorizes dependency repair, up to two Ubuntu preflights and one conditional replacement E4 under `E4-RUNNER-PREPARATION-RECOVERY-001`; none has run. Original E4 CI38398838331 remains FAIL/CLOSED. `pi-subagents@0.66.0` declares `jiti@2.7.0`, but E4 Ubuntu omits its installation; local pre-existing hoisting masked the first failure. The same original logs also show pinned `/usr/bin/git` digest mismatch and DAP adapters unavailable on the clean Ubuntu runner. Restoring the unweakened full gate requires an exact-toolchain/environment decision beyond the narrow dependency repair; STOP for Main. E1/E2/E3 COMPLETE, Campaign 3 BLOCKED, Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.

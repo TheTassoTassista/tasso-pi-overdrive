@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 hermetic source-artifact inventory; no new gate run (2026-10-13)
+
+Local extraction of cached CachyOS Git/GDB/Python/Node/prlimit package archives reproduces the exact approved binary SHA-256 values in the live policy. A package-lock-only resolution confirms `pi-subagents@0.66.0` declares `jiti@2.7.0`. These are **source-artifact checks**, not an image build, toolchain self-check, full check, preflight, native Windows test or E4 qualification. Ubuntu preflight0/2 and replacement E4 0/1; original E4 CI38398838331 stays FAIL/CLOSED. No tests or security gates were weakened.
+
 ## E4 recovery static attribution; no new test or CI (2026-10-13)
 
 Original E4 CI38398838331 remains Ubuntu `npm run check` FAIL, TAP1090/702 PASS/50 FAIL/338 skips. First `jiti` failure is attributable to E4 omitting declared `pi-subagents@0.66.0` dependencies; local Pi's pre-existing hoisted `jiti@2.7.0` is not clean-runner evidence. Existing same-run logs independently record `resource_git_binary_digest_mismatch` and `DAP_ADAPTER_UNAVAILABLE`; other historical failure members are not fully classified. No code/package/CI correction or local full rerun was made. Ubuntu preflight budget0/2, replacement E4 budget0/1; Main must decide an exact host-toolchain strategy before preflight.
