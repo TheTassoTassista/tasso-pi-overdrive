@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Campaign 3 final-candidate qualification PASS; one-shot E4 FAIL (2026-10-13)
+
+Candidate `9407238b22020e04a4dd19126a0262807e8bd1fa`: prior local Linux owned main 503/172 PASS/0 FAIL/331 skips and full `npm run check` PASS; exact-SHA Windows main CI38265696139 503/491 PASS/0 FAIL/12 skips, ordinals503, ledger NONE, Job empty/pipes drained/residual0 and final fixed-scope baseline PASS. One-shot E4 CI38398838331 did not repeat that green Linux result on its clean Ubuntu runner: `npm run check` TAP1090/702 PASS/50 FAIL/338 skips, first failure `tests/agent-hub-control-bridge.test.mjs` from missing `jiti` under `pi-subagents`; exit1. E4 Linux owned corpus/audit skipped; Windows job skipped, so no E4 Windows or integrated E1/E2/E3 process/cleanup evidence. Do not substitute the pre-E4 focused PASS or retry E4.
+
 ## Campaign 3 pre-E4-workflow native Windows main PASS (2026-10-12)
 
 [CI38263762303](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38263762303) on `b96ae39f39f9627f9aeafa7fbba8b9f6c174e88c`: complete Windows main **503 total / 491 PASS / 0 FAIL / 12 skips**, ordinals503, ledger NONE; owned Job attested/empty, pipes drained, timeout false, progress completed503/failed0, residual0. Always-on fixed-scope baseline active/stale/quarantined0, Job empty/pipes drained/residual0. Local Linux main 503/172/0/331 and full `npm run check` PASS. New dedicated E4 workflow YAML and static same-SHA/order assertions PASS, but final E4 candidate is not frozen or natively requalified; E4 not run.

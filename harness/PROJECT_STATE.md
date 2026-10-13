@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Campaign 3 E4 failed; Main boundary (2026-10-13)
+
+Pre-E4 frozen `9407238b22020e04a4dd19126a0262807e8bd1fa` has accepted E1/E2/E3 COMPLETE and exact-SHA current Windows main CI38265696139 PASS 503/491/0/12 with full ledger/ownership/baseline; local Linux main/full check PASS. One-shot E4 CI38398838331 failed at Ubuntu `npm run check`, first `MODULE_NOT_FOUND: jiti` from expected `pi-subagents` path, TAP1090/702 PASS/50 FAIL/338 skips. E4 Windows and integrated scenarios never ran. E4 BLOCKED/budget1/1, no replacement under current authority. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED. Return to Main; no product/security/routing change or E1/E2/E3 redo.
+
 ## Current — Campaign 3 current regression PASS on prior SHA; final E4 candidate pending (2026-10-12)
 
 Pre-E4-workflow `b96ae39…` passed local full Linux 503/172/0/331 and native Windows main CI38263762303 503/491/0/12, both failure-ledger NONE with exact ordinals, Windows owned Job/pipe/residual0 and fixed-scope baseline PASS. E1/E2/E3 technical COMPLETE. A CI-only dedicated same-SHA E4 job is locally green but unrun; its commit will change the candidate, so current-candidate qualification remains PARTIAL pending exact-final-SHA regression. E4 BLOCKED, Windows autonomy BLOCKED, `windowsAutonomousReady=false`, PHI PORTABILITY COMPLETE NOT CERTIFIED, external provider requests0.

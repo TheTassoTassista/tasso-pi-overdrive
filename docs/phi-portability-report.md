@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Campaign 3 E4 one-shot failed before Windows (2026-10-13)
+
+Exact frozen `9407238b22020e04a4dd19126a0262807e8bd1fa` passed current Windows main CI38265696139 with 503/491/0/12, full ordinal/failure-ledger and owned cleanup/final baseline PASS; the local Linux main/full check was green. One-shot E4 CI38398838331 failed on clean Ubuntu at `npm run check` (first `pi-subagents`/`jiti` MODULE_NOT_FOUND, TAP1090/702 PASS/50 FAIL/338 skips). Dependent E4 Windows and integrated E1/E2/E3 were skipped; no E4 Windows ownership/process-graph or provider-route evidence exists. Campaign 3 stays BLOCKED, `windowsAutonomousReady=false`, Windows autonomy BLOCKED, PHI PORTABILITY COMPLETE NOT CERTIFIED. No replacement E4 authorized; return failure to Main.
+
 ## Campaign 3 current Windows main passes; E4 final candidate pending (2026-10-12)
 
 Pre-E4-workflow [CI38263762303](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38263762303) on `b96ae39f39f9627f9aeafa7fbba8b9f6c174e88c` passed 503/491/0/12 Windows main, ordinals503, ledger NONE, owned Job/pipes/residual0 and final fixed-scope baseline PASS. Local Linux main 503/172/0/331 and full check PASS. A CI-only E4 path to certify Linux, Windows, E1/E2/E3 on one immutable SHA is prepared but NOT RUN. Its new SHA still needs exact-current regression and freeze before one E4. Windows autonomy BLOCKED/false, PHI PORTABILITY COMPLETE NOT CERTIFIED.
