@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 Host Feasibility Run 2 terminal FAIL; no sandbox assertion (2026-10-14)
+
+[CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) on exact `ab3e4b63a466249af1bdae738b8f0a1790683b32`: AppArmor syntax/load and exact Arch OCI rootfs materialization passed; first Bubblewrap invocation reported `Can't mkdir /phi: Read-only file system`, then `PAYLOAD_PROBE` FAIL, cleanup PASS and assertion15 FAIL. No payload markers 4–14 or child-death result. Host Feasibility2/2 exhausted; image/preflight/E4 not run. Local focused14/14, syntax/platform, TypeScript, package validation and shellcheck PASS; local full check remains FAIL with two Rust-related failures and cannot be reported green.
+
 ## E4 Host Feasibility Run 1 and parser-cache correction (2026-10-14)
 
 Native [CI38532600373](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532600373) on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc`: fail at `PROFILE_PARSE` because `apparmor_parser -Q` tried root-owned `/var/cache/apparmor`; `E4_CLEANUP=PASS`, `E4_ASSERT_15=FAIL`, no payload. This consumes Host Feasibility1/2 only. Local candidate adds `-K` skip-cache; updated focused suite14/14 PASS, shell syntax/shellcheck, syntax/platform, TypeScript and package validation PASS. Whitespace check of the whole working tree reports only the pre-existing protected user edit; scoped fix has no whitespace error. Full `npm run check` remains prior FAIL on two Rust-related tests, with E4 relationship unproven.

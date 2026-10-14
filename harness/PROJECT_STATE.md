@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current STOP — E4 host feasibility budget exhausted (2026-10-14)
+
+Run 1 CI38532600373 failed at unprivileged parser cache and was corrected by `-Q -K`. Run 2 [CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) on `ab3e4b63a466249af1bdae738b8f0a1790683b32` passed that point and exact rootfs materialization, then failed before payload because `/phi` was absent under a read-only rootfs. Both cleanups PASS; payload isolation assertions are unproved. Host Feasibility **2/2 FAIL**, image NOT QUALIFIED, Ubuntu preflight0/2, replacement E4 0/1. STOP for Main; no third run or autonomous readiness. E1/E2/E3 COMPLETE; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current — E4 host feasibility first native run failed at AppArmor parser cache (2026-10-14)
 
 CI38532600373 on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc` failed `PROFILE_PARSE` before payload: ordinary-user `apparmor_parser -Q` attempted root-owned `/var/cache/apparmor` and was denied. Cleanup PASS. A skip-cache-only correction is local candidate; profile permissions and production sandbox unchanged. Host Feasibility1/2, image NOT QUALIFIED, Ubuntu preflight0/2, replacement E4 0/1. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

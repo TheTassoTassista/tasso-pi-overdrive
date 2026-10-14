@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 host feasibility STOP after second failed non-certifying run (2026-10-14)
+
+[CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) passed the Run-1 AppArmor parser-cache point and exact rootfs identity, then Bubblewrap could not create `/phi` on the read-only rootfs before payload startup. Cleanup PASS, no isolation assertions completed. Together with CI38532600373, Host Feasibility2/2 is exhausted. This is a known orchestration defect, not grounds to claim host sandbox equivalence or to run a third attempt. Image NOT QUALIFIED, preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP for Φ Main authority/budget decision.
+
 ## E4 Host Feasibility Run 1: parser-cache failure, not sandbox evidence (2026-10-14)
 
 [CI38532600373](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532600373) on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc` failed before payload because ordinary-user AppArmor syntax parse tried root-owned `/var/cache/apparmor`; cleanup PASS. Skip-cache (`-K`) is the bounded local correction. Host Feasibility1/2, image unqualified, preflight0/2, replacement E4 0/1. No Windows-autonomy/readiness change.
