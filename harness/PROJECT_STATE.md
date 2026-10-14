@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 minimal image fixture closure candidate (2026-10-15)
+
+CI38645683284 on `ff5f8356c53ca0f61aa25d5f3f33347ea89cf087` reached non-root image self-check and passed exact native AST identity; focused tests exited1 before any image publication, cleanup/residual0 PASS. Node26 local minimal-context reproduction proves missing transitive `config/routing-policy.json` and default spec-vs-TAP reporter mismatch. One-file image allowlist addition plus explicit TAP reporter gives local8/8; native image qualification remains unproved. Host Feasibility3/3 PASS/no Run4, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current — E4 AST native optional binary qualification candidate (2026-10-15)
 
 CI38644668426 on `644c7ee0cf6fa28dd3bf218e2fc6ed7c31faba38` passed seed/LSP, Node closure, image build and non-root entrypoint startup; isolated self-check then rejected the npm lifecycle-blocked AST JS shim hash33bb, not the policy-pinned native binary hash7a5. The lock-integrity-matched optional native package contains the exact required binary. Scoped self-check path correction is local candidate; no image publish, cleanup/owned residual0 PASS. Image NOT QUALIFIED, preflight0/2, replacement E4 0/1; Host Feasibility3/3 PASS/no Run4, autonomy BLOCKED/false, portability NOT CERTIFIED.

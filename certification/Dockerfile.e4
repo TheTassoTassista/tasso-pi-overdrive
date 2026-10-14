@@ -39,6 +39,7 @@ RUN bash /opt/phi/scripts/install-managed-dap.sh
 COPY config/e4-toolchain-seeds.json config/git-resources.json config/dap-engine.json config/eval-engine.json config/ast-edit.json /opt/phi/config/
 COPY certification/pi/package-lock.json /opt/phi/config/pi-package-lock.json
 COPY package.json /opt/phi/project/package.json
+COPY config/routing-policy.json /opt/phi/project/config/routing-policy.json
 COPY lib/ /opt/phi/project/lib/
 COPY platform/ /opt/phi/project/platform/
 COPY tests/agent-hub-control-bridge.test.mjs tests/ast-edit-engine.test.mjs /opt/phi/project/tests/

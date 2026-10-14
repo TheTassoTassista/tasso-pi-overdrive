@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 minimal-context test closure candidate (2026-10-15)
+
+CI38645683284 on `ff5f8356c53ca0f61aa25d5f3f33347ea89cf087`: UID1001 self-check and native AST identity passed, final focused test process exit1; image unpublished, cleanup/owned residual0 PASS. Exact Node26.8.2 minimal-context reproduction without `config/routing-policy.json` gives Agent Hub PASS and AST `ERR_MODULE_NOT_FOUND`; with the one file copied plus `--test-reporter=tap`, same two test files give **8/8 PASS**, `# fail 0`, stderr0. Native image qualification remains PENDING; Rust/LSP full local failures remain separate.
+
 ## E4 AST native binary path candidate (2026-10-15)
 
 CI38644668426 on `644c7ee0cf6fa28dd3bf218e2fc6ed7c31faba38` passed non-root Node startup but self-check FAIL on `@ast-grep/cli` JS shim SHA33bb versus policy native SHA7a5; no image publication, cleanup/owned residual0 PASS. npm package tarballs match lock SRI and prove native optional package contains SHA7a5. Scoped self-check now points only to that native binary; local validation pending at this checkpoint. Full local Rust/LSP failures remain tracked separately, not relabeled.

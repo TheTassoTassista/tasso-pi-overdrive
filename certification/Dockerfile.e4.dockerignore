@@ -26,6 +26,7 @@
 !config/dap-engine.json
 !config/eval-engine.json
 !config/ast-edit.json
+!config/routing-policy.json
 !config/git-resources.json
 !config/managed-lsp.json
 !config/e4-toolchain-seeds.json

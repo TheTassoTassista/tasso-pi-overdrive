@@ -1,6 +1,12 @@
 # Phi — Session Continuation
 
-## CURRENT — E4 ast-grep native optional binary self-check correction
+## CURRENT — E4 minimal image test-context closure and TAP reporter candidate
+
+Image-only CI38645683284/job116131823845 on `ff5f8356c53ca0f61aa25d5f3f33347ea89cf087` reached UID1001 self-check and passed native AST identity, then focused tests exited1; no image publish, cleanup PASS/owned residual0. Exact Node26 minimal-context reproduction: Agent Hub passes; AST test cannot import transitive `config/routing-policy.json` because Docker allowlist omitted it (`ERR_MODULE_NOT_FOUND`). Copy/allowlist that one tracked policy file gives 8/8 PASS. Node26 default spec output also mismatched the self-check's TAP parser; explicit `--test-reporter=tap` gives `# pass 8`/`# fail 0` without test weakening. Candidate local only. Host Feasibility3/3 PASS/no Run4, image NOT QUALIFIED, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false. Next: scoped validation/ZERO_EGRESS, commit/push, one changed-candidate image-only qualification, inspect SAME run. Do-not-redo E1–E3/Host Runs1–3/unchanged failed image runs; preserve protected/user state.
+
+Focused27/27, exact Node26 minimal-context8/8, self-check/platform syntax, TypeScript, package and scoped whitespace PASS. Scoped ZERO_EGRESS PASS; no route, provider, credential, sandbox, timeout/retry or assertion change. Next action now scoped commit/push and one changed-candidate image-only qualification.
+
+## HISTORICAL — E4 ast-grep native optional binary self-check correction
 
 Image-only CI38644668426/job116128461701 on `644c7ee0cf6fa28dd3bf218e2fc6ed7c31faba38` proved seven-seed/LSP staging, exact Node ELF closure, full build and UID1001 entrypoint startup, then self-check rejected AST CLI shim SHA33bb versus policy native SHA7a5. Published npm tarballs (both match lock SRI) prove `@ast-grep/cli` retains the shim when install scripts are blocked and `@ast-grep/cli-linux-x64-gnu@0.45.3` contains the exact pinned native binary. Candidate changes only image self-check path/test to attest and execute native optional binary; no package/policy/install-script change. No image publish; cleanup PASS/owned containers0. Host Feasibility3/3 PASS/no Run4; image NOT QUALIFIED, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false. Next: local scoped validation/ZERO_EGRESS, commit/push, one changed-candidate image-only qualification, inspect SAME run; no preflight/E4 or old-run retry.
 

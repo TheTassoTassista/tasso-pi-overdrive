@@ -13,6 +13,8 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   assert.match(dockerfile, /ld-linux-x86-64\.so\.2 --list \/usr\/bin\/node/u);
   assert.match(dockerfile, /TOOLCHAIN_RUNTIME_DEPENDENCY_MISSING tool=node soname=libsimdjson\.so\.33/u);
   assert.match(dockerfile, /^COPY --from=lsp \/ \/opt\/phi\/runtime\/lsp\/managed\/$/mu);
+  assert.match(dockerfile, /^COPY config\/routing-policy\.json \/opt\/phi\/project\/config\/routing-policy\.json$/mu);
+  assert.match(ignore, /^!config\/routing-policy\.json$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
   assert.match(dockerfile, /USER 1001:1001/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/bin\/node", "\/opt\/phi\/e4-image-selfcheck\.mjs"\]/u);
@@ -35,6 +37,7 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
   assert.match(source, /node_modules\/@ast-grep\/cli-linux-x64-gnu/u);
   assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
+  assert.match(source, /\['--test', '--test-reporter=tap',/u);
   assert.doesNotMatch(source, /path\.join\(root, 'pi', 'npm', 'node_modules', '@ast-grep', 'cli', 'ast-grep'\)/u);
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
 });

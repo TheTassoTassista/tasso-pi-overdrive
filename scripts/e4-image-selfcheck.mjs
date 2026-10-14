@@ -126,7 +126,7 @@ try {
   assert.equal(fs.lstatSync('/phi').isDirectory(), true);
   assert.equal(fs.readdirSync('/phi').length, 0, '/phi is not an empty structural mountpoint');
   for (const destination of ['/evidence', '/proc', '/dev', '/tmp', '/run']) assert.equal(fs.lstatSync(destination).isDirectory(), true);
-  const focused = spawnSync('/usr/bin/node', ['--test',
+  const focused = spawnSync('/usr/bin/node', ['--test', '--test-reporter=tap',
     '/opt/phi/project/tests/agent-hub-control-bridge.test.mjs',
     '/opt/phi/project/tests/ast-edit-engine.test.mjs'], {
     encoding: 'utf8', timeout: 60000, maxBuffer: 2 * 1024 * 1024,
