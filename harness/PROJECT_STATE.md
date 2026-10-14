@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — Run-3 host rootfs candidate, native proof pending (2026-10-14)
+
+Main authorizes one final non-certifying Host Feasibility execution under `E4-HOST-BWRAP-MOUNTPOINT-RECOVERY-001`. Rootfs schema `phi-e4-host-v1` prepares empty `/phi` and all exact static Bubblewrap destinations, then the payload receives only bounded writable binds/tmpfs over a read-only root. Local targeted15/15 and scoped ZERO_EGRESS PASS; full check remains red on two Rust/LSP tests not attributed to this change. Host budget2/3; image NOT QUALIFIED; preflight0/2; replacement E4 0/1. Sandbox equivalence UNKNOWN until all 24 native assertions pass. E1/E2/E3 COMPLETE; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current STOP — E4 host feasibility budget exhausted (2026-10-14)
 
 Run 1 CI38532600373 failed at unprivileged parser cache and was corrected by `-Q -K`. Run 2 [CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) on `ab3e4b63a466249af1bdae738b8f0a1790683b32` passed that point and exact rootfs materialization, then failed before payload because `/phi` was absent under a read-only rootfs. Both cleanups PASS; payload isolation assertions are unproved. Host Feasibility **2/2 FAIL**, image NOT QUALIFIED, Ubuntu preflight0/2, replacement E4 0/1. STOP for Main; no third run or autonomous readiness. E1/E2/E3 COMPLETE; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

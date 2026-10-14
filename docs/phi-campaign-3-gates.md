@@ -1,5 +1,17 @@
 # Campaign 3 — Windows Autonomy gate ledger
 
+Final Host Feasibility Run-3 candidate (2026-10-14): `E4-HOST-BWRAP-MOUNTPOINT-RECOVERY-001` is durable. Budget **2/3**; exactly one run remains. Rootfs schema `phi-e4-host-v1` prepares empty `/phi` and validates every destination before Bubblewrap; runtime root is `--ro-bind`, with no host-root bind. Static seven-operation destination inventory (class D unexpected = none):
+
+| Destination | Class | Construction/authority |
+| --- | --- | --- |
+| `/` | A — immutable structural root | Exact-digest materialized OCI rootfs, `--ro-bind` |
+| `/proc`, `/dev` | B — Bubblewrap synthetic filesystem | Existing structural directories receive private proc/dev |
+| `/tmp`, `/run` | C — bounded writable tmpfs | Existing structural directories; no host state bind |
+| `/phi` | C — bounded fixture/project bind | Empty immutable structural directory, explicit fixture bind only |
+| `/evidence` | C — bounded evidence bind | Empty immutable structural directory, explicit evidence bind only |
+
+The read-only probe is included in the constructed rootfs at `/usr/local/bin/phi-e4-probe`, not a host bind. Rootfs layout validation fails with `ROOTFS_MOUNTPOINT_MISSING` for absent/aliased destinations. Local focused15/15, shellcheck/syntax, TypeScript, package validation PASS; indexed audit WARN/0 FAIL; full check FAIL on two Rust/LSP tests (not counted green). Pre-Run-3 scoped `ZERO_EGRESS_REVIEW: PASS`: profile bytes/hash and narrow userns rule unchanged, no global policy relaxation, no sudo bwrap, host capability/setuid/file caps, writable-root workaround, whole-root overlay, host root/home/PID/network/Docker socket bind, extra provider call, timeout or retry inflation. Nested userns denial, non-root/CapEff0, all six namespace comparisons, sentinel, parent death and cleanup remain mandatory native assertions. Security equivalence is **UNKNOWN** until all 24 pass. Image NOT QUALIFIED, preflight0/2, replacement E4 0/1; autonomy BLOCKED/false and portability NOT CERTIFIED.
+
 Host Feasibility **2/2 exhausted; STOP for Main**. Second/final [CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) on exact `ab3e4b63a466249af1bdae738b8f0a1790683b32` cleared Run-1 AppArmor parser cache, verified exact Arch OCI digest, then failed before payload: `bwrap: Can't mkdir /phi: Read-only file system`; `PAYLOAD_PROBE` FAIL, cleanup PASS. **KNOWN implementation-local mountpoint absence**, not a sandbox security verdict. Assertions4–14 and child-death evidence remain UNKNOWN. No Run 3, image qualification, preflight or replacement E4 under current authority; autonomy BLOCKED/false, portability NOT CERTIFIED. Exact next action: Main decides whether a new bounded budget/authority is warranted; do not independently fix/rerun.
 
 Host Feasibility Run 1 [CI38532600373](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532600373) on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc`: `PROFILE_PARSE` FAIL before payload due to unprivileged parser access to root-owned `/var/cache/apparmor`; cleanup PASS. A skip-cache-only correction is local candidate. Host budget **1/2**, image NOT QUALIFIED, preflight0/2, replacement E4 0/1. No sandbox equivalence or readiness claim yet.

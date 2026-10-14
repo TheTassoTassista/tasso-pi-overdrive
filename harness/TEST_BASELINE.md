@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 Run-3 mountpoint/schema candidate (2026-10-14)
+
+Focused `node --test tests/e4-host-feasibility.test.mjs tests/integrated-certification-evidence.test.mjs tests/e4-seed-transport.test.mjs`: **15/15 PASS**. Shell syntax/shellcheck, `npm run syntax`, `npm run syntax:platform`, TypeScript and package validation PASS. The rootfs validator prepares an empty `/phi` and fails deterministically on removed `/phi` or `/run`; static test confirms exactly seven intended mount operations and no host-root/socket bind. Indexed audit WARN/0 FAIL, scoped staged whitespace PASS. Full `npm run check` FAIL before later phases: 1099 total/759 PASS/2 FAIL/338 skips; Rust/LSP failures remain tracked, no E4 causal attribution. Native Run 3 NOT YET RUN; no 24-assertion or image/preflight/E4 PASS claim.
+
 ## E4 Host Feasibility Run 2 terminal FAIL; no sandbox assertion (2026-10-14)
 
 [CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) on exact `ab3e4b63a466249af1bdae738b8f0a1790683b32`: AppArmor syntax/load and exact Arch OCI rootfs materialization passed; first Bubblewrap invocation reported `Can't mkdir /phi: Read-only file system`, then `PAYLOAD_PROBE` FAIL, cleanup PASS and assertion15 FAIL. No payload markers 4–14 or child-death result. Host Feasibility2/2 exhausted; image/preflight/E4 not run. Local focused14/14, syntax/platform, TypeScript, package validation and shellcheck PASS; local full check remains FAIL with two Rust-related failures and cannot be reported green.

@@ -6,6 +6,7 @@ set -euo pipefail
 repo_root=$(realpath -e -- "$(dirname -- "${BASH_SOURCE[0]}")/..")
 profile_source="$repo_root/certification/apparmor/phi-e4-bwrap.profile"
 probe_source="$repo_root/certification/e4-host-probe.sh"
+layout_source="$repo_root/certification/e4-rootfs-layout.sh"
 expected_bwrap=$(awk '$1 == "profile" && $2 == "phi-e4-bwrap" {print $3}' "$profile_source")
 [[ "$expected_bwrap" =~ ^/[A-Za-z0-9_./-]+$ && "$expected_bwrap" != *'..'* ]] || { echo 'E4_HOST_FAIL=PROFILE_TARGET_INVALID' >&2; exit 1; }
 expected_temp=$(dirname -- "$(dirname -- "$(dirname -- "$(dirname -- "$expected_bwrap")")")")
@@ -20,7 +21,7 @@ fail() { printf 'E4_HOST_FAIL=%s\n' "$1" >&2; exit 1; }
 for command in docker dpkg-deb apt-get apparmor_parser sha256sum getcap timeout tar; do
   command -v "$command" >/dev/null 2>&1 || fail "TOOL_MISSING_$command"
 done
-[[ -f "$profile_source" && -f "$probe_source" ]] || fail PROFILE_OR_PROBE_MISSING
+[[ -f "$profile_source" && -f "$probe_source" && -f "$layout_source" ]] || fail PROFILE_OR_PROBE_MISSING
 [[ $(grep -c '^[[:space:]]*userns,[[:space:]]*$' "$profile_source") == 1 ]] || fail PROFILE_USERNS_RULE
 [[ $(grep -c 'flags=(unconfined)' "$profile_source") == 1 ]] || fail PROFILE_MODE
 grep -Fq "$expected_bwrap" "$profile_source" || fail PROFILE_TARGET
@@ -45,7 +46,10 @@ owned_alive() {
 cleanup() {
   local original=$? i
   trap - EXIT
-  if [[ -n "$sandbox_pid" ]] && kill -0 "$sandbox_pid" 2>/dev/null; then kill -KILL "$sandbox_pid" 2>/dev/null || true; fi
+  if [[ -n "$sandbox_pid" ]] && kill -0 "$sandbox_pid" 2>/dev/null; then
+    kill -KILL "$sandbox_pid" 2>/dev/null || true
+    wait "$sandbox_pid" 2>/dev/null || true
+  fi
   for i in "${!owned_pids[@]}"; do
     if [[ -n ${owned_starts[$i]} && $(proc_start "${owned_pids[$i]}") == "${owned_starts[$i]}" ]]; then
       kill -KILL "${owned_pids[$i]}" 2>/dev/null || true
@@ -56,13 +60,15 @@ cleanup() {
   fi
   if [[ -n "$container_id" ]]; then docker rm -f "$container_id" >/dev/null 2>&1 || cleanup_ok=0; fi
   rm -rf -- "$stage" "$expected_temp/phi-e4-tools" || cleanup_ok=0
+  [[ ! -e "$stage" && ! -e "$expected_temp/phi-e4-tools" ]] || cleanup_ok=0
   if owned_alive; then cleanup_ok=0; fi
+  printf 'E4_ROOTFS_CLEANUP=%s\n' "$([[ ! -e "$stage" ]] && echo PASS || echo FAIL)"
   printf 'E4_CLEANUP=%s\n' "$([[ $cleanup_ok == 1 ]] && echo PASS || echo FAIL)"
   if [[ "$original" != 0 || "$cleanup_ok" != 1 || "$proof_passed" != 1 ]]; then
-    printf 'E4_ASSERT_15=FAIL\nE4_HOST_FEASIBILITY=FAIL\n'
+    printf 'E4_ASSERT_24=FAIL\nE4_HOST_FEASIBILITY=FAIL\n'
     exit 1
   fi
-  printf 'E4_ASSERT_15=PASS\nE4_HOST_FEASIBILITY=PASS\n'
+  printf 'E4_ASSERT_24=PASS\nE4_HOST_FEASIBILITY=PASS\n'
 }
 trap cleanup EXIT
 trap 'exit 1' INT TERM
@@ -83,6 +89,7 @@ mode=$(stat -c %a "$expected_bwrap")
 bwrap_sha=$(sha256sum "$expected_bwrap" | awk '{print $1}')
 profile_sha=$(sha256sum "$profile_source" | awk '{print $1}')
 printf 'E4_BWRAP_PATH=%s\nE4_BWRAP_VERSION=%s\nE4_BWRAP_SHA256=%s\nE4_PROFILE_SHA256=%s\n' "$expected_bwrap" "$expected_version" "$bwrap_sha" "$profile_sha"
+printf 'E4_BWRAP_SETUID=NO\nE4_BWRAP_FILE_CAPS=NONE\n'
 printf 'E4_RUNNER_IMAGE=%s\nE4_KERNEL=%s\n' "${ImageVersion:-UNKNOWN}" "$(uname -r)"
 printf 'E4_APPARMOR_VERSION=%s\n' "$(apparmor_parser --version | head -1)"
 printf 'E4_APPARMOR_STATE=%s\n' "$(cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo UNKNOWN)"
@@ -95,6 +102,7 @@ printf 'E4_HOST_CAPEFF=%s\n' "$(awk '/^CapEff:/ {print $2}' /proc/self/status)"
 apparmor_parser -Q -K "$profile_source" || fail PROFILE_PARSE
 sudo -n apparmor_parser -r "$profile_source" || fail PROFILE_LOAD
 profile_loaded=1
+printf 'E4_PROFILE_LOADED=YES\nE4_ASSERT_1=PASS\n'
 
 # Docker is outside the payload and only exports the exact pinned image.
 image=$1
@@ -108,6 +116,13 @@ tar -tf "$stage/rootfs.tar" | awk '/^\// || /(^|\/)\.\.($|\/)/ {bad=1} END {exit
 tar --no-same-owner -xf "$stage/rootfs.tar" -C "$stage/rootfs" || fail ROOTFS_EXTRACTION
 [[ -x "$stage/rootfs/usr/bin/sh" && -f "$stage/rootfs/etc/os-release" ]] || fail ROOTFS_INVALID
 grep -q '^ID=arch$' "$stage/rootfs/etc/os-release" || fail ROOTFS_IDENTITY
+bash "$layout_source" prepare "$stage/rootfs" "$probe_source" || fail ROOTFS_MOUNTPOINT_MISSING
+bash "$layout_source" validate "$stage/rootfs" "$probe_source" || fail ROOTFS_MOUNTPOINT_MISSING
+rootfs_id="phi-e4-host-v1:$image_digest"
+[[ ! -e "$stage/rootfs/etc/phi-e4-rootfs-id" && ! -L "$stage/rootfs/etc/phi-e4-rootfs-id" ]] || fail ROOTFS_MARKER_EXISTS
+printf '%s\n' "$rootfs_id" > "$stage/rootfs/etc/phi-e4-rootfs-id"
+fixture_id="phi-e4-fixture:$image_digest"
+printf '%s\n' "$fixture_id" > "$stage/fixture/fixture-identity"
 printf 'E4_OCI_DIGEST=%s\n' "$image_digest"
 
 sentinel="$stage/host-sentinel"
@@ -116,31 +131,43 @@ chmod 600 "$sentinel"
 sentinel_before=$(sha256sum "$sentinel" | awk '{print $1}')
 host_pidns=$(readlink /proc/self/ns/pid)
 host_netns=$(readlink /proc/self/ns/net)
+host_userns=$(readlink /proc/self/ns/user)
+host_mntns=$(readlink /proc/self/ns/mnt)
+host_ipcns=$(readlink /proc/self/ns/ipc)
+host_utsns=$(readlink /proc/self/ns/uts)
+host_workspace=${GITHUB_WORKSPACE:-$repo_root}
+printf 'E4_SENTINEL_BEFORE_SHA=%s\nE4_PHI_BIND_SOURCE=%s\nE4_PHI_BIND_DESTINATION=/phi\n' "$sentinel_before" "$stage/fixture"
 
 bwrap_args=(
   --unshare-all --unshare-user --disable-userns --clearenv --die-with-parent --new-session
   --ro-bind "$stage/rootfs" /
   --proc /proc --dev /dev --tmpfs /tmp --tmpfs /run
-  --dir /phi --bind "$stage/fixture" /phi/fixture --bind "$stage/evidence" /phi/evidence
-  --ro-bind "$probe_source" /phi/probe.sh
+  --bind "$stage/fixture" /phi --bind "$stage/evidence" /evidence
   --setenv PATH /usr/bin:/bin --setenv HOME /tmp
-  --setenv E4_HOST_NETNS "$host_netns" --setenv E4_HOST_PIDNS "$host_pidns"
+  --setenv E4_HOST_USERNS "$host_userns" --setenv E4_HOST_MNTNS "$host_mntns"
+  --setenv E4_HOST_PIDNS "$host_pidns" --setenv E4_HOST_IPCNS "$host_ipcns"
+  --setenv E4_HOST_UTSNS "$host_utsns" --setenv E4_HOST_NETNS "$host_netns"
   --setenv E4_HOST_PID "$$" --setenv E4_HOST_SENTINEL "$sentinel"
+  --setenv E4_HOST_WORKSPACE "$host_workspace"
+  --setenv E4_ROOTFS_ID "$rootfs_id" --setenv E4_FIXTURE_ID "$fixture_id"
 )
 verify_bwrap_now() {
   [[ -f "$expected_bwrap" && ! -L "$expected_bwrap" && $(stat -c %a "$expected_bwrap") == 755 && -z $(getcap "$expected_bwrap") ]] || fail BWRAP_IDENTITY_CHANGED
   [[ $(sha256sum "$expected_bwrap" | awk '{print $1}') == "$bwrap_sha" ]] || fail BWRAP_DIGEST_CHANGED
   [[ $(sha256sum "$profile_source" | awk '{print $1}') == "$profile_sha" ]] || fail PROFILE_DIGEST_CHANGED
+  bash "$layout_source" validate "$stage/rootfs" "$probe_source" || fail ROOTFS_MOUNTPOINT_MISSING
 }
-printf 'E4_BWRAP_POLICY=unshare-all,unshare-user,disable-userns,clearenv,die-with-parent,new-session,ro-rootfs,proc,dev,tmpfs-tmp,tmpfs-run,fixture-bind,evidence-bind,probe-ro-bind\n'
+printf 'E4_BWRAP_POLICY=unshare-all,unshare-user,disable-userns,clearenv,die-with-parent,new-session,ro-rootfs,proc,dev,tmpfs-tmp,tmpfs-run,phi-bind,evidence-bind\n'
 verify_bwrap_now
-timeout --signal=TERM --kill-after=5s 60s "$expected_bwrap" "${bwrap_args[@]}" -- /usr/bin/sh /phi/probe.sh | tee "$stage/probe.out" || fail PAYLOAD_PROBE
-for assertion in 4 5 6 7 8 9 10 11 13 CAPABILITIES; do
+printf 'E4_ASSERT_2=PASS\n'
+timeout --signal=TERM --kill-after=5s 60s "$expected_bwrap" "${bwrap_args[@]}" -- /usr/bin/sh /usr/local/bin/phi-e4-probe | tee "$stage/probe.out" || fail PAYLOAD_PROBE
+for assertion in 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 NETWORK; do
   grep -Fxq "E4_ASSERT_${assertion}=PASS" "$stage/probe.out" || fail "ASSERT_${assertion}"
 done
-printf 'E4_ASSERT_1=PASS\nE4_ASSERT_2=PASS\nE4_ASSERT_3=PASS\n'
+grep -Fxq 'E4_PROBE_COMPLETE=1' "$stage/probe.out" || fail PROBE_INCOMPLETE
+printf 'E4_ASSERT_22=PASS\nE4_PIPE_STATE=CLOSED\n'
 [[ $(sha256sum "$sentinel" | awk '{print $1}') == "$sentinel_before" ]] || fail SENTINEL_CHANGED
-printf 'E4_ASSERT_12=PASS\n'
+printf 'E4_SENTINEL_AFTER_SHA=%s\nE4_ASSERT_19=PASS\n' "$sentinel_before"
 
 # A second invocation proves that --die-with-parent leaves no owned child.
 verify_bwrap_now
@@ -182,5 +209,5 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 0.2
 done
 owned_alive && fail OWNED_CHILD_SURVIVED
-printf 'E4_ASSERT_14=PASS\n'
+printf 'E4_ASSERT_21=PASS\nE4_RESIDUAL_PHI_PROCESS_COUNT=0\nE4_ASSERT_23=PASS\n'
 proof_passed=1

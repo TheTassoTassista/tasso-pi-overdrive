@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 final host feasibility candidate (2026-10-14)
+
+Main authorized exactly one Run 3 after historical Run 1/2 pre-payload failures. Rootfs construction now adds empty `/phi` and the other exact static mount destinations before read-only mount; missing destinations fail before Bubblewrap. The probe requires all 24 security/lifecycle assertions. Local focused15/15 and scoped ZERO_EGRESS PASS, but native host equivalence remains UNKNOWN and full local check has two Rust/LSP failures. Host budget2/3, image unqualified, preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false and portability NOT CERTIFIED. No Run 4 or readiness authority.
+
 ## E4 host feasibility STOP after second failed non-certifying run (2026-10-14)
 
 [CI38532993212](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532993212) passed the Run-1 AppArmor parser-cache point and exact rootfs identity, then Bubblewrap could not create `/phi` on the read-only rootfs before payload startup. Cleanup PASS, no isolation assertions completed. Together with CI38532600373, Host Feasibility2/2 is exhausted. This is a known orchestration defect, not grounds to claim host sandbox equivalence or to run a third attempt. Image NOT QUALIFIED, preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP for Φ Main authority/budget decision.
