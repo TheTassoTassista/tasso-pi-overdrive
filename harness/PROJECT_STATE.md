@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — host Bubblewrap/rootfs E4 execution candidate (2026-10-14)
+
+Main authorized `E4-HOST-BWRAP-ROOTFS-001`, replacing only nested-container Bubblewrap execution with ordinary-user host Bubblewrap over an exact-digest read-only OCI rootfs. Repository AppArmor profile and bounded non-certifying 15-assertion host feasibility implementation are local candidates, **not natively verified**. No image qualified, Host Feasibility0/2, Ubuntu preflight0/2, replacement E4 0/1. Original E4 FAIL/CLOSED; E1/E2/E3 COMPLETE. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, portability NOT CERTIFIED. The prior nested-container EPERM mechanism remains UNKNOWN; no production Linux sandbox change was made.
+
 ## Current STOP — E4 non-privileged container namespace feasibility failed (2026-10-13)
 
 The controlled private six-seed release/manifest transport is PASS, but two non-certifying native Ubuntu CI runs on the exact pinned Arch base failed the required rootless namespace operation: CI38420482485 strict full EPERM, CI38420815845 strict user-only/full and default-cap full variants all EPERM. No image was built. Exact Docker/host denial mechanism remains UNKNOWN; no safe passing container configuration was demonstrated. Current Main authority forbids privileged/security-weakening workarounds, so image build/preflight/E4 is **STOPPED for Main**. Original E4 FAIL/CLOSED, Ubuntu preflight0/2, replacement E4 0/1; E1/E2/E3 COMPLETE; Windows autonomy BLOCKED, `windowsAutonomousReady=false`, portability NOT CERTIFIED.

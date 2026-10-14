@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 host-level Bubblewrap/rootfs candidate (2026-10-14)
+
+`E4-HOST-BWRAP-ROOTFS-001` authorizes an exact-digest OCI userspace rootfs mounted read-only by ordinary-user Bubblewrap on `ubuntu-24.04`; the VM/kernel/AppArmor remain the outer trust base. A narrow repository profile and a non-certifying 15-assertion host-isolation gate are prepared locally. The two prior nested-container EPERM diagnostics remain historical, with exact cause UNKNOWN. No host feasibility run, qualified image, Ubuntu preflight or replacement E4 yet: budgets 0/2, 0/2 and 0/1. The local full check is red on two Rust-related tests, not attributed to this change. Windows autonomy remains BLOCKED/false and portability NOT CERTIFIED.
+
 ## E4 hermetic container namespace STOP (2026-10-13)
 
 The six content-verified toolchain seed assets remain private and readback-verified, but the authorized non-privileged certification image cannot yet be qualified on the hosted Ubuntu Docker runtime. Pinned-base non-certifying CI38420482485 failed strict rootless full `unshare` with EPERM; changed diagnostic CI38420815845 observed EPERM for strict user-only/full and default-cap full configurations. The exact host/Docker policy cause is UNKNOWN, while no safe full namespace variant is proved. The required product Bubblewrap gate cannot be assumed to run inside such a container. No privileged/seccomp-disabled workaround was adopted, no image/GHCR digest exists, and Ubuntu preflight0/2/replacement E4 0/1 are untouched. **STOP for Main security/runtime decision.** Original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

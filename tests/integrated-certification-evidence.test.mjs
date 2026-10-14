@@ -41,18 +41,17 @@ test('integrated Windows certification runs all four ordinary operations in orde
   assert.match(e4Windows, /- name: Final fixed-scope ownership baseline even after failure\n\s+if: always\(\)/u);
 });
 
-test('E4 image namespace feasibility is non-certifying and cannot launch the default or E4 jobs', () => {
+test('E4 host Bubblewrap feasibility is non-certifying and cannot launch the default or E4 jobs', () => {
   const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
-  const diagnostic = workflow.split('  e4-image-feasibility:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+  const diagnostic = workflow.split('  e4-host-feasibility:\n')[1]?.split('  integrated-ubuntu:\n')[0];
   const ordinary = workflow.split('  native-foundation:\n')[1];
   assert.ok(diagnostic && ordinary);
-  assert.match(diagnostic, /inputs\['e4-image-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);
-  assert.match(diagnostic, /docker run --rm --network none --read-only --tmpfs/u);
-  assert.match(diagnostic, /probe strict-full[^\n]*\n\s+--cap-drop ALL --security-opt no-new-privileges:true/u);
-  assert.match(diagnostic, /E4_NS_DIAGNOSTIC_ONLY; no variant is adopted as certification policy/u);
-  assert.match(diagnostic, /\n\s+exit 1\n/u);
+  assert.match(diagnostic, /inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);
+  assert.match(diagnostic, /runs-on: ubuntu-24\.04/u);
+  assert.match(diagnostic, /bash scripts\/e4-host-feasibility\.sh docker\.io\/library\/archlinux:base@sha256:[0-9a-f]{64}/u);
+  assert.doesNotMatch(diagnostic, /docker run|--privileged|seccomp=unconfined|sudo bwrap/u);
   assert.doesNotMatch(diagnostic, /npm run check|phi-owned-main-suite|provider|preflight/iu);
-  assert.match(ordinary.split('\n')[0], /!inputs\['e4-image-feasibility-only'\]/u);
+  assert.match(ordinary.split('\n')[0], /!inputs\['e4-host-feasibility-only'\]/u);
 });
 
 const owner = { jobAttested: true, jobEmptyVerified: true, pipesDrained: true,

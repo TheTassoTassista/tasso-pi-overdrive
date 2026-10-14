@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 host-level feasibility local candidate (2026-10-14)
+
+Focused `node --test tests/e4-host-feasibility.test.mjs tests/integrated-certification-evidence.test.mjs tests/e4-seed-transport.test.mjs`: **14/14 PASS**. Bash/sh syntax, package validation and installed-Pi TypeScript PASS. Local Bubblewrap 0.13.0 probe demonstrated explicit `--unshare-user` is required alongside `--disable-userns`; corrected flags yielded non-root UID, CapEff0 and nested-userns denial. Staged indexed source/security audit WARN/0 FAIL, scoped ZERO_EGRESS_REVIEW PASS. Full `npm run check` is **FAIL**, 1098 tests/758 PASS/2 FAIL/338 skips: Rust edit-contract syntax UNAVAILABLE and managed rust-analyzer definition result count0, reproduced in focused tests; no E4 relationship proved. Native Host Feasibility unrun (0/2); this is neither image qualification nor Ubuntu preflight/E4 evidence.
+
 ## E4 non-certifying container namespace diagnostics FAIL (2026-10-13)
 
 [CI38420482485](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38420482485) on `2b1d738405f7571e9e96f1ddbde6361eef17f24e`: pinned Arch base pull PASS, strict non-privileged rootless full `unshare` FAIL/EPERM. Changed [CI38420815845](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38420815845) on `489b6cc50ccd7ab6827f4d6d77d8c99b90ac5507`: strict user-only, strict full, default-cap+NNP full and default-cap full each exit1/EPERM; diagnostic job intentionally FAIL. Focused local workflow/seed tests **11/11 PASS** before dispatch. These are feasibility diagnostics, **not** Ubuntu preflight, full `npm run check`, image self-qualification or replacement E4. Preflight0/2, replacement0/1; no security limit changed. Underlying Docker/host policy UNKNOWN.

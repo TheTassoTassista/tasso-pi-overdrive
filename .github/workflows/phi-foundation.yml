@@ -90,44 +90,23 @@ on:
         description: One-shot Campaign-3 E4 exact-SHA Linux/Windows and E1/E2/E3 technical certification
         type: boolean
         default: false
-      e4-image-feasibility-only:
-        description: Non-certifying pinned-base rootless namespace feasibility; no preflight or E4
+      e4-host-feasibility-only:
+        description: Non-certifying host Bubblewrap and pinned-rootfs isolation feasibility; no preflight or E4
         type: boolean
         default: false
 permissions:
   contents: read
 jobs:
-  e4-image-feasibility:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-feasibility-only'] && !inputs['campaign3-e4-certification']
-    runs-on: ubuntu-latest
+  e4-host-feasibility:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification']
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Check rootless namespace operations inside pinned non-privileged base
-        shell: bash
-        run: |
-          set -euo pipefail
-          image=docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
-          probe() {
-            label=$1
-            command=$2
-            shift 2
-            set +e
-            docker run --rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-              --user 1000:1000 "$@" "$image" /bin/sh -c "$command"
-            result=$?
-            set -e
-            echo "E4_NS_PROBE $label exit=$result"
-            return 0
-          }
-          probe strict-user 'unshare --user --map-root-user /usr/bin/true' \
-            --cap-drop ALL --security-opt no-new-privileges:true
-          probe strict-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true' \
-            --cap-drop ALL --security-opt no-new-privileges:true
-          probe default-cap-nnp-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true' \
-            --security-opt no-new-privileges:true
-          probe default-cap-full 'unshare --user --map-root-user --mount --pid --fork --mount-proc /usr/bin/true'
-          echo 'E4_NS_DIAGNOSTIC_ONLY; no variant is adopted as certification policy'
-          exit 1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - name: Prove host Bubblewrap isolation over pinned representative rootfs
+        run: bash scripts/e4-host-feasibility.sh docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
   integrated-ubuntu:
     if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
@@ -889,7 +868,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-image-feasibility-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'])
     strategy:
       fail-fast: false
       matrix:
