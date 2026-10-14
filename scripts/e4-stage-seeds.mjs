@@ -110,7 +110,9 @@ export function stageSeedArchive(asset, bytes, destination) {
       inspectTree(extract, relative);
       const source = path.join(extract, relative);
       const target = path.join(destination, relative);
-      fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+      // The stage root is private; paths copied into the image must remain
+      // traversable by the non-root self-check (UID 1001).
+      fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o755 });
       fs.cpSync(source, target, { recursive: true, force: false, errorOnExist: true, dereference: false, verbatimSymlinks: true });
     }
     for (const relative of selected[asset.logicalName]) inspectTree(destination, relative);

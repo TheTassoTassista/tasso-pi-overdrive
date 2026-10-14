@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 image self-check blocked by copied directory modes (2026-10-15)
+
+CI38643757651 on `759e093dfabedd42143db112930a6a625f4f4bca` built the seven-seed image and proved exact pinned Node ELF/linker/startup closure, then OCI denied UID1001 entrypoint because staged `/usr` and `/usr/bin` were `0700`. No isolated self-check or image publication; cleanup/owned residual0 PASS. Exact-archive mode reproduction and selected-parent `0755` correction are local candidate; temporary stage root remains private `0700`. Image NOT QUALIFIED, preflight0/2, replacement E4 0/1, Host Feasibility3/3 PASS/no Run4, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current — E4 exact Node shared-library closure candidate (2026-10-14)
 
 Image-only CI38539171399 on `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed before self-check because exact pinned Node directly needs absent `libsimdjson.so.33`; staging/LSP and cleanup/residual0 passed. A signed/cache-verified exact runtime library has been added as a seventh immutable asset to the existing private internal release (asset641772299, authenticated readback PASS). Rootfs ELF/linker/startup checks are local candidate and have **not** qualified the image natively. Host Feasibility3/3 PASS/no Run4, image NOT QUALIFIED, preflight0/2, replacement E4 0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

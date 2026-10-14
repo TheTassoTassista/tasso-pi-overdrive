@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 image mode correction candidate (2026-10-15)
+
+Changed image-only CI38643757651 on `759e093dfabedd42143db112930a6a625f4f4bca`: Node ELF/linker/startup closure PASS and complete image build; non-root self-check NOT STARTED (OCI exec126) because copied seed parent directories were `0700`; no publish, cleanup/residual0 PASS. Exact cached Node archive staging reproduces root700/usr700/usr/bin700/node755 before correction and root700/usr755/usr/bin755/node755 after. Focused seed/image7/7 PASS with mode regression. Full local check remains tracked red on Rust/LSP; no unproven image PASS.
+
 ## E4 Node runtime closure candidate local baseline (2026-10-14)
 
 Focused seed/image/rootfs/Pi/Agent-Hub/AST **27/27 PASS**; syntax/platform, TypeScript, package and shell validation PASS. `npm run check` FAIL at test phase: first 1103/762 PASS/3 FAIL/338 skips, diagnostic rerun 1103/763 PASS/2 FAIL/338 skips; persistent Rust edit-contract syntax UNAVAILABLE and rust-analyzer navigation count0 are the prior failures, third first-run failure not reproduced. Native image-only CI38539171399 on prior exact `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed before self-check because pinned Node could not load `libsimdjson.so.33`; cleanup PASS/residual0. Exact library/link staging test and fail-closed Docker/runtime checks are new local candidate; native rootfs-only linker proof remains PENDING. Host Feasibility 24/24 PASS/no Run4, preflight0/2, replacement E4 0/1.

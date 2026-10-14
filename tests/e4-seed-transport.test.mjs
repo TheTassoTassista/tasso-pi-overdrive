@@ -39,7 +39,7 @@ test('E4 simdjson staging admits only the exact internal SONAME link and file', 
     const source = path.join(temporary, 'source');
     const destination = path.join(temporary, 'destination');
     fs.mkdirSync(path.join(source, 'usr', 'lib'), { recursive: true });
-    fs.mkdirSync(destination);
+    fs.mkdirSync(destination, { mode: 0o700 });
     const library = Buffer.from('fixture-simdjson-library\n');
     fs.writeFileSync(path.join(source, 'usr/lib/libsimdjson.so.33.0.0'), library);
     fs.symlinkSync('libsimdjson.so.33.0.0', path.join(source, 'usr/lib/libsimdjson.so.33'));
@@ -51,8 +51,12 @@ test('E4 simdjson staging admits only the exact internal SONAME link and file', 
       extracted: [{ ...simdjson.extracted[0], sha256: sha(library) }],
       runtimeDependency: { ...simdjson.runtimeDependency, sha256: sha(library), size: library.length } };
     stageSeedArchive(fixture, bytes, destination);
+    assert.equal(fs.statSync(destination).mode & 0o777, 0o700, 'private stage root must remain private');
     assert.equal(fs.readlinkSync(path.join(destination, 'usr/lib/libsimdjson.so.33')), 'libsimdjson.so.33.0.0');
     assert.deepEqual(fs.readFileSync(path.join(destination, 'usr/lib/libsimdjson.so.33.0.0')), library);
+    for (const relative of ['usr', 'usr/lib']) {
+      assert.equal(fs.statSync(path.join(destination, relative)).mode & 0o005, 0o005, `${relative} must be traversable/readable by the image self-check user`);
+    }
     assert.equal(fs.existsSync(path.join(destination, 'unrelated-secret')), false);
     const badSource = path.join(temporary, 'bad-source');
     fs.mkdirSync(path.join(badSource, 'usr', 'lib'), { recursive: true });
@@ -73,7 +77,7 @@ test('E4 contained extraction stages only the approved file and preserves its di
     const source = path.join(temporary, 'source');
     const destination = path.join(temporary, 'destination');
     fs.mkdirSync(path.join(source, 'usr', 'bin'), { recursive: true });
-    fs.mkdirSync(destination);
+    fs.mkdirSync(destination, { mode: 0o700 });
     const binary = Buffer.from('fixture-git-binary\n');
     fs.writeFileSync(path.join(source, 'usr', 'bin', 'git'), binary);
     fs.writeFileSync(path.join(source, 'unrelated-secret'), 'never stage');
@@ -83,7 +87,11 @@ test('E4 contained extraction stages only the approved file and preserves its di
     const bytes = fs.readFileSync(archive);
     const fixture = { ...git, size: bytes.length, sha256: sha(bytes), extracted: [{ path: 'usr/bin/git', installedPath: '/usr/bin/git', sha256: sha(binary) }] };
     stageSeedArchive(fixture, bytes, destination);
+    assert.equal(fs.statSync(destination).mode & 0o777, 0o700, 'private stage root must remain private');
     assert.deepEqual(fs.readFileSync(path.join(destination, 'usr', 'bin', 'git')), binary);
+    for (const relative of ['usr', 'usr/bin']) {
+      assert.equal(fs.statSync(path.join(destination, relative)).mode & 0o005, 0o005, `${relative} must be traversable/readable by the image self-check user`);
+    }
     assert.equal(fs.existsSync(path.join(destination, 'unrelated-secret')), false);
     assert.throws(() => stageSeedArchive(fixture, Buffer.concat([bytes, Buffer.from('x')]), destination), /E4_SEED_DOWNLOAD_IDENTITY_MISMATCH/u);
   } finally {

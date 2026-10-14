@@ -1,6 +1,12 @@
 # Phi — Session Continuation
 
-## CURRENT — E4 pinned Node runtime closure correction; changed image qualification pending
+## CURRENT — E4 non-root image path mode correction; changed image run pending
+
+Image-only CI38643757651/job116125442809 on exact `759e093dfabedd42143db112930a6a625f4f4bca` proved seven-seed staging, `E4_IMAGE_NODE_ELF_CLOSURE=PASS` and completed build, then OCI refused non-root `/usr/bin/node` exec before self-check (exit126). No image publish; cleanup PASS/residual0. Local exact archive staging reproduced `stage-root0700/usr0700/usr/bin0700/node0755`; scoped correction gives `stage-root0700/usr0755/usr/bin0755/node0755`, focused7/7 PASS. **Image NOT QUALIFIED**, Host Feasibility3/3 PASS/no Run4, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false. Next: scoped validation/ZERO_EGRESS, commit/push only mode correction/state, dispatch one changed-candidate image-only run, inspect SAME run. Do-not-redo E1–E3/Host Runs1–3 or unchanged failed image candidate. Preserve protected user edit/untracked state.
+
+Scoped ZERO_EGRESS review PASS: only selected in-image parent directory traversal changed; private stage root remains0700, no security policy/identity/runtime/routing/provider/retry/timeout/readiness change. Focused27/27, syntax/platform, TypeScript, package, scoped whitespace PASS. Full local check's prior Rust/LSP failures remain separate.
+
+## HISTORICAL — E4 pinned Node runtime closure correction; changed image qualification pending
 
 Image-only CI38539171399/job115769396669 on exact `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed at Docker `RUN npm ci` before self-check: direct Node ELF NEEDED `libsimdjson.so.33` was absent; cleanup PASS/residual0. Exact source-cache signed simdjson archive SHA `719f1e35b2da574b42a6e140fb5df6f1d43ec2ad5e75c0c2fb626108dc8e9ac7` was uploaded/read back as asset641772299 in the existing private release411800345. Scoped seven-seed manifest, extraction, early linker check and image self-check are local candidates; focused7/7 PASS. **Image NOT QUALIFIED**, Ubuntu preflight0/2, replacement E4 0/1, Host Feasibility3/3 PASS/no Run4, autonomy BLOCKED/false. Exact next action: local validation and ZERO_EGRESS, scoped commit/push, one changed-candidate image-only qualification, inspect SAME run; do not rerun E1–E3/Host Feasibility/old image unchanged. Preserve protected audit edit and user untracked files.
 
