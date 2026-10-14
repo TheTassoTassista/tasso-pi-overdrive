@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 non-certifying container namespace diagnostics FAIL (2026-10-13)
+
+[CI38420482485](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38420482485) on `2b1d738405f7571e9e96f1ddbde6361eef17f24e`: pinned Arch base pull PASS, strict non-privileged rootless full `unshare` FAIL/EPERM. Changed [CI38420815845](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38420815845) on `489b6cc50ccd7ab6827f4d6d77d8c99b90ac5507`: strict user-only, strict full, default-cap+NNP full and default-cap full each exit1/EPERM; diagnostic job intentionally FAIL. Focused local workflow/seed tests **11/11 PASS** before dispatch. These are feasibility diagnostics, **not** Ubuntu preflight, full `npm run check`, image self-qualification or replacement E4. Preflight0/2, replacement0/1; no security limit changed. Underlying Docker/host policy UNKNOWN.
+
 ## E4 seed release/readback source-identity check; no preflight (2026-10-13)
 
 Local isolated `bsdtar -xf` of six exact cached Git/GDB/GDB-common/Python/Node/util-linux packages succeeded; extracted `usr/bin/git`, `usr/bin/gdb`, `usr/bin/python3.14`, `usr/bin/node` and `usr/bin/prlimit` equal the existing approved SHA-256 values, and `gdb-common` supplies `usr/share/gdb/python/gdb/dap/__init__.py`. Private release `411800345` assets `637362890`, `637362887`, `637362892`, `637372244`, `637372241`, `637372242` each have GitHub-reported and readback size/digest equal to local source. Manifest `config/e4-toolchain-seeds.json` records these. Local six-asset staging and focused `tests/e4-seed-transport.test.mjs` **3/3 PASS**; isolated Pi lock resolves `pi-subagents@0.66.0 → jiti@2.7.0`. This is transport/source evidence only: **no certification image, self-check, full check, Ubuntu preflight or replacement E4 has run**. No product/security gate was weakened; original E4 remains FAIL/CLOSED.

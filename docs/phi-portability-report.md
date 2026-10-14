@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 hermetic container namespace STOP (2026-10-13)
+
+The six content-verified toolchain seed assets remain private and readback-verified, but the authorized non-privileged certification image cannot yet be qualified on the hosted Ubuntu Docker runtime. Pinned-base non-certifying CI38420482485 failed strict rootless full `unshare` with EPERM; changed diagnostic CI38420815845 observed EPERM for strict user-only/full and default-cap full configurations. The exact host/Docker policy cause is UNKNOWN, while no safe full namespace variant is proved. The required product Bubblewrap gate cannot be assumed to run inside such a container. No privileged/seccomp-disabled workaround was adopted, no image/GHCR digest exists, and Ubuntu preflight0/2/replacement E4 0/1 are untouched. **STOP for Main security/runtime decision.** Original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## E4 controlled seed transport verified (2026-10-13)
 
 `E4-TOOLCHAIN-SEED-TRANSPORT-001` authorized a single internal private GitHub prerelease, **not** a product release. Release `phi-cert-toolchain-seed-v1`/ID `411800345` now contains the exact cached Git/GDB/GDB-common packages plus three additional **live-mandatory** Python/Node/prlimit packages. Authenticated asset-ID readback for all six reproduces local byte sizes and SHA-256, agreeing with GitHub metadata; the small `config/e4-toolchain-seeds.json` manifest binds asset IDs to extraction and approved runtime identities. No package archive entered Git. This closes only the previous binary **transport** boundary. Hermetic image build/self-qualification, ZERO_EGRESS, Ubuntu preflight (0/2) and replacement E4 (0/1) remain unexecuted; original E4 FAIL/CLOSED, Windows autonomy BLOCKED/false and portability NOT CERTIFIED.
