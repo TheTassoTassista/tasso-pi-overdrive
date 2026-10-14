@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 image candidate prepared, no native qualification (2026-10-14)
+
+Host Feasibility3/3 PASS remains valid. The bounded exact-toolchain image/self-check and dedicated private-GHCR qualification job are prepared, but no image has been built or qualified; native image digest and private package result are UNKNOWN. Local focused15/15 and static/syntax/TypeScript/package checks PASS; full local check remains red on two existing Rust/LSP tests. Ubuntu preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current — host Bubblewrap feasibility verified, image not qualified (2026-10-14)
 
 Run 3 [CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1` passed 24/24 native host-isolation and lifecycle assertions, network probe, owned residual0 and cleanup. Host Feasibility3/3 PASS; no Run 4. Final certification image/toolchain is NOT QUALIFIED; Ubuntu preflight0/2, replacement E4 0/1. E1/E2/E3 COMPLETE, original E4 FAIL/CLOSED; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next image self-qualification using verified seed transport.

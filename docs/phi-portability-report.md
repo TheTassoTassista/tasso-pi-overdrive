@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 exact-toolchain image candidate, native qualification pending (2026-10-14)
+
+An allowlisted-context OCI build and isolated self-check are prepared from the verified private seed transport and pinned managed runtimes. The dedicated CI path will require exact tool hashes, Pi/subagents/jiti bridge, empty `/phi`, focused Agent Hub/AST tests, private GHCR visibility and an immutable image digest before any Ubuntu preflight. Local focused15/15 and syntax/TypeScript/package gates PASS; local full check remains FAIL on two Rust/LSP cases. No image digest or self-qualification PASS exists yet. Host Feasibility3/3 PASS, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Host-level Bubblewrap feasibility PASS, certification still pending (2026-10-14)
 
 Final non-certifying [Run 3 CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1` passed all 24 native host sandbox assertions and cleanup/residual0 on `ubuntu-24.04`, with exact pinned base rootfs and structural `/phi`. Historical Run 1/2 failures remain. Feasibility budget3/3; no Run 4. The actual toolchain certification image is not built or qualified; Ubuntu preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED. Next: image self-qualification using verified seeds, exact identities and digest.

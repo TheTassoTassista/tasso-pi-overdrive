@@ -94,11 +94,15 @@ on:
         description: Non-certifying host Bubblewrap and pinned-rootfs isolation feasibility; no preflight or E4
         type: boolean
         default: false
+      e4-image-qualification-only:
+        description: Build and self-qualify the private immutable E4 image; no preflight or E4
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   e4-host-feasibility:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification']
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-image-qualification-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -107,6 +111,69 @@ jobs:
           persist-credentials: false
       - name: Prove host Bubblewrap isolation over pinned representative rootfs
         run: bash scripts/e4-host-feasibility.sh docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
+  e4-image-qualification:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Pin source and stage verified immutable tool seeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+          node scripts/e4-stage-seeds.mjs
+          test -x "$RUNNER_TEMP/phi-e4-seeds/usr/bin/git"
+      - name: Stage and check managed LSP from its pinned manifest
+        run: |
+          node scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp"
+          node scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp" --check
+      - name: Build minimal-context image and run isolated no-network self-check
+        env:
+          E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
+        run: |
+          docker buildx build --file certification/Dockerfile.e4 \
+            --build-arg "PRODUCT_CANDIDATE_SHA=$GITHUB_SHA" \
+            --build-context "seeds=$RUNNER_TEMP/phi-e4-seeds" \
+            --build-context "lsp=$RUNNER_TEMP/phi-e4-lsp/managed" \
+            --load --tag "$E4_IMAGE_REF" .
+          test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
+          printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
+          printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
+          docker run --rm --name "phi-e4-image-selfcheck-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 1g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+            --user 1001:1001 "$E4_IMAGE_REF"
+      - name: Publish only qualified image and record exact digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$E4_IMAGE_REF"
+          digest=$(docker image inspect "$E4_IMAGE_REF" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -E '^ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:[a-f0-9]{64}$')
+          test "$(printf '%s\n' "$digest" | wc -l)" -eq 1
+          printf 'E4_CERTIFICATION_IMAGE_DIGEST=%s\n' "$digest"
+          package=$(gh api 'user/packages/container/tasso-pi-overdrive-e4' --jq .visibility)
+          test "$package" = private
+          printf 'E4_IMAGE_PRIVATE=PASS\n'
+      - name: Final image-job owned-container cleanup
+        if: always()
+        run: |
+          container="phi-e4-image-selfcheck-$GITHUB_RUN_ID"
+          if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
+          test -z "$(docker ps -aq --filter "name=^/$container$")"
+          printf 'E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0\n'
   integrated-ubuntu:
     if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
@@ -868,7 +935,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['e4-image-qualification-only'])
     strategy:
       fail-fast: false
       matrix:

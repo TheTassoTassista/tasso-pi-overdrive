@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 image candidate local baseline (2026-10-14)
+
+Focused E4 image/host/integrated tests **15/15 PASS**. Workflow YAML parses; self-check JS syntax, project syntax/platform, TypeScript and package validation PASS. Full `npm run check` FAIL at test phase: **1102 total / 762 PASS / 2 FAIL / 338 skips**, with prior Rust edit-contract syntax UNAVAILABLE and rust-analyzer definition navigation failures; no new failure attributed to image candidate. Native image build/selfqualification NOT RUN; local Docker daemon access denied. Host Feasibility Run 3 remains 24/24 PASS, preflight0/2, replacement E4 0/1.
+
 ## E4 native Host Feasibility Run 3 PASS (2026-10-14)
 
 [CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1`: 24/24 assertion markers PASS, extra network probe PASS, exact rootfs schema/OCI digest, ordinary-user Bubblewrap no setuid/file caps, payload CapInh/Prm/Eff/Bnd/Amb all zero, six namespace comparisons PASS, sentinel digest identical, parent-child termination PASS, `E4_PIPE_STATE=CLOSED`, owned residual0, `E4_ROOTFS_CLEANUP=PASS`, `E4_CLEANUP=PASS`, terminal feasibility PASS. The run is non-certifying; no image qualification, Ubuntu preflight or replacement E4. Local focused20/20 including sandbox/runtime tests PASS. Full local check remains FAIL on Rust syntax UNAVAILABLE and rust-analyzer empty definition; these must be resolved or shown green in the eventual real Ubuntu preflight, not hidden.

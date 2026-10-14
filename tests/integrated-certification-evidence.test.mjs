@@ -43,7 +43,7 @@ test('integrated Windows certification runs all four ordinary operations in orde
 
 test('E4 host Bubblewrap feasibility is non-certifying and cannot launch the default or E4 jobs', () => {
   const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
-  const diagnostic = workflow.split('  e4-host-feasibility:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+  const diagnostic = workflow.split('  e4-host-feasibility:\n')[1]?.split('  e4-image-qualification:\n')[0];
   const ordinary = workflow.split('  native-foundation:\n')[1];
   assert.ok(diagnostic && ordinary);
   assert.match(diagnostic, /inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);

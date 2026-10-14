@@ -1,0 +1,42 @@
+FROM docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
+ARG PRODUCT_CANDIDATE_SHA
+LABEL org.opencontainers.image.revision="${PRODUCT_CANDIDATE_SHA}"
+
+# Package dependencies supply libraries and utilities; the security-relevant
+# executables below are replaced by six already-verified immutable seed assets.
+RUN pacman -Syu --noconfirm --needed \
+      bash coreutils findutils grep gawk sed tar git gdb python python-pip nodejs npm util-linux \
+      gcc clang make cmake rust go openssh curl ca-certificates bubblewrap \
+    && pacman -Scc --noconfirm
+COPY --from=seeds /usr /usr
+
+COPY certification/pi/package.json certification/pi/package-lock.json /opt/phi/pi/npm/
+RUN npm ci --prefix /opt/phi/pi/npm --legacy-peer-deps --no-audit --no-fund
+
+COPY runtime/lsp/package.json runtime/lsp/package-lock.json /opt/phi/runtime/lsp/
+RUN npm ci --prefix /opt/phi/runtime/lsp --ignore-scripts --no-audit --no-fund
+COPY --from=lsp / /opt/phi/runtime/lsp/managed/
+COPY scripts/install-managed-lsp.mjs /opt/phi/scripts/install-managed-lsp.mjs
+COPY lib/managed-runtime-transaction.mjs /opt/phi/lib/managed-runtime-transaction.mjs
+COPY config/managed-lsp.json /opt/phi/config/managed-lsp.json
+RUN node /opt/phi/scripts/install-managed-lsp.mjs --runtime /opt/phi/runtime/lsp --check
+
+COPY config/dap-requirements.txt /opt/phi/config/dap-requirements.txt
+COPY scripts/install-managed-dap.sh /opt/phi/scripts/install-managed-dap.sh
+RUN bash /opt/phi/scripts/install-managed-dap.sh
+
+COPY config/e4-toolchain-seeds.json config/git-resources.json config/dap-engine.json config/eval-engine.json config/ast-edit.json /opt/phi/config/
+COPY certification/pi/package-lock.json /opt/phi/config/pi-package-lock.json
+COPY package.json /opt/phi/project/package.json
+COPY lib/ /opt/phi/project/lib/
+COPY platform/ /opt/phi/project/platform/
+COPY tests/agent-hub-control-bridge.test.mjs tests/ast-edit-engine.test.mjs /opt/phi/project/tests/
+RUN ln -s /opt/phi/pi/npm/node_modules /opt/phi/project/node_modules
+COPY scripts/e4-image-selfcheck.mjs /opt/phi/e4-image-selfcheck.mjs
+RUN mkdir -p /phi /evidence /run /tmp \
+    && chmod -R a+rX /opt/phi \
+    && test -z "$(find /phi -mindepth 1 -print -quit)"
+
+USER 1001:1001
+ENV HOME=/tmp
+ENTRYPOINT ["/usr/bin/node", "/opt/phi/e4-image-selfcheck.mjs"]
