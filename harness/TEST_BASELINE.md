@@ -1,6 +1,10 @@
 # Phi — Test Baseline
 
-## E4 image candidate local baseline (2026-10-14)
+## E4 Node runtime closure candidate local baseline (2026-10-14)
+
+Focused seed/image/rootfs/Pi/Agent-Hub/AST **27/27 PASS**; syntax/platform, TypeScript, package and shell validation PASS. `npm run check` FAIL at test phase: first 1103/762 PASS/3 FAIL/338 skips, diagnostic rerun 1103/763 PASS/2 FAIL/338 skips; persistent Rust edit-contract syntax UNAVAILABLE and rust-analyzer navigation count0 are the prior failures, third first-run failure not reproduced. Native image-only CI38539171399 on prior exact `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed before self-check because pinned Node could not load `libsimdjson.so.33`; cleanup PASS/residual0. Exact library/link staging test and fail-closed Docker/runtime checks are new local candidate; native rootfs-only linker proof remains PENDING. Host Feasibility 24/24 PASS/no Run4, preflight0/2, replacement E4 0/1.
+
+## Historical E4 image candidate local baseline (2026-10-14)
 
 Focused E4 image/host/integrated tests **15/15 PASS**. Workflow YAML parses; self-check JS syntax, project syntax/platform, TypeScript and package validation PASS. Full `npm run check` FAIL at test phase: **1102 total / 762 PASS / 2 FAIL / 338 skips**, with prior Rust edit-contract syntax UNAVAILABLE and rust-analyzer definition navigation failures; no new failure attributed to image candidate. Native image build/selfqualification NOT RUN; local Docker daemon access denied. Host Feasibility Run 3 remains 24/24 PASS, preflight0/2, replacement E4 0/1.
 

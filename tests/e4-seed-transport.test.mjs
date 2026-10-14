@@ -9,14 +9,19 @@ import { validateSeedManifest, validateAssetMetadata, validateDownloadedAsset, s
 
 const manifest = validateSeedManifest(JSON.parse(fs.readFileSync(new URL('../config/e4-toolchain-seeds.json', import.meta.url), 'utf8')));
 const git = manifest.assets.find((asset) => asset.logicalName === 'git-2.55.0');
+const simdjson = manifest.assets.find((asset) => asset.logicalName === 'simdjson-4.6.11-node-runtime');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-test('E4 seed manifest binds six distinct immutable assets and exact runtime paths', () => {
-  assert.equal(manifest.assets.length, 6);
-  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 6);
+test('E4 seed manifest binds seven distinct immutable assets and exact runtime paths', () => {
+  assert.equal(manifest.assets.length, 7);
+  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 7);
   assert.equal(manifest.release.internalOnly, true);
+  assert.equal(simdjson.runtimeDependency.soname, 'libsimdjson.so.33');
+  assert.equal(simdjson.runtimeDependency.requiredBySha256, manifest.assets.find((asset) => asset.logicalName === 'nodejs-26.8.2').extracted[0].sha256);
   assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.slice(1) }), /E4_SEED_MANIFEST_INVALID/u);
   assert.throws(() => validateSeedManifest({ ...manifest, assets: [...manifest.assets.slice(0, -1), manifest.assets[0]] }), /E4_SEED_MANIFEST_ASSET_INVALID/u);
+  const changed = { ...simdjson, runtimeDependency: { ...simdjson.runtimeDependency, soname: 'libsimdjson.so.34' } };
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === simdjson ? changed : asset) }), /E4_SEED_MANIFEST_RUNTIME_DEPENDENCY_INVALID/u);
 });
 
 test('E4 private asset identity rejects wrong ID, size, digest and bytes', () => {
@@ -26,6 +31,40 @@ test('E4 private asset identity rejects wrong ID, size, digest and bytes', () =>
     assert.throws(() => validateAssetMetadata(git, { ...metadata, ...change }), /E4_SEED_REMOTE_IDENTITY_MISMATCH/u);
   }
   assert.throws(() => validateDownloadedAsset(git, Buffer.alloc(git.size)), /E4_SEED_DOWNLOAD_IDENTITY_MISMATCH/u);
+});
+
+test('E4 simdjson staging admits only the exact internal SONAME link and file', () => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-e4-simdjson-seed-test-'));
+  try {
+    const source = path.join(temporary, 'source');
+    const destination = path.join(temporary, 'destination');
+    fs.mkdirSync(path.join(source, 'usr', 'lib'), { recursive: true });
+    fs.mkdirSync(destination);
+    const library = Buffer.from('fixture-simdjson-library\n');
+    fs.writeFileSync(path.join(source, 'usr/lib/libsimdjson.so.33.0.0'), library);
+    fs.symlinkSync('libsimdjson.so.33.0.0', path.join(source, 'usr/lib/libsimdjson.so.33'));
+    fs.writeFileSync(path.join(source, 'unrelated-secret'), 'never stage');
+    const archive = path.join(temporary, 'fixture.tar');
+    assert.equal(spawnSync('tar', ['-cf', archive, '-C', source, 'usr', 'unrelated-secret']).status, 0);
+    const bytes = fs.readFileSync(archive);
+    const fixture = { ...simdjson, size: bytes.length, sha256: sha(bytes),
+      extracted: [{ ...simdjson.extracted[0], sha256: sha(library) }],
+      runtimeDependency: { ...simdjson.runtimeDependency, sha256: sha(library), size: library.length } };
+    stageSeedArchive(fixture, bytes, destination);
+    assert.equal(fs.readlinkSync(path.join(destination, 'usr/lib/libsimdjson.so.33')), 'libsimdjson.so.33.0.0');
+    assert.deepEqual(fs.readFileSync(path.join(destination, 'usr/lib/libsimdjson.so.33.0.0')), library);
+    assert.equal(fs.existsSync(path.join(destination, 'unrelated-secret')), false);
+    const badSource = path.join(temporary, 'bad-source');
+    fs.mkdirSync(path.join(badSource, 'usr', 'lib'), { recursive: true });
+    fs.writeFileSync(path.join(badSource, 'usr/lib/libsimdjson.so.33.0.0'), library);
+    fs.symlinkSync('/etc/passwd', path.join(badSource, 'usr/lib/libsimdjson.so.33'));
+    const badArchive = path.join(temporary, 'bad.tar');
+    assert.equal(spawnSync('tar', ['-cf', badArchive, '-C', badSource, 'usr']).status, 0);
+    const badBytes = fs.readFileSync(badArchive);
+    assert.throws(() => stageSeedArchive({ ...fixture, size: badBytes.length, sha256: sha(badBytes) }, badBytes, path.join(temporary, 'bad-destination')), /E4_SEED_EXTRACTION_SYMLINK_ESCAPED/u);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test('E4 contained extraction stages only the approved file and preserves its digest', () => {

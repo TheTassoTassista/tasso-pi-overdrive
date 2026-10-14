@@ -1,6 +1,12 @@
 # Phi — Session Continuation
 
-## CURRENT — E4 image qualification candidate prepared, native job not run
+## CURRENT — E4 pinned Node runtime closure correction; changed image qualification pending
+
+Image-only CI38539171399/job115769396669 on exact `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed at Docker `RUN npm ci` before self-check: direct Node ELF NEEDED `libsimdjson.so.33` was absent; cleanup PASS/residual0. Exact source-cache signed simdjson archive SHA `719f1e35b2da574b42a6e140fb5df6f1d43ec2ad5e75c0c2fb626108dc8e9ac7` was uploaded/read back as asset641772299 in the existing private release411800345. Scoped seven-seed manifest, extraction, early linker check and image self-check are local candidates; focused7/7 PASS. **Image NOT QUALIFIED**, Ubuntu preflight0/2, replacement E4 0/1, Host Feasibility3/3 PASS/no Run4, autonomy BLOCKED/false. Exact next action: local validation and ZERO_EGRESS, scoped commit/push, one changed-candidate image-only qualification, inspect SAME run; do not rerun E1–E3/Host Feasibility/old image unchanged. Preserve protected audit edit and user untracked files.
+
+Focused27/27, syntax/platform, TypeScript, package, shell, scoped whitespace PASS; full local check FAIL on persistent Rust/LSP cases (first run had one additional non-reproduced failure). Scoped ZERO_EGRESS PASS; indexed audit exit0/WARN/0 FAIL. Next action is now scoped commit/push and one changed-candidate image-only qualification; preflight/E4 remain forbidden until image PASS.
+
+## HISTORICAL — E4 image qualification candidate prepared before native failure
 
 Host Feasibility Run 3 remains PASS/3-of-3; no Run 4. A private GHCR image qualification candidate uses the exact Arch base and verified six seeds, pinned managed LSP/Pi/subagents/jiti/debugpy, empty `/phi`, no-network read-only non-root self-check, focused Agent Hub/AST tests, exact candidate label/digest and package-private verification. Local focused15/15, YAML parse, syntax/platform, TypeScript and package validation PASS; `npm run check` FAIL with the pre-existing two Rust/LSP cases (1102 total/762 PASS/2 FAIL/338 skips). Local Docker daemon unavailable. Scoped ZERO_EGRESS_REVIEW PASS; provider calls0. **Image NOT QUALIFIED; Ubuntu preflight0/2; replacement E4 0/1; autonomy BLOCKED/false.** Exact next action: commit/push only scoped image candidate, dispatch one dedicated image qualification run and inspect that SAME run. If red, diagnose concrete cause before any change; never treat image publication alone as qualification. Preserve protected user audit edit/untracked state; do-not-redo Host Runs1–3, E1–E3 or original E4.
 

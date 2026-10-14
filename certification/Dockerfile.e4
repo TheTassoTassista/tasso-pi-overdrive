@@ -3,12 +3,23 @@ ARG PRODUCT_CANDIDATE_SHA
 LABEL org.opencontainers.image.revision="${PRODUCT_CANDIDATE_SHA}"
 
 # Package dependencies supply libraries and utilities; the security-relevant
-# executables below are replaced by six already-verified immutable seed assets.
+# executables below are replaced by verified immutable seed assets. The pinned
+# Node binary also needs its exact SONAME-compatible runtime library.
 RUN pacman -Syu --noconfirm --needed \
-      bash coreutils findutils grep gawk sed tar git gdb python python-pip nodejs npm util-linux \
+      bash coreutils findutils grep gawk sed tar git gdb python python-pip nodejs npm util-linux binutils \
       gcc clang make cmake rust go openssh curl ca-certificates bubblewrap \
     && pacman -Scc --noconfirm
 COPY --from=seeds /usr /usr
+RUN if test "$(readlink /usr/lib/libsimdjson.so.33)" = "libsimdjson.so.33.0.0" \
+      && echo '8ed9852623a4d807d135abe39b3a09a31147462148cbd5b8aad34f490637712c  /usr/lib/libsimdjson.so.33.0.0' | sha256sum -c - \
+      && readelf -d /usr/bin/node | grep -Fq 'Shared library: [libsimdjson.so.33]' \
+      && /lib64/ld-linux-x86-64.so.2 --list /usr/bin/node | grep -Fq 'libsimdjson.so.33 => /usr/lib/libsimdjson.so.33' \
+      && test "$(/usr/bin/node --version)" = 'v26.8.2'; then \
+      echo 'E4_IMAGE_NODE_ELF_CLOSURE=PASS'; \
+    else \
+      echo 'TOOLCHAIN_RUNTIME_DEPENDENCY_MISSING tool=node soname=libsimdjson.so.33 rootfs=phi-e4-host-v1' >&2; \
+      exit 1; \
+    fi
 
 COPY certification/pi/package.json certification/pi/package-lock.json /opt/phi/pi/npm/
 RUN npm ci --prefix /opt/phi/pi/npm --legacy-peer-deps --no-audit --no-fund

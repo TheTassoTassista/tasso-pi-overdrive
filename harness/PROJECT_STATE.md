@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-## Current — E4 image candidate prepared, no native qualification (2026-10-14)
+## Current — E4 exact Node shared-library closure candidate (2026-10-14)
+
+Image-only CI38539171399 on `c4e76b6bce4cdc47e03bf98a7dafa9b857c5749b` failed before self-check because exact pinned Node directly needs absent `libsimdjson.so.33`; staging/LSP and cleanup/residual0 passed. A signed/cache-verified exact runtime library has been added as a seventh immutable asset to the existing private internal release (asset641772299, authenticated readback PASS). Rootfs ELF/linker/startup checks are local candidate and have **not** qualified the image natively. Host Feasibility3/3 PASS/no Run4, image NOT QUALIFIED, preflight0/2, replacement E4 0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
+## Historical — E4 image candidate prepared, before native attempt (2026-10-14)
 
 Host Feasibility3/3 PASS remains valid. The bounded exact-toolchain image/self-check and dedicated private-GHCR qualification job are prepared, but no image has been built or qualified; native image digest and private package result are UNKNOWN. Local focused15/15 and static/syntax/TypeScript/package checks PASS; full local check remains red on two existing Rust/LSP tests. Ubuntu preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
 

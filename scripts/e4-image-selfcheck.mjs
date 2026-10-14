@@ -14,6 +14,7 @@ function command(binary, args, expected) {
   const result = spawnSync(binary, args, { encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024, env: { PATH: '/usr/bin:/bin', HOME: '/tmp', PYTHONDONTWRITEBYTECODE: '1', PYTHONPATH: '/opt/phi/runtime/dap/python' } });
   assert.equal(result.status, 0, `${binary} failed: ${result.error?.code ?? result.status}`);
   assert.match(result.stdout + result.stderr, expected, `${binary} version/identity mismatch`);
+  return result.stdout + result.stderr;
 }
 function fileIdentity(file, expected) {
   assert.match(expected, /^[a-f0-9]{64}$/u);
@@ -53,11 +54,27 @@ try {
   const manifest = read('e4-toolchain-seeds.json');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
-  assert.equal(manifest.assets.length, 6);
+  assert.equal(manifest.assets.length, 7);
   const byName = new Map(manifest.assets.map((item) => [item.logicalName, item]));
   for (const asset of manifest.assets) {
     for (const item of asset.extracted) fileIdentity(item.installedPath, item.sha256);
   }
+  const nodeSeed = byName.get('nodejs-26.8.2');
+  const simdjson = byName.get('simdjson-4.6.11-node-runtime')?.runtimeDependency;
+  assert.equal(simdjson?.requiredBy, '/usr/bin/node');
+  assert.equal(simdjson.requiredBySha256, nodeSeed.extracted[0].sha256);
+  assert.equal(simdjson.soname, 'libsimdjson.so.33');
+  assert.equal(simdjson.linkPath, '/usr/lib/libsimdjson.so.33');
+  assert.equal(simdjson.linkTarget, 'libsimdjson.so.33.0.0');
+  assert.equal(simdjson.path, '/usr/lib/libsimdjson.so.33.0.0');
+  assert.equal(fs.lstatSync(simdjson.linkPath).isSymbolicLink(), true, 'simdjson SONAME is not a symlink');
+  assert.equal(fs.readlinkSync(simdjson.linkPath), simdjson.linkTarget, 'simdjson SONAME target mismatch');
+  assert.equal(fs.realpathSync(simdjson.linkPath), simdjson.path, 'simdjson SONAME escapes exact library');
+  assert.equal(fs.statSync(simdjson.path).size, simdjson.size, 'simdjson library size mismatch');
+  fileIdentity(simdjson.path, simdjson.sha256);
+  command('/usr/bin/readelf', ['-d', simdjson.requiredBy], /Shared library: \[libsimdjson\.so\.33\]/u);
+  const resolution = command('/lib64/ld-linux-x86-64.so.2', ['--list', simdjson.requiredBy], /libsimdjson\.so\.33 => \/usr\/lib\/libsimdjson\.so\.33/u);
+  assert.doesNotMatch(resolution, /not found/u, 'Node has an unresolved rootfs library');
   const git = read('git-resources.json');
   const dap = read('dap-engine.json');
   const evalPolicy = read('eval-engine.json');
@@ -118,6 +135,7 @@ try {
   assert.match(focused.stdout, /^# pass [1-9][0-9]*$/mu);
   console.log('E4_IMAGE_SELFCHECK=PASS');
   console.log('E4_IMAGE_TOOL_IDENTITIES=PASS');
+  console.log('E4_IMAGE_NODE_ELF_CLOSURE=PASS');
   console.log('E4_IMAGE_PI_SUBAGENTS_JITI=PASS');
   console.log('E4_IMAGE_PHI_MOUNTPOINT=PASS');
   console.log('E4_IMAGE_FOCUSED_TESTS=PASS');

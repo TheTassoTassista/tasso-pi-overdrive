@@ -15,6 +15,7 @@ const selected = Object.freeze({
   'gdb-common-17.2': ['usr/share/gdb/python'],
   'python-3.14.7': ['usr/bin/python3.14', 'usr/lib/libpython3.14.so', 'usr/lib/libpython3.14.so.1.0', 'usr/lib/python3.14'],
   'nodejs-26.8.2': ['usr/bin/node'],
+  'simdjson-4.6.11-node-runtime': ['usr/lib/libsimdjson.so.33', 'usr/lib/libsimdjson.so.33.0.0'],
   'util-linux-2.42.4': ['usr/bin/prlimit'],
 });
 
@@ -44,6 +45,18 @@ export function validateSeedManifest(manifest) {
     const item = asset.extracted[0];
     if (!selected[asset.logicalName].some((relative) => item?.path === relative || item?.path?.startsWith(`${relative}/`)) || !validHash(item.sha256) ||
         item.installedPath !== `/${item.path}`) fail('MANIFEST_EXTRACTED_INVALID');
+    if (asset.logicalName === 'simdjson-4.6.11-node-runtime') {
+      const runtime = asset.runtimeDependency;
+      const node = manifest.assets.find((entry) => entry.logicalName === 'nodejs-26.8.2');
+      if (asset.assetId !== 641772299 || asset.name !== 'simdjson-1.4.6.11-1.1-x86_64_v3.pkg.tar.zst' ||
+          asset.sourcePackage !== 'simdjson 1:4.6.11-1.1 x86_64_v3' ||
+          asset.signatureFingerprint !== '882DCFE48E2051D48E2562ABF3B607488DB35A47' ||
+          runtime?.soname !== 'libsimdjson.so.33' || runtime.linkPath !== '/usr/lib/libsimdjson.so.33' ||
+          runtime.linkTarget !== 'libsimdjson.so.33.0.0' || runtime.path !== '/usr/lib/libsimdjson.so.33.0.0' ||
+          runtime.size !== 145480 || runtime.sha256 !== item.sha256 ||
+          runtime.requiredBy !== '/usr/bin/node' || runtime.requiredBySha256 !== node?.extracted?.[0]?.sha256 ||
+          item.path !== 'usr/lib/libsimdjson.so.33.0.0') fail('MANIFEST_RUNTIME_DEPENDENCY_INVALID');
+    } else if (asset.runtimeDependency !== undefined) fail('MANIFEST_RUNTIME_DEPENDENCY_INVALID');
   }
   if (names.size !== Object.keys(selected).length) fail('MANIFEST_INCOMPLETE');
   return manifest;
@@ -104,6 +117,14 @@ export function stageSeedArchive(asset, bytes, destination) {
     for (const item of asset.extracted) {
       const target = path.join(destination, item.path);
       if (!fs.lstatSync(target).isFile() || digest(fs.readFileSync(target)) !== item.sha256) fail('STAGED_RUNTIME_IDENTITY_MISMATCH');
+    }
+    if (asset.logicalName === 'simdjson-4.6.11-node-runtime') {
+      const runtime = asset.runtimeDependency;
+      const link = path.join(destination, 'usr/lib/libsimdjson.so.33');
+      const library = path.join(destination, 'usr/lib/libsimdjson.so.33.0.0');
+      if (!fs.lstatSync(link).isSymbolicLink() || fs.readlinkSync(link) !== runtime.linkTarget ||
+          fs.realpathSync(link) !== library || fs.statSync(library).size !== runtime.size ||
+          digest(fs.readFileSync(library)) !== runtime.sha256) fail('STAGED_RUNTIME_DEPENDENCY_MISMATCH');
     }
   } finally {
     fs.rmSync(stage, { recursive: true, force: true });

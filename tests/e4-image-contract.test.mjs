@@ -9,6 +9,9 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   const ignore = read('certification/Dockerfile.e4.dockerignore');
   assert.match(dockerfile, /^FROM docker\.io\/library\/archlinux:base@sha256:[a-f0-9]{64}$/mu);
   assert.match(dockerfile, /^COPY --from=seeds \/usr \/usr$/mu);
+  assert.match(dockerfile, /readelf -d \/usr\/bin\/node \| grep -Fq 'Shared library: \[libsimdjson\.so\.33\]'/u);
+  assert.match(dockerfile, /ld-linux-x86-64\.so\.2 --list \/usr\/bin\/node/u);
+  assert.match(dockerfile, /TOOLCHAIN_RUNTIME_DEPENDENCY_MISSING tool=node soname=libsimdjson\.so\.33/u);
   assert.match(dockerfile, /^COPY --from=lsp \/ \/opt\/phi\/runtime\/lsp\/managed\/$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
   assert.match(dockerfile, /USER 1001:1001/u);
@@ -27,6 +30,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /prompt-template-bridge\.ts/u);
   assert.match(source, /fs\.readdirSync\('\/phi'\)\.length, 0/u);
   assert.match(source, /E4_IMAGE_SELFCHECK=FAIL/u);
+  assert.match(source, /E4_IMAGE_NODE_ELF_CLOSURE=PASS/u);
+  assert.match(source, /simdjson\.requiredBySha256, nodeSeed\.extracted\[0\]\.sha256/u);
+  assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
 });
 
@@ -39,7 +45,7 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /packages: write/u);
   assert.match(job, /node scripts\/e4-stage-seeds\.mjs/u);
   assert.match(job, /node scripts\/install-managed-lsp\.mjs --runtime "\$RUNNER_TEMP\/phi-e4-lsp" --check/u);
-  assert.match(job, /docker run --rm --network none --read-only --cap-drop ALL/u);
+  assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
   assert.match(job, /--security-opt no-new-privileges/u);
   assert.match(job, /test "\$package" = private/u);
   assert.match(job, /if: always\(\)[\s\S]*E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0/u);

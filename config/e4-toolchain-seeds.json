@@ -86,6 +86,33 @@
       ]
     },
     {
+      "logicalName": "simdjson-4.6.11-node-runtime",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 641772299,
+      "name": "simdjson-1.4.6.11-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 290250,
+      "sha256": "719f1e35b2da574b42a6e140fb5df6f1d43ec2ad5e75c0c2fb626108dc8e9ac7",
+      "sourcePackage": "simdjson 1:4.6.11-1.1 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "runtimeDependency": {
+        "soname": "libsimdjson.so.33",
+        "linkPath": "/usr/lib/libsimdjson.so.33",
+        "linkTarget": "libsimdjson.so.33.0.0",
+        "path": "/usr/lib/libsimdjson.so.33.0.0",
+        "size": 145480,
+        "sha256": "8ed9852623a4d807d135abe39b3a09a31147462148cbd5b8aad34f490637712c",
+        "requiredBy": "/usr/bin/node",
+        "requiredBySha256": "5a353e52b64c67e8ac76e95e42531855f81177515d3bb608a96e341c90dbcf28"
+      },
+      "extracted": [
+        {
+          "path": "usr/lib/libsimdjson.so.33.0.0",
+          "sha256": "8ed9852623a4d807d135abe39b3a09a31147462148cbd5b8aad34f490637712c",
+          "installedPath": "/usr/lib/libsimdjson.so.33.0.0"
+        }
+      ]
+    },
+    {
       "logicalName": "util-linux-2.42.4",
       "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
       "assetId": 637372242,
