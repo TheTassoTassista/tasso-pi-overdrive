@@ -1,5 +1,11 @@
 # Phi — Test Baseline
 
+## E4 image self-qualification native PASS (2026-10-15)
+
+CI38646670801/job116135107049 exact `c3debc10d60686e92c5601ffd59ce6c1fff62c89` SUCCESS. `E4_IMAGE_SELFCHECK`, `TOOL_IDENTITIES`, `NODE_ELF_CLOSURE`, `PI_SUBAGENTS_JITI`, `PHI_MOUNTPOINT`, `FOCUSED_TESTS`, `PRIVATE` all PASS; owned containers0; immutable digest `sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`. This supersedes only earlier image-candidate pending status, not historical failed runs or two unrelated local Rust/LSP full-check failures. Ubuntu preflight0/2 and replacement E4 0/1 remain unrun.
+
+Separate Ubuntu preflight/E4 Linux harness candidate: focused E4 host/image/preflight/integrated tests **18/18 PASS**, shellcheck and shell syntax PASS, TypeScript and package validation PASS. Full local `npm run check` **FAIL** at 1105 total/765 PASS/2 FAIL/338 skips, the pre-existing Rust/LSP failures; no native Ubuntu preflight or E4 credit is inferred.
+
 ## E4 minimal-context test closure candidate (2026-10-15)
 
 CI38645683284 on `ff5f8356c53ca0f61aa25d5f3f33347ea89cf087`: UID1001 self-check and native AST identity passed, final focused test process exit1; image unpublished, cleanup/owned residual0 PASS. Exact Node26.8.2 minimal-context reproduction without `config/routing-policy.json` gives Agent Hub PASS and AST `ERR_MODULE_NOT_FOUND`; with the one file copied plus `--test-reporter=tap`, same two test files give **8/8 PASS**, `# fail 0`, stderr0. Native image qualification remains PENDING; Rust/LSP full local failures remain separate.

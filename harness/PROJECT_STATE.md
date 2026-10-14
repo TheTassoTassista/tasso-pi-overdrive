@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 certification image qualified; preflight 0/2 (2026-10-15)
+
+Image-only CI38646670801/job116135107049 on `c3debc10d60686e92c5601ffd59ce6c1fff62c89` passed complete isolated self-qualification and published private immutable `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`; cleanup/owned containers0. Exact pinned Node/libsimdjson closure, tool identities, Pi/subagents/jiti, `/phi` and focused tests PASS. Host Feasibility Run3 remains 24/24 PASS, no Run4. Separate host-Bubblewrap Ubuntu preflight path is locally implemented with focused18/18 PASS but **not yet natively executed**; preflight0/2, replacement E4 0/1. Local full check still has the prior two Rust/LSP failures. Windows autonomy BLOCKED/false and portability NOT CERTIFIED.
+
 ## Current — E4 minimal image fixture closure candidate (2026-10-15)
 
 CI38645683284 on `ff5f8356c53ca0f61aa25d5f3f33347ea89cf087` reached non-root image self-check and passed exact native AST identity; focused tests exited1 before any image publication, cleanup/residual0 PASS. Node26 local minimal-context reproduction proves missing transitive `config/routing-policy.json` and default spec-vs-TAP reporter mismatch. One-file image allowlist addition plus explicit TAP reporter gives local8/8; native image qualification remains unproved. Host Feasibility3/3 PASS/no Run4, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED.

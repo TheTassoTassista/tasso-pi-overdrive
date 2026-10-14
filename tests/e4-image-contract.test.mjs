@@ -44,9 +44,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
 
 test('E4 image qualification cannot launch preflight, default matrix or certification', () => {
   const workflow = read('.github/workflows/phi-foundation.yml');
-  const job = workflow.split('  e4-image-qualification:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+  const job = workflow.split('  e4-image-qualification:\n')[1]?.split('  e4-ubuntu-preflight:\n')[0];
   assert.ok(job);
-  assert.match(job, /inputs\['e4-image-qualification-only'\] && !inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\]/u);
+  assert.match(job, /inputs\['e4-image-qualification-only'\] && !inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\] && !inputs\['e4-ubuntu-preflight-only'\]/u);
   assert.match(job, /runs-on: ubuntu-24\.04/u);
   assert.match(job, /packages: write/u);
   assert.match(job, /node scripts\/e4-stage-seeds\.mjs/u);

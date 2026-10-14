@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 certification image qualified; Ubuntu preflight pending (2026-10-15)
+
+Exact image-only CI38646670801/job116135107049 on `c3debc10d60686e92c5601ffd59ce6c1fff62c89` passed pinned seven-seed/toolchain, Node `libsimdjson.so.33` rootfs closure, isolated UID1001 self-check, Pi/subagents/jiti and focused tests. Private immutable GHCR digest is `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`; cleanup/owned containers0. Host Feasibility Run3 remains 24/24 PASS; profile SHA `09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51`, schema `phi-e4-host-v1`. A distinct Ubuntu-only exact-image preflight path is locally implemented and focused-green but not natively run (0/2); replacement E4 has not run (0/1). Local full check still fails the prior two Rust/LSP tests. Autonomy remains BLOCKED/false; image qualification is not full portability certification.
+
 ## E4 exact-toolchain image candidate, native qualification pending (2026-10-14)
 
 An allowlisted-context OCI build and isolated self-check are prepared from the verified private seed transport and pinned managed runtimes. The dedicated CI path will require exact tool hashes, Pi/subagents/jiti bridge, empty `/phi`, focused Agent Hub/AST tests, private GHCR visibility and an immutable image digest before any Ubuntu preflight. Local focused15/15 and syntax/TypeScript/package gates PASS; local full check remains FAIL on two Rust/LSP cases. No image digest or self-qualification PASS exists yet. Host Feasibility3/3 PASS, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED.

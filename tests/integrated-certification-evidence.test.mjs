@@ -25,7 +25,9 @@ test('integrated Windows certification runs all four ordinary operations in orde
   const e4Windows = workflow.split('  campaign3-e4-windows:\n')[1]?.split('  corrupt-journal-ready-diagnostic:\n')[0];
   assert.ok(e4Linux && e4Windows, 'E4 must use dedicated same-candidate jobs, not the D-18 replay');
   assert.match(e4Linux, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
-  assert.match(e4Linux, /node scripts\/phi-owned-main-suite\.mjs/u);
+  assert.match(e4Linux, /bash scripts\/e4-ubuntu-preflight\.sh 'ghcr\.io\/thetassotassista\/tasso-pi-overdrive-e4@sha256:[a-f0-9]{64}'/u);
+  assert.match(e4Linux, /runs-on: ubuntu-24\.04/u);
+  assert.doesNotMatch(e4Linux, /ubuntu-latest|npm ci --prefix|npm install --prefix/u);
   assert.match(e4Windows, /needs: campaign3-e4-ubuntu/u);
   assert.match(e4Windows, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
   let e4Previous = e4Windows.indexOf('Full Windows main corpus and bounded failure ledger');
@@ -50,7 +52,7 @@ test('E4 host Bubblewrap feasibility is non-certifying and cannot launch the def
   assert.match(diagnostic, /runs-on: ubuntu-24\.04/u);
   assert.match(diagnostic, /bash scripts\/e4-host-feasibility\.sh docker\.io\/library\/archlinux:base@sha256:[0-9a-f]{64}/u);
   assert.doesNotMatch(diagnostic, /docker run|--privileged|seccomp=unconfined|sudo bwrap/u);
-  assert.doesNotMatch(diagnostic, /npm run check|phi-owned-main-suite|provider|preflight/iu);
+  assert.doesNotMatch(diagnostic, /npm run check|phi-owned-main-suite|provider|bash scripts\/e4-ubuntu-preflight\.sh/iu);
   assert.match(ordinary.split('\n')[0], /!inputs\['e4-host-feasibility-only'\]/u);
 });
 

@@ -98,11 +98,15 @@ on:
         description: Build and self-qualify the private immutable E4 image; no preflight or E4
         type: boolean
         default: false
+      e4-ubuntu-preflight-only:
+        description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
   e4-host-feasibility:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-image-qualification-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-image-qualification-only'] && !inputs['e4-ubuntu-preflight-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -112,7 +116,7 @@ jobs:
       - name: Prove host Bubblewrap isolation over pinned representative rootfs
         run: bash scripts/e4-host-feasibility.sh docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
   e4-image-qualification:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification']
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-ubuntu-preflight-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -174,6 +178,39 @@ jobs:
           if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
           test -z "$(docker ps -aq --filter "name=^/$container$")"
           printf 'E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0\n'
+  e4-ubuntu-preflight:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-ubuntu-preflight-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['e4-image-qualification-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          path: product
+          persist-credentials: false
+      - name: Pin exact preflight source and product identities
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          [[ "$CERTIFIED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git -C product rev-parse HEAD)" = "$CERTIFIED_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git -C product status --porcelain)"
+      - name: Pull private frozen image with runner-only package credential
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Host isolation, exact toolchain, full Linux check and regression
+        env:
+          E4_GATE_KIND: preflight
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: bash scripts/e4-ubuntu-preflight.sh 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a' "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product"
   integrated-ubuntu:
     if: github.event_name == 'workflow_dispatch' && inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only']
     runs-on: ubuntu-latest
@@ -627,39 +664,38 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   campaign3-e4-ubuntu:
-    if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only']
-    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only'] && !inputs['e4-ubuntu-preflight-only']
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
         with:
-          ref: ${{ inputs.certified_sha }}
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
         with:
-          node-version: '22.23.2'
-      - name: Pin immutable E4 candidate
+          ref: ${{ inputs.certified_sha }}
+          path: product
+          persist-credentials: false
+      - name: Pin immutable E4 product and harness
         env:
           CERTIFIED_SHA: ${{ inputs.certified_sha }}
         run: |
           [[ "$CERTIFIED_SHA" =~ ^[0-9a-f]{40}$ ]]
-          test "$(git rev-parse HEAD)" = "$CERTIFIED_SHA"
-      - name: Install source-only dependencies
-        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
-      - name: Native Linux foundation bootstrap
-        run: sh bootstrap/linux.sh
-      - name: Install pinned LSP runtime for TypeScript validation
-        run: npm ci --prefix runtime/lsp --ignore-scripts --no-audit --no-fund
-      - name: Install isolated pinned Pi for TypeScript validation without auth
-        run: npm install --prefix "$RUNNER_TEMP/phi-e4-pi-runtime" --ignore-scripts --legacy-peer-deps --no-audit --no-fund @earendil-works/pi-coding-agent@0.87.1
-      - name: Full Linux regression with syntax, TypeScript and package validation
+          test "$(git -C product rev-parse HEAD)" = "$CERTIFIED_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git -C product status --porcelain)"
+      - name: Pull private frozen image with runner-only package credential
         env:
-          PI_PACKAGE_ROOT: ${{ runner.temp }}/phi-e4-pi-runtime/node_modules/@earendil-works/pi-coding-agent
-        run: npm run check
-      - name: Exact Linux corpus and failure-ledger accounting
-        run: node scripts/phi-owned-main-suite.mjs
-      - name: Indexed source and secret heuristic audit
-        run: node scripts/phi-repository-audit.mjs
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Host isolation, exact toolchain, full Linux check and regression
+        env:
+          E4_GATE_KIND: e4
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: bash scripts/e4-ubuntu-preflight.sh 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a' "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product"
   campaign3-e4-windows:
     if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only']
     needs: campaign3-e4-ubuntu
@@ -935,7 +971,7 @@ jobs:
         if: always()
         run: node scripts/phi-owned-scope-baseline.mjs
   native-foundation:
-    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['e4-image-qualification-only'])
+    if: github.event_name != 'workflow_dispatch' || (!inputs['integrated-certification-only'] && !inputs['windows-main-failure-diagnostic-only'] && !inputs['current-failure-focused-only'] && !inputs['current-failure-context-only'] && !inputs['current-failure-cross-context-only'] && inputs['ordinary-operation-focused'] == 'none' && !inputs['lsp-diagnostic-only'] && !inputs['clone-foundation-diagnostic-only'] && !inputs['clone-watchdog-focused-only'] && !inputs['clone-test206-focused-only'] && inputs['corrupt-journal-ready-mode'] != 'isolated' && inputs['corrupt-journal-ready-mode'] != 'ordered-prefix' && inputs['create-finalization-mode'] != 'isolated' && inputs['create-finalization-mode'] != 'predecessor-context' && !inputs['precreate-regression-only'] && !inputs['two-writer-only'] && !inputs['d-wide-focused-only'] && !inputs['d-restart-focused-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['e4-image-qualification-only'] && !inputs['e4-ubuntu-preflight-only'])
     strategy:
       fail-fast: false
       matrix:
