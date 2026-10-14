@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 native Host Feasibility Run 3 PASS (2026-10-14)
+
+[CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1`: 24/24 assertion markers PASS, extra network probe PASS, exact rootfs schema/OCI digest, ordinary-user Bubblewrap no setuid/file caps, payload CapInh/Prm/Eff/Bnd/Amb all zero, six namespace comparisons PASS, sentinel digest identical, parent-child termination PASS, `E4_PIPE_STATE=CLOSED`, owned residual0, `E4_ROOTFS_CLEANUP=PASS`, `E4_CLEANUP=PASS`, terminal feasibility PASS. The run is non-certifying; no image qualification, Ubuntu preflight or replacement E4. Local focused20/20 including sandbox/runtime tests PASS. Full local check remains FAIL on Rust syntax UNAVAILABLE and rust-analyzer empty definition; these must be resolved or shown green in the eventual real Ubuntu preflight, not hidden.
+
 ## E4 Run-3 mountpoint/schema candidate (2026-10-14)
 
 Focused `node --test tests/e4-host-feasibility.test.mjs tests/integrated-certification-evidence.test.mjs tests/e4-seed-transport.test.mjs`: **15/15 PASS**. Shell syntax/shellcheck, `npm run syntax`, `npm run syntax:platform`, TypeScript and package validation PASS. The rootfs validator prepares an empty `/phi` and fails deterministically on removed `/phi` or `/run`; static test confirms exactly seven intended mount operations and no host-root/socket bind. Indexed audit WARN/0 FAIL, scoped staged whitespace PASS. Full `npm run check` FAIL before later phases: 1099 total/759 PASS/2 FAIL/338 skips; Rust/LSP failures remain tracked, no E4 causal attribution. Native Run 3 NOT YET RUN; no 24-assertion or image/preflight/E4 PASS claim.

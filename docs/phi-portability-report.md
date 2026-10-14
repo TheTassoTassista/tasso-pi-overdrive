@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Host-level Bubblewrap feasibility PASS, certification still pending (2026-10-14)
+
+Final non-certifying [Run 3 CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1` passed all 24 native host sandbox assertions and cleanup/residual0 on `ubuntu-24.04`, with exact pinned base rootfs and structural `/phi`. Historical Run 1/2 failures remain. Feasibility budget3/3; no Run 4. The actual toolchain certification image is not built or qualified; Ubuntu preflight0/2, replacement E4 0/1, autonomy BLOCKED/false, portability NOT CERTIFIED. Next: image self-qualification using verified seeds, exact identities and digest.
+
 ## E4 final host feasibility candidate (2026-10-14)
 
 Main authorized exactly one Run 3 after historical Run 1/2 pre-payload failures. Rootfs construction now adds empty `/phi` and the other exact static mount destinations before read-only mount; missing destinations fail before Bubblewrap. The probe requires all 24 security/lifecycle assertions. Local focused15/15 and scoped ZERO_EGRESS PASS, but native host equivalence remains UNKNOWN and full local check has two Rust/LSP failures. Host budget2/3, image unqualified, preflight0/2, replacement E4 0/1; Windows autonomy BLOCKED/false and portability NOT CERTIFIED. No Run 4 or readiness authority.

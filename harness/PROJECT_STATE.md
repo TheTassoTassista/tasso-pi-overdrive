@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — host Bubblewrap feasibility verified, image not qualified (2026-10-14)
+
+Run 3 [CI38536960296](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38536960296) on `ac6d61a334bb193d7cd6f4fe7c4309638fadacc1` passed 24/24 native host-isolation and lifecycle assertions, network probe, owned residual0 and cleanup. Host Feasibility3/3 PASS; no Run 4. Final certification image/toolchain is NOT QUALIFIED; Ubuntu preflight0/2, replacement E4 0/1. E1/E2/E3 COMPLETE, original E4 FAIL/CLOSED; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next image self-qualification using verified seed transport.
+
 ## Current — Run-3 host rootfs candidate, native proof pending (2026-10-14)
 
 Main authorizes one final non-certifying Host Feasibility execution under `E4-HOST-BWRAP-MOUNTPOINT-RECOVERY-001`. Rootfs schema `phi-e4-host-v1` prepares empty `/phi` and all exact static Bubblewrap destinations, then the payload receives only bounded writable binds/tmpfs over a read-only root. Local targeted15/15 and scoped ZERO_EGRESS PASS; full check remains red on two Rust/LSP tests not attributed to this change. Host budget2/3; image NOT QUALIFIED; preflight0/2; replacement E4 0/1. Sandbox equivalence UNKNOWN until all 24 native assertions pass. E1/E2/E3 COMPLETE; Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
