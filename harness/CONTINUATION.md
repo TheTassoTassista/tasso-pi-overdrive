@@ -1,6 +1,12 @@
 # Phi — Session Continuation
 
-## CURRENT — E4 non-root image path mode correction; changed image run pending
+## CURRENT — E4 ast-grep native optional binary self-check correction
+
+Image-only CI38644668426/job116128461701 on `644c7ee0cf6fa28dd3bf218e2fc6ed7c31faba38` proved seven-seed/LSP staging, exact Node ELF closure, full build and UID1001 entrypoint startup, then self-check rejected AST CLI shim SHA33bb versus policy native SHA7a5. Published npm tarballs (both match lock SRI) prove `@ast-grep/cli` retains the shim when install scripts are blocked and `@ast-grep/cli-linux-x64-gnu@0.45.3` contains the exact pinned native binary. Candidate changes only image self-check path/test to attest and execute native optional binary; no package/policy/install-script change. No image publish; cleanup PASS/owned containers0. Host Feasibility3/3 PASS/no Run4; image NOT QUALIFIED, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false. Next: local scoped validation/ZERO_EGRESS, commit/push, one changed-candidate image-only qualification, inspect SAME run; no preflight/E4 or old-run retry.
+
+Focused27/27, self-check/platform syntax, TypeScript, package and scoped whitespace PASS. Scoped ZERO_EGRESS PASS: native AST hash remains pinned, install scripts stay blocked, no package/provider/security/routing/timeout/retry/readiness change. Next action now scoped commit/push and one changed-candidate image-only run.
+
+## HISTORICAL — E4 non-root image path mode correction; changed image run pending
 
 Image-only CI38643757651/job116125442809 on exact `759e093dfabedd42143db112930a6a625f4f4bca` proved seven-seed staging, `E4_IMAGE_NODE_ELF_CLOSURE=PASS` and completed build, then OCI refused non-root `/usr/bin/node` exec before self-check (exit126). No image publish; cleanup PASS/residual0. Local exact archive staging reproduced `stage-root0700/usr0700/usr/bin0700/node0755`; scoped correction gives `stage-root0700/usr0755/usr/bin0755/node0755`, focused7/7 PASS. **Image NOT QUALIFIED**, Host Feasibility3/3 PASS/no Run4, preflight0/2, replacement E4 0/1, autonomy BLOCKED/false. Next: scoped validation/ZERO_EGRESS, commit/push only mode correction/state, dispatch one changed-candidate image-only run, inspect SAME run. Do-not-redo E1–E3/Host Runs1–3 or unchanged failed image candidate. Preserve protected user edit/untracked state.
 

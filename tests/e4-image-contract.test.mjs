@@ -33,6 +33,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /E4_IMAGE_NODE_ELF_CLOSURE=PASS/u);
   assert.match(source, /simdjson\.requiredBySha256, nodeSeed\.extracted\[0\]\.sha256/u);
   assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
+  assert.match(source, /node_modules\/@ast-grep\/cli-linux-x64-gnu/u);
+  assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
+  assert.doesNotMatch(source, /path\.join\(root, 'pi', 'npm', 'node_modules', '@ast-grep', 'cli', 'ast-grep'\)/u);
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
 });
 

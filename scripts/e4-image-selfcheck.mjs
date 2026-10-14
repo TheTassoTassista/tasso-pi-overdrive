@@ -110,7 +110,11 @@ try {
   assert.equal(typeof bridge, 'object', 'Pi subagents TypeScript bridge unavailable');
   command('/usr/bin/node', [path.join(pi, 'dist', 'bundle', 'cli.js'), '--version'], /0\.87\.1/u);
 
-  const astBin = path.join(root, 'pi', 'npm', 'node_modules', '@ast-grep', 'cli', 'ast-grep');
+  // npm blocks lifecycle scripts in this image. The cli package then retains
+  // its JS fallback shim; attest and invoke the pinned native optional binary.
+  const astPackage = 'node_modules/@ast-grep/cli-linux-x64-gnu';
+  assert.equal(lock.packages[astPackage]?.version, '0.45.3');
+  const astBin = path.join(root, 'pi', 'npm', astPackage, 'ast-grep');
   fileIdentity(astBin, ast.binarySha256);
   command(astBin, ['--version'], /ast-grep 0\.45\.3/u);
   fileIdentity(path.join(root, 'runtime', 'lsp', 'node_modules', 'typescript', 'lib', 'typescript.js'), evalPolicy.runtimes.javascript.typescriptCompiler.sha256);

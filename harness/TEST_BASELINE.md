@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 AST native binary path candidate (2026-10-15)
+
+CI38644668426 on `644c7ee0cf6fa28dd3bf218e2fc6ed7c31faba38` passed non-root Node startup but self-check FAIL on `@ast-grep/cli` JS shim SHA33bb versus policy native SHA7a5; no image publication, cleanup/owned residual0 PASS. npm package tarballs match lock SRI and prove native optional package contains SHA7a5. Scoped self-check now points only to that native binary; local validation pending at this checkpoint. Full local Rust/LSP failures remain tracked separately, not relabeled.
+
 ## E4 image mode correction candidate (2026-10-15)
 
 Changed image-only CI38643757651 on `759e093dfabedd42143db112930a6a625f4f4bca`: Node ELF/linker/startup closure PASS and complete image build; non-root self-check NOT STARTED (OCI exec126) because copied seed parent directories were `0700`; no publish, cleanup/residual0 PASS. Exact cached Node archive staging reproduces root700/usr700/usr/bin700/node755 before correction and root700/usr755/usr/bin755/node755 after. Focused seed/image7/7 PASS with mode regression. Full local check remains tracked red on Rust/LSP; no unproven image PASS.
