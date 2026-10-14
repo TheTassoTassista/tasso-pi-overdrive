@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 Host Feasibility Run 1: parser-cache failure, not sandbox evidence (2026-10-14)
+
+[CI38532600373](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532600373) on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc` failed before payload because ordinary-user AppArmor syntax parse tried root-owned `/var/cache/apparmor`; cleanup PASS. Skip-cache (`-K`) is the bounded local correction. Host Feasibility1/2, image unqualified, preflight0/2, replacement E4 0/1. No Windows-autonomy/readiness change.
+
 ## E4 host-level Bubblewrap/rootfs candidate (2026-10-14)
 
 `E4-HOST-BWRAP-ROOTFS-001` authorizes an exact-digest OCI userspace rootfs mounted read-only by ordinary-user Bubblewrap on `ubuntu-24.04`; the VM/kernel/AppArmor remain the outer trust base. A narrow repository profile and a non-certifying 15-assertion host-isolation gate are prepared locally. The two prior nested-container EPERM diagnostics remain historical, with exact cause UNKNOWN. No host feasibility run, qualified image, Ubuntu preflight or replacement E4 yet: budgets 0/2, 0/2 and 0/1. The local full check is red on two Rust-related tests, not attributed to this change. Windows autonomy remains BLOCKED/false and portability NOT CERTIFIED.

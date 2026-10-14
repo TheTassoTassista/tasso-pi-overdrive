@@ -91,7 +91,8 @@ printf 'E4_HOST_CAPEFF=%s\n' "$(awk '/^CapEff:/ {print $2}' /proc/self/status)"
 [[ $(awk '/^CapEff:/ {print $2}' /proc/self/status) == 0000000000000000 && $(awk '/^CapPrm:/ {print $2}' /proc/self/status) == 0000000000000000 ]] || fail HOST_CAPABILITIES
 [[ $(cat /sys/module/apparmor/parameters/enabled 2>/dev/null) == Y ]] || fail APPARMOR_UNAVAILABLE
 [[ $(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null) == 1 ]] || fail USERNS_RESTRICTION_CHANGED
-apparmor_parser -Q "$profile_source" || fail PROFILE_PARSE
+# The runner's policy cache is root-owned; syntax-only parsing must not touch it.
+apparmor_parser -Q -K "$profile_source" || fail PROFILE_PARSE
 sudo -n apparmor_parser -r "$profile_source" || fail PROFILE_LOAD
 profile_loaded=1
 

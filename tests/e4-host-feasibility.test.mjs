@@ -15,6 +15,7 @@ test('host feasibility scripts parse and use a fixed narrowly targeted AppArmor 
   assert.match(profile, /profile phi-e4-bwrap \/home\/runner\/work\/_temp\/phi-e4-tools\/usr\/bin\/bwrap flags=\(unconfined\) \{\n  userns,\n\}/u);
   assert.doesNotMatch(profile, /capability|mount,|network,|\/\*\*|flags=\(complain\)/u);
   assert.match(script, /expected_version=0\.9\.0-1ubuntu0\.3/u);
+  assert.match(script, /apparmor_parser -Q -K "\$profile_source"/u);
   assert.match(script, /sudo -n apparmor_parser -r "\$profile_source"/u);
   assert.match(script, /sudo -n apparmor_parser -R "\$profile_source"/u);
   assert.doesNotMatch(script, /sudo (?:-n )?"?\$?expected_bwrap|sudo (?:-n )?bwrap|sysctl -w|--privileged|seccomp=unconfined/u);

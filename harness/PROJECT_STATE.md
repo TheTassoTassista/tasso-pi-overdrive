@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current — E4 host feasibility first native run failed at AppArmor parser cache (2026-10-14)
+
+CI38532600373 on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc` failed `PROFILE_PARSE` before payload: ordinary-user `apparmor_parser -Q` attempted root-owned `/var/cache/apparmor` and was denied. Cleanup PASS. A skip-cache-only correction is local candidate; profile permissions and production sandbox unchanged. Host Feasibility1/2, image NOT QUALIFIED, Ubuntu preflight0/2, replacement E4 0/1. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## Current — host Bubblewrap/rootfs E4 execution candidate (2026-10-14)
 
 Main authorized `E4-HOST-BWRAP-ROOTFS-001`, replacing only nested-container Bubblewrap execution with ordinary-user host Bubblewrap over an exact-digest read-only OCI rootfs. Repository AppArmor profile and bounded non-certifying 15-assertion host feasibility implementation are local candidates, **not natively verified**. No image qualified, Host Feasibility0/2, Ubuntu preflight0/2, replacement E4 0/1. Original E4 FAIL/CLOSED; E1/E2/E3 COMPLETE. Windows autonomy BLOCKED, `windowsAutonomousReady=false`, portability NOT CERTIFIED. The prior nested-container EPERM mechanism remains UNKNOWN; no production Linux sandbox change was made.

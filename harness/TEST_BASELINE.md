@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 Host Feasibility Run 1 and parser-cache correction (2026-10-14)
+
+Native [CI38532600373](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38532600373) on `5adb8fe40ae76f4d3ea0f5d00d4fa13b3e7124bc`: fail at `PROFILE_PARSE` because `apparmor_parser -Q` tried root-owned `/var/cache/apparmor`; `E4_CLEANUP=PASS`, `E4_ASSERT_15=FAIL`, no payload. This consumes Host Feasibility1/2 only. Local candidate adds `-K` skip-cache; updated focused suite14/14 PASS, shell syntax/shellcheck, syntax/platform, TypeScript and package validation PASS. Whitespace check of the whole working tree reports only the pre-existing protected user edit; scoped fix has no whitespace error. Full `npm run check` remains prior FAIL on two Rust-related tests, with E4 relationship unproven.
+
 ## E4 host-level feasibility local candidate (2026-10-14)
 
 Focused `node --test tests/e4-host-feasibility.test.mjs tests/integrated-certification-evidence.test.mjs tests/e4-seed-transport.test.mjs`: **14/14 PASS**. Bash/sh syntax, package validation and installed-Pi TypeScript PASS. Local Bubblewrap 0.13.0 probe demonstrated explicit `--unshare-user` is required alongside `--disable-userns`; corrected flags yielded non-root UID, CapEff0 and nested-userns denial. Staged indexed source/security audit WARN/0 FAIL, scoped ZERO_EGRESS_REVIEW PASS. Full `npm run check` is **FAIL**, 1098 tests/758 PASS/2 FAIL/338 skips: Rust edit-contract syntax UNAVAILABLE and managed rust-analyzer definition result count0, reproduced in focused tests; no E4 relationship proved. Native Host Feasibility unrun (0/2); this is neither image qualification nor Ubuntu preflight/E4 evidence.
