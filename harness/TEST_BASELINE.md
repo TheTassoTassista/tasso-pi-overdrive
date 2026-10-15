@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 ten-seed image-only qualification FAIL (2026-10-15)
+
+Dedicated native image-only CI38817537207/job116705877790 on `a8ed3209e7dc32b32c268a5f323dfd97486bdcb5`: ten seed stage PASS, managed LSP check PASS, Docker build PASS, non-root isolated self-check FAIL at clangd version mismatch. Native image installed clang/llvm-libs23.1.1-1; product registry declares clangd22.1.8. No image published, cleanup/owned containers0 PASS. This does not run or qualify browser, cmp, Rust, DAP, Tier B, full Linux check, Preflight3 or E4. Local focused E4/host17/17, package/syntax/TypeScript/shellcheck and indexed audit exit0/WARN/0 FAIL remain valid local-only evidence. Historical Preflight2 1103/736 PASS/29 FAIL/338 skip unchanged; Final Preflight3 0/1 and replacement E4 0/1. Main compatibility/provenance decision required before new candidate.
+
 ## E4 two-tier local closure focus (2026-10-15)
 
 Historical Preflight2 remains 1103 total/736 PASS/29 FAIL/338 skip and FAIL. Local **focused**: seed/image/preflight/ledger13/13, browser4/4, DAP/LSP/eval/sandbox/launcher29/29, exact Node26 outer-ceiling fixture1/1 under explicit TAP, Rust edit corpus1/1 and rust-analyzer semantic1/1 when the exact Rust1.98.1 package is supplied in disposable fixtures. `node scripts/validate-package.mjs`, TypeScript, modified JS/Bash syntax and scoped whitespace PASS. Three readback-verified new assets make a ten-seed manifest; image Dockerfile now omits floating distro Rust. This is not a full native Ubuntu check; new ten-seed image/Tier B unqualified, all 29 historical failure identities still OPEN for native confirmation. Preflight3 0/1, replacement E4 0/1. No historical PASS/FAIL count has been rewritten.

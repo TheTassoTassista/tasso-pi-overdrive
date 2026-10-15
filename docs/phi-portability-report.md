@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## E4 image-only qualification STOP: clangd version mismatch (2026-10-15)
+
+[CI38817537207](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38817537207)/job116705877790 on exact pushed `a8ed3209e7dc32b32c268a5f323dfd97486bdcb5`: ten exact seed staging and managed LSP check PASS; image build PASS; UID1001/no-network/read-only self-check FAIL because resolved clang23.1.1-1 conflicts with product-declared clangd22.1.8. No new image publication/digest; cleanup PASS/owned containers0. This is a KNOWN toolchain compatibility blocker, not native proof for other closure tools. No exact signed clang22.1.8 archive found in checked local sources; Main must choose compatible exact supply versus a product-LSP version migration. Preflight3 and replacement E4 remain 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Do not rerun unchanged image or spend either final budget.
+
 ## E4 two-tier local closure candidate, before new image qualification (2026-10-15)
 
 The new Main decision `E4-TWO-TIER-LINUX-EXECUTION-001` is durable. Preflight2 CI38754887802 remains historical FAIL (29 exact failures); `docs/e4-ubuntu-failure-closure-v1.md` accounts for every identity and local evidence. Tier A strict host isolation is unchanged, Tier B is a separate trusted regression lane with only child-userns denial removed, and production Worker authority/policy is unchanged. Exact cmp, browser runtime and Rust1.98.1 archives have been uploaded/read back under the existing private internal seed release; the proposed ten-seed image and fixture changes are **not yet natively qualified**. Floating distro Rust has been removed from the image recipe. The previously qualified seven-seed digest must not be used to claim their callability. Final Preflight3 0/1 and replacement E4 0/1 remain unspent; Windows autonomy BLOCKED/false and portability NOT CERTIFIED. Next gate is completion of local closure/zero-egress criteria, then scoped image-only qualification on an exact committed candidate before the one final native preflight. No provider calls or readiness change.
