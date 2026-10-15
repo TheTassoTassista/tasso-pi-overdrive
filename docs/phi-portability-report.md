@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Ubuntu Preflight 1 FAIL; image and host qualification preserved (2026-10-15)
+
+CI38648775867/job116142129074 on harness `fb055a9`/product `c3debc1`/qualified image digest `8d45951a…6917e42a` passed exact host isolation precheck, then failed the image self-check's empty `/phi` predicate because the prior probe left exactly three owned fixture files. This is a **KNOWN preflight orchestration handoff defect**; the image qualification and Host Run3 remain valid. Cleanup PASS, owned processes0/containers0; no Linux full check or E4/Windows run. A local exact-footprint reset regression is focused19/19 PASS; Preflight2 is the only remaining allowed preflight after scoped audit/checkpoint. Budget1/2, replacement E4 0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## E4 certification image qualified; Ubuntu preflight pending (2026-10-15)
 
 Exact image-only CI38646670801/job116135107049 on `c3debc10d60686e92c5601ffd59ce6c1fff62c89` passed pinned seven-seed/toolchain, Node `libsimdjson.so.33` rootfs closure, isolated UID1001 self-check, Pi/subagents/jiti and focused tests. Private immutable GHCR digest is `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`; cleanup/owned containers0. Host Feasibility Run3 remains 24/24 PASS; profile SHA `09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51`, schema `phi-e4-host-v1`. A distinct Ubuntu-only exact-image preflight path is locally implemented and focused-green but not natively run (0/2); replacement E4 has not run (0/1). Local full check still fails the prior two Rust/LSP tests. Autonomy remains BLOCKED/false; image qualification is not full portability certification.

@@ -191,6 +191,10 @@ assert_no_owned
 [[ $(sha256sum "$sentinel" | awk '{print $1}') == "$sentinel_before" ]] || fail SENTINEL_CHANGED
 printf 'E4_PREFLIGHT_HOST_PRECHECK=PASS\n'
 
+# The host probe writes exactly three controlled entries. Attest and remove
+# only that footprint before the image self-check's empty-/phi assertion.
+bash "$repo_root/certification/e4-probe-fixture-reset.sh" "$stage/fixture" "phi-e4-fixture:${image##*@}" || fail PROBE_FIXTURE_RESET
+
 # The image's own complete identity check runs inside the final host sandbox,
 # before the bounded source fixture is introduced into /phi.
 run_payload /usr/bin/node /opt/phi/e4-image-selfcheck.mjs | tee "$stage/toolchain.out" || fail TOOLCHAIN_CHECK

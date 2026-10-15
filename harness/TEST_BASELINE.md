@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Ubuntu Preflight 1 failed before image toolchain checks (2026-10-15)
+
+CI38648775867/job116142129074 exact harness `fb055a9`/product `c3debc1`/image digest `8d45951a…6917e42a`: native host/rootfs precheck PASS; self-check FAIL on `/phi` three controlled probe files, no full Linux check; cleanup PASS, owned processes0/containers0. Scoped reset regression validates exact success/extra-file/symlink cases and current focused suite **19/19 PASS**; shellcheck/syntax/TypeScript/package PASS. Preflight1/2 consumed, replacement E4 0/1. Prior local full-check Rust/LSP failures remain unresolved, not counted green.
+
 ## E4 image self-qualification native PASS (2026-10-15)
 
 CI38646670801/job116135107049 exact `c3debc10d60686e92c5601ffd59ce6c1fff62c89` SUCCESS. `E4_IMAGE_SELFCHECK`, `TOOL_IDENTITIES`, `NODE_ELF_CLOSURE`, `PI_SUBAGENTS_JITI`, `PHI_MOUNTPOINT`, `FOCUSED_TESTS`, `PRIVATE` all PASS; owned containers0; immutable digest `sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`. This supersedes only earlier image-candidate pending status, not historical failed runs or two unrelated local Rust/LSP full-check failures. Ubuntu preflight0/2 and replacement E4 0/1 remain unrun.
