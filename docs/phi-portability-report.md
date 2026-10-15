@@ -2,6 +2,10 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+## Ubuntu Preflight 2 FAIL / STOP for Main (2026-10-15)
+
+Exact [CI38754887802](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38754887802)/job116490590028 on harness `01ef710cbfb76acbf85a8411b1ecd2bcee4d9d34`, product `c3debc10d60686e92c5601ffd59ce6c1fff62c89` and unchanged qualified image: host probe, three-file fixture transition and image/toolchain self-check PASS. Full Linux `npm run check` FAIL **1103/736 PASS/29 FAIL/338 skip**; first browser test cannot `lstat /tmp/.local`. Full failed-test set recorded in `docs/phi-progress.md`; Linux regression, failure ledger and indexed audit NOT RUN. Cleanup PASS with 0 owned residual processes/containers. Preflight budget **2/2**, no third run authorized; replacement E4 0/1 NOT RUN. Windows autonomy BLOCKED/false and portability NOT CERTIFIED; return to Main, no implementation or retry under current authority.
+
 ## Ubuntu Preflight 1 FAIL; image and host qualification preserved (2026-10-15)
 
 CI38648775867/job116142129074 on harness `fb055a9`/product `c3debc1`/qualified image digest `8d45951a…6917e42a` passed exact host isolation precheck, then failed the image self-check's empty `/phi` predicate because the prior probe left exactly three owned fixture files. This is a **KNOWN preflight orchestration handoff defect**; the image qualification and Host Run3 remain valid. Cleanup PASS, owned processes0/containers0; no Linux full check or E4/Windows run. A local exact-footprint reset regression is focused19/19 PASS; Preflight2 is the only remaining allowed preflight after scoped audit/checkpoint. Budget1/2, replacement E4 0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

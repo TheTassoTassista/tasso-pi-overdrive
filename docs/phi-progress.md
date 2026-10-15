@@ -2,6 +2,44 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## 2026-10-15 — Ubuntu Preflight 2 FAIL / budget exhausted; STOP for Main
+
+The **only** authorized changed-candidate [Ubuntu Preflight 2 CI38754887802](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38754887802), job `116490590028`, ran harness `01ef710cbfb76acbf85a8411b1ecd2bcee4d9d34` against frozen product `c3debc10d60686e92c5601ffd59ce6c1fff62c89` and unchanged qualified image `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`. Host isolation PASS; the exact three-file probe reset **PASS**; complete image/toolchain self-check **PASS**. Profile SHA `09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51`, Bubblewrap binary SHA `e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30f71`, rootfs schema `phi-e4-host-v1`, seed manifest SHA `da2d116db8e0a4781eaa31815371a51a0d5ca9808343ce8e5b2808acc7de4681` unchanged. This natively validates the Preflight-1 harness correction, but **does not certify the full preflight**.
+
+The first subsequent failure is product `npm run check`: browser test `allocated browser remains lazy, rejects wrong owner and unsafe input, then fails closed on runner crash` at `tests/browser-engine.test.mjs:41`, `ENOENT: lstat '/tmp/.local'` from `pinnedRuntime` (`lib/browser-engine.mjs:62`) in the isolated payload. Full Node tally: **1103 total / 736 PASS / 29 FAIL / 338 skipped**. Complete failed-test set from the same job (names preserved as logged):
+
+1. allocated browser remains lazy, rejects wrong owner and unsafe input, then fails closed on runner crash;
+2. exact close, timeout, and Chromium crash each tear down only their owned namespace;
+3. outer ceiling fixture stays live until an external deadline;
+4. debugpy module digest mismatch denies launch before any adapter process is spawned;
+5. real pinned GDB runs a C fixture inside the read-only networkless sandbox;
+6. real project-owned debugpy runs Python breakpoints and bounded inspection inside Bubblewrap;
+7. real debugpy reports debuggee failure and removes its owned sandbox process;
+8. JavaScript fixture returns real cross-file definition and diagnostics;
+9. C fixture returns real definition and diagnostics;
+10. HTML, CSS, and YAML fixtures expose document symbols;
+11. JSON fixture exposes document symbols;
+12. TypeScript LSP is lazy, project-aware, reused, and supports diagnostics/definition/references;
+13. TypeScript diagnostic overlay evaluates candidate bytes without mutating the file;
+14. Python LSP returns real diagnostics, definitions, and references;
+15. clangd returns real diagnostics, definitions, and references;
+16. managed rust-analyzer supports read-only cross-file semantic navigation;
+17. managed gopls supports read-only cross-package semantic navigation;
+18. pinned Bash LSP provides sandboxed cross-file semantics despite PATH shadowing;
+19. project switching does not leak and an arbitrary PATH server remains rejected;
+20. server failure is reported and cleanup is explicit;
+21. real TypeScript overlay blocks a bad candidate and validates a safe atomic write;
+22. minimal sandbox omits owner-local runtimes and saturates the pinned Node process budget;
+23. Python state persists while imports, files, subprocesses, network, and ambient secrets stay unavailable;
+24. JavaScript and TypeScript share bounded state without process, require, fetch, or string code generation;
+25. unrelated engine sessions never inherit retained state;
+26. timeout kills state, next execute starts clean, and cleanup leaves no private roots;
+27. unexpected kernel exit fails soft and the same engine restarts without Pi;
+28. installer is idempotent and preserves one pre-existing Fish function backup;
+29. Bubblewrap hides host paths, clears secrets/network, and confines indirect writes.
+
+Observed additional failure signatures include `/tmp/.local` absent, DAP `DAP_ADAPTER_UNAVAILABLE`, multiple LSP `language_server_exited`/`language_server_missing` (including rust-analyzer), `cmp: command not found`, and nested Bubblewrap `ENOSPC`. These are **current certification blockers**; no single shared root cause for all 29 is proven. The earlier local Rust/LSP failures remain distinct historical evidence, while the current managed rust-analyzer failure is now a live preflight failure. `E4_PREFLIGHT_FAIL=FULL_CHECK`, terminal `E4_UBUNTU_PREFLIGHT=FAIL`; Linux owned regression, separate failure-ledger certification and indexed audit were **NOT RUN**. Cleanup PASS, residual Phi-owned processes **0**, owned containers **0**. Preflight 1 remains FAIL/KNOWN probe-artifact handoff; Preflight budget **2/2 exhausted**, **no Preflight 3**. Replacement E4 **0/1**, NOT RUN. E1–E3 and Host Feasibility Run3 remain historical COMPLETE/PASS; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. **STOP → Φ Work Control/Main** for new authority/decision; do not fix/rerun under this campaign authorization. Exact next action: send this failure packet; preserve product, image, security identities, user/protected state and all failed evidence.
+
 ## 2026-10-15 — Ubuntu Preflight 1 deterministic fixture handoff FAIL; bounded correction candidate
 
 Distinct [Ubuntu Preflight 1 CI38648775867](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38648775867), job `116142129074`, ran harness `fb055a964313ef8cc1ea4e687c523c17ad023d50` against exact product `c3debc10d60686e92c5601ffd59ce6c1fff62c89` and qualified private image digest `sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`. Exact checkout, GHCR auth/pull, rootfs export/schema, pinned Bubblewrap/profile and host precheck all PASS: UID/GID1001, all cap fields zero, six distinct namespaces, read-only root, bounded writes, no host root/home/PID/socket/network, nested userns/mount denial. The next image self-check failed **before toolchain tests** with `/phi is not an empty structural mountpoint` (`3 !== 0`): the host probe had deliberately left `fixture-identity`, `fixture-writable`, `writable` in the same bounded `/phi`. **KNOWN orchestration-local fixture handoff defect**, not an image, host-isolation, Rust/LSP or product failure. Terminal `E4_UBUNTU_PREFLIGHT=FAIL`; cleanup PASS, owned processes0, containers0. Preflight budget **1/2**, replacement E4 **0/1**; no E4/Windows/E1–E3 executed.

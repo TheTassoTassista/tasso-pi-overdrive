@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current STOP — Ubuntu Preflight 2 full check FAIL (2026-10-15)
+
+CI38754887802/job116490590028 on harness `01ef710cbfb76acbf85a8411b1ecd2bcee4d9d34`, frozen product `c3debc10d60686e92c5601ffd59ce6c1fff62c89` and unchanged qualified image: host isolation, exact probe-artifact reset and image/toolchain self-check PASS. `npm run check` FAIL: **1103 total/736 PASS/29 FAIL/338 skip**, first browser test `ENOENT /tmp/.local`; complete failed names in `docs/phi-progress.md`. Linux regression, failure ledger and indexed audit NOT RUN. Cleanup PASS, owned processes/containers0. Preflight **2/2 exhausted**; no Preflight3. Replacement E4 0/1 NOT RUN. **STOP for Main**, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Host Run3 24/24 and image qualification remain historical PASS; Preflight1 remains historical FAIL. No product/security/profile/policy/image/seed change.
+
 ## Current — Ubuntu Preflight 1 FAIL; bounded correction pending (2026-10-15)
 
 CI38648775867/job116142129074 on harness `fb055a9`, frozen product `c3debc1`, exact qualified image digest `8d45951a…6917e42a` passed host/rootfs/Bubblewrap precheck but failed unchanged image self-check because the probe left exactly three files in `/phi`, violating its required empty mountpoint. Root cause **KNOWN orchestration fixture handoff**. Cleanup PASS, residual owned processes/containers0; no E4/Windows. Local exact-footprint reset correction and regression focused19/19 PASS; no image/security/product change. Preflight1/2, replacement E4 0/1, Host3/3 PASS/no Run4. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

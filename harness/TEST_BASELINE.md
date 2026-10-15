@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Ubuntu Preflight 2 native FAIL after corrected fixture handoff (2026-10-15)
+
+CI38754887802/job116490590028 exact harness `01ef710cbfb76acbf85a8411b1ecd2bcee4d9d34`/frozen product `c3debc10d60686e92c5601ffd59ce6c1fff62c89`/qualified image `sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a`: host precheck, exact fixture reset, image self-check/toolchain PASS. `npm run check` **FAIL 1103 total / 736 PASS / 29 FAIL / 338 skip** (full failed-test list in `docs/phi-progress.md`); first browser `/tmp/.local` ENOENT. Current LSP set includes rust-analyzer `language_server_missing`; DAP and other isolated-runtime failures also observed. `E4_PREFLIGHT_FAIL=FULL_CHECK`; Linux regression/failure ledger/indexed audit NOT RUN. Final cleanup PASS, owned processes0/containers0. Preflight budget2/2 exhausted and replacement E4 not started. Local harness-focused19/19, syntax/shellcheck/TypeScript/package and indexed audit exit0/WARN/0 FAIL remain **local-only** evidence; they do not override native full-check FAIL.
+
 ## Ubuntu Preflight 1 failed before image toolchain checks (2026-10-15)
 
 CI38648775867/job116142129074 exact harness `fb055a9`/product `c3debc1`/image digest `8d45951a…6917e42a`: native host/rootfs precheck PASS; self-check FAIL on `/phi` three controlled probe files, no full Linux check; cleanup PASS, owned processes0/containers0. Scoped reset regression validates exact success/extra-file/symlink cases and current focused suite **19/19 PASS**; shellcheck/syntax/TypeScript/package PASS. Preflight1/2 consumed, replacement E4 0/1. Prior local full-check Rust/LSP failures remain unresolved, not counted green.
