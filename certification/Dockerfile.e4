@@ -7,12 +7,28 @@ LABEL org.opencontainers.image.revision="${PRODUCT_CANDIDATE_SHA}"
 # Node binary also needs its exact SONAME-compatible runtime library.
 RUN pacman -Syu --noconfirm --needed \
       bash coreutils findutils grep gawk sed tar git gdb python python-pip nodejs npm util-linux binutils \
-      gcc clang make cmake go openssh curl ca-certificates bubblewrap \
+      gcc make cmake go openssh curl ca-certificates bubblewrap \
       alsa-lib at-spi2-core cairo fontconfig gtk3 libdrm libcups libx11 libxcomposite \
       libxdamage libxext libxfixes libxi libxkbcommon libxrandr mesa nspr nss pango ttf-liberation \
     && pacman -Scc --noconfirm
 COPY --from=seeds /usr /usr
 COPY --from=seeds /opt/phi/browser /opt/phi/browser
+# Only clangd is a Phi C/C++ LSP contract. Fetch the exact official release
+# during the controlled build and retain only its independently pinned binary.
+RUN set -eu; \
+    archive=/tmp/LLVM-22.1.8-Linux-X64.tar.xz; \
+    curl --fail --location --silent --show-error --retry 0 \
+      'https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz' -o "$archive"; \
+    test "$(stat -c %s "$archive")" = 1938859476; \
+    echo 'df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384  /tmp/LLVM-22.1.8-Linux-X64.tar.xz' | sha256sum -c -; \
+    mkdir -p /usr/local/lib/phi/llvm/22.1.8/bin; \
+    tar -xJf "$archive" --no-same-owner --no-same-permissions \
+      --strip-components=1 -C /usr/local/lib/phi/llvm/22.1.8 \
+      LLVM-22.1.8-Linux-X64/bin/clangd; \
+    test "$(stat -c %s /usr/local/lib/phi/llvm/22.1.8/bin/clangd)" = 106012688; \
+    echo 'aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324  /usr/local/lib/phi/llvm/22.1.8/bin/clangd' | sha256sum -c -; \
+    test "$(/usr/local/lib/phi/llvm/22.1.8/bin/clangd --version | head -n 1)" = 'clangd version 22.1.8 (https://github.com/llvm/llvm-project ca7933e47d3a3451d81e72ac174dcb5aa28b59d1)'; \
+    rm "$archive"
 RUN if test "$(readlink /usr/lib/libsimdjson.so.33)" = "libsimdjson.so.33.0.0" \
       && echo '8ed9852623a4d807d135abe39b3a09a31147462148cbd5b8aad34f490637712c  /usr/lib/libsimdjson.so.33.0.0' | sha256sum -c - \
       && readelf -d /usr/bin/node | grep -Fq 'Shared library: [libsimdjson.so.33]' \
@@ -39,7 +55,7 @@ COPY config/dap-requirements.txt /opt/phi/config/dap-requirements.txt
 COPY scripts/install-managed-dap.sh /opt/phi/scripts/install-managed-dap.sh
 RUN bash /opt/phi/scripts/install-managed-dap.sh
 
-COPY config/e4-toolchain-seeds.json config/git-resources.json config/dap-engine.json config/eval-engine.json config/ast-edit.json /opt/phi/config/
+COPY config/e4-toolchain-seeds.json config/e4-llvm-toolchain.json config/git-resources.json config/dap-engine.json config/eval-engine.json config/ast-edit.json /opt/phi/config/
 COPY certification/pi/package-lock.json /opt/phi/config/pi-package-lock.json
 COPY package.json /opt/phi/project/package.json
 COPY config/routing-policy.json /opt/phi/project/config/routing-policy.json
@@ -48,6 +64,7 @@ COPY platform/ /opt/phi/project/platform/
 COPY tests/agent-hub-control-bridge.test.mjs tests/ast-edit-engine.test.mjs /opt/phi/project/tests/
 RUN ln -s /opt/phi/pi/npm/node_modules /opt/phi/project/node_modules
 COPY scripts/e4-image-selfcheck.mjs /opt/phi/e4-image-selfcheck.mjs
+COPY scripts/e4-clangd-lsp-smoke.mjs /opt/phi/e4-clangd-lsp-smoke.mjs
 RUN mkdir -p /phi /evidence /run /tmp \
     && chmod -R a+rX /opt/phi \
     && test -z "$(find /phi -mindepth 1 -print -quit)"

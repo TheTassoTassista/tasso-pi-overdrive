@@ -9,6 +9,11 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   const ignore = read('certification/Dockerfile.e4.dockerignore');
   assert.match(dockerfile, /^FROM docker\.io\/library\/archlinux:base@sha256:[a-f0-9]{64}$/mu);
   assert.match(dockerfile, /^COPY --from=seeds \/usr \/usr$/mu);
+  assert.doesNotMatch(dockerfile, /\bgcc clang make\b/u, 'floating distro clang must not own clangd');
+  assert.match(dockerfile, /llvmorg-22\.1\.8\/LLVM-22\.1\.8-Linux-X64\.tar\.xz/u);
+  assert.match(dockerfile, /df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
+  assert.match(dockerfile, /aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324/u);
+  assert.match(dockerfile, /--strip-components=1 -C \/usr\/local\/lib\/phi\/llvm\/22\.1\.8/u);
   assert.doesNotMatch(dockerfile, /^RUN pacman[^\n]*\brust\b/mu, 'Rust must come only from the byte-pinned seed');
   assert.doesNotMatch(dockerfile, /\bcmake rust go\b/u, 'floating distro Rust must not precede the seed');
   assert.match(dockerfile, /^COPY --from=seeds \/opt\/phi\/browser \/opt\/phi\/browser$/mu);
@@ -18,6 +23,8 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   assert.match(dockerfile, /^COPY --from=lsp \/ \/opt\/phi\/runtime\/lsp\/managed\/$/mu);
   assert.match(dockerfile, /^COPY config\/routing-policy\.json \/opt\/phi\/project\/config\/routing-policy\.json$/mu);
   assert.match(ignore, /^!config\/routing-policy\.json$/mu);
+  assert.match(ignore, /^!config\/e4-llvm-toolchain\.json$/mu);
+  assert.match(ignore, /^!scripts\/e4-clangd-lsp-smoke\.mjs$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
   assert.match(dockerfile, /USER 1001:1001/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/bin\/node", "\/opt\/phi\/e4-image-selfcheck\.mjs"\]/u);
@@ -28,7 +35,7 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
 
 test('E4 self-check reads live tool manifests, proves jiti resolution and fails closed on identity mismatch', () => {
   const source = read('scripts/e4-image-selfcheck.mjs');
-  for (const name of ['e4-toolchain-seeds.json', 'git-resources.json', 'dap-engine.json', 'eval-engine.json', 'ast-edit.json', 'pi-package-lock.json']) {
+  for (const name of ['e4-toolchain-seeds.json', 'e4-llvm-toolchain.json', 'git-resources.json', 'dap-engine.json', 'eval-engine.json', 'ast-edit.json', 'pi-package-lock.json']) {
     assert.ok(source.includes(name), `${name} must be read`);
   }
   assert.match(source, /requireFromSubagents\.resolve\('jiti'\)/u);
@@ -42,7 +49,11 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
   assert.match(source, /assert\.equal\(manifest\.assets\.length, 10\)/u);
   assert.match(source, /command\('\/usr\/bin\/cmp', \['--version'\]/u);
-  assert.match(source, /command\('\/usr\/bin\/clangd', \['--version'\]/u);
+  assert.match(source, /command\(llvm\.clangdPath, \['--version'\]/u);
+  assert.match(source, /lspRuntimeStatus\(\)\.languages\.clangd\.binaryPath, llvm\.clangdPath/u);
+  assert.match(source, /E4_NO_ACCIDENTAL_23X_RESOLUTION=PASS/u);
+  assert.match(source, /E4_CPP_LSP_SMOKE=PASS/u);
+  assert.match(source, /E4_CLANGD_SHARED_LIBRARY_CLOSURE=PASS/u);
   assert.match(source, /E4_CLANGD_SHA256=/u);
   assert.match(source, /command\('\/usr\/bin\/rustc', \['--version'\]/u);
   assert.match(source, /command\('\/usr\/bin\/rustc', \['--print', 'sysroot'\]/u);
@@ -63,6 +74,8 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /packages: write/u);
   assert.match(job, /node scripts\/e4-stage-seeds\.mjs/u);
   assert.match(job, /node scripts\/install-managed-lsp\.mjs --runtime "\$RUNNER_TEMP\/phi-e4-lsp" --check/u);
+  assert.match(job, /Attest official LLVM 22\.1\.8 release asset metadata/u);
+  assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
   assert.match(job, /--security-opt no-new-privileges/u);
   assert.match(job, /test "\$package" = private/u);

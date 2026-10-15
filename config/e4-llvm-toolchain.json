@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "releaseTag": "llvmorg-22.1.8",
+  "assetId": 449438700,
+  "archiveName": "LLVM-22.1.8-Linux-X64.tar.xz",
+  "archiveUrl": "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz",
+  "archiveSize": 1938859476,
+  "archiveSha256": "df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384",
+  "archiveMember": "LLVM-22.1.8-Linux-X64/bin/clangd",
+  "clangdPath": "/usr/local/lib/phi/llvm/22.1.8/bin/clangd",
+  "clangdVersion": "22.1.8",
+  "clangdSize": 106012688,
+  "clangdSha256": "aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324",
+  "provenance": "Official llvm/llvm-project GitHub release asset; API asset ID, size, digest, tag and downloaded bytes verified"
+}

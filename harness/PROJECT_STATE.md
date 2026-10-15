@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current E4 LLVM candidate — image qualification pending (2026-10-16)
+
+Main `E4-CLANGD-22-1-8-CLOSURE-001` is durable. The official LLVM22.1.8 archive and extracted clangd have locally verified release metadata, exact size/SHA, version and C++ protocol callability. Proposed image uses the managed absolute clangd path and omits floating distro clang; normal host Pi remains on its prior path. CI38817537207 remains historical FAIL/cleanup PASS, not a qualified image. New image digest UNKNOWN. All29 Preflight2 rows OPEN, Rust/browser/cmp/DAP/Tier B not promoted. Image-only0/1, Final Preflight3 0/1, replacement E4 0/1; E1–E3 COMPLETE/do-not-redo, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Next: local ZERO_EGRESS/audit, checkpoint, one image-only qualification; first failure STOP for Main.
+
 ## Current STOP — ten-seed E4 image not qualified; clangd mismatch (2026-10-15)
 
 Image-only CI38817537207 on functional candidate `a8ed3209e7dc32b32c268a5f323dfd97486bdcb5` built and reached the isolated self-check after ten-seed and managed-LSP staging PASS, but **FAIL** because image clang23.1.1-1 differs from product-declared clangd22.1.8. No new image digest/publication; owned-container cleanup PASS/0 residual. The exact compatible signed clang package is not in checked local cache/archive endpoints; resolving via toolchain supply or product-version change requires Φ Main decision. E4 closure ledger still has 29/29 historical IDs and native closure OPEN. Final Preflight3 0/1, replacement E4 0/1; E1–E3 COMPLETE, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Protected user edit/untracked state preserved. Do not rerun unchanged image or spend Preflight3/E4.

@@ -2,6 +2,8 @@
 
 **PHI PORTABILITY: IN PROGRESS**
 
+Current E4 clangd compatibility candidate (2026-10-16): Main preserves the Phi clangd22.1.8 contract. Official LLVM `llvmorg-22.1.8` asset ID449438700/archive SHA `df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384` and extracted clangd SHA `aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324` were locally verified; bounded C++ LSP protocol smoke PASS. Image candidate installs this binary at `/usr/local/lib/phi/llvm/22.1.8/bin/clangd` and removes floating distro clang. Native image qualification PENDING (budget0/1); historical CI38817537207 remains FAIL with no digest. All29 Preflight2 entries OPEN, Final Preflight3 0/1, replacement E4 0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider call or active Pi update.
+
 ## E4 image-only qualification STOP: clangd version mismatch (2026-10-15)
 
 [CI38817537207](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38817537207)/job116705877790 on exact pushed `a8ed3209e7dc32b32c268a5f323dfd97486bdcb5`: ten exact seed staging and managed LSP check PASS; image build PASS; UID1001/no-network/read-only self-check FAIL because resolved clang23.1.1-1 conflicts with product-declared clangd22.1.8. No new image publication/digest; cleanup PASS/owned containers0. This is a KNOWN toolchain compatibility blocker, not native proof for other closure tools. No exact signed clang22.1.8 archive found in checked local sources; Main must choose compatible exact supply versus a product-LSP version migration. Preflight3 and replacement E4 remain 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Do not rerun unchanged image or spend either final budget.

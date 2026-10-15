@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 official LLVM clangd candidate local focus (2026-10-16)
+
+Official `llvmorg-22.1.8` asset ID449438700: local download size1,938,859,476/SHA `df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384` matches upstream metadata. Selected clangd size106,012,688/SHA `aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324`, version22.1.8, direct local LSP initialize/definition/shutdown PASS; ELF needs only standard libs. Focused E4/host/ledger19/19 and host C/C++ product LSP2/2 PASS. Syntax, TypeScript, package validation PASS. Native image build/self-check not run; local Docker access denied. Historical CI38817537207 FAIL unchanged, new digest UNKNOWN, all29 Preflight2 rows OPEN, Preflight3 0/1, E4 0/1. No new native browser/cmp/Rust/DAP claim.
+
 ## E4 ten-seed image-only qualification FAIL (2026-10-15)
 
 Dedicated native image-only CI38817537207/job116705877790 on `a8ed3209e7dc32b32c268a5f323dfd97486bdcb5`: ten seed stage PASS, managed LSP check PASS, Docker build PASS, non-root isolated self-check FAIL at clangd version mismatch. Native image installed clang/llvm-libs23.1.1-1; product registry declares clangd22.1.8. No image published, cleanup/owned containers0 PASS. This does not run or qualify browser, cmp, Rust, DAP, Tier B, full Linux check, Preflight3 or E4. Local focused E4/host17/17, package/syntax/TypeScript/shellcheck and indexed audit exit0/WARN/0 FAIL remain valid local-only evidence. Historical Preflight2 1103/736 PASS/29 FAIL/338 skip unchanged; Final Preflight3 0/1 and replacement E4 0/1. Main compatibility/provenance decision required before new candidate.

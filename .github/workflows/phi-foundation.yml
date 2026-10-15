@@ -142,6 +142,13 @@ jobs:
         run: |
           node scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp"
           node scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp" --check
+      - name: Attest official LLVM 22.1.8 release asset metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          identity=$(gh api repos/llvm/llvm-project/releases/tags/llvmorg-22.1.8 --jq '.assets[] | select(.name == "LLVM-22.1.8-Linux-X64.tar.xz") | [.id, .size, .digest] | @tsv')
+          test "$identity" = $'449438700\t1938859476\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384'
+          printf 'E4_LLVM_PROVENANCE=PASS tag=llvmorg-22.1.8 asset_id=449438700 archive_sha256=df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384\n'
       - name: Build minimal-context image and run isolated no-network self-check
         env:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}

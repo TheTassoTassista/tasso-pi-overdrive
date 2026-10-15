@@ -18,6 +18,7 @@
 !runtime/lsp/package-lock.json
 !scripts/
 !scripts/e4-image-selfcheck.mjs
+!scripts/e4-clangd-lsp-smoke.mjs
 !scripts/install-managed-lsp.mjs
 !scripts/install-managed-dap.sh
 !lib/managed-runtime-transaction.mjs
@@ -30,3 +31,4 @@
 !config/git-resources.json
 !config/managed-lsp.json
 !config/e4-toolchain-seeds.json
+!config/e4-llvm-toolchain.json

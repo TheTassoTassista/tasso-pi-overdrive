@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const root = '/opt/phi';
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'config', name), 'utf8'));
@@ -52,6 +53,16 @@ try {
   assert.equal(process.platform, 'linux');
   assert.equal(process.arch, 'x64');
   const manifest = read('e4-toolchain-seeds.json');
+  const llvm = read('e4-llvm-toolchain.json');
+  assert.equal(llvm.releaseTag, 'llvmorg-22.1.8');
+  assert.equal(llvm.assetId, 449438700);
+  assert.equal(llvm.archiveName, 'LLVM-22.1.8-Linux-X64.tar.xz');
+  assert.equal(llvm.archiveSize, 1938859476);
+  assert.equal(llvm.archiveSha256, 'df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384');
+  assert.equal(llvm.clangdPath, '/usr/local/lib/phi/llvm/22.1.8/bin/clangd');
+  assert.equal(llvm.clangdVersion, '22.1.8');
+  assert.equal(llvm.clangdSize, 106012688);
+  assert.equal(llvm.clangdSha256, 'aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
   assert.equal(manifest.assets.length, 10);
@@ -91,8 +102,28 @@ try {
   command(evalPolicy.runtimes.javascript.binaryPath, ['--version'], /^v26\.8\.2/mu);
   command(evalPolicy.processLimiter.binaryPath, ['--version'], /prlimit from util-linux 2\.42\.4/u);
   command('/usr/bin/cmp', ['--version'], /diffutils\) 3\.12/u);
-  command('/usr/bin/clangd', ['--version'], /^clangd version 22\.1\.8/mu);
-  process.stdout.write(`E4_CLANGD_SHA256=${hash('/usr/bin/clangd')}\n`);
+  assert.equal(fs.existsSync('/usr/bin/clangd'), false, 'distro clangd must not be image authority');
+  assert.equal(fs.realpathSync(llvm.clangdPath), llvm.clangdPath, 'managed clangd path is not canonical');
+  assert.equal(fs.statSync(llvm.clangdPath).size, llvm.clangdSize, 'managed clangd size mismatch');
+  fileIdentity(llvm.clangdPath, llvm.clangdSha256);
+  command(llvm.clangdPath, ['--version'], /^clangd version 22\.1\.8/mu);
+  const { lspRuntimeStatus } = await import(pathToFileURL(path.join(root, 'project', 'lib', 'lsp-manager.mjs')).href);
+  assert.equal(lspRuntimeStatus().languages.clangd.binaryPath, llvm.clangdPath, 'Phi resolved a non-managed clangd');
+  const clangdDynamic = command('/usr/bin/readelf', ['-d', llvm.clangdPath], /Shared library:/u);
+  assert.doesNotMatch(clangdDynamic, /libLLVM|libclang-cpp/u, 'clangd depends on an unowned LLVM library');
+  const clangdLibraries = command('/lib64/ld-linux-x86-64.so.2', ['--list', llvm.clangdPath], /libstdc\+\+\.so\.6/u);
+  assert.doesNotMatch(clangdLibraries, /not found/u, 'clangd has an unresolved library');
+  for (const match of clangdLibraries.matchAll(/=> (\/[^\s]+)/gu)) {
+    assert.match(match[1], /^\/usr\/lib\//u, `clangd library outside immutable rootfs: ${match[1]}`);
+  }
+  process.stdout.write(`E4_LLVM_PROVENANCE=PASS tag=${llvm.releaseTag} asset_id=${llvm.assetId}\n`);
+  process.stdout.write(`E4_LLVM_ARCHIVE_SHA256=${llvm.archiveSha256}\n`);
+  process.stdout.write(`E4_MANAGED_CLANGD_PATH=${llvm.clangdPath}\n`);
+  process.stdout.write(`E4_CLANGD_VERSION=${llvm.clangdVersion}\n`);
+  process.stdout.write(`E4_CLANGD_SHA256=${llvm.clangdSha256}\n`);
+  process.stdout.write('E4_CLANGD_SHARED_LIBRARY_CLOSURE=PASS\n');
+  process.stdout.write('E4_NO_ACCIDENTAL_23X_RESOLUTION=PASS\n');
+  command('/usr/bin/node', [path.join(root, 'e4-clangd-lsp-smoke.mjs'), llvm.clangdPath], /^E4_CPP_LSP_SMOKE=PASS$/mu);
   command('/usr/bin/rustc', ['--version'], /^rustc 1\.98\.1/mu);
   command('/usr/bin/cargo', ['--version'], /^cargo 1\.98\.1/mu);
   assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), '/usr');
