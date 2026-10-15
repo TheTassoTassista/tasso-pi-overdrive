@@ -7,9 +7,12 @@ LABEL org.opencontainers.image.revision="${PRODUCT_CANDIDATE_SHA}"
 # Node binary also needs its exact SONAME-compatible runtime library.
 RUN pacman -Syu --noconfirm --needed \
       bash coreutils findutils grep gawk sed tar git gdb python python-pip nodejs npm util-linux binutils \
-      gcc clang make cmake rust go openssh curl ca-certificates bubblewrap \
+      gcc clang make cmake go openssh curl ca-certificates bubblewrap \
+      alsa-lib at-spi2-core cairo fontconfig gtk3 libdrm libcups libx11 libxcomposite \
+      libxdamage libxext libxfixes libxi libxkbcommon libxrandr mesa nspr nss pango ttf-liberation \
     && pacman -Scc --noconfirm
 COPY --from=seeds /usr /usr
+COPY --from=seeds /opt/phi/browser /opt/phi/browser
 RUN if test "$(readlink /usr/lib/libsimdjson.so.33)" = "libsimdjson.so.33.0.0" \
       && echo '8ed9852623a4d807d135abe39b3a09a31147462148cbd5b8aad34f490637712c  /usr/lib/libsimdjson.so.33.0.0' | sha256sum -c - \
       && readelf -d /usr/bin/node | grep -Fq 'Shared library: [libsimdjson.so.33]' \

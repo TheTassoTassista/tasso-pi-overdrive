@@ -126,6 +126,64 @@
           "installedPath": "/usr/bin/prlimit"
         }
       ]
+    },
+    {
+      "logicalName": "diffutils-3.12-cmp",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 644268696,
+      "name": "diffutils-3.12-2.1-x86_64_v3.pkg.tar.zst",
+      "size": 358331,
+      "sha256": "4861cf7eef214499e2133173fc489535b10c26b42a093d03791c7a80d1e6f391",
+      "extracted": [
+        {
+          "path": "usr/bin/cmp",
+          "sha256": "ec366a67754f3828c731a1c35ec7d32384a3446bf3291648f5eba9f9b4d4f8d8",
+          "installedPath": "/usr/bin/cmp"
+        }
+      ]
+    },
+    {
+      "logicalName": "browser-runtime-0.36.0-chrome-152.0.7977.82",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 644268698,
+      "name": "browser-runtime-0.36.0-chrome-152.0.7977.82.pkg.tar.zst",
+      "size": 180386769,
+      "sha256": "d51d8629c617002da6ad38ab2af7f6a0fa630e30278f7525651fd0a000dec2ba",
+      "provenance": "LOCAL_PINNED_RUNTIME_SNAPSHOT; exact agent-browser and Chrome for Testing executable hashes from production browser policy",
+      "extracted": [
+        {
+          "path": "opt/phi/browser/agent-browser-0.36.0/agent-browser",
+          "sha256": "56d15181e51e00213f907fcf39707cfc76bfa804ff20f5a9373661c73f96de5e",
+          "installedPath": "/opt/phi/browser/agent-browser-0.36.0/agent-browser"
+        },
+        {
+          "path": "opt/phi/browser/chrome-152.0.7977.82/chrome",
+          "sha256": "115ee0fc6d26768ec757db2b0c6f54554dece46b59e96c7eca653c944db7f3de",
+          "installedPath": "/opt/phi/browser/chrome-152.0.7977.82/chrome"
+        }
+      ]
+    },
+    {
+      "logicalName": "rust-1.98.1-toolchain",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 644320524,
+      "name": "rust-1.1.98.1-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 80695461,
+      "sha256": "e624239dd596d3ecc80f7888a1fc8c3016ac7aa601b4f9f80487b8b6fc3f89ff",
+      "sourcePackage": "rust 1:1.98.1-1.1 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "extracted": [
+        {
+          "path": "usr/bin/rustc",
+          "sha256": "23aad380e95f6a3bfd3f49b745eb8ce4418d2ec96944bd9f49ebbde67de38d97",
+          "installedPath": "/usr/bin/rustc"
+        },
+        {
+          "path": "usr/bin/cargo",
+          "sha256": "29a290227dbeee28e20dd9692b7d71c46cd5f1d9295f90ab6975ce67c9ae9643",
+          "installedPath": "/usr/bin/cargo"
+        }
+      ]
     }
   ]
 }

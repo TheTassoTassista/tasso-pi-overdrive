@@ -23,7 +23,7 @@ expected_temp=$(dirname -- "$(dirname -- "$(dirname -- "$(dirname -- "$expected_
 expected_version=0.9.0-1ubuntu0.3
 expected_bwrap_sha=e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30f71
 expected_profile_sha=09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51
-expected_seed_sha=da2d116db8e0a4781eaa31815371a51a0d5ca9808343ce8e5b2808acc7de4681
+expected_seed_sha=e8c10f51b26f2837c29f460ac18163387e7fb024be817580014f0d4fb618beea
 expected_image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a'
 [[ ${RUNNER_OS:-} == Linux && ${RUNNER_TEMP:-} == "$expected_temp" && -n ${ImageVersion:-} ]] || fail RUNNER_IDENTITY
 [[ $(id -u) -ne 0 ]] || fail ROOT_RUNNER
@@ -209,18 +209,48 @@ cp -a -- "$product_source/." "$stage/fixture/project/" || fail PRODUCT_COPY
 [[ $(git -C "$stage/fixture/project" rev-parse HEAD) == "$product_sha" ]] || fail COPIED_PRODUCT_SHA
 ln -s /opt/phi/pi/npm/node_modules "$stage/fixture/project/node_modules"
 mkdir -p "$stage/fixture/project/runtime/lsp"
-ln -s /opt/phi/runtime/lsp/node_modules "$stage/fixture/project/runtime/lsp/node_modules"
+# Product attestation requires a canonical, single-link compiler file at the
+# project-relative path. LSP servers use the separately attested image runtime.
+compiler_source="$stage/rootfs/opt/phi/runtime/lsp/node_modules/typescript/lib/typescript.js"
+compiler_target="$stage/fixture/project/runtime/lsp/node_modules/typescript/lib/typescript.js"
+mkdir -p "$(dirname -- "$compiler_target")"
+cp -- "$compiler_source" "$compiler_target" || fail TYPESCRIPT_FIXTURE_COPY
+[[ -f "$compiler_target" && ! -L "$compiler_target" && $(stat -c %h "$compiler_target") == 1 &&
+   $(sha256sum "$compiler_target" | awk '{print $1}') == 569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39 ]] || fail TYPESCRIPT_FIXTURE_IDENTITY
+# debugpy is also checked by the product at a project-relative canonical tree.
+mkdir -p "$stage/fixture/project/runtime/dap/python"
+cp -a -- "$stage/rootfs/opt/phi/runtime/dap/python/debugpy" "$stage/fixture/project/runtime/dap/python/debugpy" || fail DAP_FIXTURE_COPY
 ast_bin=/opt/phi/pi/npm/node_modules/@ast-grep/cli-linux-x64-gnu/ast-grep
-validation_args=("${bwrap_args[@]}"
+# Tier A above retains --disable-userns. Only the trusted certification
+# regression driver removes that one switch so its production sandbox tests
+# may create their own bounded child user namespaces. Mounts, environment,
+# network and all production Worker policies are otherwise unchanged.
+trusted_regression_args=()
+for argument in "${bwrap_args[@]}"; do
+  [[ "$argument" == --disable-userns ]] || trusted_regression_args+=("$argument")
+done
+(( ${#trusted_regression_args[@]} + 1 == ${#bwrap_args[@]} )) || fail TIER_B_POLICY
+validation_args=("${trusted_regression_args[@]}"
+  --dir /tmp/.local --dir /tmp/.local/share --dir /tmp/.local/share/pi-overdrive
+  --ro-bind "$stage/rootfs/opt/phi/browser/agent-browser-0.36.0" /tmp/.local/share/pi-overdrive/agent-browser-0.36.0
+  --dir /tmp/.agent-browser --dir /tmp/.agent-browser/browsers
+  --ro-bind "$stage/rootfs/opt/phi/browser/chrome-152.0.7977.82" /tmp/.agent-browser/browsers/chrome-152.0.7977.82
   --setenv PI_PACKAGE_ROOT /opt/phi/pi/npm/node_modules/@earendil-works/pi-coding-agent
   --setenv PI_CODING_AGENT_DIR /opt/phi/pi
+  --setenv PI_OVERDRIVE_LSP_RUNTIME /opt/phi/runtime/lsp
   --setenv PI_OVERDRIVE_AST_GREP_BIN "$ast_bin"
+  --setenv NODE_OPTIONS --test-reporter=tap
   --setenv PYTHONDONTWRITEBYTECODE 1
   --setenv PYTHONPATH /opt/phi/runtime/dap/python)
 run_validation() {
   verify_frozen
   timeout --signal=TERM --kill-after=5s 20m "$expected_bwrap" "${validation_args[@]}" -- /usr/bin/sh -c "cd /phi/project && $1"
 }
+# The single-quoted expression is evaluated by the isolated child shell.
+# shellcheck disable=SC2016
+run_validation 'test ! -e /host && test ! -e /workspace && test ! -e /run/docker.sock && test ! -e /var/run/docker.sock && test ! -e "$E4_HOST_SENTINEL" && test ! -e "$E4_HOST_WORKSPACE" && test "$(awk '\''/^CapEff:/ {print $2}'\'' /proc/self/status)" = 0000000000000000 && /usr/bin/unshare --user --map-root-user /usr/bin/true' || fail TIER_B_CAPABILITY
+assert_no_owned
+printf 'E4_PREFLIGHT_TIER_B_CAPABILITY=PASS\n'
 run_validation 'npm run check' || fail FULL_CHECK
 assert_no_owned
 printf 'E4_PREFLIGHT_NPM_CHECK=PASS\n'

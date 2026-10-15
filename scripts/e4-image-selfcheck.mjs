@@ -54,7 +54,7 @@ try {
   const manifest = read('e4-toolchain-seeds.json');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
-  assert.equal(manifest.assets.length, 7);
+  assert.equal(manifest.assets.length, 10);
   const byName = new Map(manifest.assets.map((item) => [item.logicalName, item]));
   for (const asset of manifest.assets) {
     for (const item of asset.extracted) fileIdentity(item.installedPath, item.sha256);
@@ -90,6 +90,27 @@ try {
   command(evalPolicy.runtimes.python.binaryPath, ['--version'], /^Python 3\.14\.7/mu);
   command(evalPolicy.runtimes.javascript.binaryPath, ['--version'], /^v26\.8\.2/mu);
   command(evalPolicy.processLimiter.binaryPath, ['--version'], /prlimit from util-linux 2\.42\.4/u);
+  command('/usr/bin/cmp', ['--version'], /diffutils\) 3\.12/u);
+  command('/usr/bin/clangd', ['--version'], /^clangd version 22\.1\.8/mu);
+  process.stdout.write(`E4_CLANGD_SHA256=${hash('/usr/bin/clangd')}\n`);
+  command('/usr/bin/rustc', ['--version'], /^rustc 1\.98\.1/mu);
+  command('/usr/bin/cargo', ['--version'], /^cargo 1\.98\.1/mu);
+  assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), '/usr');
+  const rustProbe = fs.mkdtempSync('/tmp/phi-e4-rust-');
+  try {
+    const executable = path.join(rustProbe, 'smoke');
+    const compiled = spawnSync('/usr/bin/rustc', ['--edition=2021', '-', '-o', executable], {
+      input: 'fn main() { println!("E4_RUST_SYSROOT_READY"); }\n', encoding: 'utf8',
+      timeout: 15000, maxBuffer: 1024 * 1024, cwd: rustProbe,
+      env: { PATH: '/usr/bin:/bin', HOME: '/tmp' },
+    });
+    assert.equal(compiled.status, 0, `seeded Rust/sysroot compile failed: ${compiled.stderr}`);
+    command(executable, [], /^E4_RUST_SYSROOT_READY$/mu);
+  } finally {
+    fs.rmSync(rustProbe, { recursive: true, force: true });
+  }
+  command('/opt/phi/browser/agent-browser-0.36.0/agent-browser', ['--version'], /agent-browser 0\.36\.0/u);
+  command('/opt/phi/browser/chrome-152.0.7977.82/chrome', ['--version'], /Chrome for Testing 152\.0\.7977\.82/u);
 
   const pi = packageVersion('@earendil-works/pi-coding-agent', '0.87.1');
   const subagents = packageVersion('pi-subagents', '0.66.0');

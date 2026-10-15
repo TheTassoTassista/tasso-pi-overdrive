@@ -60,8 +60,27 @@ test('host preflight retains frozen Bubblewrap policy and isolates every validat
   assert.match(script, /E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=%s/u);
   assert.match(script, /rm -rf -- "\$stage" \|\| cleanup_ok=0/u);
   assert.match(script, /assert_no_owned\(\)/u);
-  assert.equal((script.match(/^assert_no_owned$/gmu) ?? []).length, 5, 'every payload phase must drain before the next');
+  assert.equal((script.match(/^assert_no_owned$/gmu) ?? []).length, 6, 'every payload phase must drain before the next');
   assert.doesNotMatch(script, /sudo (?:-n )?"?\$?expected_bwrap|sudo (?:-n )?bwrap|--privileged|seccomp=unconfined|--share-net|GITHUB_TOKEN|GH_TOKEN|https?:\/\//u);
+});
+
+test('trusted Tier B removes only nested-userns denial and attests canonical fixture dependencies', () => {
+  const strict = script.match(/bwrap_args=\(\n([\s\S]*?)\n\)/u)?.[1];
+  assert.ok(strict);
+  assert.match(strict, /--disable-userns/u);
+  assert.match(script, /for argument in "\$\{bwrap_args\[@\]\}"; do\n  \[\[ "\$argument" == --disable-userns \]\] \|\| trusted_regression_args\+=\("\$argument"\)\ndone/u);
+  assert.match(script, /\(\( \$\{#trusted_regression_args\[@\]\} \+ 1 == \$\{#bwrap_args\[@\]\} \)\) \|\| fail TIER_B_POLICY/u);
+  assert.match(script, /run_validation 'test ! -e \/host .*\/usr\/bin\/unshare --user --map-root-user \/usr\/bin\/true' \|\| fail TIER_B_CAPABILITY/u);
+  assert.match(script, /E4_PREFLIGHT_TIER_B_CAPABILITY=PASS/u);
+  assert.match(script, /--setenv PI_OVERDRIVE_LSP_RUNTIME \/opt\/phi\/runtime\/lsp/u);
+  assert.match(script, /compiler_target="\$stage\/fixture\/project\/runtime\/lsp\/node_modules\/typescript\/lib\/typescript\.js"/u);
+  assert.match(script, /stat -c %h "\$compiler_target"\) == 1/u);
+  assert.match(script, /cp -a -- "\$stage\/rootfs\/opt\/phi\/runtime\/dap\/python\/debugpy"/u);
+  assert.match(script, /--setenv NODE_OPTIONS --test-reporter=tap/u);
+  assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/agent-browser-0\.36\.0" \/tmp\/\.local\/share\/pi-overdrive\/agent-browser-0\.36\.0/u);
+  assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/chrome-152\.0\.7977\.82" \/tmp\/\.agent-browser\/browsers\/chrome-152\.0\.7977\.82/u);
+  assert.match(script, /expected_seed_sha=e8c10f51b26f2837c29f460ac18163387e7fb024be817580014f0d4fb618beea/u);
+  assert.doesNotMatch(script, /--share-net|--bind \/ \/|--bind \/var\/run|--bind \/run|--bind \/home/u);
 });
 
 test('probe fixture reset removes only the exact owned footprint and rejects extras or symlinks', () => {

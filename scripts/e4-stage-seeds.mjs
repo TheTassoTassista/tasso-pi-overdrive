@@ -17,6 +17,17 @@ const selected = Object.freeze({
   'nodejs-26.8.2': ['usr/bin/node'],
   'simdjson-4.6.11-node-runtime': ['usr/lib/libsimdjson.so.33', 'usr/lib/libsimdjson.so.33.0.0'],
   'util-linux-2.42.4': ['usr/bin/prlimit'],
+  'diffutils-3.12-cmp': ['usr/bin/cmp'],
+  'browser-runtime-0.36.0-chrome-152.0.7977.82': [
+    'opt/phi/browser/agent-browser-0.36.0',
+    'opt/phi/browser/chrome-152.0.7977.82',
+  ],
+  'rust-1.98.1-toolchain': [
+    'usr/bin/rustc', 'usr/bin/cargo',
+    'usr/lib/librustc_driver-6486d279b43c5e4c.so', 'usr/lib/libstd-a4cf8c125ff393c3.so',
+    'usr/lib/rust-analyzer-proc-macro-srv',
+    'usr/lib/rustlib/etc', 'usr/lib/rustlib/x86_64-unknown-linux-gnu/lib',
+  ],
 });
 
 function fail(code) { throw new Error(`E4_SEED_${code}`); }
@@ -37,14 +48,33 @@ export function validateSeedManifest(manifest) {
     if (!Object.hasOwn(selected, asset.logicalName) || names.has(asset.logicalName) ||
         !Number.isSafeInteger(asset.assetId) || asset.assetId < 1 || ids.has(asset.assetId) ||
         typeof asset.name !== 'string' || !/^[a-z0-9][a-z0-9._-]+\.pkg\.tar\.zst$/u.test(asset.name) ||
-        !Number.isSafeInteger(asset.size) || asset.size < 1 || asset.size > 100 * 1024 * 1024 ||
+        !Number.isSafeInteger(asset.size) || asset.size < 1 ||
+        asset.size > (asset.logicalName.startsWith('browser-runtime-') ? 200 : 100) * 1024 * 1024 ||
         !['UNAVAILABLE_IN_CHECKED_SOURCES', 'NOT_ASSESSED_FOR_THIS_TRANSPORT'].includes(asset.upstreamRefetchability) ||
-        !validHash(asset.sha256) || !Array.isArray(asset.extracted) || asset.extracted.length !== 1) fail('MANIFEST_ASSET_INVALID');
+        !validHash(asset.sha256) || !Array.isArray(asset.extracted) ||
+        asset.extracted.length !== (['browser-runtime-0.36.0-chrome-152.0.7977.82', 'rust-1.98.1-toolchain'].includes(asset.logicalName) ? 2 : 1)) fail('MANIFEST_ASSET_INVALID');
     names.add(asset.logicalName);
     ids.add(asset.assetId);
+    if (asset.logicalName.startsWith('browser-runtime-') &&
+        (asset.provenance !== 'LOCAL_PINNED_RUNTIME_SNAPSHOT; exact agent-browser and Chrome for Testing executable hashes from production browser policy' ||
+         asset.extracted[0]?.path !== 'opt/phi/browser/agent-browser-0.36.0/agent-browser' ||
+         asset.extracted[1]?.path !== 'opt/phi/browser/chrome-152.0.7977.82/chrome' ||
+         asset.extracted[0]?.sha256 !== '56d15181e51e00213f907fcf39707cfc76bfa804ff20f5a9373661c73f96de5e' ||
+         asset.extracted[1]?.sha256 !== '115ee0fc6d26768ec757db2b0c6f54554dece46b59e96c7eca653c944db7f3de')) fail('MANIFEST_BROWSER_IDENTITY_INVALID');
+    if (asset.logicalName === 'rust-1.98.1-toolchain' &&
+        (asset.sourcePackage !== 'rust 1:1.98.1-1.1 x86_64_v3' ||
+         asset.signatureFingerprint !== '882DCFE48E2051D48E2562ABF3B607488DB35A47' ||
+         asset.extracted[0]?.path !== 'usr/bin/rustc' ||
+         asset.extracted[1]?.path !== 'usr/bin/cargo' ||
+         asset.extracted[0]?.sha256 !== '23aad380e95f6a3bfd3f49b745eb8ce4418d2ec96944bd9f49ebbde67de38d97' ||
+         asset.extracted[1]?.sha256 !== '29a290227dbeee28e20dd9692b7d71c46cd5f1d9295f90ab6975ce67c9ae9643')) fail('MANIFEST_RUST_IDENTITY_INVALID');
+    const extractedPaths = new Set();
+    for (const item of asset.extracted) {
+      if (!selected[asset.logicalName].some((relative) => item?.path === relative || item?.path?.startsWith(`${relative}/`)) ||
+          !validHash(item.sha256) || item.installedPath !== `/${item.path}` || extractedPaths.has(item.path)) fail('MANIFEST_EXTRACTED_INVALID');
+      extractedPaths.add(item.path);
+    }
     const item = asset.extracted[0];
-    if (!selected[asset.logicalName].some((relative) => item?.path === relative || item?.path?.startsWith(`${relative}/`)) || !validHash(item.sha256) ||
-        item.installedPath !== `/${item.path}`) fail('MANIFEST_EXTRACTED_INVALID');
     if (asset.logicalName === 'simdjson-4.6.11-node-runtime') {
       const runtime = asset.runtimeDependency;
       const node = manifest.assets.find((entry) => entry.logicalName === 'nodejs-26.8.2');

@@ -12,9 +12,9 @@ const git = manifest.assets.find((asset) => asset.logicalName === 'git-2.55.0');
 const simdjson = manifest.assets.find((asset) => asset.logicalName === 'simdjson-4.6.11-node-runtime');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-test('E4 seed manifest binds seven distinct immutable assets and exact runtime paths', () => {
-  assert.equal(manifest.assets.length, 7);
-  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 7);
+test('E4 seed manifest binds ten distinct immutable assets and exact runtime paths', () => {
+  assert.equal(manifest.assets.length, 10);
+  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 10);
   assert.equal(manifest.release.internalOnly, true);
   assert.equal(simdjson.runtimeDependency.soname, 'libsimdjson.so.33');
   assert.equal(simdjson.runtimeDependency.requiredBySha256, manifest.assets.find((asset) => asset.logicalName === 'nodejs-26.8.2').extracted[0].sha256);
@@ -22,6 +22,17 @@ test('E4 seed manifest binds seven distinct immutable assets and exact runtime p
   assert.throws(() => validateSeedManifest({ ...manifest, assets: [...manifest.assets.slice(0, -1), manifest.assets[0]] }), /E4_SEED_MANIFEST_ASSET_INVALID/u);
   const changed = { ...simdjson, runtimeDependency: { ...simdjson.runtimeDependency, soname: 'libsimdjson.so.34' } };
   assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === simdjson ? changed : asset) }), /E4_SEED_MANIFEST_RUNTIME_DEPENDENCY_INVALID/u);
+  const browser = manifest.assets.find((asset) => asset.logicalName.startsWith('browser-runtime-'));
+  assert.equal(browser.extracted.length, 2);
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === browser ?
+    { ...browser, extracted: [browser.extracted[1], browser.extracted[0]] } : asset) }), /E4_SEED_MANIFEST_BROWSER_IDENTITY_INVALID/u);
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === browser ?
+    { ...browser, extracted: [browser.extracted[0], { ...browser.extracted[1], installedPath: '/tmp/chrome' }] } : asset) }), /E4_SEED_MANIFEST_EXTRACTED_INVALID/u);
+  assert.equal(manifest.assets.find((asset) => asset.logicalName === 'diffutils-3.12-cmp').extracted[0].path, 'usr/bin/cmp');
+  const rust = manifest.assets.find((asset) => asset.logicalName === 'rust-1.98.1-toolchain');
+  assert.equal(rust.extracted.length, 2);
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === rust ?
+    { ...rust, extracted: [rust.extracted[1], rust.extracted[0]] } : asset) }), /E4_SEED_MANIFEST_RUST_IDENTITY_INVALID/u);
 });
 
 test('E4 private asset identity rejects wrong ID, size, digest and bytes', () => {

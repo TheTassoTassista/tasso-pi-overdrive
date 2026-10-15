@@ -9,6 +9,9 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   const ignore = read('certification/Dockerfile.e4.dockerignore');
   assert.match(dockerfile, /^FROM docker\.io\/library\/archlinux:base@sha256:[a-f0-9]{64}$/mu);
   assert.match(dockerfile, /^COPY --from=seeds \/usr \/usr$/mu);
+  assert.doesNotMatch(dockerfile, /^RUN pacman[^\n]*\brust\b/mu, 'Rust must come only from the byte-pinned seed');
+  assert.doesNotMatch(dockerfile, /\bcmake rust go\b/u, 'floating distro Rust must not precede the seed');
+  assert.match(dockerfile, /^COPY --from=seeds \/opt\/phi\/browser \/opt\/phi\/browser$/mu);
   assert.match(dockerfile, /readelf -d \/usr\/bin\/node \| grep -Fq 'Shared library: \[libsimdjson\.so\.33\]'/u);
   assert.match(dockerfile, /ld-linux-x86-64\.so\.2 --list \/usr\/bin\/node/u);
   assert.match(dockerfile, /TOOLCHAIN_RUNTIME_DEPENDENCY_MISSING tool=node soname=libsimdjson\.so\.33/u);
@@ -37,6 +40,15 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
   assert.match(source, /node_modules\/@ast-grep\/cli-linux-x64-gnu/u);
   assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
+  assert.match(source, /assert\.equal\(manifest\.assets\.length, 10\)/u);
+  assert.match(source, /command\('\/usr\/bin\/cmp', \['--version'\]/u);
+  assert.match(source, /command\('\/usr\/bin\/clangd', \['--version'\]/u);
+  assert.match(source, /E4_CLANGD_SHA256=/u);
+  assert.match(source, /command\('\/usr\/bin\/rustc', \['--version'\]/u);
+  assert.match(source, /command\('\/usr\/bin\/rustc', \['--print', 'sysroot'\]/u);
+  assert.match(source, /E4_RUST_SYSROOT_READY/u);
+  assert.match(source, /compiled\.status, 0/u);
+  assert.match(source, /command\('\/opt\/phi\/browser\/chrome-152\.0\.7977\.82\/chrome', \['--version'\]/u);
   assert.match(source, /\['--test', '--test-reporter=tap',/u);
   assert.doesNotMatch(source, /path\.join\(root, 'pi', 'npm', 'node_modules', '@ast-grep', 'cli', 'ast-grep'\)/u);
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
