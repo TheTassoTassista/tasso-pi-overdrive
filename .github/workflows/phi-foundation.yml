@@ -98,6 +98,10 @@ on:
         description: Build and self-qualify the private immutable E4 image; no preflight or E4
         type: boolean
         default: false
+      e4-rust-diagnostic-only:
+        description: With image-only selected, run the one bounded Rust startup probe instead of qualification or publication
+        type: boolean
+        default: false
       e4-ubuntu-preflight-only:
         description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
         type: boolean
@@ -149,9 +153,10 @@ jobs:
           identity=$(gh api repos/llvm/llvm-project/releases/tags/llvmorg-22.1.8 --jq '.assets[] | select(.name == "LLVM-22.1.8-Linux-X64.tar.xz") | [.id, .size, .digest] | @tsv')
           test "$identity" = $'449438700\t1938859476\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384'
           printf 'E4_LLVM_PROVENANCE=PASS tag=llvmorg-22.1.8 asset_id=449438700 archive_sha256=df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384\n'
-      - name: Build minimal-context image and run isolated no-network self-check
+      - name: Build minimal-context image and run isolated no-network Rust diagnostic or self-check
         env:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
+          E4_RUST_DIAGNOSTIC: ${{ inputs['e4-rust-diagnostic-only'] }}
         run: |
           docker buildx build --file certification/Dockerfile.e4 \
             --build-arg "PRODUCT_CANDIDATE_SHA=$GITHUB_SHA" \
@@ -161,11 +166,19 @@ jobs:
           test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
           printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
           printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
-          docker run --rm --name "phi-e4-image-selfcheck-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
-            --security-opt no-new-privileges --pids-limit 64 --memory 1g \
-            --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
-            --user 1001:1001 "$E4_IMAGE_REF"
+          if test "$E4_RUST_DIAGNOSTIC" = true; then
+            docker run --rm --name "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 64 --memory 1g \
+              --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+              --user 1001:1001 --entrypoint /usr/bin/node "$E4_IMAGE_REF" /opt/phi/e4-rust-diagnostic.mjs
+          else
+            docker run --rm --name "phi-e4-image-selfcheck-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 64 --memory 1g \
+              --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+              --user 1001:1001 "$E4_IMAGE_REF"
+          fi
       - name: Publish only qualified image and record exact digest
+        if: ${{ !inputs['e4-rust-diagnostic-only'] }}
         env:
           GH_TOKEN: ${{ github.token }}
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
@@ -180,11 +193,20 @@ jobs:
           printf 'E4_IMAGE_PRIVATE=PASS\n'
       - name: Final image-job owned-container cleanup
         if: always()
+        env:
+          E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
         run: |
-          container="phi-e4-image-selfcheck-$GITHUB_RUN_ID"
-          if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
-          test -z "$(docker ps -aq --filter "name=^/$container$")"
+          docker info >/dev/null
+          for container in "phi-e4-image-selfcheck-$GITHUB_RUN_ID" "phi-e4-rust-diagnostic-$GITHUB_RUN_ID"; do
+            if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
+            test -z "$(docker ps -aq --filter "name=^/$container$")"
+          done
           printf 'E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0\n'
+          if docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then docker image rm "$E4_IMAGE_REF" >/dev/null; fi
+          if docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then echo 'E4_IMAGE_LOCAL_TAG_STATE=FAIL' >&2; exit 1; fi
+          printf 'E4_IMAGE_LOCAL_TAG_STATE=REMOVED\n'
+          node scripts/e4-owned-image-cleanup.mjs
+          printf 'E4_IMAGE_BUILD_TEMP_STATE=RUNNER_DOCKER_CACHE_UNSCOPED\n'
   e4-ubuntu-preflight:
     if: github.event_name == 'workflow_dispatch' && inputs['e4-ubuntu-preflight-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['e4-image-qualification-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused']
     runs-on: ubuntu-24.04

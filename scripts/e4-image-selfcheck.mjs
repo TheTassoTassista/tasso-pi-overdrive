@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { rustStartupEvidence } from './e4-rust-startup.mjs';
 
 const root = '/opt/phi';
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'config', name), 'utf8'));
@@ -65,13 +66,28 @@ try {
   assert.equal(llvm.clangdSha256, 'aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
-  assert.equal(manifest.assets.length, 10);
+  assert.equal(manifest.assets.length, 11);
   const byName = new Map(manifest.assets.map((item) => [item.logicalName, item]));
   for (const asset of manifest.assets) {
     for (const item of asset.extracted) fileIdentity(item.installedPath, item.sha256);
   }
   const nodeSeed = byName.get('nodejs-26.8.2');
   const simdjson = byName.get('simdjson-4.6.11-node-runtime')?.runtimeDependency;
+  const rustSeed = byName.get('rust-1.98.1-toolchain');
+  const rustRuntime = byName.get('llvm-libs-22.1.8-rust-runtime')?.runtimeDependency;
+  assert.equal(rustRuntime?.soname, 'libLLVM.so.22.1');
+  assert.equal(rustRuntime.path, '/usr/lib/libLLVM.so.22.1');
+  assert.equal(rustRuntime.sha256, byName.get('llvm-libs-22.1.8-rust-runtime').extracted[0].sha256);
+  assert.equal(fs.statSync(rustRuntime.path).size, rustRuntime.size);
+  fileIdentity(rustRuntime.path, rustRuntime.sha256);
+  assert.equal(rustRuntime.requiredBy, '/usr/lib/librustc_driver-6486d279b43c5e4c.so');
+  assert.equal(rustRuntime.requiredBy, rustSeed.toolchain.driverPath);
+  assert.equal(rustRuntime.requiredBySha256, rustSeed.toolchain.driverSha256);
+  fileIdentity(rustRuntime.requiredBy, rustRuntime.requiredBySha256);
+  assert.equal(rustSeed.extracted[0].installedPath, rustSeed.toolchain.rustcPath);
+  assert.equal(rustSeed.extracted[1].installedPath, rustSeed.toolchain.cargoPath);
+  assert.equal(rustSeed.toolchain.version, '1.98.1');
+  fileIdentity(rustSeed.toolchain.stdLibraryPath, rustSeed.toolchain.stdLibrarySha256);
   assert.equal(simdjson?.requiredBy, '/usr/bin/node');
   assert.equal(simdjson.requiredBySha256, nodeSeed.extracted[0].sha256);
   assert.equal(simdjson.soname, 'libsimdjson.so.33');
@@ -124,9 +140,19 @@ try {
   process.stdout.write('E4_CLANGD_SHARED_LIBRARY_CLOSURE=PASS\n');
   process.stdout.write('E4_NO_ACCIDENTAL_23X_RESOLUTION=PASS\n');
   command('/usr/bin/node', [path.join(root, 'e4-clangd-lsp-smoke.mjs'), llvm.clangdPath], /^E4_CPP_LSP_SMOKE=PASS$/mu);
-  command('/usr/bin/rustc', ['--version'], /^rustc 1\.98\.1/mu);
+  const rustStartup = rustStartupEvidence('/usr/bin/rustc', rustSeed.extracted[0].sha256);
+  process.stdout.write(`E4_RUST_STARTUP_EVIDENCE=${JSON.stringify(rustStartup.evidence)}\n`);
+  assert.equal(rustStartup.pass, true, `Rust startup failed: ${rustStartup.evidence.category}`);
+  command('/usr/bin/readelf', ['-d', rustRuntime.requiredBy], /Shared library: \[libLLVM\.so\.22\.1\]/u);
+  command('/usr/bin/readelf', ['-d', rustRuntime.path], /Library soname: \[libLLVM\.so\.22\.1\]/u);
+  const rustLibraries = command('/lib64/ld-linux-x86-64.so.2', ['--list', '/usr/bin/rustc'], /libLLVM\.so\.22\.1 => \/usr\/lib\/libLLVM\.so\.22\.1/u);
+  assert.doesNotMatch(rustLibraries, /not found/u, 'Rust has an unresolved rootfs library');
+  for (const match of rustLibraries.matchAll(/=> (\/[^\s]+)/gu)) {
+    assert.match(match[1], /^\/usr\/lib\//u, `Rust library outside immutable rootfs: ${match[1]}`);
+  }
+  process.stdout.write('E4_RUST_SHARED_LIBRARY_CLOSURE=PASS\n');
   command('/usr/bin/cargo', ['--version'], /^cargo 1\.98\.1/mu);
-  assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), '/usr');
+  assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), rustSeed.toolchain.sysrootPath);
   const rustProbe = fs.mkdtempSync('/tmp/phi-e4-rust-');
   try {
     const executable = path.join(rustProbe, 'smoke');

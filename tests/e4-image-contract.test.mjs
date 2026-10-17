@@ -25,6 +25,10 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   assert.match(ignore, /^!config\/routing-policy\.json$/mu);
   assert.match(ignore, /^!config\/e4-llvm-toolchain\.json$/mu);
   assert.match(ignore, /^!scripts\/e4-clangd-lsp-smoke\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-rust-startup\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-rust-diagnostic\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-rust-startup\.mjs \/opt\/phi\/e4-rust-startup\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-rust-diagnostic\.mjs \/opt\/phi\/e4-rust-diagnostic\.mjs$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
   assert.match(dockerfile, /USER 1001:1001/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/bin\/node", "\/opt\/phi\/e4-image-selfcheck\.mjs"\]/u);
@@ -47,7 +51,7 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
   assert.match(source, /node_modules\/@ast-grep\/cli-linux-x64-gnu/u);
   assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
-  assert.match(source, /assert\.equal\(manifest\.assets\.length, 10\)/u);
+  assert.match(source, /assert\.equal\(manifest\.assets\.length, 11\)/u);
   assert.match(source, /command\('\/usr\/bin\/cmp', \['--version'\]/u);
   assert.match(source, /command\(llvm\.clangdPath, \['--version'\]/u);
   assert.match(source, /lspRuntimeStatus\(\)\.languages\.clangd\.binaryPath, llvm\.clangdPath/u);
@@ -55,7 +59,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /E4_CPP_LSP_SMOKE=PASS/u);
   assert.match(source, /E4_CLANGD_SHARED_LIBRARY_CLOSURE=PASS/u);
   assert.match(source, /E4_CLANGD_SHA256=/u);
-  assert.match(source, /command\('\/usr\/bin\/rustc', \['--version'\]/u);
+  assert.match(source, /rustStartupEvidence\('\/usr\/bin\/rustc', rustSeed\.extracted\[0\]\.sha256\)/u);
+  assert.match(source, /E4_RUST_STARTUP_EVIDENCE=/u);
+  assert.match(source, /E4_RUST_SHARED_LIBRARY_CLOSURE=PASS/u);
   assert.match(source, /command\('\/usr\/bin\/rustc', \['--print', 'sysroot'\]/u);
   assert.match(source, /E4_RUST_SYSROOT_READY/u);
   assert.match(source, /compiled\.status, 0/u);
@@ -78,8 +84,13 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
   assert.match(job, /--security-opt no-new-privileges/u);
+  assert.match(job, /if test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
+  assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-diagnostic\.mjs/u);
+  assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] \}\}/u);
   assert.match(job, /test "\$package" = private/u);
   assert.match(job, /if: always\(\)[\s\S]*E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0/u);
+  assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
+  assert.match(job, /node scripts\/e4-owned-image-cleanup\.mjs/u);
   assert.doesNotMatch(job, /npm run check|phi-owned-main-suite|campaign3-e1-focused|campaign3-e2-focused|campaign3-e3-focused/u);
   const ordinary = workflow.split('  native-foundation:\n')[1]?.split('\n')[0] ?? '';
   assert.match(ordinary, /!inputs\['e4-image-qualification-only'\]/u);

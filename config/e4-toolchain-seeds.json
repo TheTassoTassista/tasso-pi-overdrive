@@ -164,6 +164,31 @@
       ]
     },
     {
+      "logicalName": "llvm-libs-22.1.8-rust-runtime",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 649919536,
+      "name": "llvm-libs-22.1.8-2-x86_64_v3.pkg.tar.zst",
+      "size": 37028598,
+      "sha256": "95c79ac181858b8c5ddf2072593685aea56cbe441a4594dd86344a5fc941c94a",
+      "sourcePackage": "llvm-libs 22.1.8-2 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "extracted": [
+        {
+          "path": "usr/lib/libLLVM.so.22.1",
+          "sha256": "0a2c1ae632cd180a0f23baeabc12391e195adf06d35b9ec7d513bac712a04f00",
+          "installedPath": "/usr/lib/libLLVM.so.22.1"
+        }
+      ],
+      "runtimeDependency": {
+        "soname": "libLLVM.so.22.1",
+        "path": "/usr/lib/libLLVM.so.22.1",
+        "size": 149032480,
+        "sha256": "0a2c1ae632cd180a0f23baeabc12391e195adf06d35b9ec7d513bac712a04f00",
+        "requiredBy": "/usr/lib/librustc_driver-6486d279b43c5e4c.so",
+        "requiredBySha256": "d327e04f98edadd298d7e1d01ae5877eb25995aa3943f2164dd938f2c80e0c63"
+      }
+    },
+    {
       "logicalName": "rust-1.98.1-toolchain",
       "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
       "assetId": 644320524,
@@ -172,6 +197,16 @@
       "sha256": "e624239dd596d3ecc80f7888a1fc8c3016ac7aa601b4f9f80487b8b6fc3f89ff",
       "sourcePackage": "rust 1:1.98.1-1.1 x86_64_v3",
       "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "toolchain": {
+        "version": "1.98.1",
+        "rustcPath": "/usr/bin/rustc",
+        "cargoPath": "/usr/bin/cargo",
+        "driverPath": "/usr/lib/librustc_driver-6486d279b43c5e4c.so",
+        "driverSha256": "d327e04f98edadd298d7e1d01ae5877eb25995aa3943f2164dd938f2c80e0c63",
+        "sysrootPath": "/usr",
+        "stdLibraryPath": "/usr/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-a4cf8c125ff393c3.so",
+        "stdLibrarySha256": "2577f7ed4dd472cb3ed7cb4f2c79916aee6bb328235f35696a9f08b349f4c27b"
+      },
       "extracted": [
         {
           "path": "usr/bin/rustc",

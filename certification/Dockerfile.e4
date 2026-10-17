@@ -64,6 +64,8 @@ COPY platform/ /opt/phi/project/platform/
 COPY tests/agent-hub-control-bridge.test.mjs tests/ast-edit-engine.test.mjs /opt/phi/project/tests/
 RUN ln -s /opt/phi/pi/npm/node_modules /opt/phi/project/node_modules
 COPY scripts/e4-image-selfcheck.mjs /opt/phi/e4-image-selfcheck.mjs
+COPY scripts/e4-rust-startup.mjs /opt/phi/e4-rust-startup.mjs
+COPY scripts/e4-rust-diagnostic.mjs /opt/phi/e4-rust-diagnostic.mjs
 COPY scripts/e4-clangd-lsp-smoke.mjs /opt/phi/e4-clangd-lsp-smoke.mjs
 RUN mkdir -p /phi /evidence /run /tmp \
     && chmod -R a+rX /opt/phi \

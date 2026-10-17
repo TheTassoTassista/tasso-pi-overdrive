@@ -10,14 +10,20 @@ import { validateSeedManifest, validateAssetMetadata, validateDownloadedAsset, s
 const manifest = validateSeedManifest(JSON.parse(fs.readFileSync(new URL('../config/e4-toolchain-seeds.json', import.meta.url), 'utf8')));
 const git = manifest.assets.find((asset) => asset.logicalName === 'git-2.55.0');
 const simdjson = manifest.assets.find((asset) => asset.logicalName === 'simdjson-4.6.11-node-runtime');
+const rustRuntime = manifest.assets.find((asset) => asset.logicalName === 'llvm-libs-22.1.8-rust-runtime');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-test('E4 seed manifest binds ten distinct immutable assets and exact runtime paths', () => {
-  assert.equal(manifest.assets.length, 10);
-  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 10);
+test('E4 seed manifest binds eleven distinct immutable assets and exact runtime paths', () => {
+  assert.equal(manifest.assets.length, 11);
+  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 11);
   assert.equal(manifest.release.internalOnly, true);
   assert.equal(simdjson.runtimeDependency.soname, 'libsimdjson.so.33');
   assert.equal(simdjson.runtimeDependency.requiredBySha256, manifest.assets.find((asset) => asset.logicalName === 'nodejs-26.8.2').extracted[0].sha256);
+  assert.equal(rustRuntime.runtimeDependency.soname, 'libLLVM.so.22.1');
+  assert.equal(rustRuntime.runtimeDependency.path, '/usr/lib/libLLVM.so.22.1');
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === rustRuntime ?
+    { ...rustRuntime, runtimeDependency: { ...rustRuntime.runtimeDependency, soname: 'libLLVM.so.23.1' } } : asset) }),
+  /E4_SEED_MANIFEST_RUST_RUNTIME_DEPENDENCY_INVALID/u);
   assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.slice(1) }), /E4_SEED_MANIFEST_INVALID/u);
   assert.throws(() => validateSeedManifest({ ...manifest, assets: [...manifest.assets.slice(0, -1), manifest.assets[0]] }), /E4_SEED_MANIFEST_ASSET_INVALID/u);
   const changed = { ...simdjson, runtimeDependency: { ...simdjson.runtimeDependency, soname: 'libsimdjson.so.34' } };

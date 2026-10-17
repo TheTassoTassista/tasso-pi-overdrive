@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-## Current STOP — one-shot E4 image qualification failed at Rust startup (2026-10-16)
+## Current E4 Rust closure candidate (2026-10-17)
+
+Main `E4-RUST-IMAGE-STARTUP-CLOSURE-001` authorizes diagnosis-first and one replacement image qualification. Static evidence identifies missing `libLLVM.so.22.1` required by the exact seeded Rust1.98.1 driver; prior image had llvm-libs23 and no staged 22.1 library. Signed exact 22.1.8-2 runtime package is private seed asset649919536 with SHA-verified readback; selective library-only staging, bounded Rust startup diagnostics and owned cleanup are local candidates. Native image compile/sysroot remains unproved pending one non-certifying diagnostic (0/1). CI38821281746 FAIL/CLOSED, original image-only1/1 consumed; replacement image-only0/1, Preflight3 0/1, replacement E4 0/1; 29 rows OPEN. E1–E3/Host accepted, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. No readiness change.
+
+## Historical STOP — one-shot E4 image qualification failed at Rust startup (2026-10-16)
 
 On `0a7b5cbce1ab38a5ea347db1fdd7256d6bb91c7c`, CI38821281746/job116718186938 staged ten seeds, checked managed LSP and official LLVM release metadata, built image and proved managed clangd22.1.8 path/version/SHA/shared-library closure. Its isolated self-check then FAIL at `/usr/bin/rustc --version` exit127; exact cause UNKNOWN because stderr was not retained. No qualified/published image digest; cleanup PASS/owned containers0. One image-only budget **1/1 consumed** and absolute Main STOP. Preflight3 0/1, replacement E4 0/1, all29 historical Preflight2 rows OPEN; E1–E3 COMPLETE/do-not-redo, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. No correction/retry under current authority.
 

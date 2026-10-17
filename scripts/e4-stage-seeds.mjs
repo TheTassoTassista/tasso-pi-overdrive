@@ -22,6 +22,7 @@ const selected = Object.freeze({
     'opt/phi/browser/agent-browser-0.36.0',
     'opt/phi/browser/chrome-152.0.7977.82',
   ],
+  'llvm-libs-22.1.8-rust-runtime': ['usr/lib/libLLVM.so.22.1'],
   'rust-1.98.1-toolchain': [
     'usr/bin/rustc', 'usr/bin/cargo',
     'usr/lib/librustc_driver-6486d279b43c5e4c.so', 'usr/lib/libstd-a4cf8c125ff393c3.so',
@@ -67,7 +68,15 @@ export function validateSeedManifest(manifest) {
          asset.extracted[0]?.path !== 'usr/bin/rustc' ||
          asset.extracted[1]?.path !== 'usr/bin/cargo' ||
          asset.extracted[0]?.sha256 !== '23aad380e95f6a3bfd3f49b745eb8ce4418d2ec96944bd9f49ebbde67de38d97' ||
-         asset.extracted[1]?.sha256 !== '29a290227dbeee28e20dd9692b7d71c46cd5f1d9295f90ab6975ce67c9ae9643')) fail('MANIFEST_RUST_IDENTITY_INVALID');
+         asset.extracted[1]?.sha256 !== '29a290227dbeee28e20dd9692b7d71c46cd5f1d9295f90ab6975ce67c9ae9643' ||
+         asset.toolchain?.version !== '1.98.1' ||
+         asset.toolchain.rustcPath !== '/usr/bin/rustc' || asset.toolchain.cargoPath !== '/usr/bin/cargo' ||
+         asset.toolchain.driverPath !== '/usr/lib/librustc_driver-6486d279b43c5e4c.so' ||
+         asset.toolchain.driverSha256 !== 'd327e04f98edadd298d7e1d01ae5877eb25995aa3943f2164dd938f2c80e0c63' ||
+         asset.toolchain.sysrootPath !== '/usr' ||
+         asset.toolchain.stdLibraryPath !== '/usr/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-a4cf8c125ff393c3.so' ||
+         asset.toolchain.stdLibrarySha256 !== '2577f7ed4dd472cb3ed7cb4f2c79916aee6bb328235f35696a9f08b349f4c27b')) fail('MANIFEST_RUST_IDENTITY_INVALID');
+    if (asset.logicalName !== 'rust-1.98.1-toolchain' && asset.toolchain !== undefined) fail('MANIFEST_ASSET_INVALID');
     const extractedPaths = new Set();
     for (const item of asset.extracted) {
       if (!selected[asset.logicalName].some((relative) => item?.path === relative || item?.path?.startsWith(`${relative}/`)) ||
@@ -86,6 +95,18 @@ export function validateSeedManifest(manifest) {
           runtime.size !== 145480 || runtime.sha256 !== item.sha256 ||
           runtime.requiredBy !== '/usr/bin/node' || runtime.requiredBySha256 !== node?.extracted?.[0]?.sha256 ||
           item.path !== 'usr/lib/libsimdjson.so.33.0.0') fail('MANIFEST_RUNTIME_DEPENDENCY_INVALID');
+    } else if (asset.logicalName === 'llvm-libs-22.1.8-rust-runtime') {
+      const runtime = asset.runtimeDependency;
+      if (asset.assetId !== 649919536 || asset.name !== 'llvm-libs-22.1.8-2-x86_64_v3.pkg.tar.zst' ||
+          asset.size !== 37028598 || asset.sha256 !== '95c79ac181858b8c5ddf2072593685aea56cbe441a4594dd86344a5fc941c94a' ||
+          asset.sourcePackage !== 'llvm-libs 22.1.8-2 x86_64_v3' ||
+          asset.signatureFingerprint !== '882DCFE48E2051D48E2562ABF3B607488DB35A47' ||
+          item.path !== 'usr/lib/libLLVM.so.22.1' ||
+          item.sha256 !== '0a2c1ae632cd180a0f23baeabc12391e195adf06d35b9ec7d513bac712a04f00' ||
+          runtime?.soname !== 'libLLVM.so.22.1' || runtime.path !== '/usr/lib/libLLVM.so.22.1' ||
+          runtime.size !== 149032480 || runtime.sha256 !== item.sha256 ||
+          runtime.requiredBy !== '/usr/lib/librustc_driver-6486d279b43c5e4c.so' ||
+          runtime.requiredBySha256 !== 'd327e04f98edadd298d7e1d01ae5877eb25995aa3943f2164dd938f2c80e0c63') fail('MANIFEST_RUST_RUNTIME_DEPENDENCY_INVALID');
     } else if (asset.runtimeDependency !== undefined) fail('MANIFEST_RUNTIME_DEPENDENCY_INVALID');
   }
   if (names.size !== Object.keys(selected).length) fail('MANIFEST_INCOMPLETE');
@@ -157,6 +178,19 @@ export function stageSeedArchive(asset, bytes, destination) {
       if (!fs.lstatSync(link).isSymbolicLink() || fs.readlinkSync(link) !== runtime.linkTarget ||
           fs.realpathSync(link) !== library || fs.statSync(library).size !== runtime.size ||
           digest(fs.readFileSync(library)) !== runtime.sha256) fail('STAGED_RUNTIME_DEPENDENCY_MISMATCH');
+    } else if (asset.logicalName === 'llvm-libs-22.1.8-rust-runtime') {
+      const runtime = asset.runtimeDependency;
+      const library = path.join(destination, 'usr/lib/libLLVM.so.22.1');
+      if (!fs.lstatSync(library).isFile() || fs.statSync(library).size !== runtime.size ||
+          digest(fs.readFileSync(library)) !== runtime.sha256) fail('STAGED_RUST_RUNTIME_DEPENDENCY_MISMATCH');
+    } else if (asset.logicalName === 'rust-1.98.1-toolchain') {
+      for (const [file, expected] of [
+        [asset.toolchain.driverPath, asset.toolchain.driverSha256],
+        [asset.toolchain.stdLibraryPath, asset.toolchain.stdLibrarySha256],
+      ]) {
+        const staged = path.join(destination, file.slice(1));
+        if (!fs.lstatSync(staged).isFile() || digest(fs.readFileSync(staged)) !== expected) fail('STAGED_RUST_TOOLCHAIN_MISMATCH');
+      }
     }
   } finally {
     fs.rmSync(stage, { recursive: true, force: true });

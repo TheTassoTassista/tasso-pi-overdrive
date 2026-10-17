@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 Rust closure candidate local evidence (2026-10-17)
+
+Exact signed Rust1.98.1 and llvm-libs22.1.8-2 archive metadata/bytes verified; selective two-asset staging PASS. E4 focused23/23 PASS; Rust startup classifier and owned staging cleanup regressions PASS; syntax, TypeScript and package validation PASS. This is **local/static only**: host Docker inaccessible, no rootfs Rust compile/run, no replacement image qualification yet. Old CI38821281746 remains FAIL/CLOSED. Diagnostic0/1, replacement image-only0/1, Preflight3 0/1, replacement E4 0/1.
+
 ## E4 one-shot native image-only qualification FAIL (2026-10-16)
 
 [CI38821281746](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/38821281746)/job116718186938 on `0a7b5cbce1ab38a5ea347db1fdd7256d6bb91c7c`: seed/LSP/provenance/image build PASS; isolated image self-check confirms official clangd22.1.8 path/SHA/loader and no clangd23 resolution, then FAIL at `/usr/bin/rustc --version` exit127. Rust stderr/root cause UNKNOWN. Browser and DAP not reached. Publication skipped, no qualified digest; cleanup/owned containers0 PASS. Image-only budget1/1 consumed, Preflight3 0/1, replacement E4 0/1. Existing local19/19 E4 and2/2 host C/C++ tests remain local-only. Historical CI38817537207 clangd mismatch FAIL remains distinct.
