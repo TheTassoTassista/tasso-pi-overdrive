@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current linker-detail diagnostic candidate (2026-10-17)
+
+Main `E4-RUST-LINKER-DIAGNOSTIC-001` grants one non-certifying run to replace the clipped linker evidence, not a toolchain repair. Observability-only candidate captures <=256 KiB combined fixed-command streams in a retrievable SHA-256 artifact, emits compact receipts and fails on incomplete output. Rust/LLVM/base/GCC/target/sysroot and isolation remain unchanged; local E4 26/26 and ZERO_EGRESS PASS. CI39016323973 stays FAIL/CLOSED, linker cause UNKNOWN; diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1, 29 rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next: one exact-SHA linker-detail run only after scoped checkpoint; no provider call or readiness change.
+
 ## Current STOP — native Rust startup repaired, fixture link cause UNKNOWN (2026-10-17)
 
 Non-certifying [CI39016323973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39016323973)/job117349073873 on `a31cf77b7879adbfa71ac1cae98034e239037cbd` built the exact image and proved native `/usr/bin/rustc`1.98.1 startup, pinned `libLLVM.so.22.1` loader closure, and sysroot `/usr`. Deterministic compile then **FAIL** at `x86_64-linux-gnu-gcc` link; precise cause UNKNOWN because bounded diagnostic clipped rustc's linker stderr. Cargo/broad toolchain NOT REACHED; no publication/digest. Cleanup owned containers0, process census0, staging removed, image tag removed; Docker cache unscoped. Diagnostic1/1 consumed; replacement image-only0/1 **not authorized to run before native compile/run prerequisite is resolved**. Original CI38821281746 FAIL/CLOSED, Preflight3/E4 0/1, 29 rows OPEN, E1–E3/Host do-not-redo. STOP/Main; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0, readiness unchanged.

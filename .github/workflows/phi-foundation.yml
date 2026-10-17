@@ -102,6 +102,10 @@ on:
         description: With image-only selected, run the one bounded Rust startup probe instead of qualification or publication
         type: boolean
         default: false
+      e4-rust-linker-diagnostic-only:
+        description: With image-only selected, capture the one bounded Rust linker-detail artifact; never qualify or publish
+        type: boolean
+        default: false
       e4-ubuntu-preflight-only:
         description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
         type: boolean
@@ -157,7 +161,12 @@ jobs:
         env:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
           E4_RUST_DIAGNOSTIC: ${{ inputs['e4-rust-diagnostic-only'] }}
+          E4_RUST_LINKER_DIAGNOSTIC: ${{ inputs['e4-rust-linker-diagnostic-only'] }}
         run: |
+          if test "$E4_RUST_DIAGNOSTIC" = true && test "$E4_RUST_LINKER_DIAGNOSTIC" = true; then
+            echo 'E4_DIAGNOSTIC_MODE_CONFLICT' >&2
+            exit 1
+          fi
           docker buildx build --file certification/Dockerfile.e4 \
             --build-arg "PRODUCT_CANDIDATE_SHA=$GITHUB_SHA" \
             --build-context "seeds=$RUNNER_TEMP/phi-e4-seeds" \
@@ -166,7 +175,14 @@ jobs:
           test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
           printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
           printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
-          if test "$E4_RUST_DIAGNOSTIC" = true; then
+          if test "$E4_RUST_LINKER_DIAGNOSTIC" = true; then
+            install -d -m 1777 "$RUNNER_TEMP/phi-e4-linker-evidence"
+            docker run --rm --name "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 64 --memory 1g \
+              --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+              --mount "type=bind,src=$RUNNER_TEMP/phi-e4-linker-evidence,dst=/evidence" \
+              --user 1001:1001 --entrypoint /usr/bin/node "$E4_IMAGE_REF" /opt/phi/e4-rust-linker-diagnostic.mjs
+          elif test "$E4_RUST_DIAGNOSTIC" = true; then
             docker run --rm --name "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
               --security-opt no-new-privileges --pids-limit 64 --memory 1g \
               --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
@@ -177,8 +193,16 @@ jobs:
               --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
               --user 1001:1001 "$E4_IMAGE_REF"
           fi
+      - name: Upload bounded linker-detail evidence only
+        if: ${{ always() && inputs['e4-rust-linker-diagnostic-only'] }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
+        with:
+          name: e4-rust-linker-detail-${{ github.run_id }}
+          path: ${{ runner.temp }}/phi-e4-linker-evidence/rust-linker-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish only qualified image and record exact digest
-        if: ${{ !inputs['e4-rust-diagnostic-only'] }}
+        if: ${{ !inputs['e4-rust-diagnostic-only'] && !inputs['e4-rust-linker-diagnostic-only'] }}
         env:
           GH_TOKEN: ${{ github.token }}
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
@@ -197,7 +221,7 @@ jobs:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
         run: |
           docker info >/dev/null
-          for container in "phi-e4-image-selfcheck-$GITHUB_RUN_ID" "phi-e4-rust-diagnostic-$GITHUB_RUN_ID"; do
+          for container in "phi-e4-image-selfcheck-$GITHUB_RUN_ID" "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID"; do
             if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
             test -z "$(docker ps -aq --filter "name=^/$container$")"
           done

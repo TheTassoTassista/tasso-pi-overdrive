@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Linker-detail observability local gate (2026-10-17)
+
+E4 focused **26/26 PASS**, including combined 256 KiB ceiling, explicit incomplete artifact, SHA-256, fixed minimal environment and cleanup regression. JS syntax, shellcheck E4 scripts, TypeScript, package and scoped whitespace PASS; indexed audit exit0/WARN/0 FAIL/modelCalls0 (712 indexed blobs, 19 existing WARN). This is **local diagnostic-harness validation**, not linker cause, native image qualification or Rust compile PASS. Historical CI39016323973 FAIL/CLOSED; new linker-detail diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1.
+
 ## Sole Rust-image diagnostic native FAIL (2026-10-17)
 
 [CI39016323973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39016323973)/job117349073873, candidate `a31cf77b7879adbfa71ac1cae98034e239037cbd`: seed/LSP/LLVM metadata/image build PASS; isolated native Rust SHA/version1.98.1, interpreter, exact LLVM22.1 library closure and sysroot `/usr` PASS; minimal compile **FAIL** at `x86_64-linux-gnu-gcc` link, exact cause UNKNOWN because 320-character stderr cap omitted the linker detail. Compile/run FAIL, Cargo and broad self-check NOT REACHED. No image published. Finalizer PASS: owned containers0, entrypoint process census0, seed/LSP staging removed, image tag removed; rootfs not created, Docker cache unscoped. Diagnostic1/1 consumed; replacement image-only0/1, Preflight3/E4 0/1; all29 closure rows OPEN. Do not promote local host-assisted compile to native rootfs proof. STOP/Main.

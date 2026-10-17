@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Removes only this job's two fixed staging directories and counts exact image entrypoints.
+// Removes only this job's fixed staging/evidence directories and counts exact image entrypoints.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +9,7 @@ export function cleanupOwnedImageStages(runnerTemp) {
   assert.equal(path.basename(runnerTemp), '_temp', 'unexpected runner temporary root');
   assert.equal(fs.realpathSync(runnerTemp), runnerTemp, 'runner temporary root is aliased');
   assert.equal(fs.statSync(runnerTemp).uid, process.getuid(), 'runner temporary root is foreign-owned');
-  for (const name of ['phi-e4-seeds', 'phi-e4-lsp']) {
+  for (const name of ['phi-e4-seeds', 'phi-e4-lsp', 'phi-e4-linker-evidence']) {
     const target = path.join(runnerTemp, name);
     try {
       const stat = fs.lstatSync(target);
@@ -24,7 +24,8 @@ export function cleanupOwnedImageStages(runnerTemp) {
 }
 
 export function ownedImageEntrypointPids() {
-  const markers = ['/opt/phi/e4-image-selfcheck.mjs', '/opt/phi/e4-rust-diagnostic.mjs'];
+  const markers = ['/opt/phi/e4-image-selfcheck.mjs', '/opt/phi/e4-rust-diagnostic.mjs',
+    '/opt/phi/e4-rust-linker-diagnostic.mjs'];
   const found = [];
   for (const name of fs.readdirSync('/proc')) {
     if (!/^\d+$/u.test(name)) continue;
@@ -45,6 +46,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
     assert.equal(pids.length, 0, 'Phi image entrypoint process remained');
     console.log('E4_TEMP_SEED_STAGING_STATE=REMOVED');
     console.log('E4_TEMP_LSP_STAGING_STATE=REMOVED');
+    console.log('E4_TEMP_LINKER_EVIDENCE_STATE=REMOVED');
     console.log('E4_TEMP_ROOTFS_STATE=NOT_CREATED_BY_IMAGE_ONLY_JOB');
     console.log(`E4_IMAGE_OWNED_PROCESSES_FINAL=${pids.length}`);
   } catch (error) {

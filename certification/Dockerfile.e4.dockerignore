@@ -20,6 +20,8 @@
 !scripts/e4-image-selfcheck.mjs
 !scripts/e4-rust-startup.mjs
 !scripts/e4-rust-diagnostic.mjs
+!scripts/e4-linker-capture.mjs
+!scripts/e4-rust-linker-diagnostic.mjs
 !scripts/e4-clangd-lsp-smoke.mjs
 !scripts/install-managed-lsp.mjs
 !scripts/install-managed-dap.sh

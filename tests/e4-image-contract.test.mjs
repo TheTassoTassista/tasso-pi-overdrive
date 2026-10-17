@@ -27,8 +27,12 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   assert.match(ignore, /^!scripts\/e4-clangd-lsp-smoke\.mjs$/mu);
   assert.match(ignore, /^!scripts\/e4-rust-startup\.mjs$/mu);
   assert.match(ignore, /^!scripts\/e4-rust-diagnostic\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-linker-capture\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-rust-linker-diagnostic\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-rust-startup\.mjs \/opt\/phi\/e4-rust-startup\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-rust-diagnostic\.mjs \/opt\/phi\/e4-rust-diagnostic\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-linker-capture\.mjs \/opt\/phi\/e4-linker-capture\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-rust-linker-diagnostic\.mjs \/opt\/phi\/e4-rust-linker-diagnostic\.mjs$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
   assert.match(dockerfile, /USER 1001:1001/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/bin\/node", "\/opt\/phi\/e4-image-selfcheck\.mjs"\]/u);
@@ -84,9 +88,12 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
   assert.match(job, /--security-opt no-new-privileges/u);
-  assert.match(job, /if test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
+  assert.match(job, /elif test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
   assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-diagnostic\.mjs/u);
-  assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] \}\}/u);
+  assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-linker-diagnostic\.mjs/u);
+  assert.match(job, /actions\/upload-artifact@[a-f0-9]{40}/u);
+  assert.match(job, /if-no-files-found: error/u);
+  assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] && !inputs\['e4-rust-linker-diagnostic-only'\] \}\}/u);
   assert.match(job, /test "\$package" = private/u);
   assert.match(job, /if: always\(\)[\s\S]*E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0/u);
   assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
