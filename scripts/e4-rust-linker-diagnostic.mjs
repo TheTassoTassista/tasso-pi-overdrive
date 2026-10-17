@@ -9,7 +9,6 @@ import { rustStartupEvidence } from './e4-rust-startup.mjs';
 
 const capture = new LinkerDiagnosticCapture();
 const metadata = { rust: null, gcc: null, linker: null, startfiles: [], compile: null };
-const artifactPath = '/evidence/rust-linker-diagnostic.json';
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const identity = (file) => {
   const realpath = fs.realpathSync(file);
@@ -92,7 +91,9 @@ try {
 }
 
 try {
-  const artifact = capture.artifact(metadata, artifactPath);
+  const serialized = capture.serialize(metadata);
+  const artifact = { sha256: serialized.sha256, bytes: serialized.bytes.length,
+    complete: serialized.complete, streamBytes: serialized.streamBytes };
   const receipt = { status: failure ? 'FAIL' : 'PASS', classification: capture.incomplete ? 'UNKNOWN' : 'PENDING_POST_RUN',
     reason: failure, compileExitCode: compileRecord?.exitCode ?? null,
     keyErrorLines: keyErrorLines(compileRecord?.stderr), rustPath: metadata.rust?.path ?? null,
@@ -101,9 +102,10 @@ try {
     linkerSha256: metadata.linker?.sha256 ?? null, artifact, tempDiagnosticFiles: 'REMOVED',
   };
   console.log(`E4_RUST_LINKER_RECEIPT=${JSON.stringify(receipt)}`);
+  console.log(`E4_RUST_LINKER_ARTIFACT_BASE64=${serialized.bytes.toString('base64')}`);
   console.log(`E4_RUST_LINKER_DIAGNOSTIC=${failure ? 'FAIL' : 'PASS'}`);
   if (failure) process.exitCode = 1;
 } catch (error) {
-  console.error(`E4_RUST_LINKER_DIAGNOSTIC=FAIL reason=ARTIFACT_WRITE_FAILED ${String(error.message).slice(0, 180)}`);
+  console.error(`E4_RUST_LINKER_DIAGNOSTIC=FAIL reason=ARTIFACT_EMISSION_FAILED ${String(error.message).slice(0, 180)}`);
   process.exitCode = 1;
 }

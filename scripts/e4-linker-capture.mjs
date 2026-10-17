@@ -44,13 +44,19 @@ export class LinkerDiagnosticCapture {
     return record;
   }
 
-  artifact(metadata, file) {
+  serialize(metadata) {
     const bytes = Buffer.from(JSON.stringify({ schema: 'phi-e4-linker-diagnostic-v1',
       streamLimitBytes: this.limit, streamBytesRetained: this.used,
       complete: !this.incomplete, metadata, records: this.records }, null, 2) + '\n');
+    return { bytes, sha256: sha256(bytes), complete: !this.incomplete, streamBytes: this.used };
+  }
+
+  artifact(metadata, file) {
+    const serialized = this.serialize(metadata);
+    const { bytes } = serialized;
     fs.writeFileSync(file, bytes, { mode: 0o644, flag: 'wx' });
-    return { path: file, sha256: sha256(bytes), bytes: bytes.length,
-      complete: !this.incomplete, streamBytes: this.used };
+    return { path: file, sha256: serialized.sha256, bytes: bytes.length,
+      complete: serialized.complete, streamBytes: serialized.streamBytes };
   }
 }
 

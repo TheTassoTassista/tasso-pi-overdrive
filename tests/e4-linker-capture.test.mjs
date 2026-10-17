@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { LinkerDiagnosticCapture, MAX_DIAGNOSTIC_STREAM_BYTES, keyErrorLines } from '../scripts/e4-linker-capture.mjs';
+import { extractLinkerEvidence } from '../scripts/e4-extract-linker-evidence.mjs';
 
 test('linker diagnostic retains complete stdout/stderr in one hashed artifact with bounded receipt', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-e4-linker-capture-'));
@@ -54,5 +55,41 @@ test('capture uses a fixed minimal environment and does not record ambient secre
     assert.doesNotMatch(JSON.stringify(capture.records), /not-for-diagnostic/u);
   } finally {
     delete process.env.PHI_E4_TEST_SECRET;
+  }
+});
+
+test('runner extracts and hashes the complete artifact without an image bind mount', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-e4-linker-transport-'));
+  try {
+    const capture = new LinkerDiagnosticCapture();
+    capture.run(process.execPath, ['-e', 'process.stderr.write("ld: cannot find Scrt1.o\\n")']);
+    const serialized = capture.serialize({ rust: 'pinned' });
+    const receipt = { status: 'FAIL', artifact: { sha256: serialized.sha256,
+      bytes: serialized.bytes.length, complete: true } };
+    const raw = path.join(root, 'raw.log');
+    const output = path.join(root, 'rust-linker-diagnostic.json');
+    fs.writeFileSync(raw, `E4_RUST_LINKER_RECEIPT=${JSON.stringify(receipt)}\nE4_RUST_LINKER_ARTIFACT_BASE64=${serialized.bytes.toString('base64')}\n`);
+    assert.deepEqual(extractLinkerEvidence(raw, output), receipt);
+    assert.deepEqual(fs.readFileSync(output), serialized.bytes);
+    assert.equal(fs.existsSync(raw), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('runner rejects a mismatched artifact digest and retains the raw evidence', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-e4-linker-transport-'));
+  try {
+    const capture = new LinkerDiagnosticCapture();
+    const serialized = capture.serialize({});
+    const raw = path.join(root, 'raw.log');
+    const output = path.join(root, 'rust-linker-diagnostic.json');
+    fs.writeFileSync(raw, `E4_RUST_LINKER_RECEIPT=${JSON.stringify({ artifact: {
+      sha256: '0'.repeat(64), bytes: serialized.bytes.length, complete: true } })}\nE4_RUST_LINKER_ARTIFACT_BASE64=${serialized.bytes.toString('base64')}\n`);
+    assert.throws(() => extractLinkerEvidence(raw, output), /Expected values to be strictly equal/u);
+    assert.equal(fs.existsSync(output), false);
+    assert.equal(fs.existsSync(raw), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

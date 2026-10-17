@@ -91,6 +91,8 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /elif test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
   assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-diagnostic\.mjs/u);
   assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-linker-diagnostic\.mjs/u);
+  assert.match(job, /node scripts\/e4-extract-linker-evidence\.mjs/u);
+  assert.doesNotMatch(job, /--mount .*phi-e4-linker-evidence/u);
   assert.match(job, /actions\/upload-artifact@[a-f0-9]{40}/u);
   assert.match(job, /if-no-files-found: error/u);
   assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] && !inputs\['e4-rust-linker-diagnostic-only'\] \}\}/u);

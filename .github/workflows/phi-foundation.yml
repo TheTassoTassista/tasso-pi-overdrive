@@ -176,12 +176,20 @@ jobs:
           printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
           printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
           if test "$E4_RUST_LINKER_DIAGNOSTIC" = true; then
-            install -d -m 1777 "$RUNNER_TEMP/phi-e4-linker-evidence"
-            docker run --rm --name "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+            install -d -m 0700 "$RUNNER_TEMP/phi-e4-linker-evidence"
+            if docker run --rm --name "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
               --security-opt no-new-privileges --pids-limit 64 --memory 1g \
               --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
-              --mount "type=bind,src=$RUNNER_TEMP/phi-e4-linker-evidence,dst=/evidence" \
-              --user 1001:1001 --entrypoint /usr/bin/node "$E4_IMAGE_REF" /opt/phi/e4-rust-linker-diagnostic.mjs
+              --user 1001:1001 --entrypoint /usr/bin/node "$E4_IMAGE_REF" /opt/phi/e4-rust-linker-diagnostic.mjs \
+              > "$RUNNER_TEMP/phi-e4-linker-evidence/raw.log" 2>&1; then
+              diagnostic_status=0
+            else
+              diagnostic_status=$?
+            fi
+            node scripts/e4-extract-linker-evidence.mjs \
+              "$RUNNER_TEMP/phi-e4-linker-evidence/raw.log" \
+              "$RUNNER_TEMP/phi-e4-linker-evidence/rust-linker-diagnostic.json"
+            exit "$diagnostic_status"
           elif test "$E4_RUST_DIAGNOSTIC" = true; then
             docker run --rm --name "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
               --security-opt no-new-privileges --pids-limit 64 --memory 1g \

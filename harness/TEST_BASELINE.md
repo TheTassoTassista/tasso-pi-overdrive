@@ -2,7 +2,7 @@
 
 ## Linker-detail observability local gate (2026-10-17)
 
-E4 focused **26/26 PASS**, including combined 256 KiB ceiling, explicit incomplete artifact, SHA-256, fixed minimal environment and cleanup regression. JS syntax, shellcheck E4 scripts, TypeScript, package and scoped whitespace PASS; indexed audit exit0/WARN/0 FAIL/modelCalls0 (712 indexed blobs, 19 existing WARN). This is **local diagnostic-harness validation**, not linker cause, native image qualification or Rust compile PASS. Historical CI39016323973 FAIL/CLOSED; new linker-detail diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1.
+E4 focused **28/28 PASS**, including combined 256 KiB ceiling, explicit incomplete artifact, SHA-256, fixed minimal environment, runner-side artifact extraction/tamper rejection and cleanup regression. JS syntax, shellcheck E4 scripts, TypeScript, package and scoped whitespace PASS; indexed audit exit0/WARN/0 FAIL/modelCalls0 (713 indexed blobs, 19 existing WARN). This is **local diagnostic-harness validation**, not linker cause, native image qualification or Rust compile PASS. Historical CI39016323973 FAIL/CLOSED; new linker-detail diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1.
 
 ## Sole Rust-image diagnostic native FAIL (2026-10-17)
 
