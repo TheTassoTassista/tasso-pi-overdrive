@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Current STOP — native Rust startup repaired, fixture link cause UNKNOWN (2026-10-17)
+
+Non-certifying [CI39016323973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39016323973)/job117349073873 on `a31cf77b7879adbfa71ac1cae98034e239037cbd` built the exact image and proved native `/usr/bin/rustc`1.98.1 startup, pinned `libLLVM.so.22.1` loader closure, and sysroot `/usr`. Deterministic compile then **FAIL** at `x86_64-linux-gnu-gcc` link; precise cause UNKNOWN because bounded diagnostic clipped rustc's linker stderr. Cargo/broad toolchain NOT REACHED; no publication/digest. Cleanup owned containers0, process census0, staging removed, image tag removed; Docker cache unscoped. Diagnostic1/1 consumed; replacement image-only0/1 **not authorized to run before native compile/run prerequisite is resolved**. Original CI38821281746 FAIL/CLOSED, Preflight3/E4 0/1, 29 rows OPEN, E1–E3/Host do-not-redo. STOP/Main; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0, readiness unchanged.
+
 ## Current E4 Rust closure candidate (2026-10-17)
 
 Main `E4-RUST-IMAGE-STARTUP-CLOSURE-001` authorizes diagnosis-first and one replacement image qualification. Static evidence identifies missing `libLLVM.so.22.1` required by the exact seeded Rust1.98.1 driver; prior image had llvm-libs23 and no staged 22.1 library. Signed exact 22.1.8-2 runtime package is private seed asset649919536 with SHA-verified readback; selective library-only staging, bounded Rust startup diagnostics and owned cleanup are local candidates. Native image compile/sysroot remains unproved pending one non-certifying diagnostic (0/1). CI38821281746 FAIL/CLOSED, original image-only1/1 consumed; replacement image-only0/1, Preflight3 0/1, replacement E4 0/1; 29 rows OPEN. E1–E3/Host accepted, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. No readiness change.

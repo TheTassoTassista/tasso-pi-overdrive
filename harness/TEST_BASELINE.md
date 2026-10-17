@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Sole Rust-image diagnostic native FAIL (2026-10-17)
+
+[CI39016323973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39016323973)/job117349073873, candidate `a31cf77b7879adbfa71ac1cae98034e239037cbd`: seed/LSP/LLVM metadata/image build PASS; isolated native Rust SHA/version1.98.1, interpreter, exact LLVM22.1 library closure and sysroot `/usr` PASS; minimal compile **FAIL** at `x86_64-linux-gnu-gcc` link, exact cause UNKNOWN because 320-character stderr cap omitted the linker detail. Compile/run FAIL, Cargo and broad self-check NOT REACHED. No image published. Finalizer PASS: owned containers0, entrypoint process census0, seed/LSP staging removed, image tag removed; rootfs not created, Docker cache unscoped. Diagnostic1/1 consumed; replacement image-only0/1, Preflight3/E4 0/1; all29 closure rows OPEN. Do not promote local host-assisted compile to native rootfs proof. STOP/Main.
+
 ## E4 Rust closure candidate local evidence (2026-10-17)
 
 Exact signed Rust1.98.1 and llvm-libs22.1.8-2 archive metadata/bytes verified; selective two-asset staging PASS. E4 focused23/23 PASS; Rust startup classifier and owned staging cleanup regressions PASS; syntax, TypeScript and package validation PASS. This is **local/static only**: host Docker inaccessible, no rootfs Rust compile/run, no replacement image qualification yet. Old CI38821281746 remains FAIL/CLOSED. Diagnostic0/1, replacement image-only0/1, Preflight3 0/1, replacement E4 0/1.
