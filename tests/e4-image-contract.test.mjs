@@ -77,6 +77,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
 
 test('E4 image qualification cannot launch preflight, default matrix or certification', () => {
   const workflow = read('.github/workflows/phi-foundation.yml');
+  const dispatchInputs = workflow.split('    inputs:\n')[1]?.split('\npermissions:')[0] ?? '';
+  assert.equal([...dispatchInputs.matchAll(/^      [A-Za-z0-9_-]+:$/gmu)].length, 25,
+    'workflow_dispatch must stay within the GitHub input ceiling');
   const job = workflow.split('  e4-image-qualification:\n')[1]?.split('  e4-ubuntu-preflight:\n')[0];
   assert.ok(job);
   assert.match(job, /inputs\['e4-image-qualification-only'\] && !inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\] && !inputs\['e4-ubuntu-preflight-only'\]/u);
@@ -88,14 +91,13 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
   assert.match(job, /--security-opt no-new-privileges/u);
-  assert.match(job, /elif test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
-  assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-diagnostic\.mjs/u);
+  assert.match(job, /if test "\$E4_RUST_DIAGNOSTIC" = true; then/u);
   assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-linker-diagnostic\.mjs/u);
   assert.match(job, /node scripts\/e4-extract-linker-evidence\.mjs/u);
   assert.doesNotMatch(job, /--mount .*phi-e4-linker-evidence/u);
   assert.match(job, /actions\/upload-artifact@[a-f0-9]{40}/u);
   assert.match(job, /if-no-files-found: error/u);
-  assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] && !inputs\['e4-rust-linker-diagnostic-only'\] \}\}/u);
+  assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ !inputs\['e4-rust-diagnostic-only'\] \}\}/u);
   assert.match(job, /test "\$package" = private/u);
   assert.match(job, /if: always\(\)[\s\S]*E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0/u);
   assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
