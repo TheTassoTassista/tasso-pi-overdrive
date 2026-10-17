@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-## Current E4 LLVM candidate — image qualification pending (2026-10-16)
+## Current STOP — one-shot E4 image qualification failed at Rust startup (2026-10-16)
+
+On `0a7b5cbce1ab38a5ea347db1fdd7256d6bb91c7c`, CI38821281746/job116718186938 staged ten seeds, checked managed LSP and official LLVM release metadata, built image and proved managed clangd22.1.8 path/version/SHA/shared-library closure. Its isolated self-check then FAIL at `/usr/bin/rustc --version` exit127; exact cause UNKNOWN because stderr was not retained. No qualified/published image digest; cleanup PASS/owned containers0. One image-only budget **1/1 consumed** and absolute Main STOP. Preflight3 0/1, replacement E4 0/1, all29 historical Preflight2 rows OPEN; E1–E3 COMPLETE/do-not-redo, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. No correction/retry under current authority.
+
+## Historical pre-run E4 LLVM candidate (2026-10-16)
 
 Main `E4-CLANGD-22-1-8-CLOSURE-001` is durable. The official LLVM22.1.8 archive and extracted clangd have locally verified release metadata, exact size/SHA, version and C++ protocol callability. Proposed image uses the managed absolute clangd path and omits floating distro clang; normal host Pi remains on its prior path. CI38817537207 remains historical FAIL/cleanup PASS, not a qualified image. New image digest UNKNOWN. All29 Preflight2 rows OPEN, Rust/browser/cmp/DAP/Tier B not promoted. Image-only0/1, Final Preflight3 0/1, replacement E4 0/1; E1–E3 COMPLETE/do-not-redo, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Next: local ZERO_EGRESS/audit, checkpoint, one image-only qualification; first failure STOP for Main.
 
