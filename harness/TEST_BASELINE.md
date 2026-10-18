@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Sole replacement image-only native FAIL (2026-10-18)
+
+[CI39118464500](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39118464500)/job117648992812 attempt1 on exact `11560730b0abbf219aef94c79abece6d0233b4f6`: all12 signed seeds, managed LSP, LLVM provenance, image build PASS; isolated self-check reached exact `ld.lld` version/library, clangd22.1.8, Rust1.98.1 startup and LLVM22.1 library PASS. First failure `/usr/bin/cargo --version` exit127; exact loader cause UNKNOWN because stderr not retained. Rust compile/run and later checks NOT REACHED; image publication skipped/no digest. Finalizer owned containers/processes0 and tag/staging removed. Image-only1/1 exhausted; Preflight3/E4 0/1 blocked, all29 historical rows OPEN, autonomy BLOCKED/false. Prior local E4 19/19 remains local-only; no native all-green claim or retry.
+
 ## Case A lld dependency-closure local focus (2026-10-18)
 
 Corrected CI39117154657 on `c9e3cb0` is diagnostic-only SUCCESS with complete compile evidence and `LINKER_MISSING` failure; no Rust compile/run PASS or image digest. Local repaired candidate: E4 focused **19/19 PASS** (manifest/seed/image contract/capture/clangd), real signed lld archive selective staging PASS, syntax, TypeScript, package, shell and scoped whitespace PASS. Native repaired image **NOT RUN**; replacement image-only0/1, Preflight3/E4 0/1 blocked, 29 historical rows OPEN. No E1–E3/Host rerun.

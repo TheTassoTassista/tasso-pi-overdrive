@@ -1,8 +1,12 @@
 # Phi — Session Continuation
 
-## ACTIVE — inspect SAME image-only CI39118464500
+## STOP / Main — image-only CI39118464500 failed at Cargo startup
 
-Only replacement [CI39118464500](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39118464500)/job117648992812 attempt1 on exact `11560730b0abbf219aef94c79abece6d0233b4f6` is IN PROGRESS. Image-only **1/1 consumed**; do not dispatch another. Inspect this SAME run through build, no-network/read-only UID1001 self-check, Rust compile/run, every later image check, publication/digest iff green, owned cleanup/residuals. If FAIL, STOP/Main with first failure and no retry. Preflight3/E4 still0/1 blocked until image qualification and all29 closure rows separately resolved. Corrected diagnostic1/1 consumed, autonomy BLOCKED/false, portability NOT CERTIFIED. Do-not-redo E1–E3/Host/old CIs; protect user audit and untracked state.
+Only replacement [CI39118464500](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39118464500)/job117648992812 attempt1 on `11560730b0abbf219aef94c79abece6d0233b4f6` is terminal FAIL. Seed12/LSP/LLVM/build PASS; isolated self-check reached and passed pinned `ld.lld`, clangd22.1.8 and Rust1.98.1 startup/LLVM22.1 loader, then first failed `/usr/bin/cargo --version` exit127. Exact Cargo loader cause UNKNOWN because stderr was not recorded; local ELF needs libgit2.so.1.9/libssh2.so.1/libssl.so.3/libcurl.so.4/libsqlite3.so.0, but missing native dependency is only POSSIBLE. Rust compile/run, browser/debugpy/later checks NOT REACHED. No qualified/published image. Cleanup PASS: owned containers/processes0, tag/seed/LSP/evidence staging removed; rootfs not created, build cache unscoped. Provider/model calls0. Image-only **1/1 exhausted**; no retry, repair, Preflight3 or E4 under current authority. All29 rows OPEN; autonomy BLOCKED/false, portability NOT CERTIFIED. Exact next action: deliver first-failure packet to Φ Work Control/Main. Do-not-redo CI39118464500/corrected diagnostic/E1–E3/Host. HEAD at this documentation checkpoint must be verified live; protected audit and unrelated user state retained.
+
+## Historical active-run checkpoint — image-only CI39118464500
+
+At dispatch, [CI39118464500](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39118464500)/job117648992812 attempt1 on exact `11560730b0abbf219aef94c79abece6d0233b4f6` was IN PROGRESS, with image-only 1/1 consumed. This is historical pre-result state; terminal FAIL above controls. Preflight3/E4 remain0/1 blocked, 29 rows OPEN, autonomy BLOCKED/false.
 
 ## ACTIVE — Case A repaired-image candidate; image-only 0/1 next
 
