@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Active corrected non-certifying Rust diagnostic (2026-10-18)
+
+CI39117154657/job117645157316 attempt1 on exact `c9e3cb00adf38ed6cb44ccd37091dbda4679173d` is IN PROGRESS. Corrected diagnostic1/1 consumed; image-only0/1, Preflight3/E4 0/1 blocked. No second diagnostic, no toolchain repair before evidence. Historical linker cause UNKNOWN, all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Exact next action: inspect same run/artifact and cleanup.
+
 ## Scoped corrected diagnostic ready for one native run (2026-10-18)
 
 Main decision recorded; local E4 33/33, repository-audit regressions3/3 and syntax/TypeScript/package/shellcheck PASS. Indexed audit WARN19/FAIL0/modelCalls0; ZERO_EGRESS PASS, exact toolchain/image/security inputs unchanged. Corrected diagnostic0/1, image-only0/1, Preflight3/E4 0/1; 29 rows OPEN, autonomy BLOCKED/false, portability NOT CERTIFIED. Commit/push only the staged scoped candidate, then one corrected native diagnostic; no Rust repair before valid linker evidence.

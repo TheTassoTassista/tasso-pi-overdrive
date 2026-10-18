@@ -2,6 +2,10 @@
 
 Phase status: IN PROGRESS — portable foundation, NOT Windows-ready.
 
+## ACTIVE — corrected native linker diagnostic CI39117154657
+
+The exactly one newly authorized non-certifying [CI39117154657](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39117154657)/job117645157316, attempt1, was accepted on immutable `c9e3cb00adf38ed6cb44ccd37091dbda4679173d`. It is IN PROGRESS; corrected-diagnostic budget **1/1 consumed**, no duplicate or retry. Image-only0/1, Preflight3/E4 0/1 remain unspent/blocked. Exact next action: inspect this SAME run to terminal, retrieve/verify bounded artifact and cleanup, classify from complete compiler evidence only. Historical CIs39016323973/39018110045 remain FAIL/CLOSED, linker cause UNKNOWN until proved; all29 rows OPEN, autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## 2026-10-18 — scoped validation and ZERO_EGRESS closed
 
 Corrected capture candidate: real-wrapper/E4 tests **33/33 PASS**; repository-audit regressions3/3, syntax, TypeScript, package validation, E4 shellcheck and scoped staged whitespace PASS. Indexed source/security audit exit0, WARN19 (historical/fixtures), FAIL0, modelCalls0 across713 blobs. Structured `ZERO_EGRESS_REVIEW: PASS`: staged files are only diagnostic capture/extraction, its real-wrapper regression, Main decision and dynamic state; no `config/`, `certification/`, `.github/`, product, provider or sandbox edit. Exact seed-manifest SHA `b855e35b0e937b7eced2455cb314bb1c408b4b82e6c071a695e8878fb01e51ec` and AppArmor SHA `09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51` remain unchanged. Image diagnostic uses seeded Node26.8.2; local tests used Node22.23.2. No retry/timeout increase, broader mount, secret/env dump, model call or readiness change. Corrected diagnostic remains0/1 until exact-SHA dispatch.
