@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-## CURRENT — E4 linker-detail diagnostic candidate; one authorized run next
+## STOP / Main — CI39018110045 terminal; linker cause still UNKNOWN
+
+Only authorized [CI39018110045](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39018110045)/job117354278159 on `66a0e855d44826545d9da60b50e036ac47196cea` ended FAIL. Artifact ID12095887085 SHA-256 `62274d8e99a11d3160876f78401ddc3b12f1e09848b71ef89009baab78b5ff06` is verified. Rust/GCC/ld/startfile probes passed, but compile was **NOT REACHED** because string input plus `encoding:'buffer'` made Node22 `spawnSync` throw `Unknown encoding: buffer`. This diagnostic defect is KNOWN and locally reproduced; the historical linker cause is **UNKNOWN**. Cleanup PASS (owned containers/processes0, staging/tag removed), publication SKIPPED, provider calls0. Linker-detail1/1 exhausted; replacement image-only0/1 and Preflight3/E4 0/1 blocked; 29 rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Exact next action: report to Φ Work Control/Main for a new disposition; **no** second diagnostic, toolchain fix, replacement qualification, Preflight3/E4, or E1–E3/Host rerun under current authority. Preserve protected audit/user files and the failed run/artifact. Do-not-redo CI39016323973/CI39018110045.
+
+## Historical pre-run checkpoint — E4 linker-detail candidate
 
 Attempted dispatch on `d4396ccb5c54ff045194c9946448bff271265a97` returned GitHub HTTP422 because 26 inputs exceeded its 25-input limit; **no run was created** and linker-detail budget remains 0/1. Scoped local correction reuses the existing `e4-rust-diagnostic-only` selector for the new bounded linker-detail path, with an exact 25-input regression. No toolchain, runtime isolation, timeout or retry change. Exact next action after focused validation and checkpoint: dispatch once with `e4-image-qualification-only=true` and `e4-rust-diagnostic-only=true`, then inspect that SAME run.
 

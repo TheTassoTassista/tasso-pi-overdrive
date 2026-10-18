@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## One-shot linker-detail native diagnostic FAIL (2026-10-18)
+
+[CI39018110045](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39018110045)/job117354278159 on `66a0e855d44826545d9da60b50e036ac47196cea`: seed/LSP/LLVM metadata/image build PASS; 16 Rust/GCC/ld/startfile probes PASS. Bounded 13,625-byte artifact ID12095887085/SHA-256 `62274d8e99a11d3160876f78401ddc3b12f1e09848b71ef89009baab78b5ff06` verified. `compile=null`/exit null, because the diagnostic's `spawnSync` string input and `encoding:'buffer'` produced `Unknown encoding: buffer` before Rust compile. Local Node22.23.2 exact-options reproduction confirmed. `complete=true` covers retained probes only; requested linker stderr remains ABSENT and link cause UNKNOWN. Upload PASS, publication SKIPPED, owned cleanup PASS/containers0/processes0/staging removed. Native Rust compile/run NOT PROVED. Diagnostic1/1 consumed; image-only0/1, Preflight3/E4 0/1 blocked; all29 rows OPEN. Earlier local 28/28 missed this exact string-input path; no passing-test claim for it.
+
 ## Linker-detail observability local gate (2026-10-17)
 
 E4 focused **28/28 PASS**, including combined 256 KiB ceiling, explicit incomplete artifact, SHA-256, fixed minimal environment, runner-side artifact extraction/tamper rejection and cleanup regression. JS syntax, shellcheck E4 scripts, TypeScript, package and scoped whitespace PASS; indexed audit exit0/WARN/0 FAIL/modelCalls0 (713 indexed blobs, 19 existing WARN). This is **local diagnostic-harness validation**, not linker cause, native image qualification or Rust compile PASS. Historical CI39016323973 FAIL/CLOSED; new linker-detail diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1.

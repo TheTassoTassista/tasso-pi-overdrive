@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-## Current linker-detail diagnostic candidate (2026-10-17)
+## Terminal linker-detail diagnostic; STOP / Main (2026-10-18)
+
+CI39018110045/job117354278159 on exact `66a0e855d44826545d9da60b50e036ac47196cea` is FAIL. Verified artifact ID12095887085/SHA-256 `62274d8e99a11d3160876f78401ddc3b12f1e09848b71ef89009baab78b5ff06` contains successful Rust/GCC/ld/startfile probes, but compile was NOT REACHED: `spawnSync` string input with `encoding:'buffer'` raised `Unknown encoding: buffer`. Diagnostic defect KNOWN; actual linker failure cause UNKNOWN. Cleanup PASS/owned containers0/processes0/staging removed; image publication skipped. Linker-detail1/1 exhausted, replacement image-only0/1 and Preflight3/E4 0/1 blocked. Historical CI39016323973 FAIL/CLOSED; all29 closure rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Provider calls0, no readiness change. New Main authority required before another native diagnostic or qualification.
+
+## Historical pre-run linker-detail candidate (2026-10-17)
 
 Main `E4-RUST-LINKER-DIAGNOSTIC-001` grants one non-certifying run to replace the clipped linker evidence, not a toolchain repair. Observability-only candidate captures <=256 KiB combined fixed-command streams in a retrievable SHA-256 artifact via runner stdout, without a new payload mount; it emits compact receipts and fails on incomplete output. Rust/LLVM/base/GCC/target/sysroot and isolation remain unchanged; local E4 28/28 and ZERO_EGRESS PASS. CI39016323973 stays FAIL/CLOSED, linker cause UNKNOWN; diagnostic0/1, replacement image-only0/1, Preflight3/E4 0/1, 29 rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next: one exact-SHA linker-detail run only after scoped checkpoint; no provider call or readiness change.
 
