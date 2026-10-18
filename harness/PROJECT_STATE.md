@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## E4 rootfs resolver recovery local candidate (2026-10-18)
+
+Main `E4-ROOTFS-RESOLVER-RECOVERY-001` is recorded. Root-`/` resolver false-positive fixed locally with component-aware containment and fail-fast in-image sandbox/rootfs self-test; focused34/34 and read-only/no-network Bubblewrap root-`/` probe PASS. This is not native image inventory evidence. Corrected diagnostic0/1, conditional image-only0/1, Preflight3/E4 0/1. Historical CI39138736660 FAIL/CLOSED; Cargo exit127 cause UNKNOWN; 29 Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Indexed audit PASS (WARN20/FAIL0/modelCalls0) and scoped ZERO_EGRESS review PASS before CI.
+
 ## STOP / Main — E4 inventory diagnostic consumed without valid tool evidence
 
 CI39138736660 on `566d2af626c9d1a558ba7d5a2b567580d33b96e6` FAIL. Artifact ID12140732646/SHA-256 `9c86d93dc7393451fbcdc52c855e94dfeeb1f2bf411ec35521f005fcd8389489` is transport-complete but semantically invalid: the inventory resolver misclassifies root `/` paths as escape, so all38 tools/12 assets fail before inspection and 12 dependent checks are NOT_EXECUTED. Local direct reproduction proves the diagnostic defect; Cargo's prior exit127 cause remains UNKNOWN. Cleanup PASS/owned containers0/processes0/staging and tag removed; image publication skipped, provider calls0. Diagnostic1/1 consumed; new conditional image-only0/1, Preflight3/E4 0/1 BLOCKED; all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No new code or native run until Main disposition.

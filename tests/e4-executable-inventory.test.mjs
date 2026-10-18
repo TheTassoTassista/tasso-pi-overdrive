@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { extractExecutableInventory } from '../scripts/e4-extract-executable-inventory.mjs';
 import { captureInventoryCommand, inventoryCertificationDecision, requiredExecutableInventory,
-  resolveRootfsPath, runExecutableInventory } from '../scripts/e4-executable-inventory.mjs';
+  inventoryHarnessSelfTest, resolveRootfsPath, runExecutableInventory } from '../scripts/e4-executable-inventory.mjs';
 
 const repository = new URL('../', import.meta.url).pathname;
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -57,6 +57,105 @@ test('actual inventory enumerates all seed, image, LSP and DAP executables witho
       'pyright-langserver', 'bash-language-server']) {
       assert.ok(definitions.some((entry) => entry.id === id), id);
     }
+  } finally { f.cleanup(); }
+});
+
+test('root slash resolves an existing executable, while host inventory fails before manifest reads', () => {
+  if (process.platform !== 'linux') return;
+  const resolved = resolveRootfsPath('/', '/usr/bin/true');
+  assert.equal(resolved.physical, '/usr/bin/true');
+  assert.equal(fs.statSync(resolved.physical).isFile(), true);
+  assert.equal(resolveRootfsPath('/', '/usr/./bin/true').realpath, resolved.realpath);
+  const forbidden = runExecutableInventory();
+  assert.equal(forbidden.receipt.harnessStatus, 'DIAGNOSTIC_HARNESS_INVALID');
+  assert.equal(forbidden.receipt.complete, false);
+  assert.equal(forbidden.body.tools.length, 0);
+  assert.equal(forbidden.body.assets.length, 0);
+  assert.match(forbidden.body.failures[0].reason, /^DIAGNOSTIC_HARNESS_INVALID:/u);
+  const raw = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'phi-e4-invalid-harness-')), 'raw.log');
+  try {
+    const artifact = path.join(path.dirname(raw), 'executable-inventory.json');
+    fs.writeFileSync(raw, `E4_EXECUTABLE_INVENTORY_RECEIPT=${JSON.stringify(forbidden.receipt)}\n` +
+      `E4_EXECUTABLE_INVENTORY_ARTIFACT_BASE64=${forbidden.bytes.toString('base64')}\n`);
+    assert.equal(extractExecutableInventory(raw, artifact).harnessStatus, 'DIAGNOSTIC_HARNESS_INVALID');
+    assert.equal(JSON.parse(fs.readFileSync(artifact, 'utf8')).tools.length, 0);
+  } finally { fs.rmSync(path.dirname(raw), { recursive: true, force: true }); }
+});
+
+test('nonroot containment rejects traversal and host symlink escape but retains internal links', () => {
+  const f = fixture();
+  const sibling = `${f.root}-other`;
+  try {
+    f.install('/usr/bin/tool');
+    fs.mkdirSync(sibling);
+    fs.writeFileSync(path.join(sibling, 'outside'), 'host-only');
+    fs.symlinkSync('../bin/tool', path.join(f.root, 'usr/bin/tool-link'));
+    assert.equal(resolveRootfsPath(f.root, '/usr/bin/tool-link').realpath, '/usr/bin/tool');
+    fs.symlinkSync('/usr/bin/tool', path.join(f.root, 'usr/bin/absolute-link'));
+    assert.equal(resolveRootfsPath(f.root, '/usr/bin/absolute-link').realpath, '/usr/bin/tool');
+    fs.symlinkSync(path.join(sibling, 'outside'), path.join(f.root, 'usr/bin/external'));
+    assert.throws(() => resolveRootfsPath(f.root, '/usr/bin/external'), { code: 'ENOENT' });
+    fs.symlinkSync('../../../../outside', path.join(f.root, 'usr/bin/traversal'));
+    assert.throws(() => resolveRootfsPath(f.root, '/usr/bin/traversal'), /ROOTFS_ESCAPE/u);
+    assert.throws(() => resolveRootfsPath(f.root, '/../usr/bin/tool'), /ROOTFS_TRAVERSAL/u);
+    assert.throws(() => resolveRootfsPath(f.root, '/usr/../usr/bin/tool'), /ROOTFS_TRAVERSAL/u);
+    for (const invalid of ['', 'usr/bin/tool', '//usr/bin/tool', '/usr/bin/\0tool', '/usr\\bin\\tool']) {
+      assert.throws(() => resolveRootfsPath(f.root, invalid), /INVALID_ROOTFS_PATH/u);
+    }
+    assert.throws(() => resolveRootfsPath(sibling, '/usr/bin/tool'), { code: 'ENOENT' });
+    const alias = `${f.root}-alias`;
+    fs.symlinkSync(f.root, alias);
+    try { assert.throws(() => resolveRootfsPath(alias, '/usr/bin/tool'), /ALIASED_ROOTFS_ROOT/u); }
+    finally { fs.rmSync(alias); }
+  } finally { f.cleanup(); fs.rmSync(sibling, { recursive: true, force: true }); }
+});
+
+test('image root identity hashes are bound to current pinned manifests', () => {
+  const source = fs.readFileSync(path.join(repository, 'scripts/e4-executable-inventory.mjs'), 'utf8');
+  for (const [name, constant] of [['e4-toolchain-seeds.json', 'E4_SEED_MANIFEST_SHA256'],
+    ['e4-llvm-toolchain.json', 'E4_LLVM_MANIFEST_SHA256']]) {
+    const actual = hash(fs.readFileSync(path.join(repository, 'config', name)));
+    assert.match(source, new RegExp(`const ${constant} = '${actual}'`, 'u'));
+  }
+});
+
+test('genuine fixture identities, dependent call, negative result and receipt reconcile', () => {
+  const f = fixture();
+  try {
+    const manifest = Buffer.from('{"fixture":true}\n');
+    f.install('/usr/bin/true');
+    f.install('/opt/phi/config/e4-toolchain-seeds.json', manifest);
+    f.install('/usr/bin/gdb'); f.install('/usr/bin/python3.14');
+    f.install('/usr/bin/readelf'); f.install('/lib64/ld-linux-x86-64.so.2');
+    f.install('/usr/lib/libc.so.6');
+    assert.equal(inventoryHarnessSelfTest(f.root, hash(manifest)).status, 'PASS');
+    const definitions = [
+      { id: 'gdb', path: '/usr/bin/gdb', versionArgs: ['--version'], expectedSha256: hash(elf) },
+      { id: 'python', path: '/usr/bin/python3.14', versionArgs: ['--version'], expectedSha256: hash(elf) },
+      { id: 'missing', path: '/usr/bin/missing', versionArgs: ['--version'] },
+    ];
+    const calls = [];
+    const run = (binary, args) => { calls.push([binary, ...args]); return fakeRun(binary, args); };
+    const result = runExecutableInventory({ root: f.root, definitions, runtimeAssets: [{
+      id: 'fixture-asset', path: '/opt/phi/config/e4-toolchain-seeds.json',
+      expectedSha256: hash(manifest),
+    }], run });
+    assert.equal(result.body.tools.find((item) => item.id === 'gdb').status, 'PASS');
+    assert.equal(result.body.tools.find((item) => item.id === 'gdb').sha256, hash(elf));
+    assert.equal(result.body.assets[0].status, 'PASS');
+    assert.equal(result.body.assets[0].sha256, hash(manifest));
+    assert.equal(result.body.tools.find((item) => item.id === 'missing').status, 'FAIL');
+    assert.equal(result.body.dependent.find((item) => item.id === 'gdb-dap-import').status, 'PASS');
+    assert.ok(calls.some((args) => args.join(' ').includes('python import gdb.dap')));
+    assert.equal(result.body.expectedToolCount, 3);
+    assert.equal(result.body.toolCount, 3);
+    assert.equal(result.body.expectedAssetCount, 1);
+    assert.equal(result.body.assetCount, 1);
+    assert.equal(result.receipt.failureCount, result.body.failures.length);
+    assert.equal(result.receipt.artifact.sha256, hash(result.bytes));
+    assert.equal(result.receipt.status, 'FAIL');
+    assert.equal(result.receipt.harnessStatus, 'PASS');
+    assert.equal(inventoryCertificationDecision(result), false);
   } finally { f.cleanup(); }
 });
 
@@ -250,7 +349,8 @@ test('certification rejects every unresolved mandatory status and incomplete cap
     expectedToolCount: 1, toolCount: 1, tools: [{ status: 'PASS' }], dependent: [], failures: [],
     expectedAssetCount: 0, assetCount: 0, assets: [],
   } }), false);
-  const resolved = { receipt: { complete: true }, body: { expectedToolCount: 1, toolCount: 1,
+  const resolved = { receipt: { complete: true }, body: { harness: { status: 'PASS' },
+    expectedToolCount: 1, toolCount: 1,
     expectedAssetCount: 0, assetCount: 0, assets: [],
     tools: [{ status: 'PASS', functional: { status: 'PASS', kind: 'VERSION_STARTUP' } }],
     dependent: [], failures: [] } };

@@ -37,13 +37,15 @@ export function extractExecutableInventory(rawLog, artifactFile, expectedSha = n
   assert.equal(receipt.assetCount, body.assetCount);
   assert.equal(receipt.passCount, body.passCount);
   assert.equal(receipt.failureCount, body.failures.length);
+  assert.equal(receipt.harnessStatus, body.harness?.status);
   if (receipt.complete) {
     assert.equal(body.tools.length, body.toolCount, 'complete tool count mismatch');
     assert.equal(body.assets.length, body.assetCount, 'complete asset count mismatch');
     assert.equal(body.expectedToolCount, body.toolCount, 'mandatory tool enumeration mismatch');
     assert.equal(body.expectedAssetCount, body.assetCount, 'mandatory asset enumeration mismatch');
   }
-  assert.equal(receipt.complete, !body.originalBytes && ![...body.tools, ...body.dependent].some((item) =>
+  assert.equal(receipt.complete, body.harness?.status === 'PASS' && !body.originalBytes &&
+    ![...body.tools, ...body.dependent].some((item) =>
     item.startup?.capture?.complete === false || item.dependencyClosure?.capture?.complete === false ||
     item.elfInspection?.programHeaders?.complete === false || item.elfInspection?.dynamic?.complete === false ||
     item.capture?.complete === false));

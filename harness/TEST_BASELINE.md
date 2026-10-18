@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## E4 rootfs resolver recovery local gate (2026-10-18)
+
+Scoped E4 tests **34/34 PASS** with positive root-`/` path, non-root/symlink/traversal negatives, real fixture tool+asset hash, dependent execution, failure/receipt accounting, and invalid-harness fail-fast transport. Isolated read-only/no-network Bubblewrap root-`/` resolver probe PASS. JS syntax, TypeScript, package and relevant ShellCheck PASS. Indexed audit PASS (WARN20/FAIL0/modelCalls0) and scoped ZERO_EGRESS review PASS; corrected native diagnostic NOT RUN. Historical `npm run check` remains FAIL in the two Rust-host cases; no full-gate PASS claim.
+
 ## Terminal E4 executable inventory — invalid semantic evidence (2026-10-18)
 
 Local focused30/30 passed but missed root `/`; direct post-run reproduction `resolveRootfsPath('/', '/usr/bin/true')` throws `ERR_ASSERTION ROOTFS_ESCAPE` even though the file exists. Native [CI39138736660](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39138736660) artifact ID12140732646/SHA-256 `9c86d93dc7393451fbcdc52c855e94dfeeb1f2bf411ec35521f005fcd8389489`: 38 tools/12 assets fail at resolver assertion, 12 dependent checks NOT_EXECUTED, Cargo never started; no underlying Cargo root-cause evidence. Upload/cleanup PASS, owned containers/processes0, no image publication. Diagnostic1/1 consumed; image-only0/1 and Preflight3/E4 0/1 blocked. Prior local full check still has 2 Rust-host failures; do not promote local focus to native PASS.

@@ -9,6 +9,8 @@ import { LinkerDiagnosticCapture } from './e4-linker-capture.mjs';
 export const INVENTORY_SCHEMA = 'phi-e4-executable-inventory-v1';
 export const MAX_INVENTORY_BYTES = 4 * 1024 * 1024;
 const MAX_COMMAND_BYTES = 32 * 1024;
+const E4_SEED_MANIFEST_SHA256 = 'fdecaa5d3c6b4052f89a1a4d9d66b8ee3b9d77c18766dd874f14ea47f6876ae7';
+const E4_LLVM_MANIFEST_SHA256 = 'f853ca78c83abdef74e35b274fadcaf822c1ef08173514922669f5eeb2252779';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const readJson = (root, relative) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
 function fileEvidence(file) {
@@ -128,10 +130,41 @@ export function requiredRuntimeAssets(root = '/') {
 
 // Resolve symlinks as rootfs paths, never as host paths. This also makes broken
 // absolute symlinks observable in a staged rootfs fixture without host leakage.
+function rootfsPath(input) {
+  assert.equal(typeof input, 'string', 'INVALID_ROOTFS_PATH');
+  assert.equal(path.posix.isAbsolute(input) && !input.startsWith('//') &&
+    !input.includes('\0') && !input.includes('\\'), true, 'INVALID_ROOTFS_PATH');
+  assert.equal(input.split('/').includes('..'), false, 'ROOTFS_TRAVERSAL');
+  return path.posix.normalize(input);
+}
+
+function symlinkDestination(prefix, target, suffix) {
+  assert.equal(typeof target === 'string' && target.length > 0 && !target.startsWith('//') &&
+    !target.includes('\0') && !target.includes('\\'), true, 'INVALID_SYMLINK_TARGET');
+  const parts = target.startsWith('/') ? [] : path.posix.dirname(prefix).split('/').filter(Boolean);
+  for (const part of `${target}/${suffix}`.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length === 0) throw new Error('ROOTFS_ESCAPE');
+      parts.pop();
+    } else parts.push(part);
+  }
+  return `/${parts.join('/')}`;
+}
+
+function assertContained(base, physical) {
+  const relative = path.relative(base, physical);
+  assert.equal(relative === '..' || relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative), false, 'ROOTFS_ESCAPE');
+}
+
 export function resolveRootfsPath(root, requested) {
-  assert.equal(path.isAbsolute(root) && path.isAbsolute(requested), true);
+  assert.equal(typeof root === 'string' && path.isAbsolute(root) && !root.includes('\0'),
+    true, 'INVALID_ROOTFS_ROOT');
+  const requestedPath = rootfsPath(requested);
   const base = path.resolve(root);
-  let logical = path.posix.normalize(requested);
+  assert.equal(fs.realpathSync(base), base, 'ALIASED_ROOTFS_ROOT');
+  let logical = requestedPath;
   const chain = [];
   for (let hops = 0; hops < 32; hops += 1) {
     const segments = logical.split('/').filter(Boolean);
@@ -140,23 +173,87 @@ export function resolveRootfsPath(root, requested) {
     for (let index = 0; index < segments.length; index += 1) {
       prefix += `/${segments[index]}`;
       const physical = path.join(base, prefix.slice(1));
+      assertContained(base, physical);
       const stat = fs.lstatSync(physical);
       if (!stat.isSymbolicLink()) continue;
       const target = fs.readlinkSync(physical);
       chain.push({ path: prefix, target });
       const suffix = segments.slice(index + 1).join('/');
-      logical = path.posix.normalize(path.posix.join(
-        path.posix.isAbsolute(target) ? target : path.posix.join(path.posix.dirname(prefix), target), suffix));
+      logical = symlinkDestination(prefix, target, suffix);
       changed = true;
       break;
     }
     if (!changed) {
       const physical = path.join(base, logical.slice(1));
-      assert.equal(physical === base || physical.startsWith(`${base}${path.sep}`), true, 'ROOTFS_ESCAPE');
+      assertContained(base, physical);
       return { realpath: logical, physical, symlinks: chain };
     }
   }
   throw new Error('SYMLINK_LOOP');
+}
+
+// The workflow's Docker invocation is the control-plane authority. These
+// independent in-image observations prevent a host-root invocation or an
+// environment flag by itself from enabling the root="/" inventory path.
+export function attestE4InventorySandbox() {
+  assert.equal(process.platform, 'linux', 'E4_SANDBOX_PLATFORM');
+  assert.equal(process.arch, 'x64', 'E4_SANDBOX_ARCH');
+  assert.equal(process.getuid(), 1001, 'E4_SANDBOX_UID');
+  assert.equal(process.getgid(), 1001, 'E4_SANDBOX_GID');
+  assert.equal(process.argv[1], '/opt/phi/e4-image-selfcheck.mjs', 'E4_SANDBOX_ENTRYPOINT');
+  assert.equal(fs.realpathSync(process.argv[1]), process.argv[1], 'E4_SANDBOX_ENTRYPOINT_ALIAS');
+  assert.match(fs.readFileSync('/etc/os-release', 'utf8'), /^ID=arch$/mu, 'E4_ROOTFS_DISTRO');
+  const mountpoints = fs.readFileSync('/proc/self/mountinfo', 'utf8').trimEnd().split('\n')
+    .map((line) => ({ point: line.split(' ')[4], options: line.split(' ')[5] }));
+  const roots = mountpoints.filter((entry) => entry.point === '/');
+  assert.equal(roots.length, 1, 'E4_ROOTFS_MOUNT');
+  assert.equal(roots[0].options.split(',').includes('ro'), true, 'E4_ROOTFS_WRITABLE');
+  assert.equal(mountpoints.some((entry) => entry.point === '/opt/phi' ||
+    entry.point.startsWith('/opt/phi/')), false, 'E4_ROOTFS_FOREIGN_BIND');
+  const status = fs.readFileSync('/proc/self/status', 'utf8');
+  assert.match(status, /^CapEff:\s*0000000000000000$/mu, 'E4_SANDBOX_CAPABILITIES');
+  assert.match(status, /^NoNewPrivs:\s*1$/mu, 'E4_SANDBOX_NEW_PRIVILEGES');
+  assert.equal(fs.existsSync('/run/docker.sock') || fs.existsSync('/var/run/docker.sock'),
+    false, 'E4_SANDBOX_DOCKER_SOCKET');
+  const interfaces = fs.readFileSync('/proc/net/dev', 'utf8').split('\n').slice(2)
+    .map((line) => line.split(':')[0]?.trim()).filter(Boolean);
+  assert.deepEqual(interfaces, ['lo'], 'E4_SANDBOX_NETWORK');
+  assert.equal(fileEvidence('/opt/phi/config/e4-toolchain-seeds.json').sha256,
+    E4_SEED_MANIFEST_SHA256, 'E4_ROOTFS_SEED_MANIFEST');
+  assert.equal(fileEvidence('/opt/phi/config/e4-llvm-toolchain.json').sha256,
+    E4_LLVM_MANIFEST_SHA256, 'E4_ROOTFS_LLVM_MANIFEST');
+  return { status: 'PASS', rootfs: 'ARCH_E4_IMAGE', rootReadonly: true,
+    uid: 1001, gid: 1001, noNewPrivileges: true, effectiveCapabilities: '0',
+    networkInterfaces: interfaces, seedManifestSha256: E4_SEED_MANIFEST_SHA256,
+    llvmManifestSha256: E4_LLVM_MANIFEST_SHA256 };
+}
+
+export function inventoryHarnessSelfTest(root = '/', expectedAssetSha256 = E4_SEED_MANIFEST_SHA256) {
+  const binary = resolveRootfsPath(root, '/usr/bin/true');
+  const asset = resolveRootfsPath(root, '/opt/phi/config/e4-toolchain-seeds.json');
+  const binaryStat = fs.statSync(binary.physical);
+  assert.equal(binaryStat.isFile() && Boolean(binaryStat.mode & 0o111), true,
+    'DIAGNOSTIC_HARNESS_INVALID_TOOL');
+  assert.equal(fs.statSync(asset.physical).isFile(), true, 'DIAGNOSTIC_HARNESS_INVALID_ASSET');
+  assert.equal(fileEvidence(asset.physical).sha256, expectedAssetSha256,
+    'DIAGNOSTIC_HARNESS_INVALID_ASSET_IDENTITY');
+  return { status: 'PASS', tool: '/usr/bin/true', toolRealpath: binary.realpath,
+    asset: '/opt/phi/config/e4-toolchain-seeds.json', assetSha256: expectedAssetSha256 };
+}
+
+function invalidHarnessResult(error) {
+  const reason = `DIAGNOSTIC_HARNESS_INVALID:${error.code ?? error.message}`;
+  const body = { schema: INVENTORY_SCHEMA, mode: 'COMPLETE_EXECUTABLE_INVENTORY',
+    candidateSha: /^[a-f0-9]{40}$/u.test(process.env.PHI_E4_CANDIDATE_SHA ?? '')
+      ? process.env.PHI_E4_CANDIDATE_SHA : null,
+    qualifying: false, rootfs: 'CONTAINER_ROOT', harness: { status: 'DIAGNOSTIC_HARNESS_INVALID', reason },
+    tools: [], assets: [], dependent: [], failures: [{ id: 'diagnostic-harness', status: 'FAIL', reason }],
+    expectedToolCount: 38, toolCount: 0, expectedAssetCount: 12, assetCount: 0, passCount: 0 };
+  const bytes = Buffer.from(`${JSON.stringify(body)}\n`);
+  return { body, bytes, receipt: { mode: body.mode, candidateSha: body.candidateSha,
+    status: 'FAIL', qualifying: false, complete: false, harnessStatus: 'DIAGNOSTIC_HARNESS_INVALID',
+    artifact: { sha256: sha256(bytes), bytes: bytes.length }, toolCount: 0, assetCount: 0,
+    passCount: 0, failureCount: 1 } };
 }
 
 export function captureInventoryCommand(binary, args, options = {}) {
@@ -289,8 +386,20 @@ function inspectOne(root, definition, run) {
   return item;
 }
 
-export function runExecutableInventory({ root = '/', definitions = requiredExecutableInventory(root),
-  runtimeAssets = root === '/' ? requiredRuntimeAssets(root) : [], run = captureInventoryCommand } = {}) {
+export function runExecutableInventory({ root = '/', definitions, runtimeAssets,
+  run = captureInventoryCommand } = {}) {
+  let harness = { status: 'PASS', rootfs: 'TEST_ROOTFS' };
+  if (root === '/') {
+    try {
+      assert.equal(definitions === undefined && runtimeAssets === undefined &&
+        run === captureInventoryCommand, true, 'ROOTFS_DECLARED_INVENTORY_ONLY');
+      const sandbox = attestE4InventorySandbox();
+      const selfTest = inventoryHarnessSelfTest();
+      harness = { status: 'PASS', sandbox, selfTest };
+    } catch (error) { return invalidHarnessResult(error); }
+  }
+  definitions ??= requiredExecutableInventory(root);
+  runtimeAssets ??= root === '/' ? requiredRuntimeAssets(root) : [];
   const tools = definitions.map((entry) => inspectOne(root, entry, run));
   const assets = runtimeAssets.map((entry) => inspectAsset(root, entry));
   const byId = new Map(tools.map((entry) => [entry.id, entry]));
@@ -377,7 +486,7 @@ export function runExecutableInventory({ root = '/', definitions = requiredExecu
   const body = { schema: INVENTORY_SCHEMA, mode: 'COMPLETE_EXECUTABLE_INVENTORY',
     candidateSha: /^[a-f0-9]{40}$/u.test(process.env.PHI_E4_CANDIDATE_SHA ?? '')
       ? process.env.PHI_E4_CANDIDATE_SHA : null,
-    qualifying: false, rootfs: root === '/' ? 'CONTAINER_ROOT' : 'TEST_ROOTFS',
+    qualifying: false, rootfs: root === '/' ? 'CONTAINER_ROOT' : 'TEST_ROOTFS', harness,
     tools, assets, dependent, failures, expectedToolCount: definitions.length,
     expectedAssetCount: runtimeAssets.length, assetCount: assets.length,
     toolCount: tools.length, passCount: tools.filter((item) => item.status === 'PASS').length };
@@ -395,14 +504,16 @@ export function runExecutableInventory({ root = '/', definitions = requiredExecu
   }
   return { body, bytes, receipt: { mode: body.mode, candidateSha: body.candidateSha,
     status: complete && failures.length === 0 ? 'PASS' : 'FAIL',
-    qualifying: false, complete, artifact: { sha256: sha256(bytes), bytes: bytes.length },
+    qualifying: false, complete, harnessStatus: harness.status,
+    artifact: { sha256: sha256(bytes), bytes: bytes.length },
     toolCount: body.toolCount, assetCount: body.assetCount,
     passCount: body.passCount, failureCount: body.failures.length } };
 }
 
 export function inventoryCertificationDecision(result) {
   const { body, receipt } = result;
-  return receipt.complete === true && body.expectedToolCount === body.toolCount &&
+  return receipt.complete === true && body.harness?.status === 'PASS' &&
+    body.expectedToolCount === body.toolCount &&
     body.expectedAssetCount === body.assetCount && body.tools.length === body.toolCount &&
     body.assets.length === body.assetCount && body.failures.length === 0 &&
     body.tools.every((item) => item.status === 'PASS') &&

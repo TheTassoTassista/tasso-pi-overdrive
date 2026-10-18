@@ -47,6 +47,7 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
 
 test('E4 self-check reads live tool manifests, proves jiti resolution and fails closed on identity mismatch', () => {
   const source = read('scripts/e4-image-selfcheck.mjs');
+  const inventory = read('scripts/e4-executable-inventory.mjs');
   for (const name of ['e4-toolchain-seeds.json', 'e4-llvm-toolchain.json', 'git-resources.json', 'dap-engine.json', 'eval-engine.json', 'ast-edit.json', 'pi-package-lock.json']) {
     assert.ok(source.includes(name), `${name} must be read`);
   }
@@ -56,6 +57,12 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /E4_IMAGE_SELFCHECK=FAIL/u);
   assert.match(source, /inventoryCertificationDecision\(executableInventory\)/u);
   assert.match(source, /--complete-executable-inventory/u);
+  for (const evidence of ["/proc/self/mountinfo", "/proc/self/status", "/proc/net/dev",
+    "E4_ROOTFS_WRITABLE", "E4_SANDBOX_NEW_PRIVILEGES", "E4_SANDBOX_NETWORK",
+    "E4_ROOTFS_SEED_MANIFEST", "DIAGNOSTIC_HARNESS_INVALID", "inventoryHarnessSelfTest()"])
+    assert.ok(inventory.includes(evidence), `missing rootfs/sandbox attestation ${evidence}`);
+  assert.match(inventory, /definitions === undefined && runtimeAssets === undefined/u);
+  assert.match(inventory, /body\.harness\?\.status === 'PASS'/u);
   assert.match(source, /diagnostic\.receipt\.status !== 'PASS'\) process\.exitCode = 1/u);
   assert.match(source, /E4_IMAGE_NODE_ELF_CLOSURE=PASS/u);
   assert.match(source, /simdjson\.requiredBySha256, nodeSeed\.extracted\[0\]\.sha256/u);
