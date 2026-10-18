@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Terminal E4 executable inventory — invalid semantic evidence (2026-10-18)
+
+Local focused30/30 passed but missed root `/`; direct post-run reproduction `resolveRootfsPath('/', '/usr/bin/true')` throws `ERR_ASSERTION ROOTFS_ESCAPE` even though the file exists. Native [CI39138736660](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39138736660) artifact ID12140732646/SHA-256 `9c86d93dc7393451fbcdc52c855e94dfeeb1f2bf411ec35521f005fcd8389489`: 38 tools/12 assets fail at resolver assertion, 12 dependent checks NOT_EXECUTED, Cargo never started; no underlying Cargo root-cause evidence. Upload/cleanup PASS, owned containers/processes0, no image publication. Diagnostic1/1 consumed; image-only0/1 and Preflight3/E4 0/1 blocked. Prior local full check still has 2 Rust-host failures; do not promote local focus to native PASS.
+
 ## E4 executable-inventory local candidate (2026-10-18)
 
 Final scoped rerun after hardening: **30/30 PASS** (including the two LLVM contract checks run separately). This is local-only evidence and supersedes the earlier 29-case focused count below.
