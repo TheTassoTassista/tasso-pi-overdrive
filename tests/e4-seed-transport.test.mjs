@@ -11,16 +11,23 @@ const manifest = validateSeedManifest(JSON.parse(fs.readFileSync(new URL('../con
 const git = manifest.assets.find((asset) => asset.logicalName === 'git-2.55.0');
 const simdjson = manifest.assets.find((asset) => asset.logicalName === 'simdjson-4.6.11-node-runtime');
 const rustRuntime = manifest.assets.find((asset) => asset.logicalName === 'llvm-libs-22.1.8-rust-runtime');
+const rustLinker = manifest.assets.find((asset) => asset.logicalName === 'lld-22.1.8-rust-linker');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-test('E4 seed manifest binds eleven distinct immutable assets and exact runtime paths', () => {
-  assert.equal(manifest.assets.length, 11);
-  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 11);
+test('E4 seed manifest binds twelve distinct immutable assets and exact runtime paths', () => {
+  assert.equal(manifest.assets.length, 12);
+  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 12);
   assert.equal(manifest.release.internalOnly, true);
   assert.equal(simdjson.runtimeDependency.soname, 'libsimdjson.so.33');
   assert.equal(simdjson.runtimeDependency.requiredBySha256, manifest.assets.find((asset) => asset.logicalName === 'nodejs-26.8.2').extracted[0].sha256);
   assert.equal(rustRuntime.runtimeDependency.soname, 'libLLVM.so.22.1');
   assert.equal(rustRuntime.runtimeDependency.path, '/usr/lib/libLLVM.so.22.1');
+  assert.equal(rustLinker.extracted[0].installedPath, '/usr/bin/ld.lld');
+  assert.equal(rustLinker.extracted.length, 7);
+  assert.equal(rustLinker.sourcePackage, 'lld 22.1.8-1.1 x86_64_v3');
+  assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === rustLinker ?
+    { ...rustLinker, extracted: rustLinker.extracted.map((item, index) => index === 0 ? { ...item, sha256: '0'.repeat(64) } : item) } : asset) }),
+  /E4_SEED_MANIFEST_LLD_IDENTITY_INVALID/u);
   assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === rustRuntime ?
     { ...rustRuntime, runtimeDependency: { ...rustRuntime.runtimeDependency, soname: 'libLLVM.so.23.1' } } : asset) }),
   /E4_SEED_MANIFEST_RUST_RUNTIME_DEPENDENCY_INVALID/u);

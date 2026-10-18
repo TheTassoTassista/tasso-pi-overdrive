@@ -189,6 +189,25 @@
       }
     },
     {
+      "logicalName": "lld-22.1.8-rust-linker",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 653158204,
+      "name": "lld-22.1.8-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 2209064,
+      "sha256": "76387bd48e9e3693ec6464158bcb5372602566346832023088e6e42eb42691a9",
+      "sourcePackage": "lld 22.1.8-1.1 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "extracted": [
+        { "path": "usr/bin/ld.lld", "sha256": "22eee89e7f46cd62e6c07935a58b257521f9e5800c26d58a48d3fa3460596832", "installedPath": "/usr/bin/ld.lld" },
+        { "path": "usr/lib/liblldCOFF.so.22.1", "sha256": "eddaf22d64db6d486097c614b60c19bd4fded9396c8828a6944aeb2cf02b12c2", "installedPath": "/usr/lib/liblldCOFF.so.22.1" },
+        { "path": "usr/lib/liblldCommon.so.22.1", "sha256": "ff979662e968f1ee4d80a3fdb9800acff833966b0031009f8f7b3afe5e3060e7", "installedPath": "/usr/lib/liblldCommon.so.22.1" },
+        { "path": "usr/lib/liblldELF.so.22.1", "sha256": "86479682b194da6aab86313cc82d4572c72f0de52ef450976462ec329464ffe3", "installedPath": "/usr/lib/liblldELF.so.22.1" },
+        { "path": "usr/lib/liblldMachO.so.22.1", "sha256": "946286d006b3c595be1f4336628cbc7b0fc1f10264cc38108662ae2fff7030e0", "installedPath": "/usr/lib/liblldMachO.so.22.1" },
+        { "path": "usr/lib/liblldMinGW.so.22.1", "sha256": "ee3b0d319cafc18bc81150aa7d364238be776a705be25bcd7cfc99c9fecfe67e", "installedPath": "/usr/lib/liblldMinGW.so.22.1" },
+        { "path": "usr/lib/liblldWasm.so.22.1", "sha256": "debc81bb864d9b8e838a7765b88b2ceccc1cf96c21bdc1be0b7458a38d4990eb", "installedPath": "/usr/lib/liblldWasm.so.22.1" }
+      ]
+    },
+    {
       "logicalName": "rust-1.98.1-toolchain",
       "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
       "assetId": 644320524,

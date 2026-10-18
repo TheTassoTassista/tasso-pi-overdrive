@@ -23,6 +23,12 @@ const selected = Object.freeze({
     'opt/phi/browser/chrome-152.0.7977.82',
   ],
   'llvm-libs-22.1.8-rust-runtime': ['usr/lib/libLLVM.so.22.1'],
+  'lld-22.1.8-rust-linker': [
+    'usr/bin/ld.lld',
+    'usr/lib/liblldCOFF.so.22.1', 'usr/lib/liblldCommon.so.22.1',
+    'usr/lib/liblldELF.so.22.1', 'usr/lib/liblldMachO.so.22.1',
+    'usr/lib/liblldMinGW.so.22.1', 'usr/lib/liblldWasm.so.22.1',
+  ],
   'rust-1.98.1-toolchain': [
     'usr/bin/rustc', 'usr/bin/cargo',
     'usr/lib/librustc_driver-6486d279b43c5e4c.so', 'usr/lib/libstd-a4cf8c125ff393c3.so',
@@ -53,7 +59,8 @@ export function validateSeedManifest(manifest) {
         asset.size > (asset.logicalName.startsWith('browser-runtime-') ? 200 : 100) * 1024 * 1024 ||
         !['UNAVAILABLE_IN_CHECKED_SOURCES', 'NOT_ASSESSED_FOR_THIS_TRANSPORT'].includes(asset.upstreamRefetchability) ||
         !validHash(asset.sha256) || !Array.isArray(asset.extracted) ||
-        asset.extracted.length !== (['browser-runtime-0.36.0-chrome-152.0.7977.82', 'rust-1.98.1-toolchain'].includes(asset.logicalName) ? 2 : 1)) fail('MANIFEST_ASSET_INVALID');
+        asset.extracted.length !== (asset.logicalName === 'lld-22.1.8-rust-linker' ? 7 :
+          ['browser-runtime-0.36.0-chrome-152.0.7977.82', 'rust-1.98.1-toolchain'].includes(asset.logicalName) ? 2 : 1)) fail('MANIFEST_ASSET_INVALID');
     names.add(asset.logicalName);
     ids.add(asset.assetId);
     if (asset.logicalName.startsWith('browser-runtime-') &&
@@ -76,6 +83,21 @@ export function validateSeedManifest(manifest) {
          asset.toolchain.sysrootPath !== '/usr' ||
          asset.toolchain.stdLibraryPath !== '/usr/lib/rustlib/x86_64-unknown-linux-gnu/lib/libstd-a4cf8c125ff393c3.so' ||
          asset.toolchain.stdLibrarySha256 !== '2577f7ed4dd472cb3ed7cb4f2c79916aee6bb328235f35696a9f08b349f4c27b')) fail('MANIFEST_RUST_IDENTITY_INVALID');
+    if (asset.logicalName === 'lld-22.1.8-rust-linker' &&
+        (asset.assetId !== 653158204 || asset.name !== 'lld-22.1.8-1.1-x86_64_v3.pkg.tar.zst' ||
+         asset.size !== 2209064 || asset.sha256 !== '76387bd48e9e3693ec6464158bcb5372602566346832023088e6e42eb42691a9' ||
+         asset.sourcePackage !== 'lld 22.1.8-1.1 x86_64_v3' ||
+         asset.signatureFingerprint !== '882DCFE48E2051D48E2562ABF3B607488DB35A47' ||
+         asset.extracted.some((item, index) => item.path !== selected[asset.logicalName][index] ||
+           item.sha256 !== [
+             '22eee89e7f46cd62e6c07935a58b257521f9e5800c26d58a48d3fa3460596832',
+             'eddaf22d64db6d486097c614b60c19bd4fded9396c8828a6944aeb2cf02b12c2',
+             'ff979662e968f1ee4d80a3fdb9800acff833966b0031009f8f7b3afe5e3060e7',
+             '86479682b194da6aab86313cc82d4572c72f0de52ef450976462ec329464ffe3',
+             '946286d006b3c595be1f4336628cbc7b0fc1f10264cc38108662ae2fff7030e0',
+             'ee3b0d319cafc18bc81150aa7d364238be776a705be25bcd7cfc99c9fecfe67e',
+             'debc81bb864d9b8e838a7765b88b2ceccc1cf96c21bdc1be0b7458a38d4990eb',
+           ][index]))) fail('MANIFEST_LLD_IDENTITY_INVALID');
     if (asset.logicalName !== 'rust-1.98.1-toolchain' && asset.toolchain !== undefined) fail('MANIFEST_ASSET_INVALID');
     const extractedPaths = new Set();
     for (const item of asset.extracted) {

@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Case A linker closure candidate (2026-10-18)
+
+CI39117154657 diagnostic SUCCESS/complete artifact ID12133550070, Rust compile FAIL at required `ld.lld`: `-fuse-ld=lld` plus `collect2: fatal error: cannot find 'ld'`. Signed Rust package depends on `lld`; image omitted it; local isolated GCC reproduction matched. Classification **KNOWN / LINKER_MISSING**. Exact lld22.1.8 signed asset653158204 has matched metadata/readback; seven-file selective seed and image self-check are local candidate, not native proof. Local focused19/19, syntax/TypeScript/package/shell/whitespace PASS; indexed audit WARN19/FAIL0/modelCalls0 and ZERO_EGRESS PASS. Diagnostic1/1 consumed, replacement image-only0/1, Preflight3/E4 0/1 blocked; all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next: scoped checkpoint, then one image-only qualification. No provider/model calls or readiness change.
+
 ## Active corrected non-certifying Rust diagnostic (2026-10-18)
 
 CI39117154657/job117645157316 attempt1 on exact `c9e3cb00adf38ed6cb44ccd37091dbda4679173d` is IN PROGRESS. Corrected diagnostic1/1 consumed; image-only0/1, Preflight3/E4 0/1 blocked. No second diagnostic, no toolchain repair before evidence. Historical linker cause UNKNOWN, all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Exact next action: inspect same run/artifact and cleanup.

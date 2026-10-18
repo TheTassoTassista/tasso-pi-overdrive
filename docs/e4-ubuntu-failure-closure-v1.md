@@ -1,5 +1,7 @@
 # E4_UBUNTU_FAILURE_CLOSURE_V1
 
+Corrected linker diagnostic CI39117154657 (2026-10-18) is complete/non-certifying: rustc exited1 after selecting `-fuse-ld=lld`; `collect2` could not find the linker. Signed Rust1.98.1 package declares `lld`, omitted by the image recipe/eleven-seed set; isolated GCC reproduction matched. Classification KNOWN / LINKER_MISSING, Case A. Local candidate stages pinned signed lld22.1.8 asset653158204 and verifies its seven runtime files before Rust compile/run; focused19/19 PASS, native replacement image **NOT RUN**. Diagnostic1/1 consumed, image-only0/1, Preflight3/E4 0/1 blocked. **All 29 rows below remain OPEN**; this does not close Rust-analyzer or any Preflight2 failure. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 Corrected diagnostic pre-native closure (2026-10-18): E4 33/33 and indexed-audit regressions3/3 PASS; scoped ZERO_EGRESS PASS. Corrected diagnostic0/1 still NOT RUN, image-only0/1 and Preflight3/E4 0/1 blocked. **All 29 rows OPEN**; compiler-capture validation does not close any historical failure.
 
 Corrected capture (2026-10-18): Main `E4-RUST-SPAWNSYNC-CAPTURE-RECOVERY-001` permits one new non-certifying diagnostic after local focused/ZERO_EGRESS closure. Real wrapper regressions E4 focused33/33 PASS; native corrected diagnostic0/1, image-only0/1, Preflight3/E4 0/1. **All 29 historical entries below remain OPEN**; a capture fix grants no Rust or rust-analyzer closure. CI39018110045 remains FAIL/CLOSED and linker cause UNKNOWN. No bulk promotion.

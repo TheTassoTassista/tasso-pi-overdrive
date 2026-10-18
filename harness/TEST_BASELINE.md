@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Case A lld dependency-closure local focus (2026-10-18)
+
+Corrected CI39117154657 on `c9e3cb0` is diagnostic-only SUCCESS with complete compile evidence and `LINKER_MISSING` failure; no Rust compile/run PASS or image digest. Local repaired candidate: E4 focused **19/19 PASS** (manifest/seed/image contract/capture/clangd), real signed lld archive selective staging PASS, syntax, TypeScript, package, shell and scoped whitespace PASS. Native repaired image **NOT RUN**; replacement image-only0/1, Preflight3/E4 0/1 blocked, 29 historical rows OPEN. No E1–E3/Host rerun.
+
 ## Corrected capture pre-native gate (2026-10-18)
 
 E4 focused **33/33 PASS** and indexed-audit regressions3/3 PASS. Syntax, TypeScript, package, E4 shellcheck and staged whitespace PASS. Indexed source/security audit exit0/WARN19/FAIL0/modelCalls0 across713 blobs; structured ZERO_EGRESS PASS. No `npm run check` or corrected native run was executed in this gate. The latter remains0/1 pending commit; no rootfs/linker PASS claimed.

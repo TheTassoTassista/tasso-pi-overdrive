@@ -66,7 +66,7 @@ try {
   assert.equal(llvm.clangdSha256, 'aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
-  assert.equal(manifest.assets.length, 11);
+  assert.equal(manifest.assets.length, 12);
   const byName = new Map(manifest.assets.map((item) => [item.logicalName, item]));
   for (const asset of manifest.assets) {
     for (const item of asset.extracted) fileIdentity(item.installedPath, item.sha256);
@@ -75,6 +75,11 @@ try {
   const simdjson = byName.get('simdjson-4.6.11-node-runtime')?.runtimeDependency;
   const rustSeed = byName.get('rust-1.98.1-toolchain');
   const rustRuntime = byName.get('llvm-libs-22.1.8-rust-runtime')?.runtimeDependency;
+  const rustLinker = byName.get('lld-22.1.8-rust-linker');
+  assert.equal(rustLinker.extracted[0].installedPath, '/usr/bin/ld.lld');
+  command('/usr/bin/ld.lld', ['--version'], /^LLD 22\.1\.8 /u);
+  const linkerLibraries = command('/lib64/ld-linux-x86-64.so.2', ['--list', '/usr/bin/ld.lld'], /liblldELF\.so\.22\.1 => \/usr\/lib\/liblldELF\.so\.22\.1/u);
+  assert.doesNotMatch(linkerLibraries, /not found/u, 'Rust linker has an unresolved rootfs library');
   assert.equal(rustRuntime?.soname, 'libLLVM.so.22.1');
   assert.equal(rustRuntime.path, '/usr/lib/libLLVM.so.22.1');
   assert.equal(rustRuntime.sha256, byName.get('llvm-libs-22.1.8-rust-runtime').extracted[0].sha256);

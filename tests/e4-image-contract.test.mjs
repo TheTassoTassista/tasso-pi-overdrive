@@ -55,7 +55,9 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /fs\.realpathSync\(simdjson\.linkPath\), simdjson\.path/u);
   assert.match(source, /node_modules\/@ast-grep\/cli-linux-x64-gnu/u);
   assert.match(source, /fileIdentity\(astBin, ast\.binarySha256\)/u);
-  assert.match(source, /assert\.equal\(manifest\.assets\.length, 11\)/u);
+  assert.match(source, /assert\.equal\(manifest\.assets\.length, 12\)/u);
+  assert.match(source, /command\('\/usr\/bin\/ld\.lld', \['--version'\], \/\^LLD 22/u);
+  assert.ok(source.includes('assert.doesNotMatch(linkerLibraries, /not found/u'));
   assert.match(source, /command\('\/usr\/bin\/cmp', \['--version'\]/u);
   assert.match(source, /command\(llvm\.clangdPath, \['--version'\]/u);
   assert.match(source, /lspRuntimeStatus\(\)\.languages\.clangd\.binaryPath, llvm\.clangdPath/u);
