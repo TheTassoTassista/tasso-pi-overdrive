@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { rustStartupEvidence } from './e4-rust-startup.mjs';
+import { inventoryCertificationDecision, runExecutableInventory } from './e4-executable-inventory.mjs';
 
 const root = '/opt/phi';
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'config', name), 'utf8'));
@@ -50,7 +51,20 @@ function treeIdentity(folder, expected) {
   assert.equal(outer.digest('hex'), expected, 'debugpy tree mismatch');
 }
 
-try {
+if (process.argv.slice(2).includes('--complete-executable-inventory')) {
+  try {
+    const diagnostic = runExecutableInventory();
+    process.stdout.write(`E4_EXECUTABLE_INVENTORY_RECEIPT=${JSON.stringify(diagnostic.receipt)}\n`);
+    process.stdout.write(`E4_EXECUTABLE_INVENTORY_ARTIFACT_BASE64=${diagnostic.bytes.toString('base64')}\n`);
+    if (!diagnostic.receipt.complete || diagnostic.receipt.status !== 'PASS') process.exitCode = 1;
+  } catch (error) {
+    console.error(`E4_EXECUTABLE_INVENTORY=FAIL reason=${String(error.message).slice(0, 180)}`);
+    process.exitCode = 1;
+  }
+} else try {
+  const executableInventory = runExecutableInventory();
+  assert.equal(inventoryCertificationDecision(executableInventory), true,
+    `mandatory executable inventory failed: ${JSON.stringify(executableInventory.body.failures)}`);
   assert.equal(process.platform, 'linux');
   assert.equal(process.arch, 'x64');
   const manifest = read('e4-toolchain-seeds.json');

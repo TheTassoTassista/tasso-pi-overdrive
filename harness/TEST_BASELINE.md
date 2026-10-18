@@ -1,5 +1,11 @@
 # Phi — Test Baseline
 
+## E4 executable-inventory local candidate (2026-10-18)
+
+Final scoped rerun after hardening: **30/30 PASS** (including the two LLVM contract checks run separately). This is local-only evidence and supersedes the earlier 29-case focused count below.
+
+New diagnostic/contract/capture/seed/cleanup focused tests **29/29 PASS**; seven installed JavaScript LSP initialize/shutdown calls PASS; JS syntax, TypeScript and package validation PASS. Local `npm run check` **FAIL** at 1134 total/794 PASS/2 FAIL/338 skips: Rust `HASH_ANCHORED` edit corpus syntax `UNAVAILABLE`, and rust-analyzer cross-file definition count0. Host `rustc` is absent; these two failures are previously documented environmental cases, not counted green or changed to skips. Native inventory has not run, so Cargo cause UNKNOWN, tool closure UNVERIFIED, image NOT QUALIFIED. Indexed audit exit0/WARN20/FAIL0/modelCalls0, scoped ZERO_EGRESS PASS.
+
 ## Sole replacement image-only native FAIL (2026-10-18)
 
 [CI39118464500](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39118464500)/job117648992812 attempt1 on exact `11560730b0abbf219aef94c79abece6d0233b4f6`: all12 signed seeds, managed LSP, LLVM provenance, image build PASS; isolated self-check reached exact `ld.lld` version/library, clangd22.1.8, Rust1.98.1 startup and LLVM22.1 library PASS. First failure `/usr/bin/cargo --version` exit127; exact loader cause UNKNOWN because stderr not retained. Rust compile/run and later checks NOT REACHED; image publication skipped/no digest. Finalizer owned containers/processes0 and tag/staging removed. Image-only1/1 exhausted; Preflight3/E4 0/1 blocked, all29 historical rows OPEN, autonomy BLOCKED/false. Prior local E4 19/19 remains local-only; no native all-green claim or retry.

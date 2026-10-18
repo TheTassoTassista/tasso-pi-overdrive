@@ -10,7 +10,7 @@ test('E4 image cleanup removes only fixed owned staging directories', () => {
   const root = path.join(parent, '_temp');
   try {
     fs.mkdirSync(root);
-    for (const name of ['phi-e4-seeds', 'phi-e4-lsp', 'phi-e4-linker-evidence']) {
+    for (const name of ['phi-e4-seeds', 'phi-e4-lsp', 'phi-e4-linker-evidence', 'phi-e4-executable-inventory']) {
       fs.mkdirSync(path.join(root, name));
       fs.writeFileSync(path.join(root, name, 'owned'), 'fixture');
     }
@@ -19,6 +19,7 @@ test('E4 image cleanup removes only fixed owned staging directories', () => {
     assert.equal(fs.existsSync(path.join(root, 'phi-e4-seeds')), false);
     assert.equal(fs.existsSync(path.join(root, 'phi-e4-lsp')), false);
     assert.equal(fs.existsSync(path.join(root, 'phi-e4-linker-evidence')), false);
+    assert.equal(fs.existsSync(path.join(root, 'phi-e4-executable-inventory')), false);
     assert.equal(fs.readFileSync(path.join(root, 'foreign'), 'utf8'), 'preserve');
   } finally {
     fs.rmSync(parent, { recursive: true, force: true });

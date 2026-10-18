@@ -98,10 +98,11 @@ on:
         description: Build and self-qualify the private immutable E4 image; no preflight or E4
         type: boolean
         default: false
-      e4-rust-diagnostic-only:
-        description: With image-only selected, capture the bounded non-certifying Rust linker-detail artifact; never publish
-        type: boolean
-        default: false
+      e4-image-diagnostic-mode:
+        description: With image-only selected, capture one bounded non-certifying diagnostic; never publish
+        type: choice
+        options: [none, rust-linker, complete-executable-inventory]
+        default: none
       e4-ubuntu-preflight-only:
         description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
         type: boolean
@@ -153,10 +154,10 @@ jobs:
           identity=$(gh api repos/llvm/llvm-project/releases/tags/llvmorg-22.1.8 --jq '.assets[] | select(.name == "LLVM-22.1.8-Linux-X64.tar.xz") | [.id, .size, .digest] | @tsv')
           test "$identity" = $'449438700\t1938859476\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384'
           printf 'E4_LLVM_PROVENANCE=PASS tag=llvmorg-22.1.8 asset_id=449438700 archive_sha256=df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384\n'
-      - name: Build minimal-context image and run isolated no-network Rust diagnostic or self-check
+      - name: Build minimal-context image and run isolated no-network diagnostic or self-check
         env:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
-          E4_RUST_DIAGNOSTIC: ${{ inputs['e4-rust-diagnostic-only'] }}
+          E4_DIAGNOSTIC_MODE: ${{ inputs['e4-image-diagnostic-mode'] }}
         run: |
           docker buildx build --file certification/Dockerfile.e4 \
             --build-arg "PRODUCT_CANDIDATE_SHA=$GITHUB_SHA" \
@@ -166,7 +167,7 @@ jobs:
           test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
           printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
           printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
-          if test "$E4_RUST_DIAGNOSTIC" = true; then
+          if test "$E4_DIAGNOSTIC_MODE" = rust-linker; then
             install -d -m 0700 "$RUNNER_TEMP/phi-e4-linker-evidence"
             if docker run --rm --name "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
               --security-opt no-new-privileges --pids-limit 64 --memory 1g \
@@ -181,22 +182,46 @@ jobs:
               "$RUNNER_TEMP/phi-e4-linker-evidence/raw.log" \
               "$RUNNER_TEMP/phi-e4-linker-evidence/rust-linker-diagnostic.json"
             exit "$diagnostic_status"
+          elif test "$E4_DIAGNOSTIC_MODE" = complete-executable-inventory; then
+            install -d -m 0700 "$RUNNER_TEMP/phi-e4-executable-inventory"
+            if docker run --rm --name "phi-e4-executable-inventory-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
+              --security-opt no-new-privileges --pids-limit 64 --memory 1g \
+              --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+              --user 1001:1001 --env "PHI_E4_CANDIDATE_SHA=$GITHUB_SHA" "$E4_IMAGE_REF" --complete-executable-inventory \
+              > "$RUNNER_TEMP/phi-e4-executable-inventory/raw.log" 2>&1; then
+              diagnostic_status=0
+            else
+              diagnostic_status=$?
+            fi
+            node scripts/e4-extract-executable-inventory.mjs \
+              "$RUNNER_TEMP/phi-e4-executable-inventory/raw.log" \
+              "$RUNNER_TEMP/phi-e4-executable-inventory/executable-inventory.json" "$GITHUB_SHA"
+            exit "$diagnostic_status"
           else
+            test "$E4_DIAGNOSTIC_MODE" = none
             docker run --rm --name "phi-e4-image-selfcheck-$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL \
               --security-opt no-new-privileges --pids-limit 64 --memory 1g \
               --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
               --user 1001:1001 "$E4_IMAGE_REF"
           fi
       - name: Upload bounded linker-detail evidence only
-        if: ${{ always() && inputs['e4-rust-diagnostic-only'] }}
+        if: ${{ always() && inputs['e4-image-diagnostic-mode'] == 'rust-linker' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
         with:
           name: e4-rust-linker-detail-${{ github.run_id }}
           path: ${{ runner.temp }}/phi-e4-linker-evidence/rust-linker-diagnostic.json
           if-no-files-found: error
           retention-days: 7
+      - name: Upload bounded executable inventory only
+        if: ${{ always() && inputs['e4-image-diagnostic-mode'] == 'complete-executable-inventory' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
+        with:
+          name: e4-executable-inventory-${{ github.run_id }}
+          path: ${{ runner.temp }}/phi-e4-executable-inventory/executable-inventory.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish only qualified image and record exact digest
-        if: ${{ !inputs['e4-rust-diagnostic-only'] }}
+        if: ${{ inputs['e4-image-diagnostic-mode'] == 'none' }}
         env:
           GH_TOKEN: ${{ github.token }}
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
@@ -215,7 +240,7 @@ jobs:
           E4_IMAGE_REF: ghcr.io/thetassotassista/tasso-pi-overdrive-e4:${{ github.sha }}
         run: |
           docker info >/dev/null
-          for container in "phi-e4-image-selfcheck-$GITHUB_RUN_ID" "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID"; do
+          for container in "phi-e4-image-selfcheck-$GITHUB_RUN_ID" "phi-e4-rust-diagnostic-$GITHUB_RUN_ID" "phi-e4-rust-linker-diagnostic-$GITHUB_RUN_ID" "phi-e4-executable-inventory-$GITHUB_RUN_ID"; do
             if docker container inspect "$container" >/dev/null 2>&1; then docker rm -f "$container" >/dev/null; fi
             test -z "$(docker ps -aq --filter "name=^/$container$")"
           done

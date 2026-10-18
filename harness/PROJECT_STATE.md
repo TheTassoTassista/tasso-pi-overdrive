@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## E4 executable closure local candidate (2026-10-18)
+
+`E4-TOOLCHAIN-EXECUTABLE-CLOSURE-001` authorizes a single non-certifying aggregate diagnostic after local focused and ZERO_EGRESS validation. Current implementation is staged but not yet committed, locally focused29/29 PASS and ZERO_EGRESS PASS; no new native run, no Cargo root cause, no qualified image. Historical CI39118464500 remains FAIL/CLOSED, Cargo exit127 cause UNKNOWN. New diagnostic0/1, conditional image-only0/1, Preflight3/E4 0/1; all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Host full check still has two pre-existing Rust cases failing with no host `rustc`; see `harness/TEST_BASELINE.md`.
+
 ## Terminal replacement image-only FAIL (2026-10-18)
 
 CI39118464500/job117648992812 attempt1 on functional `11560730b0abbf219aef94c79abece6d0233b4f6`: seed12/LSP/LLVM/build PASS; no-network/read-only UID1001 image self-check passed selected `ld.lld`, clangd22.1.8 and Rust1.98.1 startup/LLVM22.1 closure, then first failed Cargo `--version` exit127. Underlying cause UNKNOWN (self-check omitted Cargo stderr); local Cargo ELF dependencies indicate only POSSIBLE missing loader/library. Rust compile/run and later checks NOT REACHED, no qualified image digest/publish. Final cleanup owned containers/processes0, tag/staging removed; build cache unscoped. Image-only1/1 exhausted; Preflight3/E4 0/1 blocked, all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP/Main; no retry or fix under current decision, no provider/model call.
