@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## STOP / Main — corrected E4 inventory FAIL (2026-10-18)
+
+Sole corrected [CI39141449343](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39141449343) on `b2ed964c647c3a9dba47b9fb32bfba410fc38465` is terminal FAIL. Valid isolated harness and root-`/` self-test PASS; complete receipt/artifact ID12142321096 SHA `f0fbd4719d0e16d31b5c789b0da809ad943e251de30ed0e65f0b17c8a5dac253`: 37/38 tools PASS, 12/12 assets PASS; Cargo exit127 due missing `libgit2.so.1.9`, offline compile NOT_EXECUTED; five GCC startfile checks falsely reject in-root `..` paths. No image publication; cleanup PASS owned containers/processes0, staging/tag removed. Corrected diagnostic1/1 consumed; conditional image-only0/1, Preflight3/E4 0/1 BLOCKED. Historical CI39138736660 remains FAIL/CLOSED. All29 Ubuntu rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP for Main, no retry or patch under current failed-run rule.
+
 ## E4 rootfs resolver recovery local candidate (2026-10-18)
 
 Main `E4-ROOTFS-RESOLVER-RECOVERY-001` is recorded. Root-`/` resolver false-positive fixed locally with component-aware containment and fail-fast in-image sandbox/rootfs self-test; focused34/34 and read-only/no-network Bubblewrap root-`/` probe PASS. This is not native image inventory evidence. Corrected diagnostic0/1, conditional image-only0/1, Preflight3/E4 0/1. Historical CI39138736660 FAIL/CLOSED; Cargo exit127 cause UNKNOWN; 29 Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Indexed audit PASS (WARN20/FAIL0/modelCalls0) and scoped ZERO_EGRESS review PASS before CI.

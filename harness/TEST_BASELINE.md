@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Native corrected E4 inventory (2026-10-18)
+
+Local focused34/34, isolated Bubblewrap root-`/`, JS syntax, TypeScript, package, relevant ShellCheck, indexed audit WARN20/FAIL0/modelCalls0 and scoped ZERO_EGRESS PASS preceded sole corrected CI39141449343 on `b2ed964c647c3a9dba47b9fb32bfba410fc38465`. Native job117716558826 attempt1 **FAIL** with valid harness/self-test and transport-complete artifact ID12142321096/SHA `f0fbd4719d0e16d31b5c789b0da809ad943e251de30ed0e65f0b17c8a5dac253`: 38/38 tool records (37 PASS, Cargo FAIL), 12/12 assets PASS, dependent6 PASS/5 FAIL/1 NOT_EXECUTED. Cargo exit127 stderr names missing `libgit2.so.1.9`; five GCC startfile failures are resolver `..` false negatives. Receipt status FAIL, complete true, qualifying false. Cleanup PASS; no image qualification. Do not reinterpret as full gate PASS. The two historical Rust-host local `npm run check` failures remain unchanged.
+
 ## E4 rootfs resolver recovery local gate (2026-10-18)
 
 Scoped E4 tests **34/34 PASS** with positive root-`/` path, non-root/symlink/traversal negatives, real fixture tool+asset hash, dependent execution, failure/receipt accounting, and invalid-harness fail-fast transport. Isolated read-only/no-network Bubblewrap root-`/` resolver probe PASS. JS syntax, TypeScript, package and relevant ShellCheck PASS. Indexed audit PASS (WARN20/FAIL0/modelCalls0) and scoped ZERO_EGRESS review PASS; corrected native diagnostic NOT RUN. Historical `npm run check` remains FAIL in the two Rust-host cases; no full-gate PASS claim.
