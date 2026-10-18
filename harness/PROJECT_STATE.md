@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## Active replacement image-only (2026-10-18)
+
+CI39118464500/job117648992812 attempt1 on exact `11560730b0abbf219aef94c79abece6d0233b4f6` is IN PROGRESS. Replacement image-only1/1 consumed; no duplicate. Same-run result, full self-check, qualified OCI digest and cleanup remain UNKNOWN until terminal. Preflight3/E4 0/1 blocked; all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next inspect this SAME run. No provider/model calls or readiness change.
+
 ## Case A linker closure candidate (2026-10-18)
 
 CI39117154657 diagnostic SUCCESS/complete artifact ID12133550070, Rust compile FAIL at required `ld.lld`: `-fuse-ld=lld` plus `collect2: fatal error: cannot find 'ld'`. Signed Rust package depends on `lld`; image omitted it; local isolated GCC reproduction matched. Classification **KNOWN / LINKER_MISSING**. Exact lld22.1.8 signed asset653158204 has matched metadata/readback; seven-file selective seed and image self-check are local candidate, not native proof. Local focused19/19, syntax/TypeScript/package/shell/whitespace PASS; indexed audit WARN19/FAIL0/modelCalls0 and ZERO_EGRESS PASS. Diagnostic1/1 consumed, replacement image-only0/1, Preflight3/E4 0/1 blocked; all29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next: scoped checkpoint, then one image-only qualification. No provider/model calls or readiness change.
