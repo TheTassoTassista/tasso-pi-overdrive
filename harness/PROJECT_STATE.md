@@ -1,5 +1,13 @@
 # Phi — Current Project State
 
+## Scoped corrected diagnostic ready for one native run (2026-10-18)
+
+Main decision recorded; local E4 33/33, repository-audit regressions3/3 and syntax/TypeScript/package/shellcheck PASS. Indexed audit WARN19/FAIL0/modelCalls0; ZERO_EGRESS PASS, exact toolchain/image/security inputs unchanged. Corrected diagnostic0/1, image-only0/1, Preflight3/E4 0/1; 29 rows OPEN, autonomy BLOCKED/false, portability NOT CERTIFIED. Commit/push only the staged scoped candidate, then one corrected native diagnostic; no Rust repair before valid linker evidence.
+
+## Corrected one-shot Rust diagnostic candidate (2026-10-18)
+
+`E4-RUST-SPAWNSYNC-CAPTURE-RECOVERY-001` is recorded. Capture fix and deterministic real-wrapper tests are local only: E4 focused33/33, syntax/TypeScript/package/shellcheck PASS, ZERO_EGRESS pending. Old CI39018110045 remains FAIL/CLOSED and does not prove linker cause; corrected diagnostic budget0/1, image-only0/1, Preflight3/E4 0/1. No Rust/LLVM/GCC/base/sysroot/sandbox/provider/readiness change. All29 closure rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Next: staged audit, exact candidate checkpoint and one corrected native diagnostic; do not repair toolchain before valid evidence.
+
 ## Terminal linker-detail diagnostic; STOP / Main (2026-10-18)
 
 CI39018110045/job117354278159 on exact `66a0e855d44826545d9da60b50e036ac47196cea` is FAIL. Verified artifact ID12095887085/SHA-256 `62274d8e99a11d3160876f78401ddc3b12f1e09848b71ef89009baab78b5ff06` contains successful Rust/GCC/ld/startfile probes, but compile was NOT REACHED: `spawnSync` string input with `encoding:'buffer'` raised `Unknown encoding: buffer`. Diagnostic defect KNOWN; actual linker failure cause UNKNOWN. Cleanup PASS/owned containers0/processes0/staging removed; image publication skipped. Linker-detail1/1 exhausted, replacement image-only0/1 and Preflight3/E4 0/1 blocked. Historical CI39016323973 FAIL/CLOSED; all29 closure rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Provider calls0, no readiness change. New Main authority required before another native diagnostic or qualification.

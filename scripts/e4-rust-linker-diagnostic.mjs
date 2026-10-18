@@ -17,6 +17,7 @@ const identity = (file) => {
 };
 const checked = (binary, args, options) => {
   const record = capture.run(binary, args, options);
+  assert.equal(record.complete, true, `${binary} capture incomplete: ${record.spawnStatus}`);
   assert.equal(record.exitCode, 0, `${binary} exit=${record.exitCode} error=${record.errorCode ?? 'none'}`);
   return record.stdout.trim();
 };
@@ -27,6 +28,10 @@ const resolveTool = (name) => {
   fs.accessSync(file, fs.constants.X_OK);
   return file;
 };
+const compileEvidence = (record) => ({ command: record.command, spawnStatus: record.spawnStatus,
+  exitCode: record.exitCode, signal: record.signal, errorCode: record.errorCode,
+  stdoutComplete: record.stdoutComplete, stderrComplete: record.stderrComplete,
+  complete: record.complete });
 
 let failure = null;
 let compileRecord = null;
@@ -72,18 +77,25 @@ try {
   probe = fs.mkdtempSync('/tmp/phi-e4-rust-diagnostic-');
   const executable = path.join(probe, 'smoke');
   compileRecord = capture.run('/usr/bin/rustc', ['--edition=2021', '-', '-o', executable], {
-    input: 'fn main() { println!("phi-rust-ok"); }\n', cwd: probe,
+    input: Buffer.from('fn main() { println!("phi-rust-ok"); }\n', 'utf8'), cwd: probe,
   });
-  metadata.compile = { command: compileRecord.command, exitCode: compileRecord.exitCode,
-    errorCode: compileRecord.errorCode, complete: compileRecord.complete };
-  if (compileRecord.exitCode === 0) {
+  metadata.compile = compileEvidence(compileRecord);
+  metadata.compile.result = compileRecord.complete && compileRecord.exitCode === 0 ? 'PASS' : 'FAIL';
+  if (!compileRecord.complete) {
+    failure = `RUST_COMPILE_CAPTURE_INCOMPLETE status=${compileRecord.spawnStatus}`;
+  } else if (compileRecord.exitCode === 0) {
     const executableResult = capture.run(executable, []);
+    assert.equal(executableResult.complete, true, 'Rust executable capture incomplete');
     assert.equal(executableResult.exitCode, 0);
     assert.equal(executableResult.stdout.trim(), 'phi-rust-ok');
-  } else {
-    failure = `RUST_LINK_FAILED exit=${compileRecord.exitCode} error=${compileRecord.errorCode ?? 'none'}`;
   }
 } catch (error) {
+  if (!compileRecord) {
+    compileRecord = capture.records.findLast((record) => record.command[0] === '/usr/bin/rustc'
+      && record.command.includes('--edition=2021')) ?? null;
+    if (compileRecord) metadata.compile = compileEvidence(compileRecord);
+  }
+  capture.incomplete = true;
   failure = error.message === 'DIAGNOSTIC_OUTPUT_TOO_LARGE'
     ? 'DIAGNOSTIC_OUTPUT_TOO_LARGE' : `DIAGNOSTIC_PROBE_FAILED ${String(error.message).slice(0, 180)}`;
 } finally {
@@ -94,8 +106,15 @@ try {
   const serialized = capture.serialize(metadata);
   const artifact = { sha256: serialized.sha256, bytes: serialized.bytes.length,
     complete: serialized.complete, streamBytes: serialized.streamBytes };
-  const receipt = { status: failure ? 'FAIL' : 'PASS', classification: capture.incomplete ? 'UNKNOWN' : 'PENDING_POST_RUN',
-    reason: failure, compileExitCode: compileRecord?.exitCode ?? null,
+  const receipt = { status: failure ? 'FAIL' : 'PASS', classification: serialized.complete ? 'PENDING_POST_RUN' : 'UNKNOWN',
+    reason: failure, spawnStatus: compileRecord?.spawnStatus ?? 'CAPTURE_INCOMPLETE',
+    spawnError: compileRecord?.errorCode ?? null, compileExitCode: compileRecord?.exitCode ?? null,
+    rustCompileResult: metadata.compile?.result ?? 'NOT_REACHED',
+    compileSignal: compileRecord?.signal ?? null, captureComplete: serialized.complete,
+    combinedOutputBytes: serialized.streamBytes,
+    outputOverflow: capture.records.some((record) => record.spawnStatus === 'DIAGNOSTIC_OUTPUT_TOO_LARGE'),
+    stdoutComplete: compileRecord?.stdoutComplete ?? false,
+    stderrComplete: compileRecord?.stderrComplete ?? false,
     keyErrorLines: keyErrorLines(compileRecord?.stderr), rustPath: metadata.rust?.path ?? null,
     rustSha256: metadata.rust?.sha256 ?? null, gccPath: metadata.gcc?.path ?? null,
     gccSha256: metadata.gcc?.sha256 ?? null, linkerPath: metadata.linker?.path ?? null,

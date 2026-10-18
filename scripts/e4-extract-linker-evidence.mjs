@@ -26,6 +26,12 @@ export function extractLinkerEvidence(rawLog, artifactFile) {
   assert.equal(body.streamLimitBytes, 256 * 1024);
   assert.ok(body.streamBytesRetained <= body.streamLimitBytes);
   assert.equal(body.complete, receipt.artifact.complete);
+  if (receipt.status === 'PASS') assert.equal(body.complete, true, 'PASS requires complete compilation evidence');
+  if (body.complete) {
+    assert.equal(body.metadata?.compile?.spawnStatus, 'SPAWNED_WITH_EXIT_RESULT');
+    assert.equal(Number.isInteger(body.metadata.compile.exitCode), true);
+    assert.equal(body.metadata.compile.complete, true);
+  }
   assert.equal(path.basename(artifactFile), 'rust-linker-diagnostic.json');
   fs.writeFileSync(artifactFile, bytes, { flag: 'wx', mode: 0o600 });
   fs.rmSync(rawLog);

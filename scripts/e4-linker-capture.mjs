@@ -17,10 +17,20 @@ export class LinkerDiagnosticCapture {
 
   run(binary, args, options = {}) {
     if (this.incomplete) throw new Error('DIAGNOSTIC_OUTPUT_TOO_LARGE');
-    const result = spawnSync(binary, args, {
-      encoding: 'buffer', timeout: 15000, maxBuffer: this.limit + 1,
-      env: { PATH: '/usr/bin:/bin', HOME: '/tmp' }, ...options,
-    });
+    let result;
+    try {
+      result = spawnSync(binary, args, {
+        ...options,
+        input: typeof options.input === 'string' ? Buffer.from(options.input, 'utf8') : options.input,
+        encoding: null,
+        timeout: 15000,
+        // Node bounds each stream separately; the combined bound is enforced below.
+        maxBuffer: this.limit + 1,
+        env: { PATH: '/usr/bin:/bin', HOME: '/tmp' },
+      });
+    } catch (error) {
+      result = { stdout: null, stderr: null, status: null, signal: null, error };
+    }
     const stdout = asBuffer(result.stdout);
     const stderr = asBuffer(result.stderr);
     const remaining = this.limit - this.used;
@@ -30,25 +40,40 @@ export class LinkerDiagnosticCapture {
     const retainedStderr = stderr.subarray(0, Math.min(stderr.length, remaining));
     const retainedStdout = stdout.subarray(0, Math.min(stdout.length, remaining - retainedStderr.length));
     this.used += retainedStdout.length + retainedStderr.length;
+    const terminalExit = Number.isInteger(result.status) && result.status >= 0
+      && result.signal === null && !result.error
+      && Buffer.isBuffer(result.stdout) && Buffer.isBuffer(result.stderr);
+    const spawnError = result.error && !['ENOBUFS', 'ETIMEDOUT'].includes(result.error.code)
+      && result.status === null && result.signal === null;
+    const spawnStatus = overflow ? 'DIAGNOSTIC_OUTPUT_TOO_LARGE'
+      : spawnError ? 'SPAWN_ERROR'
+        : terminalExit ? 'SPAWNED_WITH_EXIT_RESULT' : 'CAPTURE_INCOMPLETE';
+    const complete = spawnStatus === 'SPAWNED_WITH_EXIT_RESULT';
     const record = {
-      command: [binary, ...args], exitCode: result.status,
-      errorCode: result.error?.code ?? null,
+      command: [binary, ...args], spawnStatus, exitCode: result.status,
+      signal: result.signal ?? null, errorCode: result.error?.code ?? null,
+      errorMessage: result.error ? String(result.error.message).slice(0, 180) : null,
       stdout: retainedStdout.toString('utf8'), stderr: retainedStderr.toString('utf8'),
-      stdoutBytes: stdout.length, stderrBytes: stderr.length, complete: !overflow,
+      stdoutBytes: stdout.length, stderrBytes: stderr.length,
+      stdoutComplete: complete, stderrComplete: complete, complete,
     };
     this.records.push(record);
+    if (!complete) this.incomplete = true;
     if (overflow) {
-      this.incomplete = true;
       throw new Error('DIAGNOSTIC_OUTPUT_TOO_LARGE');
     }
     return record;
   }
 
   serialize(metadata) {
+    const compile = metadata?.compile;
+    const compileComplete = compile?.spawnStatus === 'SPAWNED_WITH_EXIT_RESULT'
+      && Number.isInteger(compile.exitCode) && compile.complete === true;
+    const complete = !this.incomplete && compileComplete;
     const bytes = Buffer.from(JSON.stringify({ schema: 'phi-e4-linker-diagnostic-v1',
       streamLimitBytes: this.limit, streamBytesRetained: this.used,
-      complete: !this.incomplete, metadata, records: this.records }, null, 2) + '\n');
-    return { bytes, sha256: sha256(bytes), complete: !this.incomplete, streamBytes: this.used };
+      complete, metadata, records: this.records }, null, 2) + '\n');
+    return { bytes, sha256: sha256(bytes), complete, streamBytes: this.used };
   }
 
   artifact(metadata, file) {
