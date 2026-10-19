@@ -80,7 +80,7 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   assert.equal(llvm.clangdSha256, 'aacb4651e1886b98c5413369fc1789f4ca2d4fa5b94fdf0de4f48c98a52d4324');
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.release.id, 411800345);
-  assert.equal(manifest.assets.length, 12);
+  assert.equal(manifest.assets.length, 14);
   const byName = new Map(manifest.assets.map((item) => [item.logicalName, item]));
   for (const asset of manifest.assets) {
     for (const item of asset.extracted) fileIdentity(item.installedPath, item.sha256);
@@ -90,6 +90,8 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   const rustSeed = byName.get('rust-1.98.1-toolchain');
   const rustRuntime = byName.get('llvm-libs-22.1.8-rust-runtime')?.runtimeDependency;
   const rustLinker = byName.get('lld-22.1.8-rust-linker');
+  const libgit2 = byName.get('libgit2-1.9.7-cargo-runtime')?.runtimeDependency;
+  const llhttp = byName.get('llhttp-9.3.1-libgit2-runtime')?.runtimeDependency;
   assert.equal(rustLinker.extracted[0].installedPath, '/usr/bin/ld.lld');
   command('/usr/bin/ld.lld', ['--version'], /^LLD 22\.1\.8 /u);
   const linkerLibraries = command('/lib64/ld-linux-x86-64.so.2', ['--list', '/usr/bin/ld.lld'], /liblldELF\.so\.22\.1 => \/usr\/lib\/liblldELF\.so\.22\.1/u);
@@ -170,7 +172,34 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
     assert.match(match[1], /^\/usr\/lib\//u, `Rust library outside immutable rootfs: ${match[1]}`);
   }
   process.stdout.write('E4_RUST_SHARED_LIBRARY_CLOSURE=PASS\n');
+  assert.equal(libgit2?.requiredBy, '/usr/bin/cargo');
+  assert.equal(libgit2.requiredBySha256, rustSeed.extracted[1].sha256);
+  assert.equal(llhttp?.requiredBy, libgit2.path);
+  assert.equal(llhttp.requiredBySha256, libgit2.sha256);
+  for (const runtime of [libgit2, llhttp]) {
+    assert.equal(fs.lstatSync(runtime.linkPath).isSymbolicLink(), true, `${runtime.soname} link missing`);
+    assert.equal(fs.readlinkSync(runtime.linkPath), runtime.linkTarget, `${runtime.soname} target mismatch`);
+    assert.equal(fs.realpathSync(runtime.linkPath), runtime.path, `${runtime.soname} escapes exact library`);
+    assert.equal(fs.statSync(runtime.path).size, runtime.size, `${runtime.soname} size mismatch`);
+    fileIdentity(runtime.path, runtime.sha256);
+    const dynamic = command('/usr/bin/readelf', ['-d', runtime.path], /Library soname:/u);
+    assert.match(dynamic, new RegExp(`Library soname: \\[${runtime.soname.replaceAll('.', '\\.')}\\]`, 'u'));
+    for (const needed of runtime.needed)
+      assert.match(dynamic, new RegExp(`Shared library: \\[${needed.replaceAll('.', '\\.')}\\]`, 'u'));
+  }
+  command('/usr/bin/readelf', ['-d', '/usr/bin/cargo'], /Shared library: \[libgit2\.so\.1\.9\]/u);
+  const cargoLibraries = command('/lib64/ld-linux-x86-64.so.2', ['--list', '/usr/bin/cargo'],
+    /libgit2\.so\.1\.9 => \/usr\/lib\/libgit2\.so\.1\.9/u);
+  assert.match(cargoLibraries, /libllhttp\.so\.9\.3 => \/usr\/lib\/libllhttp\.so\.9\.3/u);
+  assert.doesNotMatch(cargoLibraries, /not found/u, 'Cargo has an unresolved rootfs library');
+  for (const match of cargoLibraries.matchAll(/=> (\/[^\s]+)/gu)) {
+    assert.match(match[1], /^\/usr\/lib\//u, `Cargo library outside immutable rootfs: ${match[1]}`);
+  }
+  process.stdout.write('E4_CARGO_LIBGIT2_CLOSURE=PASS\n');
   command('/usr/bin/cargo', ['--version'], /^cargo 1\.98\.1/mu);
+  assert.equal(executableInventory.body.dependent.find((entry) => entry.id === 'cargo-offline-compile')?.status,
+    'PASS', 'offline Cargo compilation was not verified');
+  process.stdout.write('E4_CARGO_OFFLINE_COMPILE=PASS\n');
   assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), rustSeed.toolchain.sysrootPath);
   const rustProbe = fs.mkdtempSync('/tmp/phi-e4-rust-');
   try {

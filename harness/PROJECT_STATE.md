@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## E4 Cargo/GCC local closure candidate (2026-10-19)
+
+Main `E4-CARGO-LIBGIT2-GCC-PATH-CLOSURE-001` durable. CI39141449343 remains FAIL/CLOSED with Cargo loader miss and five GCC path rejections. Signed exact libgit2/llhttp private seeds and narrow provenance-bound GCC resolver are implemented locally; E4 focus51/51, TypeScript/package/script syntax/ShellCheck PASS. Full host check remains 2 historical Rust-host FAIL, not green. Native E4 rootfs Cargo closure, actual five GCC file identities, qualified OCI digest and 29 Ubuntu rows **NOT VERIFIED/OPEN**. Image-only0/1, Preflight3/E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, no readiness activation. Await scoped audit/ZERO_EGRESS and single image-only run on frozen commit. Protected/user state preserved.
+
 ## STOP / Main — corrected E4 inventory FAIL (2026-10-18)
 
 Sole corrected [CI39141449343](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39141449343) on `b2ed964c647c3a9dba47b9fb32bfba410fc38465` is terminal FAIL. Valid isolated harness and root-`/` self-test PASS; complete receipt/artifact ID12142321096 SHA `f0fbd4719d0e16d31b5c789b0da809ad943e251de30ed0e65f0b17c8a5dac253`: 37/38 tools PASS, 12/12 assets PASS; Cargo exit127 due missing `libgit2.so.1.9`, offline compile NOT_EXECUTED; five GCC startfile checks falsely reject in-root `..` paths. No image publication; cleanup PASS owned containers/processes0, staging/tag removed. Corrected diagnostic1/1 consumed; conditional image-only0/1, Preflight3/E4 0/1 BLOCKED. Historical CI39138736660 remains FAIL/CLOSED. All29 Ubuntu rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP for Main, no retry or patch under current failed-run rule.

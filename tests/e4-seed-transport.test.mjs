@@ -12,11 +12,13 @@ const git = manifest.assets.find((asset) => asset.logicalName === 'git-2.55.0');
 const simdjson = manifest.assets.find((asset) => asset.logicalName === 'simdjson-4.6.11-node-runtime');
 const rustRuntime = manifest.assets.find((asset) => asset.logicalName === 'llvm-libs-22.1.8-rust-runtime');
 const rustLinker = manifest.assets.find((asset) => asset.logicalName === 'lld-22.1.8-rust-linker');
+const libgit2 = manifest.assets.find((asset) => asset.logicalName === 'libgit2-1.9.7-cargo-runtime');
+const llhttp = manifest.assets.find((asset) => asset.logicalName === 'llhttp-9.3.1-libgit2-runtime');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
-test('E4 seed manifest binds twelve distinct immutable assets and exact runtime paths', () => {
-  assert.equal(manifest.assets.length, 12);
-  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 12);
+test('E4 seed manifest binds fourteen distinct immutable assets and exact runtime paths', () => {
+  assert.equal(manifest.assets.length, 14);
+  assert.equal(new Set(manifest.assets.map((asset) => asset.assetId)).size, 14);
   assert.equal(manifest.release.internalOnly, true);
   assert.equal(simdjson.runtimeDependency.soname, 'libsimdjson.so.33');
   assert.equal(simdjson.runtimeDependency.requiredBySha256, manifest.assets.find((asset) => asset.logicalName === 'nodejs-26.8.2').extracted[0].sha256);
@@ -25,6 +27,21 @@ test('E4 seed manifest binds twelve distinct immutable assets and exact runtime 
   assert.equal(rustLinker.extracted[0].installedPath, '/usr/bin/ld.lld');
   assert.equal(rustLinker.extracted.length, 7);
   assert.equal(rustLinker.sourcePackage, 'lld 22.1.8-1.1 x86_64_v3');
+  assert.equal(libgit2.runtimeDependency.requiredBy, '/usr/bin/cargo');
+  assert.equal(libgit2.runtimeDependency.requiredBySha256,
+    manifest.assets.find((asset) => asset.logicalName === 'rust-1.98.1-toolchain').extracted[1].sha256);
+  assert.equal(libgit2.runtimeDependency.needed.includes(llhttp.runtimeDependency.soname), true);
+  assert.equal(llhttp.runtimeDependency.requiredBySha256, libgit2.extracted[0].sha256);
+  for (const asset of [libgit2, llhttp]) {
+    assert.equal(asset.signatureFingerprint, '882DCFE48E2051D48E2562ABF3B607488DB35A47');
+    const changed = { ...asset, runtimeDependency: { ...asset.runtimeDependency,
+      linkTarget: 'untrusted.so' } };
+    assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((item) =>
+      item === asset ? changed : item) }), /E4_SEED_MANIFEST_CARGO_RUNTIME_DEPENDENCY_INVALID/u);
+    const changedDigest = { ...asset, extracted: [{ ...asset.extracted[0], sha256: '0'.repeat(64) }] };
+    assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((item) =>
+      item === asset ? changedDigest : item) }), /E4_SEED_MANIFEST_(?:LIBGIT2|LLHTTP)_IDENTITY_INVALID/u);
+  }
   assert.throws(() => validateSeedManifest({ ...manifest, assets: manifest.assets.map((asset) => asset === rustLinker ?
     { ...rustLinker, extracted: rustLinker.extracted.map((item, index) => index === 0 ? { ...item, sha256: '0'.repeat(64) } : item) } : asset) }),
   /E4_SEED_MANIFEST_LLD_IDENTITY_INVALID/u);

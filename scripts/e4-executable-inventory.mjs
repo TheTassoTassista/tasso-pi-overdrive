@@ -9,7 +9,7 @@ import { LinkerDiagnosticCapture } from './e4-linker-capture.mjs';
 export const INVENTORY_SCHEMA = 'phi-e4-executable-inventory-v1';
 export const MAX_INVENTORY_BYTES = 4 * 1024 * 1024;
 const MAX_COMMAND_BYTES = 32 * 1024;
-const E4_SEED_MANIFEST_SHA256 = 'fdecaa5d3c6b4052f89a1a4d9d66b8ee3b9d77c18766dd874f14ea47f6876ae7';
+const E4_SEED_MANIFEST_SHA256 = 'ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70';
 const E4_LLVM_MANIFEST_SHA256 = 'f853ca78c83abdef74e35b274fadcaf822c1ef08173514922669f5eeb2252779';
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const readJson = (root, relative) => JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8'));
@@ -130,26 +130,12 @@ export function requiredRuntimeAssets(root = '/') {
 
 // Resolve symlinks as rootfs paths, never as host paths. This also makes broken
 // absolute symlinks observable in a staged rootfs fixture without host leakage.
-function rootfsPath(input) {
+function rootfsPath(input, allowParentComponents = false) {
   assert.equal(typeof input, 'string', 'INVALID_ROOTFS_PATH');
   assert.equal(path.posix.isAbsolute(input) && !input.startsWith('//') &&
     !input.includes('\0') && !input.includes('\\'), true, 'INVALID_ROOTFS_PATH');
-  assert.equal(input.split('/').includes('..'), false, 'ROOTFS_TRAVERSAL');
-  return path.posix.normalize(input);
-}
-
-function symlinkDestination(prefix, target, suffix) {
-  assert.equal(typeof target === 'string' && target.length > 0 && !target.startsWith('//') &&
-    !target.includes('\0') && !target.includes('\\'), true, 'INVALID_SYMLINK_TARGET');
-  const parts = target.startsWith('/') ? [] : path.posix.dirname(prefix).split('/').filter(Boolean);
-  for (const part of `${target}/${suffix}`.split('/')) {
-    if (!part || part === '.') continue;
-    if (part === '..') {
-      if (parts.length === 0) throw new Error('ROOTFS_ESCAPE');
-      parts.pop();
-    } else parts.push(part);
-  }
-  return `/${parts.join('/')}`;
+  if (!allowParentComponents) assert.equal(input.split('/').includes('..'), false, 'ROOTFS_TRAVERSAL');
+  return input;
 }
 
 function assertContained(base, physical) {
@@ -158,38 +144,49 @@ function assertContained(base, physical) {
     path.isAbsolute(relative), false, 'ROOTFS_ESCAPE');
 }
 
-export function resolveRootfsPath(root, requested) {
+function resolveRootfsPathCore(root, requested, allowParentComponents) {
   assert.equal(typeof root === 'string' && path.isAbsolute(root) && !root.includes('\0'),
     true, 'INVALID_ROOTFS_ROOT');
-  const requestedPath = rootfsPath(requested);
+  const requestedPath = rootfsPath(requested, allowParentComponents);
   const base = path.resolve(root);
   assert.equal(fs.realpathSync(base), base, 'ALIASED_ROOTFS_ROOT');
-  let logical = requestedPath;
+  const pending = requestedPath.split('/').slice(1);
+  const parts = [];
   const chain = [];
-  for (let hops = 0; hops < 32; hops += 1) {
-    const segments = logical.split('/').filter(Boolean);
-    let changed = false;
-    let prefix = '';
-    for (let index = 0; index < segments.length; index += 1) {
-      prefix += `/${segments[index]}`;
-      const physical = path.join(base, prefix.slice(1));
-      assertContained(base, physical);
-      const stat = fs.lstatSync(physical);
-      if (!stat.isSymbolicLink()) continue;
+  while (pending.length > 0) {
+    const segment = pending.shift();
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      if (parts.length === 0) throw new Error('ROOTFS_ESCAPE');
+      parts.pop();
+      continue;
+    }
+    const logical = `/${[...parts, segment].join('/')}`;
+    const physical = path.join(base, logical.slice(1));
+    assertContained(base, physical);
+    const stat = fs.lstatSync(physical);
+    if (stat.isSymbolicLink()) {
+      if (chain.length === 32) throw new Error('SYMLINK_LOOP');
       const target = fs.readlinkSync(physical);
-      chain.push({ path: prefix, target });
-      const suffix = segments.slice(index + 1).join('/');
-      logical = symlinkDestination(prefix, target, suffix);
-      changed = true;
-      break;
+      assert.equal(target.length > 0 && !target.startsWith('//') &&
+        !target.includes('\0') && !target.includes('\\'), true, 'INVALID_SYMLINK_TARGET');
+      chain.push({ path: logical, target });
+      if (target.startsWith('/')) parts.length = 0;
+      pending.unshift(...target.split('/'));
+      continue;
     }
-    if (!changed) {
-      const physical = path.join(base, logical.slice(1));
-      assertContained(base, physical);
-      return { realpath: logical, physical, symlinks: chain };
-    }
+    if (!stat.isDirectory() && pending.some((part) => part && part !== '.'))
+      throw new Error('ROOTFS_NON_DIRECTORY_COMPONENT');
+    parts.push(segment);
   }
-  throw new Error('SYMLINK_LOOP');
+  const logical = `/${parts.join('/')}`;
+  const physical = path.join(base, logical.slice(1));
+  assertContained(base, physical);
+  return { realpath: logical, physical, symlinks: chain };
+}
+
+export function resolveRootfsPath(root, requested) {
+  return resolveRootfsPathCore(root, requested, false);
 }
 
 // The workflow's Docker invocation is the control-plane authority. These
@@ -248,7 +245,7 @@ function invalidHarnessResult(error) {
       ? process.env.PHI_E4_CANDIDATE_SHA : null,
     qualifying: false, rootfs: 'CONTAINER_ROOT', harness: { status: 'DIAGNOSTIC_HARNESS_INVALID', reason },
     tools: [], assets: [], dependent: [], failures: [{ id: 'diagnostic-harness', status: 'FAIL', reason }],
-    expectedToolCount: 38, toolCount: 0, expectedAssetCount: 12, assetCount: 0, passCount: 0 };
+    expectedToolCount: null, toolCount: 0, expectedAssetCount: null, assetCount: 0, passCount: 0 };
   const bytes = Buffer.from(`${JSON.stringify(body)}\n`);
   return { body, bytes, receipt: { mode: body.mode, candidateSha: body.candidateSha,
     status: 'FAIL', qualifying: false, complete: false, harnessStatus: 'DIAGNOSTIC_HARNESS_INVALID',
@@ -268,6 +265,28 @@ function commandOutcome(record) {
   if (!record?.complete) return { status: 'UNKNOWN', reason: record?.spawnStatus ?? 'NO_CAPTURE' };
   if (record.exitCode !== 0) return { status: 'FAIL', reason: `PROCESS_EXIT_${record.exitCode}` };
   return { status: 'PASS', reason: null };
+}
+
+// This is deliberately private: only the fixed GCC invocation in the inventory
+// may accept parent components. Caller-supplied paths still use the strict
+// exported resolver, and the image's root="/" cannot override run/definitions.
+function resolveCapturedGccStartfile(root, name, gcc, capture) {
+  const command = ['/usr/bin/gcc', `-print-file-name=${name}`];
+  if (gcc?.status !== 'PASS' || gcc.realpath !== '/usr/bin/gcc' ||
+      !/^[a-f0-9]{64}$/u.test(gcc.sha256 ?? '')) throw new Error('GCC_PRODUCER_IDENTITY');
+  if (!Array.isArray(capture?.command) || capture.command.length !== command.length ||
+      capture.command.some((part, index) => part !== command[index])) throw new Error('GCC_OUTPUT_PROVENANCE');
+  if (!(capture?.spawnStatus === 'SPAWNED_WITH_EXIT_RESULT' &&
+    capture?.complete === true && capture?.stdoutComplete === true &&
+    capture?.stderrComplete === true && capture?.exitCode === 0)) throw new Error('GCC_OUTPUT_INCOMPLETE');
+  const selected = capture.stdout.trim();
+  if (!selected || /[\r\n]/u.test(selected)) throw new Error('GCC_OUTPUT_INVALID');
+  const resolved = resolveRootfsPathCore(root, selected, true);
+  const stat = fs.statSync(resolved.physical);
+  if (!stat.isFile()) throw new Error('GCC_OUTPUT_NOT_REGULAR_FILE');
+  return { selected, resolved, size: stat.size, sha256: fileEvidence(resolved.physical).sha256,
+    provenance: { kind: 'CAPTURED_APPROVED_GCC', command, producerRealpath: gcc.realpath,
+      producerSha256: gcc.sha256 } };
 }
 
 function inspectAsset(root, definition) {
@@ -465,14 +484,16 @@ export function runExecutableInventory({ root = '/', definitions, runtimeAssets,
     const outcome = commandOutcome(result);
     const selected = result.stdout?.trim() ?? '';
     const entry = { id: `gcc-startfile:${name}`, requires: ['gcc'], ...outcome,
-      capture: result, selectedPath: selected, realpath: null, sha256: null };
+      capture: result, selectedPath: selected, realpath: null, symlinks: [],
+      size: null, sha256: null, provenance: null };
     if (outcome.status === 'PASS') {
       try {
-        if (!selected.startsWith('/')) throw new Error('NO_ABSOLUTE_SELECTION');
-        const resolved = resolveRootfsPath(root, selected);
-        if (!fs.statSync(resolved.physical).isFile()) throw new Error('NOT_REGULAR_FILE');
-        entry.realpath = resolved.realpath;
-        entry.sha256 = fileEvidence(resolved.physical).sha256;
+        const verified = resolveCapturedGccStartfile(root, name, byId.get('gcc'), result);
+        entry.realpath = verified.resolved.realpath;
+        entry.symlinks = verified.resolved.symlinks;
+        entry.size = verified.size;
+        entry.sha256 = verified.sha256;
+        entry.provenance = verified.provenance;
       } catch (error) { entry.status = 'FAIL'; entry.reason = `STARTFILE_${error.code ?? error.message}`; }
     }
     dependent.push(entry);

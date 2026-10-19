@@ -1,5 +1,11 @@
 # Phi — Test Baseline
 
+## E4 Cargo/GCC local candidate (2026-10-19)
+
+Scoped indexed source/security audit exit0, 717 blobs, WARN20/FAIL0/modelCalls0; scoped ZERO_EGRESS PASS. Protected user audit excluded from index and preserved byte-identical.
+
+`node --test tests/e4-*.test.mjs`: **51/51 PASS, 0 FAIL, 0 skip**. Covers exact new seed manifest/transport contracts, Cargo dependency self-check contract, all five historical GCC path shapes through the actual inventory caller, producer/provenance/hash, symlink and escape negatives, strict untrusted traversal, and root-`/` fail-closed behavior. Isolated read-only/no-network Bubblewrap root-`/` resolver probe PASS; host inventory denied without E4 attestation. Modified JS `node --check`, Bash syntax/ShellCheck, installed-Pi TypeScript and package validation PASS. `npm run check` **FAIL** at tests: **1143 total / 803 PASS / 2 FAIL / 338 skip**; the two pre-existing Rust-host syntax/rust-analyzer cases are documented below, not counted green. Native image-only **NOT RUN**; Cargo offline compilation and physical GCC identities in image remain **NOT_NATIVE_VERIFIED**. Image-only0/1, Preflight3/E4 0/1; all29 Ubuntu rows OPEN.
+
 ## Native corrected E4 inventory (2026-10-18)
 
 Local focused34/34, isolated Bubblewrap root-`/`, JS syntax, TypeScript, package, relevant ShellCheck, indexed audit WARN20/FAIL0/modelCalls0 and scoped ZERO_EGRESS PASS preceded sole corrected CI39141449343 on `b2ed964c647c3a9dba47b9fb32bfba410fc38465`. Native job117716558826 attempt1 **FAIL** with valid harness/self-test and transport-complete artifact ID12142321096/SHA `f0fbd4719d0e16d31b5c789b0da809ad943e251de30ed0e65f0b17c8a5dac253`: 38/38 tool records (37 PASS, Cargo FAIL), 12/12 assets PASS, dependent6 PASS/5 FAIL/1 NOT_EXECUTED. Cargo exit127 stderr names missing `libgit2.so.1.9`; five GCC startfile failures are resolver `..` false negatives. Receipt status FAIL, complete true, qualifying false. Cleanup PASS; no image qualification. Do not reinterpret as full gate PASS. The two historical Rust-host local `npm run check` failures remain unchanged.

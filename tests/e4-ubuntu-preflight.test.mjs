@@ -79,7 +79,7 @@ test('trusted Tier B removes only nested-userns denial and attests canonical fix
   assert.match(script, /--setenv NODE_OPTIONS --test-reporter=tap/u);
   assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/agent-browser-0\.36\.0" \/tmp\/\.local\/share\/pi-overdrive\/agent-browser-0\.36\.0/u);
   assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/chrome-152\.0\.7977\.82" \/tmp\/\.agent-browser\/browsers\/chrome-152\.0\.7977\.82/u);
-  assert.match(script, /expected_seed_sha=e8c10f51b26f2837c29f460ac18163387e7fb024be817580014f0d4fb618beea/u);
+  assert.match(script, /expected_seed_sha=ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70/u);
   assert.doesNotMatch(script, /--share-net|--bind \/ \/|--bind \/var\/run|--bind \/run|--bind \/home/u);
 });
 

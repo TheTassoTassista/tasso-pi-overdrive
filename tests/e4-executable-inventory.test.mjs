@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { extractExecutableInventory } from '../scripts/e4-extract-executable-inventory.mjs';
-import { captureInventoryCommand, inventoryCertificationDecision, requiredExecutableInventory,
+import { captureInventoryCommand, inventoryCertificationDecision, requiredExecutableInventory, requiredRuntimeAssets,
   inventoryHarnessSelfTest, resolveRootfsPath, runExecutableInventory } from '../scripts/e4-executable-inventory.mjs';
 
 const repository = new URL('../', import.meta.url).pathname;
@@ -56,6 +56,15 @@ test('actual inventory enumerates all seed, image, LSP and DAP executables witho
       'agent-browser', 'cmp', 'pi-cli', 'ast-grep', 'tsc', 'vtsls',
       'pyright-langserver', 'bash-language-server']) {
       assert.ok(definitions.some((entry) => entry.id === id), id);
+    }
+    const assets = requiredRuntimeAssets(f.root);
+    for (const [name, installedPath] of [
+      ['libgit2-1.9.7-cargo-runtime', '/usr/lib/libgit2.so.1.9.7'],
+      ['llhttp-9.3.1-libgit2-runtime', '/usr/lib/libllhttp.so.9.3.1'],
+    ]) {
+      const asset = assets.find((entry) => entry.id === `${name}:${installedPath}`);
+      assert.ok(asset, `${name} must be a mandatory asset`);
+      assert.match(asset.expectedSha256, /^[a-f0-9]{64}$/u);
     }
   } finally { f.cleanup(); }
 });
@@ -180,7 +189,8 @@ test('complete 38-tool inventory still reaches the final independent server afte
       calls.push([binary, ...args]);
       if (binary === '/usr/bin/cargo' && args[0] === '--version') return { ...good(''), exitCode: 127,
         stderr: 'cargo failed in fixture\n' };
-      if (binary === '/usr/bin/gcc' && args[0]?.startsWith('-print-file-name=')) return good('/usr/lib/libc.so.6\n');
+      if (binary === '/usr/bin/gcc' && args[0]?.startsWith('-print-file-name='))
+        return { ...good('/usr/lib/libc.so.6\n'), command: [binary, ...args] };
       return fakeRun(binary, args);
     };
     const result = runExecutableInventory({ root: f.root, definitions, run });
@@ -372,7 +382,8 @@ test('fixture command failure is recorded without abandoning independent invento
     }));
     const run = (binary, args) => {
       if (binary === '/usr/bin/cargo' && args[0] === 'build') throw new Error('fixture command failed');
-      if (binary === '/usr/bin/gcc' && args[0]?.startsWith('-print-file-name=')) return good('/usr/lib/libc.so.6\n');
+      if (binary === '/usr/bin/gcc' && args[0]?.startsWith('-print-file-name='))
+        return { ...good('/usr/lib/libc.so.6\n'), command: [binary, ...args] };
       return fakeRun(binary, args);
     };
     const result = runExecutableInventory({ root: f.root, definitions, run });
@@ -380,5 +391,82 @@ test('fixture command failure is recorded without abandoning independent invento
     assert.match(result.body.dependent.find((entry) => entry.id === 'cargo-offline-compile').reason, /^FIXTURE_/u);
     assert.equal(result.body.dependent.find((entry) => entry.id === 'gcc-startfile:libc.so').status, 'PASS');
     assert.equal(result.body.tools.length, definitions.length);
+  } finally { f.cleanup(); }
+});
+
+test('approved GCC startfile captures canonicalize all five historical parent paths with physical evidence', () => {
+  const f = fixture();
+  try {
+    for (const binary of ['/usr/bin/gcc', '/usr/bin/readelf', '/lib64/ld-linux-x86-64.so.2',
+      '/usr/lib/libc.so.6']) f.install(binary);
+    const names = ['crt1.o', 'Scrt1.o', 'crti.o', 'crtn.o', 'libc.so'];
+    for (const name of names) f.install(`/usr/lib/${name}`, Buffer.from(`verified-${name}\n`));
+    for (const name of ['libgcc.a', 'libgcc_s.so']) f.install(`/usr/lib/${name}`);
+    const definitions = [{ id: 'gcc', path: '/usr/bin/gcc', reason: 'fixture',
+      expectedSha256: hash(elf), versionArgs: ['--version'] }];
+    const run = (binary, args) => binary === '/usr/bin/gcc' && args[0]?.startsWith('-print-file-name=')
+      ? { ...good(`/usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/${args[0].split('=')[1]}\n`),
+        command: [binary, ...args] } : fakeRun(binary, args);
+    fs.mkdirSync(path.join(f.root, 'usr/lib/gcc/x86_64-pc-linux-gnu/16'), { recursive: true });
+    const result = runExecutableInventory({ root: f.root, definitions, run });
+    for (const name of names) {
+      const entry = result.body.dependent.find((item) => item.id === `gcc-startfile:${name}`);
+      assert.equal(entry.status, 'PASS', `${name}: ${entry.reason}`);
+      assert.equal(entry.realpath, `/usr/lib/${name}`);
+      assert.equal(entry.sha256, hash(Buffer.from(`verified-${name}\n`)));
+      assert.equal(entry.provenance.kind, 'CAPTURED_APPROVED_GCC');
+      assert.deepEqual(entry.provenance.command, ['/usr/bin/gcc', `-print-file-name=${name}`]);
+      assert.equal(entry.provenance.producerSha256, hash(elf));
+      assert.equal(entry.selectedPath, `/usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/${name}`);
+    }
+    assert.throws(() => resolveRootfsPath(f.root, '/usr/lib/gcc/x86_64-pc-linux-gnu/16/../../../../lib/crt1.o'),
+      /ROOTFS_TRAVERSAL/u);
+  } finally { f.cleanup(); }
+});
+
+test('GCC parent-path exception rejects command spoofing, incomplete capture, escape and missing physical file', () => {
+  const f = fixture();
+  try {
+    for (const binary of ['/usr/bin/gcc', '/usr/bin/readelf', '/lib64/ld-linux-x86-64.so.2',
+      '/usr/lib/libc.so.6']) f.install(binary);
+    f.install('/usr/lib/crt1.o');
+    const definitions = [{ id: 'gcc', path: '/usr/bin/gcc', reason: 'fixture',
+      expectedSha256: hash(elf), versionArgs: ['--version'] }];
+    const probe = (capture) => runExecutableInventory({ root: f.root, definitions,
+      run: (binary, args) => binary === '/usr/bin/gcc' && args[0] === '-print-file-name=crt1.o'
+        ? capture : fakeRun(binary, args) }).body.dependent.find((item) => item.id === 'gcc-startfile:crt1.o');
+    const base = { ...good('/usr/lib/crt1.o\n'), command: ['/usr/bin/gcc', '-print-file-name=crt1.o'] };
+    assert.match(probe({ ...base, command: ['/usr/bin/gcc', '-print-file-name=libc.so'] }).reason,
+      /STARTFILE_GCC_OUTPUT_PROVENANCE/u);
+    assert.match(probe({ ...base, stdoutComplete: false }).reason, /STARTFILE_GCC_OUTPUT_INCOMPLETE/u);
+    assert.match(probe({ ...base, stdout: '/../../usr/lib/crt1.o\n' }).reason, /STARTFILE_ROOTFS_ESCAPE/u);
+    assert.match(probe({ ...base, stdout: '/usr/lib/missing.o\n' }).reason, /STARTFILE_ENOENT/u);
+    assert.match(probe({ ...base, stdout: '/usr/lib/crt1.o\n/usr/lib/other.o\n' }).reason,
+      /STARTFILE_GCC_OUTPUT_INVALID/u);
+    assert.equal(probe(base).status, 'PASS');
+  } finally { f.cleanup(); }
+});
+
+test('captured GCC paths resolve physical symlinks before parent components and reject symlink escape', () => {
+  const f = fixture();
+  try {
+    for (const binary of ['/usr/bin/gcc', '/usr/bin/readelf', '/lib64/ld-linux-x86-64.so.2',
+      '/usr/lib/libc.so.6']) f.install(binary);
+    f.install('/usr/lib/crt1.o', Buffer.from('physical-startfile'));
+    fs.mkdirSync(path.join(f.root, 'usr/lib/gcc'), { recursive: true });
+    fs.symlinkSync('/usr/lib', path.join(f.root, 'usr/lib/gcc/inside'));
+    const definitions = [{ id: 'gcc', path: '/usr/bin/gcc', reason: 'fixture',
+      expectedSha256: hash(elf), versionArgs: ['--version'] }];
+    const probe = (selected) => runExecutableInventory({ root: f.root, definitions,
+      run: (binary, args) => binary === '/usr/bin/gcc' && args[0] === '-print-file-name=crt1.o'
+        ? { ...good(`${selected}\n`), command: [binary, ...args] } : fakeRun(binary, args) })
+      .body.dependent.find((item) => item.id === 'gcc-startfile:crt1.o');
+    const inside = probe('/usr/lib/gcc/inside/../lib/crt1.o');
+    assert.equal(inside.status, 'PASS');
+    assert.equal(inside.realpath, '/usr/lib/crt1.o');
+    assert.equal(inside.sha256, hash(Buffer.from('physical-startfile')));
+    assert.deepEqual(inside.symlinks, [{ path: '/usr/lib/gcc/inside', target: '/usr/lib' }]);
+    fs.symlinkSync('../../../../outside', path.join(f.root, 'usr/lib/gcc/escape'));
+    assert.match(probe('/usr/lib/gcc/escape/../lib/crt1.o').reason, /STARTFILE_ROOTFS_ESCAPE/u);
   } finally { f.cleanup(); }
 });

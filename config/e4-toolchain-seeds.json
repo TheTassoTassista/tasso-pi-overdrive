@@ -208,6 +208,62 @@
       ]
     },
     {
+      "logicalName": "llhttp-9.3.1-libgit2-runtime",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 656454813,
+      "name": "llhttp-9.3.1-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 31626,
+      "sha256": "a58434148b444cd74b17368e46e0b5fffc4b4f3f49c7c190994566a633c60c53",
+      "sourcePackage": "llhttp 9.3.1-1.1 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "runtimeDependency": {
+        "soname": "libllhttp.so.9.3",
+        "linkPath": "/usr/lib/libllhttp.so.9.3",
+        "linkTarget": "libllhttp.so.9.3.1",
+        "path": "/usr/lib/libllhttp.so.9.3.1",
+        "size": 71552,
+        "sha256": "4e34c778da2adc57107dc55dd3baad7338c6b5d1098b23442dc8dfc4411fa274",
+        "requiredBy": "/usr/lib/libgit2.so.1.9.7",
+        "requiredBySha256": "42c695df8099e00da2a8e8612eb07e2df9e98a187f3b27612b12ac4fdc2adde3",
+        "needed": ["libc.so.6"]
+      },
+      "extracted": [
+        {
+          "path": "usr/lib/libllhttp.so.9.3.1",
+          "sha256": "4e34c778da2adc57107dc55dd3baad7338c6b5d1098b23442dc8dfc4411fa274",
+          "installedPath": "/usr/lib/libllhttp.so.9.3.1"
+        }
+      ]
+    },
+    {
+      "logicalName": "libgit2-1.9.7-cargo-runtime",
+      "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
+      "assetId": 656454811,
+      "name": "libgit2-1.1.9.7-1.1-x86_64_v3.pkg.tar.zst",
+      "size": 1255424,
+      "sha256": "493d2c1c1bdf9ee9ece17f3c9cd4c897d04d83ed1e7f9ec9f108d9d8997a8476",
+      "sourcePackage": "libgit2 1:1.9.7-1.1 x86_64_v3",
+      "signatureFingerprint": "882DCFE48E2051D48E2562ABF3B607488DB35A47",
+      "runtimeDependency": {
+        "soname": "libgit2.so.1.9",
+        "linkPath": "/usr/lib/libgit2.so.1.9",
+        "linkTarget": "libgit2.so.1.9.7",
+        "path": "/usr/lib/libgit2.so.1.9.7",
+        "size": 1693152,
+        "sha256": "42c695df8099e00da2a8e8612eb07e2df9e98a187f3b27612b12ac4fdc2adde3",
+        "requiredBy": "/usr/bin/cargo",
+        "requiredBySha256": "29a290227dbeee28e20dd9692b7d71c46cd5f1d9295f90ab6975ce67c9ae9643",
+        "needed": ["libssl.so.3", "libcrypto.so.3", "libllhttp.so.9.3", "libpcre2-8.so.0", "libssh2.so.1", "libz.so.1", "libc.so.6"]
+      },
+      "extracted": [
+        {
+          "path": "usr/lib/libgit2.so.1.9.7",
+          "sha256": "42c695df8099e00da2a8e8612eb07e2df9e98a187f3b27612b12ac4fdc2adde3",
+          "installedPath": "/usr/lib/libgit2.so.1.9.7"
+        }
+      ]
+    },
+    {
       "logicalName": "rust-1.98.1-toolchain",
       "upstreamRefetchability": "NOT_ASSESSED_FOR_THIS_TRANSPORT",
       "assetId": 644320524,
