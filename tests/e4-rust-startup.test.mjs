@@ -63,7 +63,7 @@ test('Rust smoke exec evidence identifies the containing mount, modes and a real
     assert.equal(typeof evidence.mount.target, 'string');
     assert.ok(evidence.mount.flags.includes('rw'));
     assert.equal(evidence.mountExec, executableEvidence.mountExec);
-    assert.equal(evidence.lsmDenial, 'UNKNOWN');
+    assert.equal(evidence.lsmDenial, 'LSM_EVIDENCE_UNAVAILABLE');
     assert.ok(JSON.stringify(evidence).length < 4096);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -74,9 +74,12 @@ test('Rust smoke exec evidence identifies the containing mount, modes and a real
 test('mount evidence selects the deepest real mount and preserves noexec when directly observed', () => {
   const mountinfo = '1 0 8:1 / / rw - ext4 /dev/sda rw\n2 1 0:3 / /tmp rw,nosuid,nodev,noexec - tmpfs tmpfs rw\n';
   assert.deepEqual(containingMount('/tmp/phi-e4-rust-x/smoke', mountinfo),
-    { target: '/tmp', flags: ['rw', 'nosuid', 'nodev', 'noexec'] });
-  assert.deepEqual(containingMount('/tmpish/smoke', mountinfo), { target: '/', flags: ['rw'] });
+    { id: 2, root: '/', target: '/tmp', filesystem: 'tmpfs', flags: ['rw', 'nosuid', 'nodev', 'noexec'],
+      superFlags: ['rw'], overlappingAncestors: 1 });
+  assert.deepEqual(containingMount('/tmpish/smoke', mountinfo),
+    { id: 1, root: '/', target: '/', filesystem: 'ext4', flags: ['rw'], superFlags: ['rw'], overlappingAncestors: 0 });
   assert.equal(containingMount('/tmp/smoke', 'unavailable'), 'UNKNOWN');
+  assert.equal(containingMount('/tmp/smoke', `${mountinfo}3 2 0:4 / /tmp rw - tmpfs tmpfs rw\n`), 'UNKNOWN');
 });
 
 test('unavailable Rust smoke diagnostics remain explicitly UNKNOWN', () => {

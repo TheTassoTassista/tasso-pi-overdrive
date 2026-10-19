@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-19 — E4 native execve forensic pre-dispatch candidate
+
+`node --test tests/e4-*.test.mjs`: **59 PASS / 0 FAIL / 0 skip**. Real local EACCES vs process-exit, actual executable mode/owner/mount/ELF/process capture, static no-interpreter, missing LSM, ambiguous mount, bounded hashed transport, forged-PASS rejection and owned cleanup are covered. `npm run check` **FAIL** at tests: 1151 total / 811 PASS / 2 historical Rust-host FAIL / 338 skip (`20-class real edit-contract corpus` and `managed rust-analyzer ... cross-file navigation`). Separate installed-Pi TypeScript, package validation, changed-script syntax and relevant ShellCheck PASS. This is local evidence only; no native image/execve probe, consolidated qualification, Preflight3 or E4 result.
+
 ## 2026-10-19 — E4 Rust smoke EACCES observability checkpoint
 
 Focused `node --test tests/e4-*.test.mjs`: **54 PASS / 0 FAIL / 0 skip**; narrower Rust/image focus 8/8. `node --check` for both changed scripts, `npm run typecheck`, `node scripts/validate-package.mjs` and scoped `git diff --check`: PASS. A real local executable copy ran at mode0755 and produced `EACCES` after mode0644; `/tmp` mount on this host was observed executable, but this is **not** the CI image mount. Synthetic noexec mount parsing and unavailable-evidence `UNKNOWN` regressions PASS. `npm run check` **FAIL**, 1146 total/806 PASS/2 historical Rust-host FAIL/338 skip; the chain stopped at tests, so separate TypeScript/package checks were run. No native image/Preflight3/E4 run or provider call; this checkpoint does not assert a full green gate.

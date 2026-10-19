@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## E4 one-shot execve forensic probe authorized, local candidate only (2026-10-19)
+
+`E4-RUST-EXECVE-FORENSIC-PROBE-001` is durable. Local observability and image-job transport candidate has focused E4 59/59 PASS with no image/toolchain/security/product input change; full host check retains two Rust-host failures. Historical CI39268510691 remains FAIL/CLOSED and its EACCES cause UNKNOWN. Forensic0/1 not dispatched; consolidated0/1, Preflight3 0/1, replacement E4 0/1. All29 Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No image qualification or readiness claim.
+
 ## STOP / Main — E4 consolidated qualification not dispatched (2026-10-19)
 
 `E4-QUALIFICATION-EXECUTION-CONTRACT-RESET-001` is durable. Prior CI39268510691 proves compiled Rust smoke execution `EACCES`, not its mechanism. Bounded failure metadata and local regressions have been added, but no direct native file/mount/ELF/LSM evidence exists and local Docker API is inaccessible. No speculative fix or new native run. Consolidated0/1, Preflight3 0/1, replacement E4 0/1; 29 historical Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main evidence/authority decision required before qualification.

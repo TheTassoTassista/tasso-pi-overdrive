@@ -120,6 +120,11 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /elif test "\$E4_DIAGNOSTIC_MODE" = complete-executable-inventory; then/u);
   assert.match(job, /"\$E4_IMAGE_REF" --complete-executable-inventory/u);
   assert.match(job, /node scripts\/e4-extract-executable-inventory\.mjs/u);
+  assert.match(job, /elif test "\$E4_DIAGNOSTIC_MODE" = rust-execve; then/u);
+  assert.match(job, /"\$E4_IMAGE_REF" --rust-execve-forensic/u);
+  assert.match(job, /node scripts\/e4-extract-rust-execve-evidence\.mjs/u);
+  assert.match(job, /e4-rust-execve-forensic-\$\{\{ github\.run_id \}\}/u);
+  assert.match(job, /phi-e4-rust-execve-forensic-\$GITHUB_RUN_ID/u);
   assert.doesNotMatch(job, /--mount .*phi-e4-linker-evidence/u);
   assert.match(job, /actions\/upload-artifact@[a-f0-9]{40}/u);
   assert.match(job, /if-no-files-found: error/u);

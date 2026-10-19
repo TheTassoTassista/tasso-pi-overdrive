@@ -7,10 +7,12 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { rustStartupEvidence, rustSmokeExecEvidence } from './e4-rust-startup.mjs';
+import { RUST_EXECVE_SCHEMA, RUST_SMOKE_SOURCE, RUST_SMOKE_SOURCE_SHA256,
+  rustStartupEvidence, rustSmokeExecEvidence, serializeRustForensic } from './e4-rust-startup.mjs';
 import { inventoryCertificationDecision, runExecutableInventory } from './e4-executable-inventory.mjs';
 
 const root = '/opt/phi';
+const rustForensicMode = process.argv.slice(2).includes('--rust-execve-forensic');
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'config', name), 'utf8'));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 function command(binary, args, expected) {
@@ -202,25 +204,71 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   process.stdout.write('E4_CARGO_OFFLINE_COMPILE=PASS\n');
   assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), rustSeed.toolchain.sysrootPath);
   const rustProbe = fs.mkdtempSync('/tmp/phi-e4-rust-');
+  const forensic = rustForensicMode ? {
+    schema: RUST_EXECVE_SCHEMA, qualifying: false,
+    candidateSha: process.env.PHI_E4_CANDIDATE_SHA ?? null,
+    historicalSha: 'b914cfe53779244fdfac093ba29539b6d4ff12c8',
+    seedManifestSha256: hash(path.join(root, 'config', 'e4-toolchain-seeds.json')),
+    rustcSha256: rustSeed.extracted[0].sha256,
+    compile: null, beforeExec: null, executionInvocation: null, execution: null,
+    cleanup: 'UNKNOWN', error: null,
+  } : null;
   try {
     const executable = path.join(rustProbe, 'smoke');
     const compiled = spawnSync('/usr/bin/rustc', ['--edition=2021', '-', '-o', executable], {
-      input: 'fn main() { println!("E4_RUST_SYSROOT_READY"); }\n', encoding: 'utf8',
+      input: RUST_SMOKE_SOURCE, encoding: 'utf8',
       timeout: 15000, maxBuffer: 1024 * 1024, cwd: rustProbe,
       env: { PATH: '/usr/bin:/bin', HOME: '/tmp' },
     });
+    if (forensic) forensic.compile = {
+      binary: '/usr/bin/rustc', args: ['--edition=2021', '-', '-o', executable],
+      cwd: rustProbe, sourceSha256: RUST_SMOKE_SOURCE_SHA256,
+      outputPath: executable, inputMethod: 'stdin', timeoutMs: 15000, maxBufferBytes: 1024 * 1024,
+      env: { PATH: '/usr/bin:/bin', HOME: '/tmp' },
+      exitCode: compiled.status, errorCode: compiled.error?.code ?? null, signal: compiled.signal ?? null,
+      stdout: String(compiled.stdout ?? '').slice(0, 2048), stderr: String(compiled.stderr ?? '').slice(0, 2048),
+      stdoutComplete: Buffer.byteLength(compiled.stdout ?? '') <= 2048,
+      stderrComplete: Buffer.byteLength(compiled.stderr ?? '') <= 2048,
+    };
     assert.equal(compiled.status, 0, `seeded Rust/sysroot compile failed: ${compiled.stderr}`);
+    if (forensic) forensic.beforeExec = rustSmokeExecEvidence(executable, null);
+    if (forensic) forensic.executionInvocation = {
+      method: 'spawnSync', binary: executable, args: [], cwd: process.cwd(),
+      timeoutMs: 15000, maxBufferBytes: 1024 * 1024,
+      env: { PATH: '/usr/bin:/bin', HOME: '/tmp', PYTHONDONTWRITEBYTECODE: '1',
+        PYTHONPATH: '/opt/phi/runtime/dap/python' },
+    };
     const smoke = spawnSync(executable, [], { encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024,
       env: { PATH: '/usr/bin:/bin', HOME: '/tmp', PYTHONDONTWRITEBYTECODE: '1', PYTHONPATH: '/opt/phi/runtime/dap/python' } });
+    if (forensic) forensic.execution = rustSmokeExecEvidence(executable, smoke);
     if (smoke.status !== 0 || smoke.error) {
-      console.error(`E4_RUST_SMOKE_EXEC_EVIDENCE=${JSON.stringify(rustSmokeExecEvidence(executable, smoke))}`);
+      if (!forensic) console.error(`E4_RUST_SMOKE_EXEC_EVIDENCE=${JSON.stringify(rustSmokeExecEvidence(executable, smoke))}`);
     }
-    assert.equal(smoke.status, 0, `${executable} failed: ${smoke.error?.code ?? smoke.status}`);
-    assert.match(smoke.stdout + smoke.stderr, /^E4_RUST_SYSROOT_READY$/mu);
+    if (!forensic) {
+      assert.equal(smoke.status, 0, `${executable} failed: ${smoke.error?.code ?? smoke.status}`);
+      assert.match(smoke.stdout + smoke.stderr, /^E4_RUST_SYSROOT_READY$/mu);
+    }
+  } catch (error) {
+    if (!forensic) throw error;
+    forensic.error = String(error.message).slice(0, 180);
   } finally {
-    fs.rmSync(rustProbe, { recursive: true, force: true });
-    console.log('E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS');
+    try {
+      fs.rmSync(rustProbe, { recursive: true, force: true });
+      assert.equal(fs.existsSync(rustProbe), false);
+      if (forensic) forensic.cleanup = 'PASS';
+      console.log('E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS');
+    } catch (error) {
+      if (!forensic) throw error;
+      forensic.cleanup = 'FAIL';
+      forensic.error ??= `CLEANUP_${String(error.message).slice(0, 120)}`;
+    }
   }
+  if (forensic) {
+    const { bytes, receipt } = serializeRustForensic(forensic);
+    console.log(`E4_RUST_EXECVE_FORENSIC_RECEIPT=${JSON.stringify(receipt)}`);
+    console.log(`E4_RUST_EXECVE_FORENSIC_ARTIFACT_BASE64=${bytes.toString('base64')}`);
+    if (!forensic.complete) process.exitCode = 1;
+  } else {
   command('/opt/phi/browser/agent-browser-0.36.0/agent-browser', ['--version'], /agent-browser 0\.36\.0/u);
   command('/opt/phi/browser/chrome-152.0.7977.82/chrome', ['--version'], /Chrome for Testing 152\.0\.7977\.82/u);
 
@@ -276,6 +324,7 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   console.log('E4_IMAGE_PI_SUBAGENTS_JITI=PASS');
   console.log('E4_IMAGE_PHI_MOUNTPOINT=PASS');
   console.log('E4_IMAGE_FOCUSED_TESTS=PASS');
+  }
 } catch (error) {
   console.error(`E4_IMAGE_SELFCHECK=FAIL reason=${String(error.message).slice(0, 300)}`);
   process.exitCode = 1;
