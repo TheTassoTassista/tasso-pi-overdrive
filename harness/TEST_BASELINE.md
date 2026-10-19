@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-19 — E4 Rust smoke EACCES observability checkpoint
+
+Focused `node --test tests/e4-*.test.mjs`: **54 PASS / 0 FAIL / 0 skip**; narrower Rust/image focus 8/8. `node --check` for both changed scripts, `npm run typecheck`, `node scripts/validate-package.mjs` and scoped `git diff --check`: PASS. A real local executable copy ran at mode0755 and produced `EACCES` after mode0644; `/tmp` mount on this host was observed executable, but this is **not** the CI image mount. Synthetic noexec mount parsing and unavailable-evidence `UNKNOWN` regressions PASS. `npm run check` **FAIL**, 1146 total/806 PASS/2 historical Rust-host FAIL/338 skip; the chain stopped at tests, so separate TypeScript/package checks were run. No native image/Preflight3/E4 run or provider call; this checkpoint does not assert a full green gate.
+
 ## Sole Cargo/GCC image-only native qualification FAIL (2026-10-19)
 
 [CI39268510691](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39268510691)/job118114335911 on exact `b914cfe53779244fdfac093ba29539b6d4ff12c8`: seed14/LSP/LLVM/build PASS; in-image mandatory inventory gate returned true, Rust startup/LLVM closure PASS, Cargo/libgit2 loader closure PASS, actual offline Cargo compile PASS. No separate inventory artifact in image-only mode, so individual GCC file hashes are not available in the run log. Next Rust smoke compile assertion passed, executable spawn from `/tmp` failed `EACCES` (mechanism UNKNOWN), self-check exit1. Browser/later checks NOT_REACHED; no qualified image/digest. Finalizer owned containers0/processes0, tag and staging removed, rootfs not created; Docker cache unscoped. Image-only1/1 consumed; Preflight3/E4 0/1 blocked, all29 Ubuntu rows OPEN, autonomy BLOCKED. Local focused51/51 and full host 1143/803 PASS/2 historical FAIL/338 skip remain separate evidence.

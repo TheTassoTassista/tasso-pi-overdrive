@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## STOP / Main — E4 consolidated qualification not dispatched (2026-10-19)
+
+`E4-QUALIFICATION-EXECUTION-CONTRACT-RESET-001` is durable. Prior CI39268510691 proves compiled Rust smoke execution `EACCES`, not its mechanism. Bounded failure metadata and local regressions have been added, but no direct native file/mount/ELF/LSM evidence exists and local Docker API is inaccessible. No speculative fix or new native run. Consolidated0/1, Preflight3 0/1, replacement E4 0/1; 29 historical Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main evidence/authority decision required before qualification.
+
 ## STOP / Main — E4 image-only CI39268510691 FAIL (2026-10-19)
 
 Frozen functional `b914cfe53779244fdfac093ba29539b6d4ff12c8`: 14 signed seed stage, managed LSP, official LLVM, image build, inventory gate, Rust startup/LLVM closure, Cargo/libgit2 loader closure and offline Cargo compilation PASS in native image. Self-check then FAIL at execution of its compiled Rust smoke from `/tmp` with `EACCES`; exact denial mechanism UNKNOWN. Browser/later checks NOT_REACHED; publication skipped, no qualified OCI digest. Cleanup PASS (owned containers/processes0, tag/staging removed, no rootfs). Image-only1/1 consumed; Preflight3/E4 0/1 BLOCKED, 29 Ubuntu rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP/Main; no retry or patch under this authority.

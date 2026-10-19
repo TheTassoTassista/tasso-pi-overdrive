@@ -90,6 +90,8 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.match(source, /command\('\/usr\/bin\/rustc', \['--print', 'sysroot'\]/u);
   assert.match(source, /E4_RUST_SYSROOT_READY/u);
   assert.match(source, /compiled\.status, 0/u);
+  assert.match(source, /E4_RUST_SMOKE_EXEC_EVIDENCE=/u);
+  assert.match(source, /E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS/u);
   assert.match(source, /command\('\/opt\/phi\/browser\/chrome-152\.0\.7977\.82\/chrome', \['--version'\]/u);
   assert.match(source, /\['--test', '--test-reporter=tap',/u);
   assert.doesNotMatch(source, /path\.join\(root, 'pi', 'npm', 'node_modules', '@ast-grep', 'cli', 'ast-grep'\)/u);

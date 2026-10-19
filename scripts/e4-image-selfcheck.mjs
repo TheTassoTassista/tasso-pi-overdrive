@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { rustStartupEvidence } from './e4-rust-startup.mjs';
+import { rustStartupEvidence, rustSmokeExecEvidence } from './e4-rust-startup.mjs';
 import { inventoryCertificationDecision, runExecutableInventory } from './e4-executable-inventory.mjs';
 
 const root = '/opt/phi';
@@ -210,9 +210,16 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
       env: { PATH: '/usr/bin:/bin', HOME: '/tmp' },
     });
     assert.equal(compiled.status, 0, `seeded Rust/sysroot compile failed: ${compiled.stderr}`);
-    command(executable, [], /^E4_RUST_SYSROOT_READY$/mu);
+    const smoke = spawnSync(executable, [], { encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024,
+      env: { PATH: '/usr/bin:/bin', HOME: '/tmp', PYTHONDONTWRITEBYTECODE: '1', PYTHONPATH: '/opt/phi/runtime/dap/python' } });
+    if (smoke.status !== 0 || smoke.error) {
+      console.error(`E4_RUST_SMOKE_EXEC_EVIDENCE=${JSON.stringify(rustSmokeExecEvidence(executable, smoke))}`);
+    }
+    assert.equal(smoke.status, 0, `${executable} failed: ${smoke.error?.code ?? smoke.status}`);
+    assert.match(smoke.stdout + smoke.stderr, /^E4_RUST_SYSROOT_READY$/mu);
   } finally {
     fs.rmSync(rustProbe, { recursive: true, force: true });
+    console.log('E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS');
   }
   command('/opt/phi/browser/agent-browser-0.36.0/agent-browser', ['--version'], /agent-browser 0\.36\.0/u);
   command('/opt/phi/browser/chrome-152.0.7977.82/chrome', ['--version'], /Chrome for Testing 152\.0\.7977\.82/u);

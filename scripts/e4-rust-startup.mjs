@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
@@ -41,4 +42,73 @@ export function rustStartupEvidence(binary, expectedSha256) {
       missingLibraries: failure.missingLibraries,
     },
   };
+}
+
+// This is metadata-only failure evidence for the existing image self-check.
+// In particular, a failed exec alone cannot distinguish noexec from modes/LSM.
+const mode = (stat) => (stat.mode & 0o7777).toString(8).padStart(4, '0');
+const observed = (fn) => {
+  try { return fn(); } catch { return 'UNKNOWN'; }
+};
+const unescapeMount = (value) => value.replace(/\\([0-7]{3})/gu, (_, octal) => String.fromCharCode(Number.parseInt(octal, 8)));
+
+export function containingMount(file, mountinfo) {
+  if (typeof mountinfo !== 'string') return 'UNKNOWN';
+  const mounts = [];
+  for (const line of mountinfo.split('\n')) {
+    const separator = line.indexOf(' - ');
+    if (separator < 0) continue;
+    const left = line.slice(0, separator).split(' ');
+    if (left.length < 6) continue;
+    const target = unescapeMount(left[4]);
+    if (target !== '/' && !file.startsWith(`${target}/`) && file !== target) continue;
+    mounts.push({ target, flags: left[5].split(',').filter((flag) => /^(?:ro|rw|exec|noexec|nosuid|nodev)$/u.test(flag)) });
+  }
+  mounts.sort((a, b) => b.target.length - a.target.length);
+  return mounts[0] ?? 'UNKNOWN';
+}
+
+export function rustSmokeExecEvidence(binary, result, options = {}) {
+  const stat = options.stat ?? fs.statSync;
+  const realpath = options.realpath ?? fs.realpathSync;
+  const readFile = options.readFile ?? fs.readFileSync;
+  const spawn = options.spawn ?? spawnSync;
+  const file = observed(() => {
+    const details = stat(binary);
+    return { path: binary, realpath: realpath(binary), mode: mode(details), uid: details.uid, gid: details.gid,
+      regular: details.isFile(), size: details.size };
+  });
+  const directories = [];
+  for (let directory = path.dirname(binary);; directory = path.dirname(directory)) {
+    directories.push(observed(() => {
+      const details = stat(directory);
+      return { path: directory, mode: mode(details), uid: details.uid, gid: details.gid };
+    }));
+    if (directory === '/') break;
+  }
+  const mount = observed(() => {
+    const mountinfo = readFile('/proc/self/mountinfo', 'utf8');
+    return mountinfo.length <= 128 * 1024 ? containingMount(binary, mountinfo) : 'UNKNOWN';
+  });
+  const mountExec = mount === 'UNKNOWN' ? 'UNKNOWN' : mount.flags.includes('noexec') ? 'NOEXEC' : 'EXEC';
+  const elfInterpreter = observed(() => {
+    const elf = spawn('/usr/bin/readelf', ['-h', '-lW', binary], { encoding: 'utf8', timeout: 15000, maxBuffer: 1024 * 1024 });
+    if (elf.status !== 0 || elf.error) return 'UNKNOWN';
+    const elfType = /\bType:\s+(EXEC|DYN)\b/u.exec(elf.stdout)?.[1] ?? 'UNKNOWN';
+    const interpreter = /\[Requesting program interpreter: (\/[A-Za-z0-9_./+-]+)\]/u.exec(elf.stdout)?.[1];
+    if (!interpreter) return 'UNKNOWN';
+    const details = observed(() => stat(interpreter));
+    return { path: interpreter, elfType, exists: details !== 'UNKNOWN',
+      mode: details === 'UNKNOWN' ? 'UNKNOWN' : mode(details),
+      uid: details === 'UNKNOWN' ? 'UNKNOWN' : details.uid,
+      gid: details === 'UNKNOWN' ? 'UNKNOWN' : details.gid };
+  });
+  const lsm = observed(() => {
+    const profile = readFile('/proc/self/attr/current', 'utf8').trim();
+    return /^[A-Za-z0-9_ .:/()+-]{1,160}$/u.test(profile) ? profile : 'UNKNOWN';
+  });
+  return { file, directories, mount, elfInterpreter, lsm,
+    mountExec, lsmDenial: 'UNKNOWN',
+    executingUid: observed(() => process.getuid()), executingGid: observed(() => process.getgid()),
+    errorCode: result?.error?.code ?? null, exitCode: result?.status ?? null, signal: result?.signal ?? null };
 }
