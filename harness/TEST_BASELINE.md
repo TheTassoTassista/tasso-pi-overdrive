@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## Sole Cargo/GCC image-only native qualification FAIL (2026-10-19)
+
+[CI39268510691](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39268510691)/job118114335911 on exact `b914cfe53779244fdfac093ba29539b6d4ff12c8`: seed14/LSP/LLVM/build PASS; in-image mandatory inventory gate returned true, Rust startup/LLVM closure PASS, Cargo/libgit2 loader closure PASS, actual offline Cargo compile PASS. No separate inventory artifact in image-only mode, so individual GCC file hashes are not available in the run log. Next Rust smoke compile assertion passed, executable spawn from `/tmp` failed `EACCES` (mechanism UNKNOWN), self-check exit1. Browser/later checks NOT_REACHED; no qualified image/digest. Finalizer owned containers0/processes0, tag and staging removed, rootfs not created; Docker cache unscoped. Image-only1/1 consumed; Preflight3/E4 0/1 blocked, all29 Ubuntu rows OPEN, autonomy BLOCKED. Local focused51/51 and full host 1143/803 PASS/2 historical FAIL/338 skip remain separate evidence.
+
 ## E4 Cargo/GCC local candidate (2026-10-19)
 
 Scoped indexed source/security audit exit0, 717 blobs, WARN20/FAIL0/modelCalls0; scoped ZERO_EGRESS PASS. Protected user audit excluded from index and preserved byte-identical.

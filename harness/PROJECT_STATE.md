@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## STOP / Main — E4 image-only CI39268510691 FAIL (2026-10-19)
+
+Frozen functional `b914cfe53779244fdfac093ba29539b6d4ff12c8`: 14 signed seed stage, managed LSP, official LLVM, image build, inventory gate, Rust startup/LLVM closure, Cargo/libgit2 loader closure and offline Cargo compilation PASS in native image. Self-check then FAIL at execution of its compiled Rust smoke from `/tmp` with `EACCES`; exact denial mechanism UNKNOWN. Browser/later checks NOT_REACHED; publication skipped, no qualified OCI digest. Cleanup PASS (owned containers/processes0, tag/staging removed, no rootfs). Image-only1/1 consumed; Preflight3/E4 0/1 BLOCKED, 29 Ubuntu rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. STOP/Main; no retry or patch under this authority.
+
 ## E4 Cargo/GCC local closure candidate (2026-10-19)
 
 Main `E4-CARGO-LIBGIT2-GCC-PATH-CLOSURE-001` durable. CI39141449343 remains FAIL/CLOSED with Cargo loader miss and five GCC path rejections. Signed exact libgit2/llhttp private seeds and narrow provenance-bound GCC resolver are implemented locally; E4 focus51/51, TypeScript/package/script syntax/ShellCheck PASS. Full host check remains 2 historical Rust-host FAIL, not green. Native E4 rootfs Cargo closure, actual five GCC file identities, qualified OCI digest and 29 Ubuntu rows **NOT VERIFIED/OPEN**. Image-only0/1, Preflight3/E4 0/1; Windows autonomy BLOCKED/false, portability NOT CERTIFIED, no readiness activation. Await scoped audit/ZERO_EGRESS and single image-only run on frozen commit. Protected/user state preserved.

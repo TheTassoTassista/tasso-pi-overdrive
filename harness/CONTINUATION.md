@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## CURRENT STOP / Main — image-only budget consumed, Rust smoke EACCES
+
+Branch `feature/routing-presets-quality`, functional candidate local/remote `b914cfe53779244fdfac093ba29539b6d4ff12c8`; auto push CI39268403756 cancelled. Sole image-only [CI39268510691](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39268510691)/job118114335911 terminal FAIL on that SHA. Seed14/LSP/LLVM/image build PASS; self-check inventory gate returned true, Rust startup/LLVM closure PASS, Cargo/libgit2 loader closure PASS and actual Cargo offline compile PASS. First failure: compiled Rust smoke executable `/tmp/phi-e4-rust-Kke6lD/smoke` failed spawn with `EACCES`; precise denial mechanism UNKNOWN because file mode/mountinfo were not retained. Browser and later checks NOT_REACHED; no qualified/published digest. Final cleanup PASS: owned containers0/processes0, tag and seed/LSP staging removed, no rootfs created; Docker cache unscoped. Image-only1/1 exhausted, Preflight3/E4 0/1 BLOCKED, all29 Ubuntu rows OPEN, autonomy BLOCKED/false, portability NOT CERTIFIED. **STOP/Main; do not fix or relaunch under current decision.** Next: Main decides whether this implementation/environment mismatch warrants targeted diagnosis and new native authority. Do-not-redo same CI/E1–E3/Host; protected audit user edit/hash and unrelated untracked files preserved, index should be empty after docs checkpoint, provider calls0.
+
 ## CURRENT — E4 Cargo/GCC local candidate, image-only NOT RUN
 
 Scoped indexed audit exit0/WARN20/FAIL0/modelCalls0 and `ZERO_EGRESS_REVIEW: PASS` for the candidate's pinned private seed, narrow GCC provenance path, unchanged product/isolation/authority/provider/timeouts/readiness and no test suppression. This is not native image proof.
