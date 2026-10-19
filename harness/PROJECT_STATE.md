@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-19 — E4 forensic STOP / Main
+
+The sole native Rust execve forensic [CI39314492929](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39314492929) on `33b673d796f89980d5f0f2a80e56bca11a36c5a9` is SUCCESS as diagnostic only. Verified artifact SHA `f59a42b9a30f607aa73d11a0de315fa085e3d9cebb3a29ced4ffda41dd8bc7bc` proves Rust compile0, executable0755/owner1001, actual `/tmp` tmpfs mount453 `noexec`, effective X access `EACCES`, direct spawn `EACCES`/no child. Current cause KNOWN_NOEXEC; historical CI39268510691 exact mount LIKELY but unobserved. ELF interpreter exists; later loader outcome and LSM denial remain UNKNOWN. Cleanup PASS, owned containers/processes0, no image publication. Forensic1/1 spent; consolidated0/1, Preflight3 0/1, replacement E4 0/1 unspent. Strict Tier A and trusted Tier B execution-workspace ownership require Main before any mount/output-path change. All29 Ubuntu rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider calls or readiness activation.
+
 ## E4 one-shot execve forensic probe authorized, local candidate only (2026-10-19)
 
 `E4-RUST-EXECVE-FORENSIC-PROBE-001` is durable. Local observability and image-job transport candidate has focused E4 59/59 PASS with no image/toolchain/security/product input change; full host check retains two Rust-host failures. Historical CI39268510691 remains FAIL/CLOSED and its EACCES cause UNKNOWN. Forensic0/1 not dispatched; consolidated0/1, Preflight3 0/1, replacement E4 0/1. All29 Ubuntu rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No image qualification or readiness claim.

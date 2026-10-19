@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-19 — sole native E4 Rust execve forensic result
+
+CI39314492929/job118272330107 on `33b673d796f89980d5f0f2a80e56bca11a36c5a9`: diagnostic job SUCCESS, artifact ID12217154834/SHA `f59a42b9a30f607aa73d11a0de315fa085e3d9cebb3a29ced4ffda41dd8bc7bc`, 4,966 bytes, receipt/integrity/schema/completeness PASS. In-container rustc compile0; actual `/tmp` mount453 `noexec`, smoke mode0755, direct spawn EACCES/no child. Owned cleanup containers0/processes0 and stages/tag removed; image publication skipped. This is **not** image qualification, Preflight3 or E4. Local E4 59/59, TypeScript/package/syntax/ShellCheck PASS; full host `npm run check` remains 1151 total/811 PASS/2 historical Rust-host FAIL/338 skip. Forensic1/1 spent, all other new native budgets0/1. No post-probe code change or retest claim.
+
 ## 2026-10-19 — E4 native execve forensic pre-dispatch candidate
 
 `node --test tests/e4-*.test.mjs`: **59 PASS / 0 FAIL / 0 skip**. Real local EACCES vs process-exit, actual executable mode/owner/mount/ELF/process capture, static no-interpreter, missing LSM, ambiguous mount, bounded hashed transport, forged-PASS rejection and owned cleanup are covered. `npm run check` **FAIL** at tests: 1151 total / 811 PASS / 2 historical Rust-host FAIL / 338 skip (`20-class real edit-contract corpus` and `managed rust-analyzer ... cross-file navigation`). Separate installed-Pi TypeScript, package validation, changed-script syntax and relevant ShellCheck PASS. This is local evidence only; no native image/execve probe, consolidated qualification, Preflight3 or E4 result.
