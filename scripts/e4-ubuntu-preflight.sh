@@ -25,6 +25,11 @@ expected_bwrap_sha=e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30
 expected_profile_sha=09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51
 expected_seed_sha=ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70
 expected_image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a'
+if [[ ${E4_CONSOLIDATED_GATE:-false} == true ]]; then
+  [[ ${E4_CERTIFIED_IMAGE_DIGEST:-} =~ ^ghcr\.io/thetassotassista/tasso-pi-overdrive-e4@sha256:[a-f0-9]{64}$ ]] || fail CONSOLIDATED_DIGEST
+  [[ "$product_sha" == "${GITHUB_SHA:-}" ]] || fail CONSOLIDATED_CANDIDATE
+  expected_image=$E4_CERTIFIED_IMAGE_DIGEST
+fi
 [[ ${RUNNER_OS:-} == Linux && ${RUNNER_TEMP:-} == "$expected_temp" && -n ${ImageVersion:-} ]] || fail RUNNER_IDENTITY
 [[ $(id -u) -ne 0 ]] || fail ROOT_RUNNER
 [[ "$image" == "$expected_image" && "$product_sha" =~ ^[a-f0-9]{40}$ ]] || fail FROZEN_IDENTITY

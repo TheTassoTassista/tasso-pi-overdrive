@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-19 — E4 trusted executable scratch local baseline
+
+E4-focused `node --test tests/e4*.test.mjs`: **67 PASS / 0 FAIL / 0 skip**. Covers Tier-A noexec/no-scratch, Tier-B effective tmpfs size/flags/owner/mode negatives, host-bind rejection, nested-userns denial, 38+14+12 check ownership, receipt tamper/incomplete rejection, runner cleanup marker and owned-stage cleanup. Changed JS/Bash syntax, all package syntax tasks, TypeScript, package validation and relevant ShellCheck PASS. Indexed staged audit WARN20/FAIL0/modelCalls0 over724 blobs; ZERO_EGRESS review PASS. Full host `npm run check`: **FAIL at tests, 1159 total / 819 PASS / 2 known Rust-host FAIL / 338 skip**; tests are edit corpus Rust syntax and rust-analyzer semantic navigation, with local rustc absent. Subsequent syntax/TypeScript/package stages were run separately and passed. Local Docker daemon access denied, so actual Tier-B scratch/exec is NOT_NATIVE_VERIFIED. Consolidated image+Preflight3 and replacement E4 NOT RUN; all29 historical Preflight2 entries OPEN.
+
 ## 2026-10-19 — sole native E4 Rust execve forensic result
 
 CI39314492929/job118272330107 on `33b673d796f89980d5f0f2a80e56bca11a36c5a9`: diagnostic job SUCCESS, artifact ID12217154834/SHA `f59a42b9a30f607aa73d11a0de315fa085e3d9cebb3a29ced4ffda41dd8bc7bc`, 4,966 bytes, receipt/integrity/schema/completeness PASS. In-container rustc compile0; actual `/tmp` mount453 `noexec`, smoke mode0755, direct spawn EACCES/no child. Owned cleanup containers0/processes0 and stages/tag removed; image publication skipped. This is **not** image qualification, Preflight3 or E4. Local E4 59/59, TypeScript/package/syntax/ShellCheck PASS; full host `npm run check` remains 1151 total/811 PASS/2 historical Rust-host FAIL/338 skip. Forensic1/1 spent, all other new native budgets0/1. No post-probe code change or retest claim.

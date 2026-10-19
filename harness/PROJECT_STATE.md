@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-19 — E4 trusted scratch local candidate, native gate pending
+
+`E4-TRUSTED-EXECUTABLE-SCRATCH-001` permits only a controller-owned, one-smoke executable tmpfs for Tier-B image qualification. Tier A retains `/tmp noexec` and no scratch; exact same-image Tier B verifies effective scratch flags/owner/mode, frozen Rust input/seed identity, bounded compile+execution and cleanup. Joint A∧B receipts gate image publication; Preflight3 is conditional on complete image-job success and exact digest/candidate. Local E4 67/67 PASS and syntax/TypeScript/package/ShellCheck PASS; full host check has the same two environmental Rust failures, not a green gate. Native scratch is NOT_NATIVE_VERIFIED. Consolidated0/1, Preflight3 0/1, replacement E4 0/1; all29 historical rows OPEN. Windows autonomy remains BLOCKED/false and portability NOT CERTIFIED; no product authority/provider/readiness change.
+
 ## 2026-10-19 — E4 forensic STOP / Main
 
 The sole native Rust execve forensic [CI39314492929](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39314492929) on `33b673d796f89980d5f0f2a80e56bca11a36c5a9` is SUCCESS as diagnostic only. Verified artifact SHA `f59a42b9a30f607aa73d11a0de315fa085e3d9cebb3a29ced4ffda41dd8bc7bc` proves Rust compile0, executable0755/owner1001, actual `/tmp` tmpfs mount453 `noexec`, effective X access `EACCES`, direct spawn `EACCES`/no child. Current cause KNOWN_NOEXEC; historical CI39268510691 exact mount LIKELY but unobserved. ELF interpreter exists; later loader outcome and LSM denial remain UNKNOWN. Cleanup PASS, owned containers/processes0, no image publication. Forensic1/1 spent; consolidated0/1, Preflight3 0/1, replacement E4 0/1 unspent. Strict Tier A and trusted Tier B execution-workspace ownership require Main before any mount/output-path change. All29 Ubuntu rows OPEN; Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider calls or readiness activation.

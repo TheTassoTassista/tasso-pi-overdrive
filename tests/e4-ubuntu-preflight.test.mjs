@@ -12,14 +12,17 @@ const probe = readFileSync(new URL('../certification/e4-host-probe.sh', import.m
 const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
 const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
 
-test('Ubuntu preflight is a separate exact-image, exact-candidate gate without E4 or Windows', () => {
+test('Ubuntu preflight uses exact image and candidate, and may follow joint image qualification', () => {
   assert.ok(preflight);
-  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['campaign3-e4-certification'\]/u);
+  assert.match(preflight, /needs: e4-image-qualification/u);
+  assert.match(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
+  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['e4-image-qualification-only'\]/u);
   assert.match(preflight, /runs-on: ubuntu-24\.04/u);
   assert.match(preflight, /packages: read/u);
   assert.match(preflight, /E4_GATE_KIND: preflight/u);
   assert.match(preflight, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
-  assert.match(preflight, /bash scripts\/e4-ubuntu-preflight\.sh 'ghcr\.io\/thetassotassista\/tasso-pi-overdrive-e4@sha256:[a-f0-9]{64}'/u);
+  assert.match(preflight, /E4_CERTIFIED_IMAGE_DIGEST: \$\{\{ needs\.e4-image-qualification\.outputs\.digest \}\}/u);
+  assert.match(preflight, /bash scripts\/e4-ubuntu-preflight\.sh "\$image" "\$CERTIFIED_SHA"/u);
   assert.doesNotMatch(preflight, /campaign3-e4-windows:|phi-bounded-workflow-pi-smoke|--e1|--e2|--autonomy-crash-v2/u);
   const defaultJob = workflow.split('  native-foundation:\n')[1]?.split('\n')[0];
   assert.match(defaultJob ?? '', /!inputs\['e4-ubuntu-preflight-only'\]/u);

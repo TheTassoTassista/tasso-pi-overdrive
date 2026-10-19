@@ -9,7 +9,7 @@ export function cleanupOwnedImageStages(runnerTemp) {
   assert.equal(path.basename(runnerTemp), '_temp', 'unexpected runner temporary root');
   assert.equal(fs.realpathSync(runnerTemp), runnerTemp, 'runner temporary root is aliased');
   assert.equal(fs.statSync(runnerTemp).uid, process.getuid(), 'runner temporary root is foreign-owned');
-  for (const name of ['phi-e4-seeds', 'phi-e4-lsp', 'phi-e4-linker-evidence', 'phi-e4-executable-inventory', 'phi-e4-execve-evidence']) {
+  for (const name of ['phi-e4-seeds', 'phi-e4-lsp', 'phi-e4-linker-evidence', 'phi-e4-executable-inventory', 'phi-e4-execve-evidence', 'phi-e4-tier-evidence']) {
     const target = path.join(runnerTemp, name);
     try {
       const stat = fs.lstatSync(target);
@@ -49,6 +49,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url
     console.log('E4_TEMP_LINKER_EVIDENCE_STATE=REMOVED');
     console.log('E4_TEMP_EXECUTABLE_INVENTORY_STATE=REMOVED');
     console.log('E4_TEMP_EXECVE_EVIDENCE_STATE=REMOVED');
+    console.log('E4_TEMP_TIER_EVIDENCE_STATE=REMOVED');
     console.log('E4_TEMP_ROOTFS_STATE=NOT_CREATED_BY_IMAGE_ONLY_JOB');
     console.log(`E4_IMAGE_OWNED_PROCESSES_FINAL=${pids.length}`);
   } catch (error) {

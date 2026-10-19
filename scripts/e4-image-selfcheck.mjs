@@ -10,9 +10,18 @@ import { pathToFileURL } from 'node:url';
 import { RUST_EXECVE_SCHEMA, RUST_SMOKE_SOURCE, RUST_SMOKE_SOURCE_SHA256,
   rustStartupEvidence, rustSmokeExecEvidence, serializeRustForensic } from './e4-rust-startup.mjs';
 import { inventoryCertificationDecision, runExecutableInventory } from './e4-executable-inventory.mjs';
+import { E4_TIER_CHECKS, e4TierReceipt, verifyE4NestedUsernsDenied, verifyE4TierMount } from './e4-tier-contract.mjs';
+import { runE4TrustedRustSmoke } from './e4-trusted-rust-smoke.mjs';
 
 const root = '/opt/phi';
 const rustForensicMode = process.argv.slice(2).includes('--rust-execve-forensic');
+const trustedSmokeMode = process.argv.slice(2).includes('--trusted-generated-smoke');
+const tierAImageMode = process.argv.slice(2).includes('--tier-a-image');
+const candidateSha = process.env.PHI_E4_CANDIDATE_SHA ?? '';
+const tierAProgress = Object.fromEntries(E4_TIER_CHECKS.filter((check) => check.tier === 'A')
+  .map((check) => [check.id, 'NOT_EXECUTED']));
+let activeTierACheck = 'A_EXECUTABLE_INVENTORY';
+let inventoryChecks = [];
 const read = (name) => JSON.parse(fs.readFileSync(path.join(root, 'config', name), 'utf8'));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 function command(binary, args, expected) {
@@ -53,7 +62,33 @@ function treeIdentity(folder, expected) {
   assert.equal(outer.digest('hex'), expected, 'debugpy tree mismatch');
 }
 
-if (process.argv.slice(2).includes('--complete-executable-inventory')) {
+if (trustedSmokeMode) {
+  try {
+    assert.deepEqual(process.argv.slice(2), ['--trusted-generated-smoke'], 'TRUSTED_SMOKE_ARGV');
+    const smoke = runE4TrustedRustSmoke();
+    assert.equal(smoke.cleanup, 'PASS', 'RUST_SMOKE_CLEANUP');
+    const manifestSha = hash(path.join(root, 'config', 'e4-toolchain-seeds.json'));
+    const receipt = e4TierReceipt('B', { B_RUST_GENERATED_EXEC: { status: 'PASS',
+      inputSha256: createHash('sha256').update(`${smoke.rustcSha256}:${smoke.sourceSha256}`).digest('hex') } },
+    candidateSha, manifestSha);
+    process.stdout.write(`E4_RUST_TRUSTED_SMOKE=${JSON.stringify(smoke)}\n`);
+    process.stdout.write(`E4_TIER_RECEIPT=${JSON.stringify(receipt)}\n`);
+    process.stdout.write('E4_IMAGE_TIER_B=PASS\n');
+  } catch (error) {
+    console.error(`E4_IMAGE_TIER_B=FAIL reason=${String(error.message).slice(0, 300)}`);
+    if (error.evidence) process.stdout.write(`E4_RUST_TRUSTED_FAILURE=${JSON.stringify(error.evidence)}\n`);
+    if (/^[a-f0-9]{40}$/u.test(candidateSha)) {
+      try {
+        const manifestSha = hash(path.join(root, 'config', 'e4-toolchain-seeds.json'));
+        const inputSha256 = createHash('sha256').update(`${manifestSha}:${RUST_SMOKE_SOURCE_SHA256}`).digest('hex');
+        process.stdout.write(`E4_TIER_RECEIPT=${JSON.stringify(e4TierReceipt('B', {
+          B_RUST_GENERATED_EXEC: { status: 'FAIL', inputSha256 },
+        }, candidateSha, manifestSha))}\n`);
+      } catch { console.error('E4_TIER_B_RECEIPT=INCOMPLETE'); }
+    }
+    process.exitCode = 1;
+  }
+} else if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   try {
     const diagnostic = runExecutableInventory();
     process.stdout.write(`E4_EXECUTABLE_INVENTORY_RECEIPT=${JSON.stringify(diagnostic.receipt)}\n`);
@@ -64,9 +99,26 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
     process.exitCode = 1;
   }
 } else try {
+  if (tierAImageMode) {
+    assert.deepEqual(process.argv.slice(2), ['--tier-a-image'], 'TIER_A_ARGV');
+    assert.match(candidateSha, /^[a-f0-9]{40}$/u, 'TIER_A_CANDIDATE_ID');
+    verifyE4TierMount('A');
+    verifyE4NestedUsernsDenied();
+  }
   const executableInventory = runExecutableInventory();
+  const inventoryManifestSha = hash(path.join(root, 'config', 'e4-toolchain-seeds.json'));
+  inventoryChecks = [
+    ...executableInventory.body.tools.map((entry) => ({ id: `tool:${entry.id}`, tier: 'A',
+      status: entry.status, inputSha256: entry.expectedSha256 ?? inventoryManifestSha })),
+    ...executableInventory.body.assets.map((entry) => ({ id: `asset:${entry.id}`, tier: 'A',
+      status: entry.status, inputSha256: entry.expectedSha256 ?? inventoryManifestSha })),
+    ...executableInventory.body.dependent.map((entry) => ({ id: `dependent:${entry.id}`, tier: 'A',
+      status: entry.status, inputSha256: inventoryManifestSha })),
+  ];
   assert.equal(inventoryCertificationDecision(executableInventory), true,
     `mandatory executable inventory failed: ${JSON.stringify(executableInventory.body.failures)}`);
+  tierAProgress.A_EXECUTABLE_INVENTORY = 'PASS';
+  activeTierACheck = 'A_TOOLCHAIN_IDENTITIES';
   assert.equal(process.platform, 'linux');
   assert.equal(process.arch, 'x64');
   const manifest = read('e4-toolchain-seeds.json');
@@ -203,6 +255,9 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
     'PASS', 'offline Cargo compilation was not verified');
   process.stdout.write('E4_CARGO_OFFLINE_COMPILE=PASS\n');
   assert.equal(command('/usr/bin/rustc', ['--print', 'sysroot'], /^\/usr\n?$/u).trim(), rustSeed.toolchain.sysrootPath);
+  tierAProgress.A_TOOLCHAIN_IDENTITIES = 'PASS';
+  activeTierACheck = 'A_RUNTIME_SMOKES';
+  if (rustForensicMode) {
   const rustProbe = fs.mkdtempSync('/tmp/phi-e4-rust-');
   const forensic = rustForensicMode ? {
     schema: RUST_EXECVE_SCHEMA, qualifying: false,
@@ -268,7 +323,9 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
     console.log(`E4_RUST_EXECVE_FORENSIC_RECEIPT=${JSON.stringify(receipt)}`);
     console.log(`E4_RUST_EXECVE_FORENSIC_ARTIFACT_BASE64=${bytes.toString('base64')}`);
     if (!forensic.complete) process.exitCode = 1;
-  } else {
+  }
+  }
+  if (!rustForensicMode) {
   command('/opt/phi/browser/agent-browser-0.36.0/agent-browser', ['--version'], /agent-browser 0\.36\.0/u);
   command('/opt/phi/browser/chrome-152.0.7977.82/chrome', ['--version'], /Chrome for Testing 152\.0\.7977\.82/u);
 
@@ -307,6 +364,8 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   assert.equal(fs.lstatSync('/phi').isDirectory(), true);
   assert.equal(fs.readdirSync('/phi').length, 0, '/phi is not an empty structural mountpoint');
   for (const destination of ['/evidence', '/proc', '/dev', '/tmp', '/run']) assert.equal(fs.lstatSync(destination).isDirectory(), true);
+  tierAProgress.A_RUNTIME_SMOKES = 'PASS';
+  activeTierACheck = 'A_FOCUSED_TESTS';
   const focused = spawnSync('/usr/bin/node', ['--test', '--test-reporter=tap',
     '/opt/phi/project/tests/agent-hub-control-bridge.test.mjs',
     '/opt/phi/project/tests/ast-edit-engine.test.mjs'], {
@@ -318,7 +377,15 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   assert.equal(focused.status, 0, `focused Agent Hub/AST tests failed: ${focused.error?.code ?? focused.status}; cases=${JSON.stringify(failedNames)}`);
   assert.match(focused.stdout, /^# fail 0$/mu);
   assert.match(focused.stdout, /^# pass [1-9][0-9]*$/mu);
+  tierAProgress.A_FOCUSED_TESTS = 'PASS';
+  if (tierAImageMode) {
+    const manifestSha = hash(path.join(root, 'config', 'e4-toolchain-seeds.json'));
+    const results = Object.fromEntries(Object.entries(tierAProgress).map(([id, status]) =>
+      [id, { status, inputSha256: manifestSha }]));
+    process.stdout.write(`E4_TIER_RECEIPT=${JSON.stringify(e4TierReceipt('A', results, candidateSha, manifestSha, inventoryChecks))}\n`);
+  }
   console.log('E4_IMAGE_SELFCHECK=PASS');
+  if (tierAImageMode) console.log('E4_IMAGE_TIER_A=PASS');
   console.log('E4_IMAGE_TOOL_IDENTITIES=PASS');
   console.log('E4_IMAGE_NODE_ELF_CLOSURE=PASS');
   console.log('E4_IMAGE_PI_SUBAGENTS_JITI=PASS');
@@ -327,5 +394,14 @@ if (process.argv.slice(2).includes('--complete-executable-inventory')) {
   }
 } catch (error) {
   console.error(`E4_IMAGE_SELFCHECK=FAIL reason=${String(error.message).slice(0, 300)}`);
+  if (tierAImageMode && /^[a-f0-9]{40}$/u.test(candidateSha)) {
+    tierAProgress[activeTierACheck] = 'FAIL';
+    try {
+      const manifestSha = hash(path.join(root, 'config', 'e4-toolchain-seeds.json'));
+      const results = Object.fromEntries(Object.entries(tierAProgress).map(([id, status]) =>
+        [id, { status, inputSha256: manifestSha }]));
+      process.stdout.write(`E4_TIER_RECEIPT=${JSON.stringify(e4TierReceipt('A', results, candidateSha, manifestSha, inventoryChecks))}\n`);
+    } catch { console.error('E4_TIER_A_RECEIPT=INCOMPLETE'); }
+  }
   process.exitCode = 1;
 }

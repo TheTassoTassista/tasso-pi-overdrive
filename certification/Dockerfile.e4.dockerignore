@@ -18,6 +18,8 @@
 !runtime/lsp/package-lock.json
 !scripts/
 !scripts/e4-image-selfcheck.mjs
+!scripts/e4-tier-contract.mjs
+!scripts/e4-trusted-rust-smoke.mjs
 !scripts/e4-executable-inventory.mjs
 !scripts/e4-lsp-startup-smoke.mjs
 !scripts/e4-rust-startup.mjs

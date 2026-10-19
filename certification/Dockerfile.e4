@@ -64,6 +64,8 @@ COPY platform/ /opt/phi/project/platform/
 COPY tests/agent-hub-control-bridge.test.mjs tests/ast-edit-engine.test.mjs /opt/phi/project/tests/
 RUN ln -s /opt/phi/pi/npm/node_modules /opt/phi/project/node_modules
 COPY scripts/e4-image-selfcheck.mjs /opt/phi/e4-image-selfcheck.mjs
+COPY scripts/e4-tier-contract.mjs /opt/phi/e4-tier-contract.mjs
+COPY scripts/e4-trusted-rust-smoke.mjs /opt/phi/e4-trusted-rust-smoke.mjs
 COPY scripts/e4-executable-inventory.mjs /opt/phi/e4-executable-inventory.mjs
 COPY scripts/e4-lsp-startup-smoke.mjs /opt/phi/e4-lsp-startup-smoke.mjs
 COPY scripts/e4-rust-startup.mjs /opt/phi/e4-rust-startup.mjs
@@ -71,7 +73,7 @@ COPY scripts/e4-rust-diagnostic.mjs /opt/phi/e4-rust-diagnostic.mjs
 COPY scripts/e4-linker-capture.mjs /opt/phi/e4-linker-capture.mjs
 COPY scripts/e4-rust-linker-diagnostic.mjs /opt/phi/e4-rust-linker-diagnostic.mjs
 COPY scripts/e4-clangd-lsp-smoke.mjs /opt/phi/e4-clangd-lsp-smoke.mjs
-RUN mkdir -p /phi /evidence /run /tmp \
+RUN mkdir -p /phi /evidence /run /tmp /phi-cert-exec \
     && chmod -R a+rX /opt/phi \
     && test -z "$(find /phi -mindepth 1 -print -quit)"
 

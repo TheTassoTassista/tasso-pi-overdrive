@@ -30,14 +30,19 @@ test('E4 image is built from the pinned base and exact seed/LSP contexts with st
   assert.match(ignore, /^!scripts\/e4-linker-capture\.mjs$/mu);
   assert.match(ignore, /^!scripts\/e4-rust-linker-diagnostic\.mjs$/mu);
   assert.match(ignore, /^!scripts\/e4-executable-inventory\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-tier-contract\.mjs$/mu);
+  assert.match(ignore, /^!scripts\/e4-trusted-rust-smoke\.mjs$/mu);
   assert.match(ignore, /^!scripts\/e4-lsp-startup-smoke\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-rust-startup\.mjs \/opt\/phi\/e4-rust-startup\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-rust-diagnostic\.mjs \/opt\/phi\/e4-rust-diagnostic\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-linker-capture\.mjs \/opt\/phi\/e4-linker-capture\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-rust-linker-diagnostic\.mjs \/opt\/phi\/e4-rust-linker-diagnostic\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-executable-inventory\.mjs \/opt\/phi\/e4-executable-inventory\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-tier-contract\.mjs \/opt\/phi\/e4-tier-contract\.mjs$/mu);
+  assert.match(dockerfile, /^COPY scripts\/e4-trusted-rust-smoke\.mjs \/opt\/phi\/e4-trusted-rust-smoke\.mjs$/mu);
   assert.match(dockerfile, /^COPY scripts\/e4-lsp-startup-smoke\.mjs \/opt\/phi\/e4-lsp-startup-smoke\.mjs$/mu);
   assert.match(dockerfile, /mkdir -p \/phi \/evidence \/run \/tmp/u);
+  assert.match(dockerfile, /\/phi-cert-exec/u);
   assert.match(dockerfile, /USER 1001:1001/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/bin\/node", "\/opt\/phi\/e4-image-selfcheck\.mjs"\]/u);
   assert.doesNotMatch(dockerfile, /COPY \./u);
@@ -98,7 +103,7 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
 });
 
-test('E4 image qualification cannot launch preflight, default matrix or certification', () => {
+test('E4 image qualification runs separated tiers and only then may launch conditional preflight', () => {
   const workflow = read('.github/workflows/phi-foundation.yml');
   const dispatchInputs = workflow.split('    inputs:\n')[1]?.split('\npermissions:')[0] ?? '';
   assert.equal([...dispatchInputs.matchAll(/^      [A-Za-z0-9_-]+:$/gmu)].length, 25,
@@ -113,6 +118,13 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /Attest official LLVM 22\.1\.8 release asset metadata/u);
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
+  assert.match(job, /\/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777/u);
+  assert.match(job, /"\$E4_IMAGE_REF" --tier-a-image/u);
+  assert.match(job, /docker run --rm --name "phi-e4-trusted-rust-smoke-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
+  assert.match(job, /--tmpfs \/phi-cert-exec:rw,exec,nosuid,nodev,size=64m,mode=0700,uid=1001,gid=1001/u);
+  assert.match(job, /"\$E4_IMAGE_REF" --trusted-generated-smoke/u);
+  assert.match(job, /node scripts\/e4-verify-tier-receipts\.mjs/u);
+  assert.match(job, /digest: \$\{\{ steps\.publish\.outputs\.digest \}\}/u);
   assert.match(job, /--security-opt no-new-privileges/u);
   assert.match(job, /if test "\$E4_DIAGNOSTIC_MODE" = rust-linker; then/u);
   assert.match(job, /--entrypoint \/usr\/bin\/node "\$E4_IMAGE_REF" \/opt\/phi\/e4-rust-linker-diagnostic\.mjs/u);
@@ -134,6 +146,10 @@ test('E4 image qualification cannot launch preflight, default matrix or certific
   assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
   assert.match(job, /node scripts\/e4-owned-image-cleanup\.mjs/u);
   assert.doesNotMatch(job, /npm run check|phi-owned-main-suite|campaign3-e1-focused|campaign3-e2-focused|campaign3-e3-focused/u);
+  const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+  assert.match(preflight, /needs: e4-image-qualification/u);
+  assert.match(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
+  assert.match(preflight, /E4_CERTIFIED_IMAGE_DIGEST: \$\{\{ needs\.e4-image-qualification\.outputs\.digest \}\}/u);
   const ordinary = workflow.split('  native-foundation:\n')[1]?.split('\n')[0] ?? '';
   assert.match(ordinary, /!inputs\['e4-image-qualification-only'\]/u);
 });
