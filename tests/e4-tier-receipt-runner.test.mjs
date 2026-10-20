@@ -27,8 +27,10 @@ test('runner requires two complete same-candidate PASS receipts and Rust cleanup
   try {
     fs.writeFileSync(aPath, `E4_TIER_RECEIPT=${JSON.stringify(receipt('A'))}\nE4_IMAGE_TIER_A=PASS\n`);
     fs.writeFileSync(bPath, `E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS\nE4_TIER_RECEIPT=${JSON.stringify(receipt('B'))}\nE4_IMAGE_TIER_B=PASS\n`);
-    assert.equal(run().status, 0);
-    assert.match(run().stdout, /E4_CERTIFICATION_IMAGE_QUALIFIED=YES/u);
+    const valid = run();
+    assert.equal(valid.status, 0);
+    assert.match(valid.stdout, /E4_TIER_JOINT=PASS/u);
+    assert.doesNotMatch(valid.stdout, /E4_CERTIFICATION_IMAGE_QUALIFIED=YES/u);
     fs.writeFileSync(bPath, `E4_TIER_RECEIPT=${JSON.stringify(receipt('B'))}\nE4_IMAGE_TIER_B=PASS\n`);
     assert.notEqual(run().status, 0, 'missing cleanup cannot qualify');
     fs.writeFileSync(bPath, `E4_RUST_SMOKE_WORKSPACE_CLEANUP=PASS\nE4_TIER_RECEIPT=${JSON.stringify(receipt('B', 'FAIL'))}\nE4_IMAGE_TIER_B=PASS\n`);

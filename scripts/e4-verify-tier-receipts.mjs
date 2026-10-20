@@ -21,4 +21,4 @@ function receipt(file, tier) {
 const result = e4JointQualification(receipt(aPath, 'A'), receipt(bPath, 'B'));
 assert.equal(result.candidateSha, candidateSha);
 process.stdout.write(`E4_JOINT_QUALIFICATION=${JSON.stringify(result)}\n`);
-process.stdout.write('E4_CERTIFICATION_IMAGE_QUALIFIED=YES\n');
+process.stdout.write('E4_TIER_JOINT=PASS\n');

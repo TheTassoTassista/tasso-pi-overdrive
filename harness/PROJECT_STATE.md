@@ -1,5 +1,11 @@
 # Phi — Current Project State
 
+## 2026-10-20 — one post-export image qualification authorized, not dispatched
+
+Indexed current-stage audit exit0/WARN20/FAIL0/modelCalls0; scoped ZERO_EGRESS_REVIEW PASS. This supersedes the provisional pending note below.
+
+Main `E4-POST-EXPORT-QUALIFICATION-001` permits exactly one new native image qualification (0/1 before dispatch) on frozen product `d94c3474820dd4a0097b140969afb605cf641985` through a separately versioned workflow. The scoped local candidate binds source/tag/receipts/cleanup to d94, preserves Tier-A strict and Tier-B trusted-scratch security, observes export and requires authenticated published-digest readback. Preflight3 no longer starts automatically: all29 Preflight2 rows are still OPEN and require independent readiness assessment after image PASS. Historical CI39325461966 FAIL/CLOSED/exit143 cause UNKNOWN; CI39474339973 PASS/non-certifying export only. Preflight3/E4 budgets0/1, Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0. Local focused E4 73/73 and syntax/TypeScript/package/ShellCheck PASS; indexed ZERO_EGRESS/checkpoint still pending.
+
 ## 2026-10-20 — export-only native diagnostic complete; STOP/Main
 
 `E4-BUILDKIT-EXPORT-RECOVERY-001`'s sole non-certifying [CI39474339973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39474339973) on instrumentation SHA `19a2c535497112b357b9b2be65da2cee5984111c` and frozen product d94c347 **PASS**: native Buildx Docker-driver `--load` export exited0, local image identity `sha256:a5daa10f7f2cce04233417ff489f48742cc80289cce102d89e0683af787fc7c7`, evidence artifact ID12288588059, upload and owned cleanup PASS (processes0, named containers absent). No Tier A/B, qualified/published digest, Preflight3 or replacement E4. Historical CI39325461966 remains FAIL/CLOSED/exit143, actor/root cause UNKNOWN, cleanup UNVERIFIED. Consolidated1/1 and export-only1/1 consumed; Preflight3/E4 0/1. All29 Preflight2 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main must decide any new qualification authority; no autonomous retry/provider call/readiness change.

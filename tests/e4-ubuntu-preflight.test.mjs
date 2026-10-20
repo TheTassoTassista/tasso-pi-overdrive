@@ -12,10 +12,10 @@ const probe = readFileSync(new URL('../certification/e4-host-probe.sh', import.m
 const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
 const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
 
-test('Ubuntu preflight uses exact image and candidate, and may follow joint image qualification', () => {
+test('Ubuntu preflight requires separate dispatch after image qualification and readiness review', () => {
   assert.ok(preflight);
   assert.match(preflight, /needs: e4-image-qualification/u);
-  assert.match(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
+  assert.doesNotMatch(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
   assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['e4-image-qualification-only'\]/u);
   assert.match(preflight, /runs-on: ubuntu-24\.04/u);
   assert.match(preflight, /packages: read/u);

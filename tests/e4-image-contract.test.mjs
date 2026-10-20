@@ -103,7 +103,7 @@ test('E4 self-check reads live tool manifests, proves jiti resolution and fails 
   assert.doesNotMatch(source, /fetch\(|https?:\/\//u);
 });
 
-test('E4 image qualification runs separated tiers and only then may launch conditional preflight', () => {
+test('E4 image qualification freezes product separately from workflow and cannot auto-start preflight', () => {
   const workflow = read('.github/workflows/phi-foundation.yml');
   const dispatchInputs = workflow.split('    inputs:\n')[1]?.split('\npermissions:')[0] ?? '';
   assert.equal([...dispatchInputs.matchAll(/^      [A-Za-z0-9_-]+:$/gmu)].length, 25,
@@ -113,10 +113,16 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   assert.match(job, /inputs\['e4-image-qualification-only'\] && inputs\['e4-image-diagnostic-mode'\] != 'export-only'/u);
   assert.match(job, /runs-on: ubuntu-24\.04/u);
   assert.match(job, /packages: write/u);
-  assert.match(job, /node scripts\/e4-stage-seeds\.mjs/u);
-  assert.match(job, /node scripts\/e4-export-observe\.mjs --candidate "\$GITHUB_SHA" --context "\$GITHUB_WORKSPACE" --mode qualification/u);
+  assert.match(job, /E4_PRODUCT_SHA: \$\{\{ inputs\.certified_sha \}\}/u);
+  assert.match(job, /ref: \$\{\{ inputs\.certified_sha \}\}\n          path: product/u);
+  assert.match(job, /test "\$E4_PRODUCT_SHA" = d94c3474820dd4a0097b140969afb605cf641985/u);
+  assert.match(job, /test "\$\(git -C product rev-parse HEAD\)" = "\$E4_PRODUCT_SHA"/u);
+  assert.match(job, /\(cd product && node scripts\/e4-stage-seeds\.mjs\)/u);
+  assert.match(job, /node scripts\/e4-export-observe\.mjs --candidate "\$E4_PRODUCT_SHA" --context "\$GITHUB_WORKSPACE\/product" --mode qualification/u);
+  assert.match(job, /metadata_id=\$\(jq -r '\."containerimage\.digest"' "\$RUNNER_TEMP\/phi-e4-export-evidence\/buildx-metadata\.json"\)/u);
+  assert.match(job, /docker image inspect "\$E4_IMAGE_REF" --format '\{\{\.Id\}\}'\)" = "\$metadata_id"/u);
   assert.match(job, /Preserve bounded Buildx export evidence even on failure\n        if: always\(\)/u);
-  assert.match(job, /node scripts\/install-managed-lsp\.mjs --runtime "\$RUNNER_TEMP\/phi-e4-lsp" --check/u);
+  assert.match(job, /node product\/scripts\/install-managed-lsp\.mjs --runtime "\$RUNNER_TEMP\/phi-e4-lsp" --check/u);
   assert.match(job, /Attest official LLVM 22\.1\.8 release asset metadata/u);
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
   assert.match(job, /docker run --rm --name "phi-e4-image-selfcheck-\$GITHUB_RUN_ID" --network none --read-only --cap-drop ALL/u);
@@ -126,6 +132,7 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   assert.match(job, /--tmpfs \/phi-cert-exec:rw,exec,nosuid,nodev,size=64m,mode=0700,uid=1001,gid=1001/u);
   assert.match(job, /"\$E4_IMAGE_REF" --trusted-generated-smoke/u);
   assert.match(job, /node scripts\/e4-verify-tier-receipts\.mjs/u);
+  assert.match(job, /"\$RUNNER_TEMP\/phi-e4-tier-evidence\/tier-b\.log" "\$E4_PRODUCT_SHA"/u);
   assert.match(job, /digest: \$\{\{ steps\.publish\.outputs\.digest \}\}/u);
   assert.match(job, /--security-opt no-new-privileges/u);
   assert.match(job, /if test "\$E4_DIAGNOSTIC_MODE" = rust-linker; then/u);
@@ -144,6 +151,9 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   assert.match(job, /if-no-files-found: error/u);
   assert.match(job, /Publish only qualified image and record exact digest\n        if: \$\{\{ inputs\['e4-image-diagnostic-mode'\] == 'none' \}\}/u);
   assert.match(job, /test "\$package" = private/u);
+  assert.match(job, /docker buildx imagetools inspect --raw "\$digest"/u);
+  assert.match(job, /authenticatedReadback:"PASS"/u);
+  assert.match(job, /Preserve bounded publication evidence\n        if: always\(\)/u);
   assert.match(job, /if: always\(\)[\s\S]*E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0/u);
   assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
   assert.match(job, /node scripts\/e4-owned-image-cleanup\.mjs/u);
@@ -160,8 +170,8 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   assert.match(exportOnly, /E4_EXPORT_ONLY_CLEANUP=PASS/u);
   const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
   assert.match(preflight, /needs: e4-image-qualification/u);
-  assert.match(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
-  assert.match(preflight, /E4_CERTIFIED_IMAGE_DIGEST: \$\{\{ needs\.e4-image-qualification\.outputs\.digest \}\}/u);
+  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['e4-image-qualification-only'\]/u);
+  assert.doesNotMatch(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
   const ordinary = workflow.split('  native-foundation:\n')[1]?.split('\n')[0] ?? '';
   assert.match(ordinary, /!inputs\['e4-image-qualification-only'\]/u);
 });

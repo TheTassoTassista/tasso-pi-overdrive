@@ -1,5 +1,11 @@
 # Phi — Test Baseline
 
+## 2026-10-20 — frozen-source qualification pre-dispatch local baseline
+
+Indexed current-stage audit exit0/WARN20/FAIL0/modelCalls0 over726 blobs; scoped ZERO_EGRESS_REVIEW PASS. This supersedes the provisional pending note below.
+
+Focused `node --test tests/e4*.test.mjs`: **73 PASS / 0 FAIL / 0 skip** after separate product/workflow SHA, metadata identity, non-automatic Preflight3, tier-only marker and authenticated publication-readback regressions. Changed JS `node --check`, installed-Pi `npm run typecheck`, package validation and all 12 E4 workflow inline Bash syntax/ShellCheck blocks PASS. Frozen certification/config/product/LSP/E4 image scripts match d94; the already-accepted native export-only CI39474339973 remains non-certifying. Full host `npm run check` was not rerun: its two historical Rust-host failures are not relabeled. New image qualification0/1; Preflight3/E4 0/1. Native Tier A/B/publication currently NOT RUN; all29 rows OPEN, autonomy BLOCKED/false. Indexed audit/ZERO_EGRESS pending.
+
 ## 2026-10-20 — sole native export-only evidence
 
 [CI39474339973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39474339973)/job118806303817 attempt1 on instrumentation commit `19a2c535497112b357b9b2be65da2cee5984111c`, frozen product d94c347: seed/LSP/LLVM PASS, Buildx0.38.0/default Docker driver/`--load` build37/37 and export PASS, export phase308.3s, local image ID `sha256:a5daa10f7f2cce04233417ff489f48742cc80289cce102d89e0683af787fc7c7`. Bounded receipt SHA `fbf6a9cc2ffaa856bb8911401d64636335707f1f0fed222a5106b7ccf08b7ec3`; artifact ID12288588059 upload PASS. Finalizer PASS: tag/staging removed, Phi-owned processes0, named containers absent; cache unscoped. 33 samples show minimum free disk3,320,340,480B and MemAvailable365,924,352B; no cgroup metrics/historical-cause proof. Local focused73/73/syntax/TypeScript/package/ShellCheck/indexed ZERO_EGRESS remain PASS. Native diagnostic is non-certifying: Tier A/B and publication NOT RUN, no qualified digest. Historical CI39325461966 remains FAIL/CLOSED/exit143 cause UNKNOWN. Consolidated1/1, export-only1/1, Preflight3/E4 0/1; Windows autonomy BLOCKED/false.
