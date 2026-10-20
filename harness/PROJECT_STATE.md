@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-20 — export-only native diagnostic complete; STOP/Main
+
+`E4-BUILDKIT-EXPORT-RECOVERY-001`'s sole non-certifying [CI39474339973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39474339973) on instrumentation SHA `19a2c535497112b357b9b2be65da2cee5984111c` and frozen product d94c347 **PASS**: native Buildx Docker-driver `--load` export exited0, local image identity `sha256:a5daa10f7f2cce04233417ff489f48742cc80289cce102d89e0683af787fc7c7`, evidence artifact ID12288588059, upload and owned cleanup PASS (processes0, named containers absent). No Tier A/B, qualified/published digest, Preflight3 or replacement E4. Historical CI39325461966 remains FAIL/CLOSED/exit143, actor/root cause UNKNOWN, cleanup UNVERIFIED. Consolidated1/1 and export-only1/1 consumed; Preflight3/E4 0/1. All29 Preflight2 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main must decide any new qualification authority; no autonomous retry/provider call/readiness change.
+
 ## 2026-10-20 — BuildKit export recovery local candidate
 
 `E4-BUILDKIT-EXPORT-RECOVERY-001` authorizes only bounded workflow observability, owned failure cleanup and one non-certifying export-only native diagnostic if historical cause stays UNKNOWN. Same CI39325461966 is FAIL/CLOSED, actor/cause UNKNOWN, cleanup unverified; consolidated1/1 spent. Frozen d94c347 image build inputs and `--load` export remain unchanged. Local candidate records bounded telemetry/receipt and verifies ownership before tag deletion; the separate diagnostic job cannot publish or execute Tier A/B. Export diagnostic0/1, Preflight3/E4 0/1. All29 historical rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider or readiness change.

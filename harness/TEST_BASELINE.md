@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-20 — sole native export-only evidence
+
+[CI39474339973](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39474339973)/job118806303817 attempt1 on instrumentation commit `19a2c535497112b357b9b2be65da2cee5984111c`, frozen product d94c347: seed/LSP/LLVM PASS, Buildx0.38.0/default Docker driver/`--load` build37/37 and export PASS, export phase308.3s, local image ID `sha256:a5daa10f7f2cce04233417ff489f48742cc80289cce102d89e0683af787fc7c7`. Bounded receipt SHA `fbf6a9cc2ffaa856bb8911401d64636335707f1f0fed222a5106b7ccf08b7ec3`; artifact ID12288588059 upload PASS. Finalizer PASS: tag/staging removed, Phi-owned processes0, named containers absent; cache unscoped. 33 samples show minimum free disk3,320,340,480B and MemAvailable365,924,352B; no cgroup metrics/historical-cause proof. Local focused73/73/syntax/TypeScript/package/ShellCheck/indexed ZERO_EGRESS remain PASS. Native diagnostic is non-certifying: Tier A/B and publication NOT RUN, no qualified digest. Historical CI39325461966 remains FAIL/CLOSED/exit143 cause UNKNOWN. Consolidated1/1, export-only1/1, Preflight3/E4 0/1; Windows autonomy BLOCKED/false.
+
 ## 2026-10-20 — BuildKit export observer local baseline
 
 Focused E4 export/image/cleanup tests PASS, including exact frozen Buildx argument contract, numeric143-versus-signal UNKNOWN, missing telemetry as null, fake-Docker export failure/success, redaction, owned stage/tag cleanup and pre-existing tag non-deletion. All E4 tests **73/73 PASS**, modified JS syntax, installed-Pi TypeScript, package validation and all 10 E4 workflow inline Bash/ShellCheck blocks PASS. Indexed audit exit0/WARN20/FAIL0/modelCalls0 over726 staged blobs; scoped ZERO_EGRESS PASS. This is local only: no new native export run, Tier A/B, image qualification, Preflight3 or E4. Historical host `npm run check` retains two Rust-dependent failures and is not relabeled. Consolidated1/1, export-only0/1, Preflight3/E4 0/1.
