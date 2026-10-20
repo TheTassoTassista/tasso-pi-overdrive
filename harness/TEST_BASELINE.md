@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-19 — consolidated E4 native gate on d94c347
+
+[CI39325461966](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39325461966)/job118310028561 attempt1 FAIL: seed, LSP and LLVM metadata steps PASS; Docker build 37/37 PASS, `#47 exporting layers` exit143 after 4m38s, exact cause UNKNOWN. No Tier-A/Tier-B runtime tests or receipts, no artifact, no qualified image/digest. Evidence upload and owned cleanup steps SKIPPED; residual counts UNKNOWN. Preflight3 SKIPPED, replacement E4 NOT RUN. Local E4 67/67 and separate syntax/TypeScript/package/ShellCheck remain PASS, but full host `npm run check` retains the two documented Rust-host failures. Consolidated1/1 spent; no retry authorized.
+
 ## 2026-10-19 — E4 trusted executable scratch local baseline
 
 E4-focused `node --test tests/e4*.test.mjs`: **67 PASS / 0 FAIL / 0 skip**. Covers Tier-A noexec/no-scratch, Tier-B effective tmpfs size/flags/owner/mode negatives, host-bind rejection, nested-userns denial, 38+14+12 check ownership, receipt tamper/incomplete rejection, runner cleanup marker and owned-stage cleanup. Changed JS/Bash syntax, all package syntax tasks, TypeScript, package validation and relevant ShellCheck PASS. Indexed staged audit WARN20/FAIL0/modelCalls0 over724 blobs; ZERO_EGRESS review PASS. Full host `npm run check`: **FAIL at tests, 1159 total / 819 PASS / 2 known Rust-host FAIL / 338 skip**; tests are edit corpus Rust syntax and rust-analyzer semantic navigation, with local rustc absent. Subsequent syntax/TypeScript/package stages were run separately and passed. Local Docker daemon access denied, so actual Tier-B scratch/exec is NOT_NATIVE_VERIFIED. Consolidated image+Preflight3 and replacement E4 NOT RUN; all29 historical Preflight2 entries OPEN.

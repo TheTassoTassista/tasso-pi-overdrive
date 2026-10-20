@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-19 — E4 consolidated native gate STOP / Main
+
+The sole authorized [CI39325461966](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39325461966) on functional `d94c3474820dd4a0097b140969afb605cf641985` failed during Docker image layer export (exit143, cause UNKNOWN) after the signed seeds, managed LSP, LLVM provenance and build stage37/37 passed. Neither Tier-A nor Tier-B runtime check ran; no receipt, published image or digest. Actions skipped evidence upload and owned cleanup, leaving residual ownership UNKNOWN. Preflight3 skipped and replacement E4 not run. Consolidated1/1 consumed, Preflight3 0/1, E4 0/1; all29 historical rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider calls or readiness change. Main disposition required before another native gate.
+
 ## 2026-10-19 — E4 trusted scratch local candidate, native gate pending
 
 `E4-TRUSTED-EXECUTABLE-SCRATCH-001` permits only a controller-owned, one-smoke executable tmpfs for Tier-B image qualification. Tier A retains `/tmp noexec` and no scratch; exact same-image Tier B verifies effective scratch flags/owner/mode, frozen Rust input/seed identity, bounded compile+execution and cleanup. Joint A∧B receipts gate image publication; Preflight3 is conditional on complete image-job success and exact digest/candidate. Local E4 67/67 PASS and syntax/TypeScript/package/ShellCheck PASS; full host check has the same two environmental Rust failures, not a green gate. Native scratch is NOT_NATIVE_VERIFIED. Consolidated0/1, Preflight3 0/1, replacement E4 0/1; all29 historical rows OPEN. Windows autonomy remains BLOCKED/false and portability NOT CERTIFIED; no product authority/provider/readiness change.
