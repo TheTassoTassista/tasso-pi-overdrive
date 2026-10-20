@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-20 — native E4 image qualification PASS; Preflight3 readiness NOT_READY
+
+Sole [CI39479889427](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39479889427) on workflow `a549d538783172fd7714771ddc063885db146b95` and frozen d94c347 product completed native export, Tier A (64 mandatory inventory PASS), Tier B trusted Rust compile/execute and exact cleanup, private publication and authenticated OCI readback. Qualified digest: `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2`. Artifacts and finalizer PASS; owned processes/containers0. New image qualification1/1 consumed. The 29 historical Preflight2 rows remain individually OPEN (20 NOT_RUN focused), so independent Preflight3 readiness FAIL/NOT_READY; Preflight3 0/1 and replacement E4 0/1 SKIPPED/BLOCKED. Historical CI39325461966 cause UNKNOWN; no retroactive claim. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main disposition required; no retry/provider call/readiness promotion.
+
 ## 2026-10-20 — one post-export image qualification authorized, not dispatched
 
 Indexed current-stage audit exit0/WARN20/FAIL0/modelCalls0; scoped ZERO_EGRESS_REVIEW PASS. This supersedes the provisional pending note below.

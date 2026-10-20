@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-20 — sole native E4 post-export qualification
+
+[CI39479889427](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39479889427)/job118825392569 attempt1 SUCCESS on workflow `a549d538783172fd7714771ddc063885db146b95`/frozen product d94c347. Stage/attest seeds, managed LSP and LLVM PASS; Buildx0.38.0/Docker28.0.4/default Docker driver/`--load` exit0, local image and metadata ID `sha256:7ab3a2b2a60348e29ef53b555555285eed19e3bee951bbd7007af68f89f7c141`. Tier A PASS 4 owning checks+64/64 tool/asset/dependent inventory; Tier B PASS exact 64MiB `rw,exec,nosuid,nodev` scratch, compile0/execute0/workspace cleanup. Downloaded logs independently pass current joint receipt verifier. Private OCI digest `ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2`, authenticated manifest readback PASS and manifest SHA matches digest. Artifacts Tier12292485081/export12292345268/publication12292305836 uploaded; finalizer PASS, local tag/staging removed, owned containers/processes0. Local focused73/73, syntax/TypeScript/package, 12 inline Bash/ShellCheck and indexed ZERO_EGRESS PASS remain distinct. Full host `npm run check` **not rerun**; two historical Rust-host failures remain FAIL. Preflight3 SKIPPED/0/1 because all29 historical rows still OPEN; E4 replacement SKIPPED/0/1. Image qualification1/1 consumed; autonomy BLOCKED/false.
+
 ## 2026-10-20 — frozen-source qualification pre-dispatch local baseline
 
 Indexed current-stage audit exit0/WARN20/FAIL0/modelCalls0 over726 blobs; scoped ZERO_EGRESS_REVIEW PASS. This supersedes the provisional pending note below.
