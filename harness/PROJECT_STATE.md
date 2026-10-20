@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-20 — BuildKit export recovery local candidate
+
+`E4-BUILDKIT-EXPORT-RECOVERY-001` authorizes only bounded workflow observability, owned failure cleanup and one non-certifying export-only native diagnostic if historical cause stays UNKNOWN. Same CI39325461966 is FAIL/CLOSED, actor/cause UNKNOWN, cleanup unverified; consolidated1/1 spent. Frozen d94c347 image build inputs and `--load` export remain unchanged. Local candidate records bounded telemetry/receipt and verifies ownership before tag deletion; the separate diagnostic job cannot publish or execute Tier A/B. Export diagnostic0/1, Preflight3/E4 0/1. All29 historical rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider or readiness change.
+
 ## 2026-10-19 — E4 consolidated native gate STOP / Main
 
 The sole authorized [CI39325461966](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39325461966) on functional `d94c3474820dd4a0097b140969afb605cf641985` failed during Docker image layer export (exit143, cause UNKNOWN) after the signed seeds, managed LSP, LLVM provenance and build stage37/37 passed. Neither Tier-A nor Tier-B runtime check ran; no receipt, published image or digest. Actions skipped evidence upload and owned cleanup, leaving residual ownership UNKNOWN. Preflight3 skipped and replacement E4 not run. Consolidated1/1 consumed, Preflight3 0/1, E4 0/1; all29 historical rows OPEN. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. No provider calls or readiness change. Main disposition required before another native gate.

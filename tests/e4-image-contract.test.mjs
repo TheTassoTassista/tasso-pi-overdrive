@@ -108,12 +108,14 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   const dispatchInputs = workflow.split('    inputs:\n')[1]?.split('\npermissions:')[0] ?? '';
   assert.equal([...dispatchInputs.matchAll(/^      [A-Za-z0-9_-]+:$/gmu)].length, 25,
     'workflow_dispatch must stay within the GitHub input ceiling');
-  const job = workflow.split('  e4-image-qualification:\n')[1]?.split('  e4-ubuntu-preflight:\n')[0];
+  const job = workflow.split('  e4-image-qualification:\n')[1]?.split('  e4-export-only-diagnostic:\n')[0];
   assert.ok(job);
-  assert.match(job, /inputs\['e4-image-qualification-only'\] && !inputs\['e4-host-feasibility-only'\] && !inputs\['campaign3-e4-certification'\] && !inputs\['e4-ubuntu-preflight-only'\]/u);
+  assert.match(job, /inputs\['e4-image-qualification-only'\] && inputs\['e4-image-diagnostic-mode'\] != 'export-only'/u);
   assert.match(job, /runs-on: ubuntu-24\.04/u);
   assert.match(job, /packages: write/u);
   assert.match(job, /node scripts\/e4-stage-seeds\.mjs/u);
+  assert.match(job, /node scripts\/e4-export-observe\.mjs --candidate "\$GITHUB_SHA" --context "\$GITHUB_WORKSPACE" --mode qualification/u);
+  assert.match(job, /Preserve bounded Buildx export evidence even on failure\n        if: always\(\)/u);
   assert.match(job, /node scripts\/install-managed-lsp\.mjs --runtime "\$RUNNER_TEMP\/phi-e4-lsp" --check/u);
   assert.match(job, /Attest official LLVM 22\.1\.8 release asset metadata/u);
   assert.match(job, /449438700\\t1938859476\\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384/u);
@@ -146,6 +148,16 @@ test('E4 image qualification runs separated tiers and only then may launch condi
   assert.match(job, /E4_IMAGE_LOCAL_TAG_STATE=REMOVED/u);
   assert.match(job, /node scripts\/e4-owned-image-cleanup\.mjs/u);
   assert.doesNotMatch(job, /npm run check|phi-owned-main-suite|campaign3-e1-focused|campaign3-e2-focused|campaign3-e3-focused/u);
+  const exportOnly = workflow.split('  e4-export-only-diagnostic:\n')[1]?.split('  e4-ubuntu-preflight:\n')[0];
+  assert.ok(exportOnly);
+  assert.match(exportOnly, /inputs\['e4-image-diagnostic-mode'\] == 'export-only'/u);
+  assert.match(exportOnly, /permissions:\n      contents: read/u);
+  assert.doesNotMatch(exportOnly, /packages: write|docker push|--tier-a-image|--trusted-generated-smoke|e4-verify-tier-receipts/u);
+  assert.match(exportOnly, /ref: d94c3474820dd4a0097b140969afb605cf641985/u);
+  assert.match(exportOnly, /--candidate d94c3474820dd4a0097b140969afb605cf641985 --context "\$GITHUB_WORKSPACE\/product" --mode diagnostic/u);
+  assert.match(exportOnly, /Upload bounded export receipt on failure or success\n        if: always\(\)/u);
+  assert.match(exportOnly, /Verify exact diagnostic-owned cleanup\n        if: always\(\)/u);
+  assert.match(exportOnly, /E4_EXPORT_ONLY_CLEANUP=PASS/u);
   const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
   assert.match(preflight, /needs: e4-image-qualification/u);
   assert.match(preflight, /needs\.e4-image-qualification\.result == 'success'/u);

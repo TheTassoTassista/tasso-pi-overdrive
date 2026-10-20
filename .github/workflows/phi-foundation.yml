@@ -101,7 +101,7 @@ on:
       e4-image-diagnostic-mode:
         description: With E4 image gate selected, capture one bounded non-certifying diagnostic; never publish
         type: choice
-        options: [none, rust-linker, complete-executable-inventory, rust-execve]
+        options: [none, rust-linker, complete-executable-inventory, rust-execve, export-only]
         default: none
       e4-ubuntu-preflight-only:
         description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
@@ -121,7 +121,7 @@ jobs:
       - name: Prove host Bubblewrap isolation over pinned representative rootfs
         run: bash scripts/e4-host-feasibility.sh docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
   e4-image-qualification:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-ubuntu-preflight-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && inputs['e4-image-diagnostic-mode'] != 'export-only' && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-ubuntu-preflight-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
@@ -162,11 +162,7 @@ jobs:
           E4_DIAGNOSTIC_MODE: ${{ inputs['e4-image-diagnostic-mode'] }}
         run: |
           set -o pipefail
-          docker buildx build --file certification/Dockerfile.e4 \
-            --build-arg "PRODUCT_CANDIDATE_SHA=$GITHUB_SHA" \
-            --build-context "seeds=$RUNNER_TEMP/phi-e4-seeds" \
-            --build-context "lsp=$RUNNER_TEMP/phi-e4-lsp/managed" \
-            --load --tag "$E4_IMAGE_REF" .
+          node scripts/e4-export-observe.mjs --candidate "$GITHUB_SHA" --context "$GITHUB_WORKSPACE" --mode qualification
           test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
           printf 'E4_SEED_MANIFEST_SHA256=%s\n' "$(sha256sum config/e4-toolchain-seeds.json | awk '{print $1}')"
           printf 'E4_APPARMOR_PROFILE_SHA256=%s\n' "$(sha256sum certification/apparmor/phi-e4-bwrap.profile | awk '{print $1}')"
@@ -243,6 +239,17 @@ jobs:
           path: ${{ runner.temp }}/phi-e4-tier-evidence/*.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Preserve bounded Buildx export evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
+        with:
+          name: e4-export-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/phi-e4-export-evidence/export-receipt.json
+            ${{ runner.temp }}/phi-e4-export-evidence/buildx-metadata.json
+            ${{ runner.temp }}/phi-e4-export-evidence/ownership.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload bounded linker-detail evidence only
         if: ${{ always() && inputs['e4-image-diagnostic-mode'] == 'rust-linker' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
@@ -294,11 +301,98 @@ jobs:
             test -z "$(docker ps -aq --filter "name=^/$container$")"
           done
           printf 'E4_IMAGE_RESIDUAL_OWNED_CONTAINERS=0\n'
-          if docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then docker image rm "$E4_IMAGE_REF" >/dev/null; fi
+          owner="$RUNNER_TEMP/phi-e4-export-evidence/ownership.json"
+          if test -f "$owner"; then
+            test "$(jq -r .runId "$owner")" = "$GITHUB_RUN_ID"
+            test "$(jq -r .candidate "$owner")" = "$GITHUB_SHA"
+            test "$(jq -r .imageRef "$owner")" = "$E4_IMAGE_REF"
+            test "$(jq -r .preexistingTag "$owner")" = false
+            if docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then
+              test "$(docker image inspect "$E4_IMAGE_REF" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$GITHUB_SHA"
+              docker image rm "$E4_IMAGE_REF" >/dev/null
+            fi
+          elif docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then
+            echo 'E4_IMAGE_LOCAL_TAG_STATE=UNVERIFIED_OWNER' >&2
+            exit 1
+          fi
           if docker image inspect "$E4_IMAGE_REF" >/dev/null 2>&1; then echo 'E4_IMAGE_LOCAL_TAG_STATE=FAIL' >&2; exit 1; fi
           printf 'E4_IMAGE_LOCAL_TAG_STATE=REMOVED\n'
           node scripts/e4-owned-image-cleanup.mjs
           printf 'E4_IMAGE_BUILD_TEMP_STATE=RUNNER_DOCKER_CACHE_UNSCOPED\n'
+  e4-export-only-diagnostic:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && inputs['e4-image-diagnostic-mode'] == 'export-only' && !inputs['e4-host-feasibility-only'] && !inputs['e4-ubuntu-preflight-only'] && !inputs['campaign3-e4-certification']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: d94c3474820dd4a0097b140969afb605cf641985
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4, immutable
+        with:
+          node-version: '22.23.2'
+      - name: Attest frozen product and stage exact signed seeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git -C product rev-parse HEAD)" = d94c3474820dd4a0097b140969afb605cf641985
+          test -z "$(git -C product status --porcelain)"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libarchive-tools
+          (cd product && node scripts/e4-stage-seeds.mjs)
+          test -x "$RUNNER_TEMP/phi-e4-seeds/usr/bin/git"
+      - name: Stage and check frozen managed LSP
+        run: |
+          node product/scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp"
+          node product/scripts/install-managed-lsp.mjs --runtime "$RUNNER_TEMP/phi-e4-lsp" --check
+      - name: Attest frozen LLVM release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          identity=$(gh api repos/llvm/llvm-project/releases/tags/llvmorg-22.1.8 --jq '.assets[] | select(.name == "LLVM-22.1.8-Linux-X64.tar.xz") | [.id, .size, .digest] | @tsv')
+          test "$identity" = $'449438700\t1938859476\tsha256:df0e1ecf16caf3489a272a5eea4eec9b0d82878f6477fa309504f918a0006384'
+      - name: Export frozen image once without qualification or publication
+        run: node scripts/e4-export-observe.mjs --candidate d94c3474820dd4a0097b140969afb605cf641985 --context "$GITHUB_WORKSPACE/product" --mode diagnostic
+      - name: Upload bounded export receipt on failure or success
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
+        with:
+          name: e4-export-only-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/phi-e4-export-evidence/export-receipt.json
+            ${{ runner.temp }}/phi-e4-export-evidence/buildx-metadata.json
+            ${{ runner.temp }}/phi-e4-export-evidence/ownership.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Verify exact diagnostic-owned cleanup
+        if: always()
+        run: |
+          docker info >/dev/null
+          image=ghcr.io/thetassotassista/tasso-pi-overdrive-e4:d94c3474820dd4a0097b140969afb605cf641985
+          owner="$RUNNER_TEMP/phi-e4-export-evidence/ownership.json"
+          if test -f "$owner"; then
+            test "$(jq -r .runId "$owner")" = "$GITHUB_RUN_ID"
+            test "$(jq -r .candidate "$owner")" = d94c3474820dd4a0097b140969afb605cf641985
+            test "$(jq -r .imageRef "$owner")" = "$image"
+            test "$(jq -r .preexistingTag "$owner")" = false
+            if docker image inspect "$image" >/dev/null 2>&1; then
+              test "$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = d94c3474820dd4a0097b140969afb605cf641985
+              docker image rm "$image" >/dev/null
+            fi
+          elif docker image inspect "$image" >/dev/null 2>&1; then
+            echo 'E4_EXPORT_ONLY_CLEANUP=UNVERIFIED reason=missing_owner_record' >&2
+            exit 1
+          fi
+          test -z "$(docker ps -aq --filter "name=^/phi-e4-image-selfcheck-$GITHUB_RUN_ID$" --filter "name=^/phi-e4-trusted-rust-smoke-$GITHUB_RUN_ID$")"
+          node scripts/e4-owned-image-cleanup.mjs
+          test -z "$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null)"
+          printf 'E4_EXPORT_ONLY_CLEANUP=PASS\n'
   e4-ubuntu-preflight:
     needs: e4-image-qualification
     if: always() && github.event_name == 'workflow_dispatch' && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && ((inputs['e4-ubuntu-preflight-only'] && !inputs['e4-image-qualification-only']) || (inputs['e4-image-qualification-only'] && !inputs['e4-ubuntu-preflight-only'] && inputs['e4-image-diagnostic-mode'] == 'none' && needs.e4-image-qualification.result == 'success'))

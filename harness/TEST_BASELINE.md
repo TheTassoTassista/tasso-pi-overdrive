@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-20 — BuildKit export observer local baseline
+
+Focused E4 export/image/cleanup tests PASS, including exact frozen Buildx argument contract, numeric143-versus-signal UNKNOWN, missing telemetry as null, fake-Docker export failure/success, redaction, owned stage/tag cleanup and pre-existing tag non-deletion. All E4 tests **73/73 PASS**, modified JS syntax, installed-Pi TypeScript, package validation and all 10 E4 workflow inline Bash/ShellCheck blocks PASS. Indexed audit exit0/WARN20/FAIL0/modelCalls0 over726 staged blobs; scoped ZERO_EGRESS PASS. This is local only: no new native export run, Tier A/B, image qualification, Preflight3 or E4. Historical host `npm run check` retains two Rust-dependent failures and is not relabeled. Consolidated1/1, export-only0/1, Preflight3/E4 0/1.
+
 ## 2026-10-19 — consolidated E4 native gate on d94c347
 
 [CI39325461966](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39325461966)/job118310028561 attempt1 FAIL: seed, LSP and LLVM metadata steps PASS; Docker build 37/37 PASS, `#47 exporting layers` exit143 after 4m38s, exact cause UNKNOWN. No Tier-A/Tier-B runtime tests or receipts, no artifact, no qualified image/digest. Evidence upload and owned cleanup steps SKIPPED; residual counts UNKNOWN. Preflight3 SKIPPED, replacement E4 NOT RUN. Local E4 67/67 and separate syntax/TypeScript/package/ShellCheck remain PASS, but full host `npm run check` retains the two documented Rust-host failures. Consolidated1/1 spent; no retry authorized.
