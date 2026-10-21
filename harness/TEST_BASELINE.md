@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-21 — sole replacement native Preflight3 CI39633619005
+
+Job119338102695 on harness `7cddfe2`, frozen d94c347 and unchanged qualified image: host/image/Tier-B PASS, Node26 full test discovery **1159 total / 821 PASS / 0 FAIL / 338 baseline skip**. The nine historical reporter failures did not recur. `npm run check` FAIL after test phase at missing fixture `runtime/lsp/node_modules/.bin/tsc`; no full TAP/per-ID post-check, Linux regression or indexed audit. Cleanup FAIL at `DIRECTORY_CENSUS` on unreadable `rootfs/run/systemd/dissect-root`; owned processes0/containers0, staging absence UNVERIFIED. Overall Preflight3 FAIL/CLOSED, no native acceptance; replacement E4 not run.
+
 ## 2026-10-21 — Preflight3 recovery local validation, not native acceptance
 
 Cached Node26.8.2 executes reporter/gate/ledger focus: 20 tests, 17 PASS, 0 FAIL, 3 existing Windows-only skip. E4 preflight/owned cleanup focus: 12 PASS, 0 FAIL. Complete local `npm run check` and full explicit-TAP suite each execute 1172 tests with 832 PASS, 2 FAIL (same historical absent-rustc/cargo corpus and rust-analyzer cases), 338 pre-existing platform skips; not a green full gate. All syntax scripts, installed-Pi TypeScript, package validation and scoped Bash/ShellCheck pass. Native frozen-product test count, historical 29-ID post-check verifier, Linux regression, indexed audit and full cleanup remain pending the one replacement Preflight3. Historical CI39626491649 stays FAIL/CLOSED.

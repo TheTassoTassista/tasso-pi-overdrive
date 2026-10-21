@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-21 — replacement Preflight3 FAIL/CLOSED; Main STOP
+
+Only replacement [CI39633619005](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39633619005) on harness `7cddfe2`/frozen d94c347/qualified OCI digest passed host/image/Tier-B and all 1159 native tests (821 PASS, 0 FAIL, 338 baseline skip), proving the nine reporter collisions did not recur. `npm run check` then failed because the disposable fixture lacks `.bin/tsc`; no complete gate acceptance. Cleanup also failed closed on an unreadable `rootfs/run/systemd/dissect-root`; owned processes0/containers0 but stage removal UNVERIFIED. Replacement Preflight3 1/1 FAIL/CLOSED; E4 0/1 NOT RUN; historical 29 acceptance rows OPEN. No further patch/retry under current authority. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## 2026-10-21 — Preflight3 recovery candidate, not native acceptance
 
 Main `E4-PREFLIGHT3-REPORTER-CLEANUP-RECOVERY-001` authorizes reporter-orchestration and owned-cleanup correction only. Local Node26 focused reporter tests and E4 cleanup tests PASS; full local suite has only the two pre-existing missing-Rust host failures. Nine historical failures are individually reconciled and cleanup mechanism locally reproduced; exact historical CA mode remains LIKELY. Product d94c347, qualified OCI digest and Tier A/B stay frozen. Replacement Preflight3 0/1, E4 0/1 conditional; neither has run. Windows autonomy BLOCKED/false and portability NOT CERTIFIED. Historical CI39626491649 remains FAIL/CLOSED.
