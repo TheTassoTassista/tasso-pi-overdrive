@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-21 — native Preflight3 CI39626491649, FAIL/CLOSED
+
+Frozen product d94c347 with qualified OCI digest: host/image/toolchain/Tier-B checks PASS. Full `npm run check`: 1159 total, 812 PASS, 9 FAIL, 338 skip; first failed test ordinal50 (`clone-runtime-reporter`), later explicit `ERR_INVALID_ARG_VALUE` from inherited TAP reporter plus nested reporter, and `FAILURE_LEDGER_INCOMPLETE` in ledger tests. All29 exact historical target assertions and separate Rust edit corpus PASS unskipped in the native TAP; post-check per-ID verifier was not reached due full-check failure. Linux owned regression/indexed audit not reached. Cleanup FAIL (`Permission denied` on rootfs CA files), residual owned processes0, containers UNKNOWN. Preflight3 1/1 spent; replacement E4 0/1. No native acceptance PASS claimed.
+
 ## 2026-10-21 — Preflight3 local readiness evidence, not native acceptance
 
 Direct local historical-file checks: 29 original target assertions executed, 28 PASS/1 FAIL (row16 rust-analyzer definition count0), target skip0; three unrelated Windows-only tests skip on Linux. Separate Rust edit-corpus test FAIL with `syntax:UNAVAILABLE`; current host lacks rustc/cargo. Earlier exact-toolchain disposable focused tests passed both distinct Rust cases, while native semantic proof remains pending. E4-focused tests 74/74 PASS including fail-closed 29-row TAP checker; changed JS/Bash syntax, installed-Pi TypeScript, package validation and ShellCheck PASS. The prior qualified image CI39479889427 remains PASS without rerun. Indexed/ZERO_EGRESS and one Preflight3 0/1 remain pending; no full host `npm run check` is claimed green.
