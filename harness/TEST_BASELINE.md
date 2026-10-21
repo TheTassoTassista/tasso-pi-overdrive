@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-21 — Preflight3 recovery local validation, not native acceptance
+
+Cached Node26.8.2 executes reporter/gate/ledger focus: 20 tests, 17 PASS, 0 FAIL, 3 existing Windows-only skip. E4 preflight/owned cleanup focus: 12 PASS, 0 FAIL. Complete local `npm run check` and full explicit-TAP suite each execute 1172 tests with 832 PASS, 2 FAIL (same historical absent-rustc/cargo corpus and rust-analyzer cases), 338 pre-existing platform skips; not a green full gate. All syntax scripts, installed-Pi TypeScript, package validation and scoped Bash/ShellCheck pass. Native frozen-product test count, historical 29-ID post-check verifier, Linux regression, indexed audit and full cleanup remain pending the one replacement Preflight3. Historical CI39626491649 stays FAIL/CLOSED.
+
 ## 2026-10-21 — native Preflight3 CI39626491649, FAIL/CLOSED
 
 Frozen product d94c347 with qualified OCI digest: host/image/toolchain/Tier-B checks PASS. Full `npm run check`: 1159 total, 812 PASS, 9 FAIL, 338 skip; first failed test ordinal50 (`clone-runtime-reporter`), later explicit `ERR_INVALID_ARG_VALUE` from inherited TAP reporter plus nested reporter, and `FAILURE_LEDGER_INCOMPLETE` in ledger tests. All29 exact historical target assertions and separate Rust edit corpus PASS unskipped in the native TAP; post-check per-ID verifier was not reached due full-check failure. Linux owned regression/indexed audit not reached. Cleanup FAIL (`Permission denied` on rootfs CA files), residual owned processes0, containers UNKNOWN. Preflight3 1/1 spent; replacement E4 0/1. No native acceptance PASS claimed.

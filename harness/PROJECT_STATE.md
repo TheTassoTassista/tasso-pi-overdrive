@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-21 — Preflight3 recovery candidate, not native acceptance
+
+Main `E4-PREFLIGHT3-REPORTER-CLEANUP-RECOVERY-001` authorizes reporter-orchestration and owned-cleanup correction only. Local Node26 focused reporter tests and E4 cleanup tests PASS; full local suite has only the two pre-existing missing-Rust host failures. Nine historical failures are individually reconciled and cleanup mechanism locally reproduced; exact historical CA mode remains LIKELY. Product d94c347, qualified OCI digest and Tier A/B stay frozen. Replacement Preflight3 0/1, E4 0/1 conditional; neither has run. Windows autonomy BLOCKED/false and portability NOT CERTIFIED. Historical CI39626491649 remains FAIL/CLOSED.
+
 ## 2026-10-21 — sole Preflight3 FAIL/CLOSED; STOP Main
 
 CI39626491649 on workflow `f236f6b`/frozen d94c347/qualified OCI digest ran the native host/image/Tier-B prechecks successfully. Full `npm run check` failed 9 of 1159 tests: first failure was reporter ordinal50; explicit nested reporter collided with inherited TAP `NODE_OPTIONS`, and failure-ledger checks subsequently failed. All29 historical target assertions plus the separate Rust syntax test were unskipped PASS in the native TAP, but per-ID post-check validation was not reached and historical acceptance remains OPEN. Cleanup independently FAIL on owned rootfs CA-file permissions; owned processes0, containers UNKNOWN. Preflight3 1/1 consumed FAIL/CLOSED; replacement E4 0/1 not run. No retry, product/image/security modification or provider call. Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Main disposition required.

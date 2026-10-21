@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -13,6 +14,7 @@ const probe = readFileSync(new URL('../certification/e4-host-probe.sh', import.m
 const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
 const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
 const qualifiedImage = 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2';
+const frozenProduct = 'd94c3474820dd4a0097b140969afb605cf641985';
 
 test('Ubuntu preflight requires separate dispatch after image qualification and readiness review', () => {
   assert.ok(preflight);
@@ -67,7 +69,11 @@ test('host preflight retains frozen Bubblewrap policy and isolates every validat
   assert.match(script, /run_validation 'node scripts\/phi-repository-audit\.mjs'/u);
   assert.match(script, /E4_PREFLIGHT_CLEANUP=%s/u);
   assert.match(script, /E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=%s/u);
-  assert.match(script, /rm -rf -- "\$stage" \|\| cleanup_ok=0/u);
+  assert.match(script, /if docker info >\/dev\/null 2>&1; then[\s\S]*container_residual=0[\s\S]*docker container inspect "\$container_id"/u);
+  assert.match(script, /process_residual=UNKNOWN container_residual=UNKNOWN/u);
+  assert.match(script, /trap cleanup EXIT/u);
+  assert.match(script, /if \[\[ "\$original" != 0 \|\| "\$cleanup_ok" != 1 \|\| "\$preflight_passed" != 1 \]\]; then/u);
+  assert.match(script, /bash "\$cleanup_source" "\$stage" "\$expected_temp" \|\| cleanup_ok=0/u);
   assert.match(script, /assert_no_owned\(\)/u);
   assert.equal((script.match(/^assert_no_owned$/gmu) ?? []).length, 6, 'every payload phase must drain before the next');
   assert.doesNotMatch(script, /sudo (?:-n )?"?\$?expected_bwrap|sudo (?:-n )?bwrap|--privileged|seccomp=unconfined|--share-net|GITHUB_TOKEN|GH_TOKEN|https?:\/\//u);
@@ -118,11 +124,68 @@ test('trusted Tier B removes only nested-userns denial and attests canonical fix
   assert.match(script, /compiler_target="\$stage\/fixture\/project\/runtime\/lsp\/node_modules\/typescript\/lib\/typescript\.js"/u);
   assert.match(script, /stat -c %h "\$compiler_target"\) == 1/u);
   assert.match(script, /cp -a -- "\$stage\/rootfs\/opt\/phi\/runtime\/dap\/python\/debugpy"/u);
-  assert.match(script, /--setenv NODE_OPTIONS --test-reporter=tap/u);
+  assert.doesNotMatch(script, /--setenv NODE_OPTIONS --test-reporter=tap/u);
+  assert.match(script, /run_validation 'npm run check' \|\| fail FULL_CHECK/u);
+  assert.match(script, /run_validation 'node --test --test-reporter=tap tests\/\*\.test\.mjs' \| tee "\$stage\/full-check\.log" \|\| fail FULL_TAP_CHECK/u);
+  assert.match(script, /TEST_OVERLAY_BASE[\s\S]*TEST_OVERLAY_SOURCE[\s\S]*TEST_OVERLAY_TARGET/u);
   assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/agent-browser-0\.36\.0" \/tmp\/\.local\/share\/pi-overdrive\/agent-browser-0\.36\.0/u);
   assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/chrome-152\.0\.7977\.82" \/tmp\/\.agent-browser\/browsers\/chrome-152\.0\.7977\.82/u);
   assert.match(script, /expected_seed_sha=ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70/u);
   assert.doesNotMatch(script, /--share-net|--bind \/ \/|--bind \/var\/run|--bind \/run|--bind \/home/u);
+});
+
+test('frozen fixture test overlay changes only child reporter selection and is hash-bound', () => {
+  const file = 'tests/clone-runtime-gate.test.mjs';
+  const root = new URL('../', import.meta.url).pathname;
+  const original = spawnSync('git', ['show', `${frozenProduct}:${file}`], { cwd: root, encoding: 'utf8' });
+  assert.equal(original.status, 0, original.stderr);
+  const overlay = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+  const before = "['--input-type=module', '-e', outerCeilingFixture]";
+  const after = "['--test-reporter=tap', '--input-type=module', '-e', outerCeilingFixture]";
+  assert.equal(original.stdout.split(before).length, 2, 'one exact frozen child invocation');
+  assert.equal(overlay, original.stdout.replace(before, after), 'no assertion, discovery, fixture or line change');
+  const digest = (content) => createHash('sha256').update(content).digest('hex');
+  assert.equal(digest(original.stdout), 'a724c525f93c3c58b93cc7dbcf4198afddd1c3f0b1cfcd9b2a3d0d614fd9de74');
+  assert.equal(digest(overlay), 'c1dac8bad745ef581b99c8872ce3ca6c26baecfad5818981a81293243951dfcb');
+  assert.ok(script.includes(`"$product_sha" == ${frozenProduct}`));
+  assert.ok(script.includes(digest(original.stdout)) && script.includes(digest(overlay)));
+});
+
+test('explicit parent TAP leaves real reporter children independent and preserves non-reporter NODE_OPTIONS', () => {
+  const env = { ...process.env, NODE_OPTIONS: '--no-warnings' };
+  delete env.NODE_TEST_CONTEXT;
+  const files = ['tests/clone-runtime-gate.test.mjs', 'tests/clone-runtime-reporter.test.mjs', 'tests/failure-ledger.test.mjs'];
+  const run = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...files],
+    { cwd: new URL('../', import.meta.url).pathname, env, encoding: 'utf8', timeout: 30000 });
+  assert.equal(run.error, undefined);
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.match(run.stdout, /^TAP version 13/mu);
+  assert.match(run.stdout, /^# tests 20$/mu);
+  assert.match(run.stdout, /^# pass 17$/mu);
+  assert.match(run.stdout, /^# fail 0$/mu);
+  assert.match(run.stdout, /^# skipped 3$/mu);
+  assert.doesNotMatch(run.stdout + run.stderr, /ERR_INVALID_ARG_VALUE|FAILURE_LEDGER_INCOMPLETE/u);
+  const child = spawnSync(process.execPath, ['--test', 'tests/e4-owned-rootfs-cleanup.test.mjs'],
+    { cwd: new URL('../', import.meta.url).pathname, env, encoding: 'utf8', timeout: 30000 });
+  assert.equal(child.status, 0, child.stderr);
+  assert.ok(child.stdout.length > 0, 'child without an explicit reporter still reports results');
+  assert.doesNotMatch(child.stdout + child.stderr, /ERR_INVALID_ARG_VALUE/u);
+
+  const temporary = mkdtempSync(path.join(tmpdir(), 'phi-e4-reporter-child-'));
+  try {
+    const fixture = path.join(temporary, 'failure.test.mjs');
+    writeFileSync(fixture, `import test from 'node:test';
+import assert from 'node:assert/strict';
+test('non-reporter option preserved', () => assert.equal(process.env.NODE_OPTIONS, '--no-warnings'));
+test('genuine failure remains fatal', () => assert.equal(1, 2));
+`);
+    const failed = spawnSync(process.execPath, ['--test', '--test-reporter=tap', fixture],
+      { env, encoding: 'utf8', timeout: 30000 });
+    assert.equal(failed.status, 1);
+    assert.match(failed.stdout, /^# tests 2$/mu);
+    assert.match(failed.stdout, /^# pass 1$/mu);
+    assert.match(failed.stdout, /^# fail 1$/mu);
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
 
 test('probe fixture reset removes only the exact owned footprint and rejects extras or symlinks', () => {

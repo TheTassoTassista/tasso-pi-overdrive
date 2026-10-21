@@ -106,7 +106,7 @@ test('hang', () => { setInterval(() => {}, 1000); return new Promise(() => {}); 
 `;
 test('outer ceiling fixture stays live until an external deadline', () => {
   const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  const result = spawnSync(process.execPath, ['--input-type=module', '-e', outerCeilingFixture],
+  const result = spawnSync(process.execPath, ['--test-reporter=tap', '--input-type=module', '-e', outerCeilingFixture],
     { encoding: 'utf8', env, timeout: 1200 });
   assert.equal(result.error?.code, 'ETIMEDOUT');
   assert.equal(result.status, null);

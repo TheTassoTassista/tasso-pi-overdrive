@@ -17,6 +17,7 @@ repo_root=$(realpath -e -- "$(dirname -- "${BASH_SOURCE[0]}")/..")
 profile_source="$repo_root/certification/apparmor/phi-e4-bwrap.profile"
 probe_source="$repo_root/certification/e4-host-probe.sh"
 layout_source="$repo_root/certification/e4-rootfs-layout.sh"
+cleanup_source="$repo_root/certification/e4-owned-rootfs-cleanup.sh"
 expected_bwrap=$(awk '$1 == "profile" && $2 == "phi-e4-bwrap" {print $3}' "$profile_source")
 [[ "$expected_bwrap" =~ ^/[A-Za-z0-9_./-]+$ && "$expected_bwrap" != *'..'* ]] || fail PROFILE_TARGET_INVALID
 expected_temp=$(dirname -- "$(dirname -- "$(dirname -- "$(dirname -- "$expected_bwrap")")")")
@@ -73,7 +74,7 @@ still_owned() {
   [[ "$root" == "$stage/rootfs" || "$command_line" == *"$stage/rootfs"* ]]
 }
 cleanup() {
-  local original=$? identity pid
+  local original=$? identity pid process_residual=UNKNOWN container_residual=UNKNOWN
   trap - EXIT
   mapfile -t residual < <(owned_rootfs_pids)
   for identity in "${residual[@]}"; do
@@ -91,16 +92,29 @@ cleanup() {
   done
   mapfile -t residual < <(owned_rootfs_pids)
   (( ${#residual[@]} == 0 )) || cleanup_ok=0
+  if [[ -r /proc/self/stat && -r /proc/self/mountinfo ]]; then
+    process_residual=${#residual[@]}
+  else
+    cleanup_ok=0
+  fi
   if [[ "$profile_loaded" == 1 ]]; then sudo -n apparmor_parser -R "$profile_source" || cleanup_ok=0; fi
   if [[ -n "$container_id" ]]; then docker rm -f "$container_id" >/dev/null 2>&1 || cleanup_ok=0; fi
-  rm -rf -- "$stage" || cleanup_ok=0
+  bash "$cleanup_source" "$stage" "$expected_temp" || cleanup_ok=0
   if [[ "$tools_owned" == 1 ]]; then rm -rf -- "$expected_temp/phi-e4-tools" || cleanup_ok=0; fi
   [[ ! -e "$stage" ]] || cleanup_ok=0
   if [[ "$tools_owned" == 1 && -e "$expected_temp/phi-e4-tools" ]]; then cleanup_ok=0; fi
-  if [[ -n "$container_id" ]] && docker container inspect "$container_id" >/dev/null 2>&1; then cleanup_ok=0; fi
+  if docker info >/dev/null 2>&1; then
+    container_residual=0
+    if [[ -n "$container_id" ]] && docker container inspect "$container_id" >/dev/null 2>&1; then
+      container_residual=1
+      cleanup_ok=0
+    fi
+  else
+    cleanup_ok=0
+  fi
   printf 'E4_PREFLIGHT_CLEANUP=%s\n' "$([[ "$cleanup_ok" == 1 ]] && echo PASS || echo FAIL)"
-  printf 'E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=%s\n' "${#residual[@]}"
-  printf 'E4_PREFLIGHT_RESIDUAL_OWNED_CONTAINERS=%s\n' "$([[ "$cleanup_ok" == 1 ]] && echo 0 || echo UNKNOWN)"
+  printf 'E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=%s\n' "$process_residual"
+  printf 'E4_PREFLIGHT_RESIDUAL_OWNED_CONTAINERS=%s\n' "$container_residual"
   if [[ "$original" != 0 || "$cleanup_ok" != 1 || "$preflight_passed" != 1 ]]; then
     printf '%s=FAIL\n' "$gate_marker"
     exit 1
@@ -212,6 +226,18 @@ printf 'E4_PREFLIGHT_TOOLCHAIN=PASS\n'
 mkdir -m 700 "$stage/fixture/project"
 cp -a -- "$product_source/." "$stage/fixture/project/" || fail PRODUCT_COPY
 [[ $(git -C "$stage/fixture/project" rev-parse HEAD) == "$product_sha" ]] || fail COPIED_PRODUCT_SHA
+# Frozen product code and image stay at d94c347. Overlay only the attested
+# qualification test's child-reporter selection, preserving its declaration,
+# assertion, fixture and historical line identity.
+if [[ "$product_sha" == d94c3474820dd4a0097b140969afb605cf641985 ]]; then
+  overlay_source="$repo_root/tests/clone-runtime-gate.test.mjs"
+  overlay_target="$stage/fixture/project/tests/clone-runtime-gate.test.mjs"
+  [[ $(sha256sum "$overlay_target" | awk '{print $1}') == a724c525f93c3c58b93cc7dbcf4198afddd1c3f0b1cfcd9b2a3d0d614fd9de74 ]] || fail TEST_OVERLAY_BASE
+  [[ $(sha256sum "$overlay_source" | awk '{print $1}') == c1dac8bad745ef581b99c8872ce3ca6c26baecfad5818981a81293243951dfcb ]] || fail TEST_OVERLAY_SOURCE
+  cp -- "$overlay_source" "$overlay_target" || fail TEST_OVERLAY_COPY
+  [[ $(sha256sum "$overlay_target" | awk '{print $1}') == c1dac8bad745ef581b99c8872ce3ca6c26baecfad5818981a81293243951dfcb ]] || fail TEST_OVERLAY_TARGET
+  printf 'E4_PREFLIGHT_TEST_OVERLAY_SHA=%s\n' c1dac8bad745ef581b99c8872ce3ca6c26baecfad5818981a81293243951dfcb
+fi
 ln -s /opt/phi/pi/npm/node_modules "$stage/fixture/project/node_modules"
 mkdir -p "$stage/fixture/project/runtime/lsp"
 # Product attestation requires a canonical, single-link compiler file at the
@@ -244,7 +270,6 @@ validation_args=("${trusted_regression_args[@]}"
   --setenv PI_CODING_AGENT_DIR /opt/phi/pi
   --setenv PI_OVERDRIVE_LSP_RUNTIME /opt/phi/runtime/lsp
   --setenv PI_OVERDRIVE_AST_GREP_BIN "$ast_bin"
-  --setenv NODE_OPTIONS --test-reporter=tap
   --setenv PYTHONDONTWRITEBYTECODE 1
   --setenv PYTHONPATH /opt/phi/runtime/dap/python)
 run_validation() {
@@ -256,7 +281,10 @@ run_validation() {
 run_validation 'test ! -e /host && test ! -e /workspace && test ! -e /run/docker.sock && test ! -e /var/run/docker.sock && test ! -e "$E4_HOST_SENTINEL" && test ! -e "$E4_HOST_WORKSPACE" && test "$(awk '\''/^CapEff:/ {print $2}'\'' /proc/self/status)" = 0000000000000000 && /usr/bin/unshare --user --map-root-user /usr/bin/true' || fail TIER_B_CAPABILITY
 assert_no_owned
 printf 'E4_PREFLIGHT_TIER_B_CAPABILITY=PASS\n'
-run_validation 'npm run check' | tee "$stage/full-check.log" || fail FULL_CHECK
+run_validation 'npm run check' || fail FULL_CHECK
+# The reporter belongs to this parent test process only. NODE_OPTIONS would
+# leak into nested tests that deliberately select their own reporter.
+run_validation 'node --test --test-reporter=tap tests/*.test.mjs' | tee "$stage/full-check.log" || fail FULL_TAP_CHECK
 node "$repo_root/scripts/e4-preflight-assertions.mjs" "$stage/full-check.log" "$stage/fixture/project" || fail HISTORICAL_ASSERTIONS
 assert_no_owned
 printf 'E4_PREFLIGHT_NPM_CHECK=PASS\n'
