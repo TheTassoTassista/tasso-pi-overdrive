@@ -24,7 +24,7 @@ expected_version=0.9.0-1ubuntu0.3
 expected_bwrap_sha=e318903862396f96de3df57264e0158682b952fd3fb53ac23d876413e7b30f71
 expected_profile_sha=09fdd69a36701d5e53e732407ac847a21a764a3e3be7ffa1c7d348826d79bf51
 expected_seed_sha=ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70
-expected_image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a'
+expected_image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2'
 if [[ ${E4_CONSOLIDATED_GATE:-false} == true ]]; then
   [[ ${E4_CERTIFIED_IMAGE_DIGEST:-} =~ ^ghcr\.io/thetassotassista/tasso-pi-overdrive-e4@sha256:[a-f0-9]{64}$ ]] || fail CONSOLIDATED_DIGEST
   [[ "$product_sha" == "${GITHUB_SHA:-}" ]] || fail CONSOLIDATED_CANDIDATE
@@ -256,7 +256,8 @@ run_validation() {
 run_validation 'test ! -e /host && test ! -e /workspace && test ! -e /run/docker.sock && test ! -e /var/run/docker.sock && test ! -e "$E4_HOST_SENTINEL" && test ! -e "$E4_HOST_WORKSPACE" && test "$(awk '\''/^CapEff:/ {print $2}'\'' /proc/self/status)" = 0000000000000000 && /usr/bin/unshare --user --map-root-user /usr/bin/true' || fail TIER_B_CAPABILITY
 assert_no_owned
 printf 'E4_PREFLIGHT_TIER_B_CAPABILITY=PASS\n'
-run_validation 'npm run check' || fail FULL_CHECK
+run_validation 'npm run check' | tee "$stage/full-check.log" || fail FULL_CHECK
+node "$repo_root/scripts/e4-preflight-assertions.mjs" "$stage/full-check.log" "$stage/fixture/project" || fail HISTORICAL_ASSERTIONS
 assert_no_owned
 printf 'E4_PREFLIGHT_NPM_CHECK=PASS\n'
 run_validation 'node scripts/phi-owned-main-suite.mjs' || fail LINUX_REGRESSION

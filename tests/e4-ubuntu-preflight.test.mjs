@@ -6,11 +6,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const scriptUrl = new URL('../scripts/e4-ubuntu-preflight.sh', import.meta.url);
+const assertionUrl = new URL('../scripts/e4-preflight-assertions.mjs', import.meta.url);
 const script = readFileSync(scriptUrl, 'utf8');
 const resetUrl = new URL('../certification/e4-probe-fixture-reset.sh', import.meta.url);
 const probe = readFileSync(new URL('../certification/e4-host-probe.sh', import.meta.url), 'utf8');
 const workflow = readFileSync(new URL('../.github/workflows/phi-foundation.yml', import.meta.url), 'utf8');
 const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
+const qualifiedImage = 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2';
 
 test('Ubuntu preflight requires separate dispatch after image qualification and readiness review', () => {
   assert.ok(preflight);
@@ -22,6 +24,9 @@ test('Ubuntu preflight requires separate dispatch after image qualification and 
   assert.match(preflight, /E4_GATE_KIND: preflight/u);
   assert.match(preflight, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
   assert.match(preflight, /E4_CERTIFIED_IMAGE_DIGEST: \$\{\{ needs\.e4-image-qualification\.outputs\.digest \}\}/u);
+  assert.ok(preflight.includes(`image='${qualifiedImage}'`), 'separate dispatch must use the qualified image, not an older digest');
+  assert.ok(script.includes(`expected_image='${qualifiedImage}'`), 'host verification must pin the same image');
+  assert.equal((workflow.match(new RegExp(qualifiedImage, 'gu')) ?? []).length, 2, 'preflight and replacement E4 must use the same digest');
   assert.match(preflight, /bash scripts\/e4-ubuntu-preflight\.sh "\$image" "\$CERTIFIED_SHA"/u);
   assert.doesNotMatch(preflight, /campaign3-e4-windows:|phi-bounded-workflow-pi-smoke|--e1|--e2|--autonomy-crash-v2/u);
   const defaultJob = workflow.split('  native-foundation:\n')[1]?.split('\n')[0];
@@ -57,6 +62,7 @@ test('host preflight retains frozen Bubblewrap policy and isolates every validat
   assert.ok(resetCall < script.indexOf('run_payload /usr/bin/node /opt/phi/e4-image-selfcheck.mjs'));
   assert.match(script, /run_payload \/usr\/bin\/node \/opt\/phi\/e4-image-selfcheck\.mjs/u);
   assert.match(script, /run_validation 'npm run check'/u);
+  assert.match(script, /node "\$repo_root\/scripts\/e4-preflight-assertions\.mjs" "\$stage\/full-check\.log" "\$stage\/fixture\/project" \|\| fail HISTORICAL_ASSERTIONS/u);
   assert.match(script, /run_validation 'node scripts\/phi-owned-main-suite\.mjs'/u);
   assert.match(script, /run_validation 'node scripts\/phi-repository-audit\.mjs'/u);
   assert.match(script, /E4_PREFLIGHT_CLEANUP=%s/u);
@@ -65,6 +71,39 @@ test('host preflight retains frozen Bubblewrap policy and isolates every validat
   assert.match(script, /assert_no_owned\(\)/u);
   assert.equal((script.match(/^assert_no_owned$/gmu) ?? []).length, 6, 'every payload phase must drain before the next');
   assert.doesNotMatch(script, /sudo (?:-n )?"?\$?expected_bwrap|sudo (?:-n )?bwrap|--privileged|seccomp=unconfined|--share-net|GITHUB_TOKEN|GH_TOKEN|https?:\/\//u);
+});
+
+test('native full-check evidence requires every historical assertion and both Rust cases without skips', () => {
+  const root = new URL('../', import.meta.url).pathname;
+  const ledger = readFileSync(new URL('../docs/e4-ubuntu-failure-closure-v1.md', import.meta.url), 'utf8');
+  const entries = [...ledger.matchAll(/^\| (\d+) \| `([^`:]+\.test\.mjs):(\d+)` \|/gmu)];
+  assert.equal(entries.length, 29);
+  const names = entries.map(([, , file, line]) => {
+    const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').split('\n');
+    return source[Number(line) - 1]?.match(/^test\((['"])(.*?)\1/u)?.[2];
+  });
+  const rust = '20-class real edit-contract corpus uses exact oracles and no model calls';
+  assert.ok(names.every(Boolean));
+  const temporary = mkdtempSync(path.join(tmpdir(), 'phi-e4-tap-'));
+  const output = path.join(temporary, 'full-check.log');
+  const run = (lines) => {
+    writeFileSync(output, `TAP version 13\n${lines.join('\n')}\n`);
+    return spawnSync(process.execPath, [assertionUrl.pathname, output, root], { encoding: 'utf8' });
+  };
+  const pass = [...names, rust].map((name, index) => `ok ${index + 1} - ${name}`);
+  try {
+    const complete = run(pass);
+    assert.equal(complete.status, 0, complete.stderr);
+    assert.match(complete.stdout, /E4_PREFLIGHT_HISTORICAL_ASSERTIONS=PASS count=29/u);
+    assert.match(complete.stdout, /E4_PREFLIGHT_RUST_HOST_ASSERTIONS=PASS count=2/u);
+    assert.notEqual(run(pass.filter((_, index) => index !== 3)).status, 0, 'missing historical assertion');
+    assert.notEqual(run(pass.map((line, index) => index === 4 ? `${line} # SKIP` : line)).status, 0, 'silently skipped assertion');
+    assert.notEqual(run(pass.map((line, index) => index === 5 ? line.replace(/^ok/u, 'not ok') : line)).status, 0, 'failed assertion');
+    assert.notEqual(run([...pass, pass[0]]).status, 0, 'duplicate assertion');
+    assert.notEqual(run(pass.slice(0, -1)).status, 0, 'missing Rust syntax oracle');
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test('trusted Tier B removes only nested-userns denial and attests canonical fixture dependencies', () => {

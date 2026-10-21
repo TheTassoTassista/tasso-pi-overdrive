@@ -463,7 +463,7 @@ jobs:
             test "$CERTIFIED_SHA" = "$GITHUB_SHA"
             image="$E4_CERTIFIED_IMAGE_DIGEST"
           else
-            image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a'
+            image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2'
           fi
           bash scripts/e4-ubuntu-preflight.sh "$image" "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product"
   integrated-ubuntu:
@@ -950,7 +950,7 @@ jobs:
         env:
           E4_GATE_KIND: e4
           CERTIFIED_SHA: ${{ inputs.certified_sha }}
-        run: bash scripts/e4-ubuntu-preflight.sh 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:8d45951a54903c8406c888331ee70e11cca3cdd4ef7c15ac6044761a6917e42a' "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product"
+        run: bash scripts/e4-ubuntu-preflight.sh 'ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2' "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product"
   campaign3-e4-windows:
     if: github.event_name == 'workflow_dispatch' && inputs['campaign3-e4-certification'] && !inputs['integrated-certification-only']
     needs: campaign3-e4-ubuntu
