@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-22 — Campaign 3 billing readiness not established
+
+Main `E4-GITHUB-ACTIONS-BILLING-RECOVERY-001` grants one conditional replacement combined probe, not an automatic retry. Personal repository billing owner `TheTassoTassista`; exact account payment/spending restriction and present clearance UNKNOWN because read-only billing API needs unavailable `user` scope and browser access is blocked by a saved user permission. Operational `BILLING_READY=NO` (unproven). Historical CI39730012824 remains FAIL/CLOSED/dispatched-not-started and its original 1/1 budget consumed; replacement probe 0/1, second replacement Preflight3 0/1 and E4 0/1 all NOT RUN. No native CI dispatched under the new decision; frozen product/image/recovery unchanged, local84/84 not promoted, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Account-owner review/official clearance evidence or GitHub Support is required before pre-dispatch re-evaluation.
+
 ## 2026-10-22 — Campaign 3 STOP/Main at native probe scheduling
 
 Combined native TSC/rootfs probe CI39730012824 on functional `569ee16` failed before a runner was assigned: GitHub annotation cites failed recent account payments or spending limit; runner ID0, steps0, artifacts0. Probe 1/1 dispatched/FAIL/CLOSED; no native compiler, rootfs, cleanup or residual-census acceptance. Conditional second replacement Preflight3 0/1 and E4 0/1 remain NOT RUN. Local repaired candidate/84 E4 tests remain local only. Main budget disposition and external billing resolution required; no retry. Historical failed gates remain failed, 29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
