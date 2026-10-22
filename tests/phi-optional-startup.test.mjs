@@ -33,6 +33,7 @@ function fixture() {
   fs.mkdirSync(path.join(root, 'scripts'));
   fs.mkdirSync(unitRoot, { recursive: true });
   fs.copyFileSync(path.join(source, 'config', 'second-brain.json'), path.join(root, 'config', 'second-brain.json'));
+  fs.writeFileSync(path.join(root, 'config', 'optional-services.json'), JSON.stringify({ version: 1, omniroute: 'auto' }), { mode: 0o600 });
   const manager = path.join(root, 'scripts', 'pi-overdrive-memory-services.sh');
   fs.writeFileSync(manager, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
   for (const unit of ['pi-overdrive-embeddings', 'pi-overdrive-openviking', 'pi-overdrive-hindsight']) {
@@ -40,6 +41,25 @@ function fixture() {
   }
   return { root, unitRoot, manager, env: { ...process.env, XDG_CONFIG_HOME: path.join(root, 'config-home'), PI_OVERDRIVE_LAUNCHER_TEST_MODE: '1' } };
 }
+
+linuxTest('deferred or untrusted OmniRoute policy never launches gateway while memory remains independent', () => {
+  const setup = fixture();
+  try {
+    const policy = path.join(setup.root, 'config', 'optional-services.json');
+    const calls = [];
+    const run = (_command, args) => { calls.push(args[0]); return { status: 0 }; };
+    fs.writeFileSync(policy, JSON.stringify({ version: 1, omniroute: 'deferred' }));
+    let result = prepareOptionalServices({ root: setup.root, environment: setup.env, run });
+    assert.equal(result.omniroute, 'DEFERRED_FAIL_CLOSED');
+    assert.equal(result.secondBrain, 'READY');
+    assert.deepEqual(calls, ['status']);
+    fs.chmodSync(policy, 0o666);
+    result = prepareOptionalServices({ root: setup.root, environment: setup.env, run });
+    assert.equal(result.omniroute, 'SECURITY_MISMATCH');
+    assert.equal(result.secondBrain, 'READY');
+    assert.deepEqual(calls, ['status', 'status']);
+  } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
+});
 
 linuxTest('healthy optional services are reused; SearXNG never invokes Docker', () => {
   const setup = fixture();
