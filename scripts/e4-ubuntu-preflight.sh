@@ -8,6 +8,7 @@ fail() { printf 'E4_PREFLIGHT_FAIL=%s\n' "$1" >&2; exit 1; }
 case ${E4_GATE_KIND:-} in
   preflight) gate_marker=E4_UBUNTU_PREFLIGHT ;;
   e4) gate_marker=E4_LINUX_FOUNDATION ;;
+  probe) gate_marker=E4_TSC_ROOTFS_PROBE ;;
   *) fail GATE_KIND ;;
 esac
 image=$1
@@ -242,12 +243,7 @@ ln -s /opt/phi/pi/npm/node_modules "$stage/fixture/project/node_modules"
 mkdir -p "$stage/fixture/project/runtime/lsp"
 # Product attestation requires a canonical, single-link compiler file at the
 # project-relative path. LSP servers use the separately attested image runtime.
-compiler_source="$stage/rootfs/opt/phi/runtime/lsp/node_modules/typescript/lib/typescript.js"
-compiler_target="$stage/fixture/project/runtime/lsp/node_modules/typescript/lib/typescript.js"
-mkdir -p "$(dirname -- "$compiler_target")"
-cp -- "$compiler_source" "$compiler_target" || fail TYPESCRIPT_FIXTURE_COPY
-[[ -f "$compiler_target" && ! -L "$compiler_target" && $(stat -c %h "$compiler_target") == 1 &&
-   $(sha256sum "$compiler_target" | awk '{print $1}') == 569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39 ]] || fail TYPESCRIPT_FIXTURE_IDENTITY
+bash "$repo_root/certification/e4-typescript-fixture.sh" "$stage/rootfs" "$stage/fixture/project" || fail TYPESCRIPT_FIXTURE
 # debugpy is also checked by the product at a project-relative canonical tree.
 mkdir -p "$stage/fixture/project/runtime/dap/python"
 cp -a -- "$stage/rootfs/opt/phi/runtime/dap/python/debugpy" "$stage/fixture/project/runtime/dap/python/debugpy" || fail DAP_FIXTURE_COPY
@@ -276,6 +272,13 @@ run_validation() {
   verify_frozen
   timeout --signal=TERM --kill-after=5s 20m "$expected_bwrap" "${validation_args[@]}" -- /usr/bin/sh -c "cd /phi/project && $1"
 }
+if [[ "$gate_marker" == E4_TSC_ROOTFS_PROBE ]]; then
+  run_validation 'node scripts/typecheck.mjs' || fail TYPECHECK_PROBE
+  assert_no_owned
+  printf 'E4_TSC_ROOTFS_TYPECHECK=PASS\n'
+  preflight_passed=1
+  exit 0
+fi
 # The single-quoted expression is evaluated by the isolated child shell.
 # shellcheck disable=SC2016
 run_validation 'test ! -e /host && test ! -e /workspace && test ! -e /run/docker.sock && test ! -e /var/run/docker.sock && test ! -e "$E4_HOST_SENTINEL" && test ! -e "$E4_HOST_WORKSPACE" && test "$(awk '\''/^CapEff:/ {print $2}'\'' /proc/self/status)" = 0000000000000000 && /usr/bin/unshare --user --map-root-user /usr/bin/true' || fail TIER_B_CAPABILITY

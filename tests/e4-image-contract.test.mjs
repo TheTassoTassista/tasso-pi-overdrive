@@ -170,7 +170,7 @@ test('E4 image qualification freezes product separately from workflow and cannot
   assert.match(exportOnly, /E4_EXPORT_ONLY_CLEANUP=PASS/u);
   const preflight = workflow.split('  e4-ubuntu-preflight:\n')[1]?.split('  integrated-ubuntu:\n')[0];
   assert.match(preflight, /needs: e4-image-qualification/u);
-  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['e4-image-qualification-only'\]/u);
+  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && inputs\['e4-image-diagnostic-mode'\] != 'tsc-rootfs' && !inputs\['e4-image-qualification-only'\]/u);
   assert.doesNotMatch(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
   const ordinary = workflow.split('  native-foundation:\n')[1]?.split('\n')[0] ?? '';
   assert.match(ordinary, /!inputs\['e4-image-qualification-only'\]/u);

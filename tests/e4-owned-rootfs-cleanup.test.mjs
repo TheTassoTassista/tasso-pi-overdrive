@@ -64,6 +64,32 @@ test('real tar --no-same-owner extraction retains non-writable CA directory mode
   }
 });
 
+test('owned unreadable systemd directory is diagnosed before owner-only repair and complete removal', () => {
+  const { temp, stage } = make();
+  const outside = path.join(temp, 'unrelated');
+  const dissect = path.join(stage, 'rootfs/run/systemd/dissect-root');
+  fs.mkdirSync(dissect, { recursive: true });
+  fs.writeFileSync(path.join(dissect, 'owned'), 'fixture');
+  fs.writeFileSync(outside, 'preserve');
+  fs.chmodSync(dissect, 0o000);
+  try {
+    const original = spawnSync('find', ['-P', stage, '-xdev', '-type', 'd'], { encoding: 'utf8' });
+    assert.notEqual(original.status, 0, 'the historical census cannot traverse an unreadable directory');
+    assert.match(original.stderr, /Permission denied/u);
+    const repaired = clean(stage, temp);
+    assert.equal(repaired.status, 0, repaired.stderr);
+    assert.match(repaired.stdout, new RegExp(`E4_OWNED_ROOTFS_DISSECT_BEFORE=uid:${process.getuid()} gid:.* mode:0 type:directory`, 'u'));
+    assert.equal(fs.existsSync(stage), false);
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'preserve');
+    const again = clean(stage, temp);
+    assert.equal(again.status, 0, again.stderr);
+    assert.match(again.stdout, /already_absent=1/u);
+  } finally {
+    if (fs.existsSync(dissect)) fs.chmodSync(dissect, 0o700);
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 test('absent rootfs is safe but a symlinked rootfs or foreign stage shape fails closed', () => {
   const first = make();
   const second = make();
@@ -104,4 +130,39 @@ test('active mount and unavailable mount census both fail before changing owned 
     assert.equal(fs.existsSync(stage), true);
     assert.equal(clean(stage, temp).status, 0);
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('foreign directory metadata and failed removal both fail closed without deleting unrelated state', () => {
+  const { temp, stage } = make();
+  const foreign = path.join(stage, 'rootfs/foreign');
+  const unrelated = path.join(temp, 'unrelated');
+  const bin = path.join(temp, 'bin');
+  fs.mkdirSync(foreign, { recursive: true });
+  fs.chmodSync(foreign, 0o000);
+  fs.mkdirSync(bin);
+  fs.writeFileSync(unrelated, 'preserve');
+  const stat = path.join(bin, 'stat');
+  const rm = path.join(bin, 'rm');
+  const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, PHI_TEST_FOREIGN: foreign };
+  try {
+    fs.writeFileSync(stat, '#!/bin/sh\nif [ "$1" = "-c" ] && [ "$2" = "%u" ] && [ "$4" = "$PHI_TEST_FOREIGN" ]; then printf "999999\\n"; else exec /usr/bin/stat "$@"; fi\n');
+    fs.chmodSync(stat, 0o755);
+    const denied = clean(stage, temp, env);
+    assert.notEqual(denied.status, 0);
+    assert.match(denied.stderr, /FOREIGN_DIRECTORY/u);
+    assert.equal(fs.statSync(foreign).mode & 0o777, 0o000, 'foreign directory mode is not modified');
+    fs.rmSync(stat);
+    fs.chmodSync(foreign, 0o755);
+    fs.writeFileSync(rm, '#!/bin/sh\nexit 1\n');
+    fs.chmodSync(rm, 0o755);
+    const partial = clean(stage, temp, env);
+    assert.notEqual(partial.status, 0);
+    assert.match(partial.stderr, /E4_OWNED_ROOTFS_CLEANUP_FAIL=REMOVE/u);
+    assert.equal(fs.existsSync(stage), true);
+    assert.equal(fs.readFileSync(unrelated, 'utf8'), 'preserve');
+    assert.equal(clean(stage, temp).status, 0);
+  } finally {
+    if (fs.existsSync(foreign)) fs.chmodSync(foreign, 0o755);
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

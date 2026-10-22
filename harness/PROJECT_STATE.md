@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-22 — Main TSC/rootfs recovery locally prepared; native pending
+
+Original Main TSC/rootfs authority and no-new-budget reconciliation are durable. Frozen product d94c347 and qualified OCI digest unchanged. Qualification-only pinned TypeScript 6.0.3 bin/lib fixture passes a real extracted frozen-project typecheck; absent bin fails. Owned-rootfs cleanup handles locally reproduced unreadable owned directories without changing foreign resources; exact failed-CI path metadata UNKNOWN until native probe. Focused E4 84/84, syntax/ShellCheck/TypeScript/package/YAML and indexed ZERO_EGRESS local review PASS. Combined native probe0/1, conditional second replacement Preflight3 0/1, replacement E4 0/1: none dispatched. Historical CI39626491649/CI39633619005 FAIL/CLOSED; 29 acceptance rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Protected audit and unrelated user files preserved.
+
 ## 2026-10-21 — replacement Preflight3 FAIL/CLOSED; Main STOP
 
 Only replacement [CI39633619005](https://github.com/TheTassoTassista/tasso-pi-overdrive/actions/runs/39633619005) on harness `7cddfe2`/frozen d94c347/qualified OCI digest passed host/image/Tier-B and all 1159 native tests (821 PASS, 0 FAIL, 338 baseline skip), proving the nine reporter collisions did not recur. `npm run check` then failed because the disposable fixture lacks `.bin/tsc`; no complete gate acceptance. Cleanup also failed closed on an unreadable `rootfs/run/systemd/dissect-root`; owned processes0/containers0 but stage removal UNVERIFIED. Replacement Preflight3 1/1 FAIL/CLOSED; E4 0/1 NOT RUN; historical 29 acceptance rows OPEN. No further patch/retry under current authority. Windows autonomy BLOCKED/false, portability NOT CERTIFIED.

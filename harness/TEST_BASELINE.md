@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-22 — E4 recovery local focus, not native acceptance
+
+E4-focused local tests: **84 PASS / 0 FAIL / 0 skip**. Actual frozen d94c347 disposable-project `scripts/typecheck.mjs` fails with missing `.bin/tsc`, then passes with attested TypeScript 6.0.3 bin/lib fixture; CLI version PASS. Cleanup focus covers tar/read-only, mode000 `dissect-root`, foreign metadata, symlink, active/unknown mounts, partial removal, idempotency and unrelated-state preservation. Bash/ShellCheck, installed-Pi TypeScript, package, changed JS syntax and workflow YAML parse (24 jobs/25 inputs) PASS. Indexed audit exit0/WARN-only/modelCalls0; scoped ZERO_EGRESS review PASS. Full local host `npm run check` not repeated because previous host-only Rust compiler/navigation failures remain recorded, not relabeled. Native combined probe/cleanup receipts and full Preflight3 NOT RUN.
+
 ## 2026-10-21 — sole replacement native Preflight3 CI39633619005
 
 Job119338102695 on harness `7cddfe2`, frozen d94c347 and unchanged qualified image: host/image/Tier-B PASS, Node26 full test discovery **1159 total / 821 PASS / 0 FAIL / 338 baseline skip**. The nine historical reporter failures did not recur. `npm run check` FAIL after test phase at missing fixture `runtime/lsp/node_modules/.bin/tsc`; no full TAP/per-ID post-check, Linux regression or indexed audit. Cleanup FAIL at `DIRECTORY_CENSUS` on unreadable `rootfs/run/systemd/dissect-root`; owned processes0/containers0, staging absence UNVERIFIED. Overall Preflight3 FAIL/CLOSED, no native acceptance; replacement E4 not run.

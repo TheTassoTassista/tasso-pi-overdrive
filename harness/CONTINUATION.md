@@ -1,5 +1,13 @@
 # Phi — Session Continuation
 
+## CURRENT — Main-authorized TSC/rootfs recovery candidate; native probe 0/1
+
+Starting local `f812e86161c03c1bfa0180ffe0921207d12e7422` and remote ancestor `7cddfe2711cd41b53853bb1510b937516369a740` on `feature/routing-presets-quality`; verify live after checkpoint. Existing Main base/reconciliation authority is durable, **NO NEW BUDGET**. Missing TypeScript bin/lib fixture cause KNOWN; real frozen-project typecheck FAIL without compiler and PASS with pinned fixture. Cleanup unreadable-directory mechanism reproduced; exact CI `dissect-root` metadata UNKNOWN pending native probe. Local E4 focus84/84, Bash/ShellCheck/TypeScript/package/YAML and indexed ZERO_EGRESS PASS. Combined native probe0/1, second replacement Preflight3 0/1 conditional, replacement E4 0/1 conditional: NOT DISPATCHED. Exact next action: scoped commit/normal fast-forward push after diff review, then one combined native probe on product d94c347/qualified digest; inspect SAME run+artifact. First failure/UNKNOWN stops Main, no retry. Do not redo closed CI39626491649/CI39633619005, image CI39479889427 or E1–E3/Host. Protected audit SHA `f556b3adc88e58f5319f208b4a74c496705ef90b24680bf8bde12e5ce5a9f3ba` and unrelated user files preserved. Windows autonomy BLOCKED/false, portability NOT CERTIFIED, provider calls0.
+
+## ACTIVE MAIN AUTHORITY RESTORED — E4-PREFLIGHT3-TSC-ROOTFS-RECOVERY-001
+
+The existing Main TSC/rootfs recovery decision is restored in `harness/DECISIONS.md`; this is **RESTORATION OF EXISTING MAIN AUTHORITY — NO NEW BUDGET**. Historical Preflight3 failures remain closed. The combined native probe (0/1), second replacement Preflight3 (0/1 conditional) and replacement E4 (0/1 conditional) require live budget and local-prerequisite verification before dispatch. This pointer supersedes the older “no patch” STOP only within that bounded recovery scope; product/image/security/readiness remain frozen.
+
 ## FAST DEFAULT — standing Work policy
 
 Phi uses FAST DEFAULT unless a stricter task-specific instruction applies. Optimize for the shortest **reliable** path to accepted evidence, never for fewer required checks. Before repeating work, reuse prior results only when source, configuration, dependencies, environment, security contract and acceptance predicates are equivalent. Start with targeted inspection, deterministic/focused validation and known relevant prerequisites; still run every mandatory full/native gate. Cluster failures only on a demonstrated common signature or cause, retaining each failure's identity and disposition.

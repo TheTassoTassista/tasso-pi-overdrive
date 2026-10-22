@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, symlinkSync, existsSync, cpSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -20,7 +20,7 @@ test('Ubuntu preflight requires separate dispatch after image qualification and 
   assert.ok(preflight);
   assert.match(preflight, /needs: e4-image-qualification/u);
   assert.doesNotMatch(preflight, /needs\.e4-image-qualification\.result == 'success'/u);
-  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && !inputs\['e4-image-qualification-only'\]/u);
+  assert.match(preflight, /inputs\['e4-ubuntu-preflight-only'\] && inputs\['e4-image-diagnostic-mode'\] != 'tsc-rootfs' && !inputs\['e4-image-qualification-only'\]/u);
   assert.match(preflight, /runs-on: ubuntu-24\.04/u);
   assert.match(preflight, /packages: read/u);
   assert.match(preflight, /E4_GATE_KIND: preflight/u);
@@ -28,7 +28,7 @@ test('Ubuntu preflight requires separate dispatch after image qualification and 
   assert.match(preflight, /E4_CERTIFIED_IMAGE_DIGEST: \$\{\{ needs\.e4-image-qualification\.outputs\.digest \}\}/u);
   assert.ok(preflight.includes(`image='${qualifiedImage}'`), 'separate dispatch must use the qualified image, not an older digest');
   assert.ok(script.includes(`expected_image='${qualifiedImage}'`), 'host verification must pin the same image');
-  assert.equal((workflow.match(new RegExp(qualifiedImage, 'gu')) ?? []).length, 2, 'preflight and replacement E4 must use the same digest');
+  assert.equal((workflow.match(new RegExp(qualifiedImage, 'gu')) ?? []).length, 3, 'probe, preflight and replacement E4 must use the same digest');
   assert.match(preflight, /bash scripts\/e4-ubuntu-preflight\.sh "\$image" "\$CERTIFIED_SHA"/u);
   assert.doesNotMatch(preflight, /campaign3-e4-windows:|phi-bounded-workflow-pi-smoke|--e1|--e2|--autonomy-crash-v2/u);
   const defaultJob = workflow.split('  native-foundation:\n')[1]?.split('\n')[0];
@@ -37,6 +37,27 @@ test('Ubuntu preflight requires separate dispatch after image qualification and 
   assert.match(e4Ubuntu ?? '', /!inputs\['e4-ubuntu-preflight-only'\]/u);
   const e4UbuntuJob = workflow.split('  campaign3-e4-ubuntu:\n')[1]?.split('  campaign3-e4-windows:\n')[0];
   assert.match(e4UbuntuJob ?? '', /E4_GATE_KIND: e4/u);
+});
+
+test('combined TSC/rootfs probe is one non-certifying mode with full cleanup and bounded evidence', () => {
+  const probeJob = workflow.split('  e4-tsc-rootfs-probe:\n')[1]?.split('  e4-ubuntu-preflight:\n')[0];
+  const imageJob = workflow.split('  e4-image-qualification:\n')[1]?.split('  e4-export-only-diagnostic:\n')[0];
+  assert.ok(probeJob);
+  assert.match(probeJob, /inputs\['e4-ubuntu-preflight-only'\] && inputs\['e4-image-diagnostic-mode'\] == 'tsc-rootfs'/u);
+  assert.match(probeJob, /E4_GATE_KIND: probe/u);
+  assert.match(probeJob, /ref: \$\{\{ inputs\.certified_sha \}\}/u);
+  assert.match(probeJob, /test "\$CERTIFIED_SHA" = d94c3474820dd4a0097b140969afb605cf641985/u);
+  assert.match(probeJob, /E4_TSC_ROOTFS_TYPECHECK=PASS/u);
+  assert.match(probeJob, /E4_OWNED_ROOTFS_CLEANUP=PASS/u);
+  assert.match(probeJob, /E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=0/u);
+  assert.match(probeJob, /E4_PREFLIGHT_RESIDUAL_OWNED_CONTAINERS=0/u);
+  assert.match(probeJob, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/u);
+  assert.match(imageJob ?? '', /inputs\['e4-image-diagnostic-mode'\] != 'tsc-rootfs'/u);
+  assert.match(script, /probe\) gate_marker=E4_TSC_ROOTFS_PROBE/u);
+  assert.match(script, /run_validation 'node scripts\/typecheck\.mjs' \|\| fail TYPECHECK_PROBE/u);
+  assert.match(script, /E4_TSC_ROOTFS_TYPECHECK=PASS/u);
+  assert.ok(script.indexOf("run_validation 'node scripts/typecheck.mjs'") < script.indexOf("run_validation 'npm run check'"));
+  assert.doesNotMatch(probeJob, /campaign3-e4-windows:|npm run check|e4-image-qualification-only: true/u);
 });
 
 test('host preflight retains frozen Bubblewrap policy and isolates every validation command', () => {
@@ -121,8 +142,7 @@ test('trusted Tier B removes only nested-userns denial and attests canonical fix
   assert.match(script, /run_validation 'test ! -e \/host .*\/usr\/bin\/unshare --user --map-root-user \/usr\/bin\/true' \|\| fail TIER_B_CAPABILITY/u);
   assert.match(script, /E4_PREFLIGHT_TIER_B_CAPABILITY=PASS/u);
   assert.match(script, /--setenv PI_OVERDRIVE_LSP_RUNTIME \/opt\/phi\/runtime\/lsp/u);
-  assert.match(script, /compiler_target="\$stage\/fixture\/project\/runtime\/lsp\/node_modules\/typescript\/lib\/typescript\.js"/u);
-  assert.match(script, /stat -c %h "\$compiler_target"\) == 1/u);
+  assert.match(script, /bash "\$repo_root\/certification\/e4-typescript-fixture\.sh" "\$stage\/rootfs" "\$stage\/fixture\/project" \|\| fail TYPESCRIPT_FIXTURE/u);
   assert.match(script, /cp -a -- "\$stage\/rootfs\/opt\/phi\/runtime\/dap\/python\/debugpy"/u);
   assert.doesNotMatch(script, /--setenv NODE_OPTIONS --test-reporter=tap/u);
   assert.match(script, /run_validation 'npm run check' \|\| fail FULL_CHECK/u);
@@ -132,6 +152,49 @@ test('trusted Tier B removes only nested-userns denial and attests canonical fix
   assert.match(script, /--ro-bind "\$stage\/rootfs\/opt\/phi\/browser\/chrome-152\.0\.7977\.82" \/tmp\/\.agent-browser\/browsers\/chrome-152\.0\.7977\.82/u);
   assert.match(script, /expected_seed_sha=ddf8e28d8be90e1e2d941e364b68e735aa5dca3c48295763883d368f97e03f70/u);
   assert.doesNotMatch(script, /--share-net|--bind \/ \/|--bind \/var\/run|--bind \/run|--bind \/home/u);
+});
+
+test('pinned compiler fixture executes the frozen product typecheck and fails without its local bin', () => {
+  const root = new URL('../', import.meta.url).pathname;
+  const helper = new URL('../certification/e4-typescript-fixture.sh', import.meta.url).pathname;
+  const temporary = mkdtempSync(path.join(tmpdir(), 'phi-e4-tsc-fixture-'));
+  const project = path.join(temporary, 'project');
+  const rootfs = path.join(temporary, 'rootfs');
+  const source = path.join(root, 'runtime/lsp/node_modules');
+  const piRoot = process.env.PI_PACKAGE_ROOT || path.resolve(path.dirname(process.execPath), '..', 'lib', 'node_modules', '@earendil-works', 'pi-coding-agent');
+  assert.ok(existsSync(path.join(piRoot, 'node_modules')), 'actual installed Pi is required');
+  mkdirSync(project);
+  mkdirSync(path.join(rootfs, 'opt/phi/runtime/lsp/node_modules'), { recursive: true });
+  cpSync(path.join(source, 'typescript'), path.join(rootfs, 'opt/phi/runtime/lsp/node_modules/typescript'), { recursive: true });
+  const env = { ...process.env, PI_PACKAGE_ROOT: piRoot };
+  delete env.PI_OVERDRIVE_TSC;
+  try {
+    const archive = spawnSync('git', ['archive', '--format=tar', frozenProduct], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
+    assert.equal(archive.status, 0, archive.stderr?.toString());
+    const extract = spawnSync('tar', ['-xf', '-', '-C', project], { input: archive.stdout, encoding: 'utf8' });
+    assert.equal(extract.status, 0, extract.stderr);
+    symlinkSync(path.dirname(path.dirname(piRoot)), path.join(project, 'node_modules'), 'dir');
+    const runTypecheck = () => spawnSync(process.execPath, ['scripts/typecheck.mjs'], { cwd: project, env, encoding: 'utf8', timeout: 120000 });
+    const missing = runTypecheck();
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /typecheck dependency missing: .*runtime\/lsp\/node_modules\/\.bin\/tsc/u);
+    const built = spawnSync('bash', [helper, rootfs, project], { env, encoding: 'utf8', timeout: 30000 });
+    assert.equal(built.status, 0, built.stderr);
+    assert.match(built.stdout, /E4_PREFLIGHT_TYPESCRIPT_FIXTURE=PASS version=6\.0\.3/u);
+    const compiler = path.join(project, 'runtime/lsp/node_modules/.bin/tsc');
+    const version = spawnSync(process.execPath, [compiler, '--version'], { env, encoding: 'utf8' });
+    assert.equal(version.status, 0, version.stderr);
+    assert.equal(version.stdout.trim(), 'Version 6.0.3');
+    const checked = runTypecheck();
+    assert.equal(checked.status, 0, checked.stderr);
+    assert.match(checked.stdout, /Extension TypeScript check against installed Pi: PASS/u);
+    const escapeRoot = path.join(temporary, 'escape-rootfs');
+    mkdirSync(path.join(escapeRoot, 'opt/phi/runtime/lsp/node_modules'), { recursive: true });
+    symlinkSync(path.join(source, 'typescript'), path.join(escapeRoot, 'opt/phi/runtime/lsp/node_modules/typescript'), 'dir');
+    const escaped = spawnSync('bash', [helper, escapeRoot, project], { env, encoding: 'utf8' });
+    assert.notEqual(escaped.status, 0);
+    assert.match(escaped.stderr, /E4_TYPESCRIPT_FIXTURE_FAIL=SOURCE_ESCAPE/u);
+  } finally { rmSync(temporary, { recursive: true, force: true }); }
 });
 
 test('frozen fixture test overlay changes only child reporter selection and is hash-bound', () => {

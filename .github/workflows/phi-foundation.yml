@@ -99,9 +99,9 @@ on:
         type: boolean
         default: false
       e4-image-diagnostic-mode:
-        description: With E4 image gate selected, capture one bounded non-certifying diagnostic; never publish
+        description: Select bounded E4 diagnostic; tsc-rootfs requires Ubuntu preflight-only and never certifies
         type: choice
-        options: [none, rust-linker, complete-executable-inventory, rust-execve, export-only]
+        options: [none, rust-linker, complete-executable-inventory, rust-execve, export-only, tsc-rootfs]
         default: none
       e4-ubuntu-preflight-only:
         description: Ubuntu-only host-Bubblewrap preflight over the frozen qualified E4 image; no Windows or E4
@@ -121,7 +121,7 @@ jobs:
       - name: Prove host Bubblewrap isolation over pinned representative rootfs
         run: bash scripts/e4-host-feasibility.sh docker.io/library/archlinux:base@sha256:3c64b538588416593f69a1aebd2f2ec0f2541b29159f32556fa7def2167147a0
   e4-image-qualification:
-    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && inputs['e4-image-diagnostic-mode'] != 'export-only' && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-ubuntu-preflight-only']
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-image-qualification-only'] && inputs['e4-image-diagnostic-mode'] != 'export-only' && inputs['e4-image-diagnostic-mode'] != 'tsc-rootfs' && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e4-certification'] && !inputs['e4-ubuntu-preflight-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
@@ -423,9 +423,61 @@ jobs:
           node scripts/e4-owned-image-cleanup.mjs
           test -z "$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null)"
           printf 'E4_EXPORT_ONLY_CLEANUP=PASS\n'
+  e4-tsc-rootfs-probe:
+    if: github.event_name == 'workflow_dispatch' && inputs['e4-ubuntu-preflight-only'] && inputs['e4-image-diagnostic-mode'] == 'tsc-rootfs' && !inputs['campaign3-e4-certification'] && !inputs['e4-image-qualification-only']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, immutable
+        with:
+          ref: ${{ inputs.certified_sha }}
+          path: product
+          persist-credentials: false
+      - name: Pin independent frozen product and harness identities
+        env:
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          test "$CERTIFIED_SHA" = d94c3474820dd4a0097b140969afb605cf641985
+          test "$(git -C product rev-parse HEAD)" = "$CERTIFIED_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git -C product status --porcelain)"
+      - name: Pull private qualified image with runner-only package credential
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Native pinned typecheck and owned-rootfs cleanup probe
+        env:
+          E4_GATE_KIND: probe
+          CERTIFIED_SHA: ${{ inputs.certified_sha }}
+        run: |
+          set -o pipefail
+          image='ghcr.io/thetassotassista/tasso-pi-overdrive-e4@sha256:4fdd60d808c9bfdf31c6c9832424e2fe3804ccb119aa0e59ce788b4f8668c8a2'
+          bash scripts/e4-ubuntu-preflight.sh "$image" "$CERTIFIED_SHA" "$GITHUB_WORKSPACE/product" 2>&1 | tee "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_PREFLIGHT_TYPESCRIPT_FIXTURE=PASS version=6.0.3' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_TSC_ROOTFS_TYPECHECK=PASS' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_OWNED_ROOTFS_CLEANUP=PASS' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_PREFLIGHT_CLEANUP=PASS' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_PREFLIGHT_RESIDUAL_OWNED_PROCESSES=0' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_PREFLIGHT_RESIDUAL_OWNED_CONTAINERS=0' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          grep -Fxq 'E4_TSC_ROOTFS_PROBE=PASS' "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+          sha256sum "$RUNNER_TEMP/phi-e4-tsc-rootfs-probe.log"
+      - name: Preserve bounded native probe evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, immutable
+        with:
+          name: phi-e4-tsc-rootfs-probe-${{ github.run_id }}
+          path: ${{ runner.temp }}/phi-e4-tsc-rootfs-probe.log
+          if-no-files-found: error
+          retention-days: 7
   e4-ubuntu-preflight:
     needs: e4-image-qualification
-    if: always() && github.event_name == 'workflow_dispatch' && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && inputs['e4-ubuntu-preflight-only'] && !inputs['e4-image-qualification-only']
+    if: always() && github.event_name == 'workflow_dispatch' && !inputs['campaign3-e4-certification'] && !inputs['e4-host-feasibility-only'] && !inputs['campaign3-e1-focused'] && !inputs['campaign3-e2-focused'] && !inputs['campaign3-e3-focused'] && inputs['e4-ubuntu-preflight-only'] && inputs['e4-image-diagnostic-mode'] != 'tsc-rootfs' && !inputs['e4-image-qualification-only']
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
