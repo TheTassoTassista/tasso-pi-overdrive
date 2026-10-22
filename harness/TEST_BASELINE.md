@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-22 — native probe CI39730012824 did not execute
+
+GitHub Actions job119662648597 failed scheduling with a billing/spending-limit annotation: runner ID0, steps0, artifacts0. No native test, typecheck, cleanup or process/container census ran. Probe 1/1 dispatched/FAIL/CLOSED; local E4 84/84 PASS below is unchanged and must not be promoted to native acceptance. Second replacement Preflight3/E4 NOT RUN.
+
 ## 2026-10-22 — E4 recovery local focus, not native acceptance
 
 E4-focused local tests: **84 PASS / 0 FAIL / 0 skip**. Actual frozen d94c347 disposable-project `scripts/typecheck.mjs` fails with missing `.bin/tsc`, then passes with attested TypeScript 6.0.3 bin/lib fixture; CLI version PASS. Cleanup focus covers tar/read-only, mode000 `dissect-root`, foreign metadata, symlink, active/unknown mounts, partial removal, idempotency and unrelated-state preservation. Bash/ShellCheck, installed-Pi TypeScript, package, changed JS syntax and workflow YAML parse (24 jobs/25 inputs) PASS. Indexed audit exit0/WARN-only/modelCalls0; scoped ZERO_EGRESS review PASS. Full local host `npm run check` not repeated because previous host-only Rust compiler/navigation failures remain recorded, not relabeled. Native combined probe/cleanup receipts and full Preflight3 NOT RUN.

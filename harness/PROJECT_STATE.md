@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-22 — Campaign 3 STOP/Main at native probe scheduling
+
+Combined native TSC/rootfs probe CI39730012824 on functional `569ee16` failed before a runner was assigned: GitHub annotation cites failed recent account payments or spending limit; runner ID0, steps0, artifacts0. Probe 1/1 dispatched/FAIL/CLOSED; no native compiler, rootfs, cleanup or residual-census acceptance. Conditional second replacement Preflight3 0/1 and E4 0/1 remain NOT RUN. Local repaired candidate/84 E4 tests remain local only. Main budget disposition and external billing resolution required; no retry. Historical failed gates remain failed, 29 rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED.
+
 ## 2026-10-22 — Main TSC/rootfs recovery locally prepared; native pending
 
 Original Main TSC/rootfs authority and no-new-budget reconciliation are durable. Frozen product d94c347 and qualified OCI digest unchanged. Qualification-only pinned TypeScript 6.0.3 bin/lib fixture passes a real extracted frozen-project typecheck; absent bin fails. Owned-rootfs cleanup handles locally reproduced unreadable owned directories without changing foreign resources; exact failed-CI path metadata UNKNOWN until native probe. Focused E4 84/84, syntax/ShellCheck/TypeScript/package/YAML and indexed ZERO_EGRESS local review PASS. Combined native probe0/1, conditional second replacement Preflight3 0/1, replacement E4 0/1: none dispatched. Historical CI39626491649/CI39633619005 FAIL/CLOSED; 29 acceptance rows OPEN, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Protected audit and unrelated user files preserved.
