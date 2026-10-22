@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-22 — Optional-services stable activation BLOCKED, switch unused
+
+The non-certifying development candidate remains separate from the active local `phi` installation. Main's conditional switch is 0/1 unused: Pi's existing online startup has external update traffic, the absolute-network acceptance contract is unresolved, and the development worktree lacks managed MCP/LSP dependencies while active Pi settings register only the stable checkout. No OmniRoute permission repair or entrypoint switch occurred. Second Brain remains healthy, SearXNG autostart deferred. Campaign-3 billing/readiness and frozen product/image remain unchanged.
+
 ## 2026-10-22 — Campaign 3 billing readiness not established
 
 Main `E4-GITHUB-ACTIONS-BILLING-RECOVERY-001` grants one conditional replacement combined probe, not an automatic retry. Personal repository billing owner `TheTassoTassista`; exact account payment/spending restriction and present clearance UNKNOWN because read-only billing API needs unavailable `user` scope and browser access is blocked by a saved user permission. Operational `BILLING_READY=NO` (unproven). Historical CI39730012824 remains FAIL/CLOSED/dispatched-not-started and its original 1/1 budget consumed; replacement probe 0/1, second replacement Preflight3 0/1 and E4 0/1 all NOT RUN. No native CI dispatched under the new decision; frozen product/image/recovery unchanged, local84/84 not promoted, Windows autonomy BLOCKED/false, portability NOT CERTIFIED. Account-owner review/official clearance evidence or GitHub Support is required before pre-dispatch re-evaluation.
