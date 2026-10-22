@@ -69,6 +69,17 @@ Project rule interoperability runs automatically before Context Governor for the
 
 ## Daily Pi startup
 
+The non-certifying `feature/phi-optional-services-startup` candidate adds a separate
+`phi`-only path: after Pi's own argument parser and terminal checks establish a
+Linux interactive REPL, Phi asks the existing locked OmniRoute launcher mode and
+Second Brain manager to prepare eligible services. Ordinary unavailability is
+fail-soft; untrusted configuration, process or endpoint identity is rejected.
+Phi does not invoke the full Pi launcher or open its dashboard. SearXNG autostart
+is deliberately deferred because the current fixed-name Docker-start rule
+cannot attest container identity; active Phi search still uses Brave/Perplexity.
+This development worktree is not installed in the stable Pi configuration.
+
+
 `scripts/install-pi-launcher.sh` installs an idempotent Fish function and a
 user-local launcher. Typing `pi` serializes startup, starts OmniRoute with its
 documented `--headless` flag, waits on `/api/health/ping`, starts only the

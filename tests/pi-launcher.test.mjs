@@ -34,6 +34,7 @@ touch \"$PI_TEST_ROOT/omni-ready\"`);
 printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/sudo\"
 touch \"$PI_TEST_ROOT/searx-ready\"`);
   executable(path.join(bin, "docker"), "exit 99");
+  executable(path.join(bin, "ss"), '\npid=$(<"$XDG_STATE_HOME/pi-overdrive/launcher/omniroute.pid")\nprintf \'LISTEN 0 128 127.0.0.1:20128 0.0.0.0:* users:(("omniroute",pid=%s,fd=3))\\n\' "$pid"');
   executable(path.join(bin, "xdg-open"), "printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/browser\"");
   executable(path.join(bin, "pi-overdrive-memory-services"), "printf '%s\\n' \"$*\" >> \"$PI_TEST_ROOT/calls/memory\"");
   executable(path.join(bin, "pi-real"), `
@@ -42,6 +43,7 @@ if [[ \"\${1:-}\" == --hold ]]; then /usr/bin/sleep 2; fi`);
   const env = {
     ...process.env,
     HOME: root,
+    XDG_CONFIG_HOME: path.join(root, '.config'),
     XDG_STATE_HOME: state,
     PI_TEST_ROOT: root,
     PI_OVERDRIVE_LAUNCHER_TEST_MODE: "1",
@@ -157,4 +159,50 @@ test("installer is idempotent and preserves one pre-existing Fish function backu
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("Phi OmniRoute-only mode reuses one managed process without Docker, browser or Pi", () => {
+  const setup = fixture();
+  let pid;
+  try {
+    const configDir = path.join(setup.root, '.config', 'omniroute');
+    mkdirSync(configDir, { recursive: true, mode: 0o700 });
+    writeFileSync(path.join(configDir, 'server.env'), '', { mode: 0o600 });
+    executable(path.join(setup.root, 'bin', 'omniroute'), 'printf "%s\\n" "$*" >> "$PI_TEST_ROOT/calls/omniroute"\ntouch "$PI_TEST_ROOT/omni-ready"\n/usr/bin/sleep 2');
+    for (let run = 0; run < 2; run += 1) {
+      const result = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
+      assert.equal(result.status, 0, result.error?.message ?? result.stderr);
+    }
+    pid = Number(readFileSync(path.join(setup.env.XDG_STATE_HOME, 'pi-overdrive', 'launcher', 'omniroute.pid'), 'utf8'));
+    assert.equal(readFileSync(path.join(setup.calls, 'omniroute'), 'utf8'), '--headless\n');
+    for (const name of ['sudo', 'browser', 'pi', 'memory']) assert.equal(existsSync(path.join(setup.calls, name)), false, name);
+    executable(path.join(setup.root, 'bin', 'ss'), 'pid=$(<"$XDG_STATE_HOME/pi-overdrive/launcher/omniroute.pid")\nprintf \'LISTEN 0 128 0.0.0.0:20128 0.0.0.0:* users:(("omniroute",pid=%s,fd=3))\\n\' "$pid"');
+    const wrongBind = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
+    assert.equal(wrongBind.status, 3);
+    assert.match(wrongBind.stderr, /IDENTITY_UNVERIFIED/u);
+    assert.equal(readFileSync(path.join(setup.calls, 'omniroute'), 'utf8'), '--headless\n');
+  } finally {
+    if (pid) { try { process.kill(pid, 'SIGTERM'); } catch {} }
+    rmSync(setup.root, { recursive: true, force: true });
+  }
+});
+
+test("Phi OmniRoute-only mode rejects unsafe config and spoofed healthy endpoint", () => {
+  const setup = fixture();
+  try {
+    const configDir = path.join(setup.root, '.config', 'omniroute');
+    mkdirSync(configDir, { recursive: true, mode: 0o700 });
+    const config = path.join(configDir, 'server.env');
+    writeFileSync(config, '', { mode: 0o644 });
+    let result = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
+    assert.equal(result.status, 3);
+    assert.match(result.stderr, /SECURITY_MISMATCH/u);
+    chmodSync(config, 0o600);
+    writeFileSync(path.join(setup.root, 'omni-ready'), '');
+    result = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
+    assert.equal(result.status, 3);
+    assert.match(result.stderr, /IDENTITY_UNVERIFIED/u);
+    assert.equal(existsSync(path.join(setup.calls, 'omniroute')), false);
+    assert.equal(existsSync(path.join(setup.calls, 'sudo')), false);
+  } finally { rmSync(setup.root, { recursive: true, force: true }); }
 });

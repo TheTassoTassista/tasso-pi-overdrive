@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PRODUCT, THEMES, renderSplash, themeName } from '../branding/terminal.mjs';
 import { requireAutonomousBackend } from '../platform/index.mjs';
 import { launchEngine, runOwnedEngine } from '../platform/shared/process.mjs';
@@ -7,6 +8,7 @@ import { readPhiConfig, setPhiTheme } from '../lib/phi-config.mjs';
 import { phiDoctor } from '../lib/phi-doctor.mjs';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
 import { runWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
+import { entersInteractiveLinuxRepl, prepareOptionalServices } from '../lib/phi-optional-startup.mjs';
 
 async function main(args) {
   if (args[0] === '--version') { console.log(`Phi ${PRODUCT.version} (Pi ${PRODUCT.piVersion})`); return; }
@@ -62,6 +64,21 @@ async function main(args) {
     if (!report.checks.some((row) => row.capability === name && row.status === 'PASS')) throw new Error(`PHI_STARTUP_BLOCKED: ${name}; run phi doctor`);
   }
   const runtime = discoverPiRuntime();
+  if (process.platform === 'linux' && process.stdin.isTTY && process.stdout.isTTY) {
+    try {
+      const { parseArgs } = await import(pathToFileURL(path.join(runtime.root, 'dist', 'cli', 'args.js')).href);
+      if (entersInteractiveLinuxRepl(args, parseArgs(args))) {
+        const optional = prepareOptionalServices({ root: fileURLToPath(new URL('..', import.meta.url)) });
+        for (const [name, status] of Object.entries(optional)) {
+          if (name !== 'elapsedMs' && !['READY', 'STARTED', 'DEFERRED_SECURITY_BOUNDARY'].includes(status)) {
+            process.stderr.write(`Phi optional ${name}: ${status}\n`);
+          }
+        }
+      }
+    } catch {
+      process.stderr.write('Phi optional startup: classification unavailable; services not started.\n');
+    }
+  }
   await launchEngine(runtime.node, [runtime.entry, ...args], { ...process.env, PHI_LAUNCH: '1', PHI_THEME: theme });
 }
 

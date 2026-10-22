@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-22 — optional-services non-certifying local focus
+
+On separate `feature/phi-optional-services-startup` worktree: 17/17 targeted CLI/launcher/service tests PASS; changed Bash/JS syntax, ShellCheck, package validation, `git diff --check` PASS. Initial `npm run typecheck` found no worktree-local managed `.bin/tsc`; re-run with the unchanged original worktree's pinned TypeScript 6.0.3 via `PI_OVERDRIVE_TSC` PASS, with no install/download. Existing isolated `npm run smoke:memory` exited0, 12 checks PASS with temporary ledger, separate offline Pi RPC sessions, fail-soft backend unavailability and zero real provider calls; backend projections to real services NOT_EXECUTED. Host preparation observation: Second Brain READY, OmniRoute SECURITY_MISMATCH (configuration permissions), SearXNG deferred; elapsed39 ms, baseline UNKNOWN. No full suite/CI/native certification claim; Campaign-3 baseline and budgets unchanged.
+
 ## 2026-10-22 — native probe CI39730012824 did not execute
 
 GitHub Actions job119662648597 failed scheduling with a billing/spending-limit annotation: runner ID0, steps0, artifacts0. No native test, typecheck, cleanup or process/container census ran. Probe 1/1 dispatched/FAIL/CLOSED; local E4 84/84 PASS below is unchanged and must not be promoted to native acceptance. Second replacement Preflight3/E4 NOT RUN.
