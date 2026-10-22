@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-22 — Final controlled optional-services activation DEFERRED
+
+Main `PHI-OPTIONAL-SERVICES-FINAL-ACTIVATION-001` is durable in the development lane. Live preflight found no independent, dependency-complete, Pi-registered target: foundation is launcher-only, candidate MCP/LSP installations are absent, and candidate Doctor fails package registration because active Pi settings still point at the main checkout. The previous decision excludes global Pi settings changes, while a no-override target REPL check requires registration before the final switch. Absolute-startup network acceptance also remains UNKNOWN; prior online Pi startup displayed its own update notification, not coordinator/provider traffic. All pre-switch conditions are therefore not PASS. **ACTIVATION_DEFERRED**, no target preparation or stable switch, budget 0/1 unused, no rollback needed; Campaign-3 product/image/readiness unchanged.
+
 ## 2026-10-22 — Optional-services stable activation BLOCKED, switch unused
 
 The non-certifying development candidate remains separate from the active local `phi` installation. Main's conditional switch is 0/1 unused: Pi's existing online startup has external update traffic, the absolute-network acceptance contract is unresolved, and the development worktree lacks managed MCP/LSP dependencies while active Pi settings register only the stable checkout. No OmniRoute permission repair or entrypoint switch occurred. Second Brain remains healthy, SearXNG autostart deferred. Campaign-3 billing/readiness and frozen product/image remain unchanged.
