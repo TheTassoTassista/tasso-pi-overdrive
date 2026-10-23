@@ -2,6 +2,10 @@
 
 Do not hide intentional limitations.
 
+## Optional local services beyond Second Brain
+
+Daily `phi` has verified Second Brain preparation only. OmniRoute still lacks production AppImage/extracted-binary-to-listener attestation and clean stop; a bounded FUSE diagnostic generated two root-owned core dumps requiring separate exact host cleanup authority. SearXNG has neither non-privileged Docker/container/config attestation nor a Phi search route. Both remain deferred/fail-closed; gateway HTTP200 does not establish callable models, a container name does not establish trusted identity, and no second stable switch is authorized. Evidence and next authority boundary: `docs/phi-progress.md` (2026-10-23 integration diagnostic).
+
 ## V5 mixed recovery beyond terminal observation
 
 Status: PARTIAL / DEFERRED_FOR_SAFETY

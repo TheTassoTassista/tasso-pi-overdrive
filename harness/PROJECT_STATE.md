@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-23 — OmniRoute/SearXNG development gate BLOCKED_SPECIFIC_EVIDENCE
+
+The stable daily CLI remains the verified Second Brain-only target. OmniRoute's extracted user-owned diagnostic reached loopback health, but production provenance and clean shutdown are unproved; two root-owned dumps from the FUSE diagnostic remain for exact host-authorized cleanup. SearXNG cannot be attested with the present fixed-name `docker start` privilege, and Phi search remains Brave/Perplexity-only. No second stable switch or privilege change occurred. Root-owned extracted deployment and narrow read-only container/config attestation require Main authority before completing the technical gates. See the newest `docs/phi-progress.md` and `harness/CONTINUATION.md`; Campaign 3 and Windows autonomy remain unchanged.
+
 ## 2026-10-23 — Second Brain-only daily `phi` activation COMPLETE
 
 The Main-approved partial activation used its sole local switch (1/1). Stable launcher and Pi package registry point to owner-only versioned target `/home/tasso/.local/share/phi/targets/90fc48609853` with the required Second Brain/runtime payloads; existing auth is unchanged. Fresh ordinary `phi` TTY reached Pi0.87.1 with `gpt-6-sol:medium`; `/memory-status` confirmed Second Brain OK, OpenViking and Hindsight available, 0 model tokens/cost. Existing unit PIDs/restart counters were unchanged and no Pi process remained after exit. OmniRoute is deferred fail-closed; SearXNG is deferred at its security boundary. This is a Second Brain-only local activation, not all-optional-services activation, native cold-start certification, absolute zero-egress certification or Windows autonomy. Exact gate evidence, backup and remaining unknowns: `docs/phi-progress.md`.

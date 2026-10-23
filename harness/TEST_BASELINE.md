@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-23 — OmniRoute/SearXNG development diagnostic
+
+Scoped launcher core-suppression change: `node --test tests/pi-launcher.test.mjs` **8 PASS / 0 FAIL**; `bash -n scripts/pi-launcher.sh`, ShellCheck, package validation and `git diff --check` PASS. Prior optional-services **17/17 PASS** reused only for unchanged paths. New native user-unit AppImage diagnostic showed exact child/cgroup/socket chain but health NOT READY and SIGBUS/core files on stop; extracted diagnostic reached HTTP200, then SIGTRAP on stop with `LimitCORE=0` and no stored new dump. Both are non-certifying and do not prove production identity/callability. Stable `phi doctor --json` returned Pi/package/GPT default/OpenViking/Hindsight PASS, OmniRoute/SearXNG NOT AVAILABLE; Second Brain unit PIDs/restarts were unchanged. SearXNG Docker start/query NOT RUN because read-only identity inspection is unavailable. No full suite, CI, provider/model call or stable activation.
+
 ## 2026-10-23 — Second Brain-only local activation
 
 New scoped Pi prompt-loader + optional-startup run: **10 PASS / 0 FAIL**; previous unchanged optional-services focus **17/17 PASS** reused. Versioned target package validation PASS, JS syntax and diff check PASS, isolated target Doctor Pi/package/default/sandbox/LSP-presence PASS and real offline TTY exit0. Post-switch ordinary online `phi` TTY exit0, `gpt-6-sol:medium`, `/memory-status` Second Brain/OpenViking/Hindsight PASS, 0 tokens/cost. Coordinator warm readiness25ms; three systemd unit PIDs unchanged with `NRestarts=0`, OmniRoute/SearXNG ports closed, no residual Phi process. Native cold start deliberately NOT RUN on healthy shared services. No full check, CI, provider call or Rust install; these are not implied by this local activation.
