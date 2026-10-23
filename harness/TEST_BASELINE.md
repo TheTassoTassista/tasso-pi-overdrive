@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-23 — Second Brain-only local activation
+
+New scoped Pi prompt-loader + optional-startup run: **10 PASS / 0 FAIL**; previous unchanged optional-services focus **17/17 PASS** reused. Versioned target package validation PASS, JS syntax and diff check PASS, isolated target Doctor Pi/package/default/sandbox/LSP-presence PASS and real offline TTY exit0. Post-switch ordinary online `phi` TTY exit0, `gpt-6-sol:medium`, `/memory-status` Second Brain/OpenViking/Hindsight PASS, 0 tokens/cost. Coordinator warm readiness25ms; three systemd unit PIDs unchanged with `NRestarts=0`, OmniRoute/SearXNG ports closed, no residual Phi process. Native cold start deliberately NOT RUN on healthy shared services. No full check, CI, provider call or Rust install; these are not implied by this local activation.
+
 ## 2026-10-22 — optional-services live host diagnostic, non-certifying
 
 Unchanged implementation retains historical 17/17 focused PASS; it was not rerun for freshness. New real host preparation returned OmniRoute `UNAVAILABLE` at 1142 ms, repeated in a persistent TTY at 1116 ms for process-lifecycle diagnosis, then `IDENTITY_UNVERIFIED` exit3 once the descendant listener became healthy (HTTP200). This is a **failed activation gate**, not a passing OmniRoute test. After test-owned cleanup, port20128 closed and owned residual processes0. Existing memory units stayed active with PIDs/restarts unchanged; read-only OpenViking exact-resource retrieval returned 1 existing item, Hindsight recall 2 existing items; both backend health probes passed. SearXNG port8888 closed, trusted inspect unavailable. `node scripts/validate-package.mjs` and `git diff --check` PASS for this docs-only checkpoint. No Phi inference call, full suite, CI, real SearXNG query or stable `phi` E2E was executed; background credential/provider activity and absolute egress remain UNKNOWN because OmniRoute performs background housekeeping.

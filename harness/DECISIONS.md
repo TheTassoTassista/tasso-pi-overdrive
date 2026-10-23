@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-23 — PHI-SECOND-BRAIN-PARTIAL-ACTIVATION-001 (user-supplied Φ Main decision)
+
+Decision: **APPROVE_PARTIAL / FAST DEFAULT**. Activate only existing Second Brain preparation on ordinary interactive Linux `phi` startup after isolated target, dependency, Pi registration, network, security and rollback gates. OmniRoute remains `DEFERRED_FAIL_CLOSED`; SearXNG remains `DEFERRED_SECURITY_BOUNDARY`. The single local launcher/registry switch is authorized once after passing gates, with rollback on failed post-switch validation. Do not require unrelated Rust semantics, copied credentials or a cold restart of healthy shared units. No CI, provider call, push, merge, frozen Campaign-3 change or Windows-autonomy promotion. This narrows the earlier all-optional-services activation gate; it does not certify absolute Pi network zero-egress or native cold-start behavior.
+
 ## 2026-10-23 — PHI-LOCAL-SERVICES-FINAL-002 (user-supplied Φ Main decision)
 
 Decision: **IMPLEMENT_SMALLER / CONDITIONAL_ACTIVATION**. Reuse the existing optional-services coordinator; prioritize Second Brain. Promote OmniRoute only with verified original AppImage, launch/process-generation, parent/child, UID, executable/mount and socket/listener chain; otherwise retain `DEFERRED_FAIL_CLOSED`. SearXNG remains `DEFERRED_SECURITY_BOUNDARY` without Docker privilege or web-route change. Prepare and test a version-identifiable dependency-complete target with isolated Pi registry. Active Pi registration may change only in the previously authorized one-shot local switch (0/1), after all dependency, real TTY, security, network, Second Brain, backup and rollback gates pass. No global offline mode, provider call, install/download, CI, push, merge, frozen product or routing change. Current isolated gate is PARTIAL, so switch remains 0/1 UNUSED and stable Phi unchanged.

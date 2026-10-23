@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-23 — Second Brain-only daily `phi` activation COMPLETE
+
+The Main-approved partial activation used its sole local switch (1/1). Stable launcher and Pi package registry point to owner-only versioned target `/home/tasso/.local/share/phi/targets/90fc48609853` with the required Second Brain/runtime payloads; existing auth is unchanged. Fresh ordinary `phi` TTY reached Pi0.87.1 with `gpt-6-sol:medium`; `/memory-status` confirmed Second Brain OK, OpenViking and Hindsight available, 0 model tokens/cost. Existing unit PIDs/restart counters were unchanged and no Pi process remained after exit. OmniRoute is deferred fail-closed; SearXNG is deferred at its security boundary. This is a Second Brain-only local activation, not all-optional-services activation, native cold-start certification, absolute zero-egress certification or Windows autonomy. Exact gate evidence, backup and remaining unknowns: `docs/phi-progress.md`.
+
 ## 2026-10-23 — Optional-services isolated target PARTIAL; stable activation deferred
 
 New focused evidence: installed Pi0.87.1 ties authentication storage to `PI_CODING_AGENT_DIR` and exposes no separate auth-file CLI option; no credentials were duplicated to staging, so GPT-6 selection remains unproven there. `rustc`/`cargo` are absent on this host, leaving six Rust semantic LSP failures. A real-process two-second delayed Second Brain fixture passes under the fixed 12-second cap; focused tests 17/17. Native post-fix cold startup remains untested. Activation gate remains PARTIAL and stable switch 0/1 unused.
