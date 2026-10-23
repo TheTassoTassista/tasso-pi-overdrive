@@ -91,6 +91,22 @@ linuxTest('stopped memory uses existing manager start; ordinary failures stay fa
   } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
 });
 
+linuxTest('cold Second Brain start gets a bounded readiness window without restarting healthy units', () => {
+  const setup = fixture();
+  try {
+    const calls = [];
+    const run = (_command, args, env, timeout) => {
+      calls.push({ action: args[0], attempts: env.PI_OVERDRIVE_MEMORY_WAIT_ATTEMPTS, interval: env.PI_OVERDRIVE_MEMORY_WAIT_INTERVAL, timeout });
+      return { status: args[0] === 'status' ? 1 : 0 };
+    };
+    const result = prepareOptionalServices({ root: setup.root, environment: setup.env, run });
+    assert.equal(result.secondBrain, 'STARTED');
+    assert.deepEqual(calls.map((call) => call.action), ['--phi-prepare-omniroute', 'status', 'start']);
+    assert.deepEqual(calls.at(-1), { action: 'start', attempts: '100', interval: '0.1', timeout: 12_000 });
+    assert.equal(calls.at(-2).timeout, 4_000);
+  } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
+});
+
 linuxTest('untrusted units fail closed and are not executed', () => {
   const setup = fixture();
   try {
