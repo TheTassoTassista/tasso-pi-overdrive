@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-23 — PHI-OMNIROUTE-DERIVED-PAYLOAD-001 (user-supplied Φ Main decision)
+
+Decision: **APPROVE_MINIMAL_DERIVED_PAYLOAD / FAST DEFAULT**, subordinate to `PHI-OMNIROUTE-PROTECTED-INSTALL-001`. From the verified OmniRoute 3.8.50 AppImage extraction, one new private staging may omit only `resources/app/node_modules/global-agent/node_modules/.bin/semver`, the broken absolute CI-workspace npm CLI symlink. This is not authority to alter other bytes/entries, reinstall dependencies, publish under `/opt`, switch stable Phi, enable OmniRoute, clean core dumps, change credentials/routing, or run CI/provider calls. Full source-to-derived manifest comparison, static dependency review and safely isolated relevant runtime validation are mandatory before `DERIVED_PAYLOAD_READY=YES`; otherwise fail closed. A separately approved root host operator remains required for any versioned protected installation, and later production attestation/activation remains a different gate. Evidence and exact host request are in the newest `docs/phi-progress.md` entry.
+
 ## 2026-10-23 — PHI-OMNIROUTE-PROTECTED-INSTALL-001 (user-supplied Φ Main decision)
 
 Decision: **APPROVE_BOUNDED_HOST_INSTALL / FAST DEFAULT** for an offline, manifest-attested, root-owned versioned OmniRoute 3.8.50 target at `/opt/phi/omniroute/3.8.50`, conditional on complete content validation and a separate concrete host-operator approval. No self-escalation, global privilege, second stable switch, inference, SearXNG/Docker work, CI, push, merge or frozen-product change. Reject unsafe tree entries rather than publishing them. Current extraction revealed an upstream absolute external symlink, so the install precondition failed and no operator install was requested or performed; see the current progress ledger. Exact older core dumps remain separately pending privileged inode-checked unlink.

@@ -1,8 +1,12 @@
 # Phi — Current Project State
 
-## 2026-10-23 — OmniRoute protected-install gate FAIL before publication
+## 2026-10-23 — OmniRoute minimal derived payload READY for host review only
 
-The verified 3.8.50 AppImage was extracted offline and fully inventoried in private staging, but its upstream archive contains a broken absolute symlink escaping the intended target. The proposed root-owned `/opt/phi/omniroute/3.8.50` was **not** installed; no protected lifecycle or autostart proof exists. State `OMNIROUTE_DEFERRED_SPECIFIC_BLOCKER`, with exact manifest and offending path in the newest `docs/phi-progress.md`. Old root-owned core dumps remain pending separate operator cleanup. Stable daily Phi remains Second Brain-only; SearXNG/Campaign3 unchanged.
+One Main-authorized omission of the broken upstream npm `.bin/semver` symlink yielded a private derived staging whose complete manifest matches every other original entry. A rootless no-network headless trial reached HTTP200 and clean exit0 with no `--no-sandbox` flag or residual process. `DERIVED_PAYLOAD_READY=YES` does **not** install or activate OmniRoute: `/opt/phi/omniroute/3.8.50` remains unpublished, protected native identity/egress attestation is outstanding, and the app attempted blocked background network fetches. Stable Phi remains Second Brain-only; OmniRoute/SearXNG deferred, core dumps untouched, Campaign3 unchanged. Separate host approval and the precise install request are in newest `docs/phi-progress.md`.
+
+## 2026-10-23 — Historical OmniRoute protected-install gate FAIL before publication
+
+The verified 3.8.50 AppImage was extracted offline and fully inventoried in private staging, but its upstream archive contains a broken absolute symlink escaping the intended target. The proposed root-owned `/opt/phi/omniroute/3.8.50` was **not** installed; no protected lifecycle or autostart proof existed at this historical checkpoint. State was `OMNIROUTE_DEFERRED_SPECIFIC_BLOCKER`, with exact manifest and offending path in the preceding protected-install `docs/phi-progress.md` entry. Old root-owned core dumps remained pending separate operator cleanup. Stable daily Phi remained Second Brain-only; SearXNG/Campaign3 unchanged.
 
 ## 2026-10-23 — OmniRoute native trial deferred; Second Brain stable
 
