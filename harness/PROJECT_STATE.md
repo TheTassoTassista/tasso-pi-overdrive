@@ -1,6 +1,10 @@
 # Phi — Current Project State
 
-## 2026-10-23 — OmniRoute minimal derived payload READY for host review only
+## 2026-10-23 — OmniRoute host approval pending
+
+The derived 3.8.50 payload and original asset have fresh pinned-digest/full-tree PASS evidence. A bounded root-operator installer and exact approval/rollback packet are prepared and locally validated only in read-only/unprivileged fixture paths. No host installation, root command, native protected lifecycle, production network attestation, autostart or Phi/Pi switch occurred. `/opt/phi/omniroute/3.8.50` remains absent; `OMNIROUTE_PROTECTED_LOCAL_PROVEN=NO`, `OMNIROUTE_HOST_APPROVAL_PENDING`. Separate explicit operator approval is required. Historical core cleanup is independent. See newest `docs/phi-progress.md` entry.
+
+## 2026-10-23 — Historical OmniRoute minimal derived payload READY for host review only
 
 One Main-authorized omission of the broken upstream npm `.bin/semver` symlink yielded a private derived staging whose complete manifest matches every other original entry. A rootless no-network headless trial reached HTTP200 and clean exit0 with no `--no-sandbox` flag or residual process. `DERIVED_PAYLOAD_READY=YES` does **not** install or activate OmniRoute: `/opt/phi/omniroute/3.8.50` remains unpublished, protected native identity/egress attestation is outstanding, and the app attempted blocked background network fetches. Stable Phi remains Second Brain-only; OmniRoute/SearXNG deferred, core dumps untouched, Campaign3 unchanged. Separate host approval and the precise install request are in newest `docs/phi-progress.md`.
 
