@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-23 — OmniRoute native trial deferred; Second Brain stable
+
+The installed OmniRoute3.8.50 AppImage matches the official release digest, but its network-isolated native trial could not mount FUSE; the available unprivileged user-systemd IP filter did not enforce egress denial. No protected extracted candidate or clean lifecycle proof is available. `OMNIROUTE_IDENTITY=UNVERIFIED`, autostart disabled. Exact prior core files await privileged inode-checked cleanup. SearXNG remains deferred by Main decision without Docker change. The active daily CLI remains Second Brain-only, with no new stable switch or Campaign-3 change. See the newest `docs/phi-progress.md`.
+
 ## 2026-10-23 — OmniRoute/SearXNG development gate BLOCKED_SPECIFIC_EVIDENCE
 
 The stable daily CLI remains the verified Second Brain-only target. OmniRoute's extracted user-owned diagnostic reached loopback health, but production provenance and clean shutdown are unproved; two root-owned dumps from the FUSE diagnostic remain for exact host-authorized cleanup. SearXNG cannot be attested with the present fixed-name `docker start` privilege, and Phi search remains Brave/Perplexity-only. No second stable switch or privilege change occurred. Root-owned extracted deployment and narrow read-only container/config attestation require Main authority before completing the technical gates. See the newest `docs/phi-progress.md` and `harness/CONTINUATION.md`; Campaign 3 and Windows autonomy remain unchanged.

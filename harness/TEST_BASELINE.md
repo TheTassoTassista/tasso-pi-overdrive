@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-23 — OmniRoute final bounded trial
+
+Installed asset version/size/digest matched GitHub v3.8.50 release API. Rootless network-namespace preflight: loopback `ok`, host non-loopback `ENETUNREACH`; user-systemd IP filter preflight: non-loopback `ECONNREFUSED` despite configured deny, so not a valid egress guard. Single native AppImage trial: FUSE mount denied, process exit127 after 8ms, health/shutdown NOT REACHED; no listener, FUSE mount, process or new core residue. No B trial (no protected candidate), no spoof/reuse/concurrency negative product tests, no new code tests. Historical launcher 8/8 and package/syntax/ShellCheck results reused on unchanged code. Core dump metadata verified read-only; exact old files remain pending host unlink. No CI or provider/model calls.
+
 ## 2026-10-23 — OmniRoute/SearXNG development diagnostic
 
 Scoped launcher core-suppression change: `node --test tests/pi-launcher.test.mjs` **8 PASS / 0 FAIL**; `bash -n scripts/pi-launcher.sh`, ShellCheck, package validation and `git diff --check` PASS. Prior optional-services **17/17 PASS** reused only for unchanged paths. New native user-unit AppImage diagnostic showed exact child/cgroup/socket chain but health NOT READY and SIGBUS/core files on stop; extracted diagnostic reached HTTP200, then SIGTRAP on stop with `LimitCORE=0` and no stored new dump. Both are non-certifying and do not prove production identity/callability. Stable `phi doctor --json` returned Pi/package/GPT default/OpenViking/Hindsight PASS, OmniRoute/SearXNG NOT AVAILABLE; Second Brain unit PIDs/restarts were unchanged. SearXNG Docker start/query NOT RUN because read-only identity inspection is unavailable. No full suite, CI, provider/model call or stable activation.

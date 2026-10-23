@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-23 — PHI-OMNIROUTE-SEARXNG-RESOLUTION-001 (user-supplied Φ Main decision)
+
+Decision: **OMNIROUTE_EXPERIMENT_FIRST / SEARXNG_DEFER / CORE_CLEANUP_APPROVE**. One bounded local OmniRoute trial: prefer an installed native/headless lifecycle, consider a protected extracted candidate only if necessary and available, and retain fail-closed executable→process→listener→socket attestation. Exact prior test-owned root core dumps may be removed only after canonical identity, ownership, inode and writer checks and with actual host authority; otherwise prepare an exact administrative request. SearXNG autostart/search remain deferred with no Docker mutation. No stable Phi switch, inference, CI, push, merge, deploy, provider/routing change or new host privilege. The observed outcome and residual boundary are recorded in the current progress ledger; this decision grants no automatic activation.
+
 ## 2026-10-23 — PHI-SECOND-BRAIN-PARTIAL-ACTIVATION-001 (user-supplied Φ Main decision)
 
 Decision: **APPROVE_PARTIAL / FAST DEFAULT**. Activate only existing Second Brain preparation on ordinary interactive Linux `phi` startup after isolated target, dependency, Pi registration, network, security and rollback gates. OmniRoute remains `DEFERRED_FAIL_CLOSED`; SearXNG remains `DEFERRED_SECURITY_BOUNDARY`. The single local launcher/registry switch is authorized once after passing gates, with rollback on failed post-switch validation. Do not require unrelated Rust semantics, copied credentials or a cold restart of healthy shared units. No CI, provider call, push, merge, frozen Campaign-3 change or Windows-autonomy promotion. This narrows the earlier all-optional-services activation gate; it does not certify absolute Pi network zero-egress or native cold-start behavior.
