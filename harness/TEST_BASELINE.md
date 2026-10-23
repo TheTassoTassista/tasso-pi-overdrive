@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-23 — OmniRoute protected-install preparation
+
+Existing AppImage digest/version/size unchanged. New offline bwrap extraction exit0; SHA-256 manifest of all 16861 files, 3603 directories and 3 symlinks generated and checked. Source archive path traversal scan: 20466 entries, 0 unsafe paths. Extracted special/SUID/SGID/capability scan: 0; **one external absolute broken symlink** in upstream archive, so install gate FAIL. No root publication or native lifecycle, spoof/reuse/network/health test. Package validation/diff check run for documentation checkpoint; historical launcher8/8 and Second Brain proof reused on unchanged inputs. Core dumps still pending operator unlink; no provider/model call or CI.
+
 ## 2026-10-23 — OmniRoute final bounded trial
 
 Installed asset version/size/digest matched GitHub v3.8.50 release API. Rootless network-namespace preflight: loopback `ok`, host non-loopback `ENETUNREACH`; user-systemd IP filter preflight: non-loopback `ECONNREFUSED` despite configured deny, so not a valid egress guard. Single native AppImage trial: FUSE mount denied, process exit127 after 8ms, health/shutdown NOT REACHED; no listener, FUSE mount, process or new core residue. No B trial (no protected candidate), no spoof/reuse/concurrency negative product tests, no new code tests. Historical launcher 8/8 and package/syntax/ShellCheck results reused on unchanged code. Core dump metadata verified read-only; exact old files remain pending host unlink. No CI or provider/model calls.

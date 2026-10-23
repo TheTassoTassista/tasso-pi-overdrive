@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-23 — OmniRoute protected-install gate FAIL before publication
+
+The verified 3.8.50 AppImage was extracted offline and fully inventoried in private staging, but its upstream archive contains a broken absolute symlink escaping the intended target. The proposed root-owned `/opt/phi/omniroute/3.8.50` was **not** installed; no protected lifecycle or autostart proof exists. State `OMNIROUTE_DEFERRED_SPECIFIC_BLOCKER`, with exact manifest and offending path in the newest `docs/phi-progress.md`. Old root-owned core dumps remain pending separate operator cleanup. Stable daily Phi remains Second Brain-only; SearXNG/Campaign3 unchanged.
+
 ## 2026-10-23 — OmniRoute native trial deferred; Second Brain stable
 
 The installed OmniRoute3.8.50 AppImage matches the official release digest, but its network-isolated native trial could not mount FUSE; the available unprivileged user-systemd IP filter did not enforce egress denial. No protected extracted candidate or clean lifecycle proof is available. `OMNIROUTE_IDENTITY=UNVERIFIED`, autostart disabled. Exact prior core files await privileged inode-checked cleanup. SearXNG remains deferred by Main decision without Docker change. The active daily CLI remains Second Brain-only, with no new stable switch or Campaign-3 change. See the newest `docs/phi-progress.md`.

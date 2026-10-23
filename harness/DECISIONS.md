@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-23 — PHI-OMNIROUTE-PROTECTED-INSTALL-001 (user-supplied Φ Main decision)
+
+Decision: **APPROVE_BOUNDED_HOST_INSTALL / FAST DEFAULT** for an offline, manifest-attested, root-owned versioned OmniRoute 3.8.50 target at `/opt/phi/omniroute/3.8.50`, conditional on complete content validation and a separate concrete host-operator approval. No self-escalation, global privilege, second stable switch, inference, SearXNG/Docker work, CI, push, merge or frozen-product change. Reject unsafe tree entries rather than publishing them. Current extraction revealed an upstream absolute external symlink, so the install precondition failed and no operator install was requested or performed; see the current progress ledger. Exact older core dumps remain separately pending privileged inode-checked unlink.
+
 ## 2026-10-23 — PHI-OMNIROUTE-SEARXNG-RESOLUTION-001 (user-supplied Φ Main decision)
 
 Decision: **OMNIROUTE_EXPERIMENT_FIRST / SEARXNG_DEFER / CORE_CLEANUP_APPROVE**. One bounded local OmniRoute trial: prefer an installed native/headless lifecycle, consider a protected extracted candidate only if necessary and available, and retain fail-closed executable→process→listener→socket attestation. Exact prior test-owned root core dumps may be removed only after canonical identity, ownership, inode and writer checks and with actual host authority; otherwise prepare an exact administrative request. SearXNG autostart/search remain deferred with no Docker mutation. No stable Phi switch, inference, CI, push, merge, deploy, provider/routing change or new host privilege. The observed outcome and residual boundary are recorded in the current progress ledger; this decision grants no automatic activation.
