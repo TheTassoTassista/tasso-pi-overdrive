@@ -107,6 +107,18 @@ linuxTest('cold Second Brain start gets a bounded readiness window without resta
   } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
 });
 
+linuxTest('delayed local backend readiness beyond the former 1.6-second window succeeds', () => {
+  const setup = fixture();
+  try {
+    fs.writeFileSync(path.join(setup.root, 'config', 'optional-services.json'), JSON.stringify({ version: 1, omniroute: 'deferred' }), { mode: 0o600 });
+    fs.writeFileSync(setup.manager, '#!/bin/sh\nif [ "$1" = status ]; then exit 1; fi\nif [ "$1" = start ]; then /usr/bin/sleep 2; exit 0; fi\nexit 2\n', { mode: 0o700 });
+    const result = prepareOptionalServices({ root: setup.root, environment: setup.env });
+    assert.equal(result.omniroute, 'DEFERRED_FAIL_CLOSED');
+    assert.equal(result.secondBrain, 'STARTED');
+    assert.ok(result.elapsedMs >= 1_600);
+  } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
+});
+
 linuxTest('untrusted units fail closed and are not executed', () => {
   const setup = fixture();
   try {
