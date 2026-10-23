@@ -148,7 +148,13 @@ start_omniroute() {
     /usr/bin/touch -- "$log_file"
     /usr/bin/chmod 600 -- "$log_file"
     echo "Pi Overdrive: starting OmniRoute headless."
-    /usr/bin/nohup "$omniroute_bin" --headless >>"$log_file" 2>&1 9>&- &
+    # Electron/AppImage can crash while a FUSE mount is torn down. Never let a
+    # gateway child persist a credential-bearing core dump during startup or
+    # cleanup; keep this limit scoped to OmniRoute, not the Pi process.
+    (
+      ulimit -c 0
+      exec /usr/bin/nohup "$omniroute_bin" --headless
+    ) >>"$log_file" 2>&1 9>&- &
     local omni_pid=$!
     local pid_tmp=$launcher_state/.omniroute.pid.$$
     printf '%s\n' "$omni_pid" > "$pid_tmp"

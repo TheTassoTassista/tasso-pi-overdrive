@@ -168,13 +168,14 @@ test("Phi OmniRoute-only mode reuses one managed process without Docker, browser
     const configDir = path.join(setup.root, '.config', 'omniroute');
     mkdirSync(configDir, { recursive: true, mode: 0o700 });
     writeFileSync(path.join(configDir, 'server.env'), '', { mode: 0o600 });
-    executable(path.join(setup.root, 'bin', 'omniroute'), 'printf "%s\\n" "$*" >> "$PI_TEST_ROOT/calls/omniroute"\ntouch "$PI_TEST_ROOT/omni-ready"\n/usr/bin/sleep 2');
+    executable(path.join(setup.root, 'bin', 'omniroute'), 'printf "%s\\n" "$*" >> "$PI_TEST_ROOT/calls/omniroute"\nulimit -c > "$PI_TEST_ROOT/calls/omniroute-core-limit"\ntouch "$PI_TEST_ROOT/omni-ready"\n/usr/bin/sleep 2');
     for (let run = 0; run < 2; run += 1) {
       const result = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
       assert.equal(result.status, 0, result.error?.message ?? result.stderr);
     }
     pid = Number(readFileSync(path.join(setup.env.XDG_STATE_HOME, 'pi-overdrive', 'launcher', 'omniroute.pid'), 'utf8'));
     assert.equal(readFileSync(path.join(setup.calls, 'omniroute'), 'utf8'), '--headless\n');
+    assert.equal(readFileSync(path.join(setup.calls, 'omniroute-core-limit'), 'utf8').trim(), '0');
     for (const name of ['sudo', 'browser', 'pi', 'memory']) assert.equal(existsSync(path.join(setup.calls, name)), false, name);
     executable(path.join(setup.root, 'bin', 'ss'), 'pid=$(<"$XDG_STATE_HOME/pi-overdrive/launcher/omniroute.pid")\nprintf \'LISTEN 0 128 0.0.0.0:20128 0.0.0.0:* users:(("omniroute",pid=%s,fd=3))\\n\' "$pid"');
     const wrongBind = spawnSync(launcher, ['--phi-prepare-omniroute'], { env: setup.env, encoding: 'utf8', timeout: 1_000 });
