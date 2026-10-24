@@ -200,7 +200,11 @@ def verify_or_copy_tree(root_fd, rows, children, expected_uid, expected_gid, tar
                 stat.S_IMODE(st.st_mode) == mode and not (st.st_mode & 0o6000),
                 "directory identity/mode mismatch: " + rel)
         wanted = children.get(rel, set())
-        require(set(os.listdir(source_fd)) == wanted, "directory children mismatch: " + rel)
+        actual = set(os.listdir(source_fd))
+        if actual != wanted:
+            raise RuntimeError("directory children mismatch: " + rel +
+                               " missing=" + repr(sorted(wanted - actual)) +
+                               " added=" + repr(sorted(actual - wanted)))
         for name in sorted(wanted):
             child = name if rel == "." else rel + "/" + name
             entry = rows[child]
@@ -265,7 +269,11 @@ def verify_or_copy_tree(root_fd, rows, children, expected_uid, expected_gid, tar
                     os.chown(name, 0, 0, dir_fd=dest_fd, follow_symlinks=False)
             require(stat_identity(before, os.stat(name, dir_fd=source_fd, follow_symlinks=False)),
                     "source changed during scan: " + child)
-        require(set(os.listdir(source_fd)) == wanted, "directory changed during scan: " + rel)
+        actual = set(os.listdir(source_fd))
+        if actual != wanted:
+            raise RuntimeError("directory changed during scan: " + rel +
+                               " missing=" + repr(sorted(wanted - actual)) +
+                               " added=" + repr(sorted(actual - wanted)))
     walk(root_fd, ".", copy_root_fd)
 
 

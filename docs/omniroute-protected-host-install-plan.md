@@ -1,6 +1,6 @@
 # OmniRoute 3.8.50 — protected host operation approval packet
 
-Status: **OMNIROUTE_HOST_APPROVAL_PENDING**. This packet prepares an operation; it does not authorize or execute it. The operator must explicitly approve the exact commands below. It does not activate OmniRoute in Phi.
+Status: **INSTALL_FAIL_CLOSED / ROOT CAUSE UNKNOWN**. The previously approved block ran once and stopped with `directory children mismatch: .` before publication. The exact quarantine `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21` remains root-owned and untouched; the versioned target and sidecar are absent. A subsequent unprivileged full-tree verification of the quarantine found no missing, added or changed entries. This does **not** establish which names differed at failure time. The old approval and script hash below are historical: **DO NOT RUN THE BLOCK AGAIN**. A diagnostic-only script revision now has SHA-256 `b3d0ab7b16aeddee0add681e546bcc215da86d59c6c38e0e96359416fe9b8106`; it neither resolves the unexplained mismatch nor has host-execution approval. No second install, root cleanup, service activation or core removal is authorized by this packet.
 
 ## Exact inputs and intended output
 
@@ -17,9 +17,9 @@ The operator needs one bounded root execution to create `/opt/phi/omniroute`, a 
 
 The main risks are a mutable user source, symlink/path substitution, partial root quarantine on failure, accidental replacement of a published target, and OmniRoute's background egress. The installer pins the manifest and AppImage digests; opens every source ancestor/entry without following symlinks; copies only listed entries through directory file descriptors into a root-only same-filesystem quarantine; hashes bytes during copying; independently rescans the protected copy; enforces root ownership and 0755 directories, 0755 executable files, 0644 other files, two fixed internal symlinks and no setuid/setgid/hardlinks/special files; then uses Linux `renameat2(RENAME_NOREPLACE)` for atomic publication. An existing target or sidecar is an error, never overwritten. The root executable script must itself be copied to a protected location and hash-checked **after** copying, before execution. Any failure is fail-closed; a quarantine/sidecar may remain for exact operator review, never cleaned by a broad glob.
 
-## Exact commands for operator approval — NOT EXECUTED
+## Historical exact commands — EXECUTED ONCE; DO NOT REUSE
 
-The user-level check below is read-only and was run successfully. The subsequent `sudo` commands are **proposed only**. The operator must review the entire linked Python script and approve these commands before they run. Do not bypass the script-digest comparison.
+The user-level check succeeded and the operator ran the `sudo` block once against the old pinned script. It failed closed before publication. These commands are retained only to explain that attempt; the source script has since changed for diagnostics, so its old digest check must now fail. Do not bypass or update that check without a new concrete host approval and a disposition of the unexplained failure.
 
 ```bash
 set -euo pipefail

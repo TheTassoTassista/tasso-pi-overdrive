@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-24 — OmniRoute protected install FAIL_CLOSED; cause UNKNOWN
+
+The one approved host install stopped before versioned publication with `directory children mismatch: .`; target and sidecar remain absent. The exact root-owned quarantine is retained. A fresh unprivileged full-tree read-only check matches all manifest entries, so no persistent integrity mismatch is present; the actual names seen at failure time were not logged and root cause remains UNKNOWN. Diagnostic-only script/test change preserves fail-closed behavior but invalidates the prior approved script hash. No second root attempt or cleanup is authorized; OmniRoute autostart remains disabled. Stable Second Brain-only Phi, SearXNG defer, Campaign3 and user files are unchanged. See newest progress entry.
+
 ## 2026-10-23 — OmniRoute host approval pending
 
 The derived 3.8.50 payload and original asset have fresh pinned-digest/full-tree PASS evidence. A bounded root-operator installer and exact approval/rollback packet are prepared and locally validated only in read-only/unprivileged fixture paths. No host installation, root command, native protected lifecycle, production network attestation, autostart or Phi/Pi switch occurred. `/opt/phi/omniroute/3.8.50` remains absent; `OMNIROUTE_PROTECTED_LOCAL_PROVEN=NO`, `OMNIROUTE_HOST_APPROVAL_PENDING`. Separate explicit operator approval is required. Historical core cleanup is independent. See newest `docs/phi-progress.md` entry.
