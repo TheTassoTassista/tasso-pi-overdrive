@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — isolated SearXNG runtime preparation only
+
+New one-shot runtime-script offline tests **7 PASS / 0 FAIL** (fixed image/no pull/no network/no real mounts, synthetic JSON fixture, unprivileged refusal, body deadline, foreign-container refusal, Docker-inspect ambiguity and mount/network rejection), plus unchanged host-attestor focused tests **9 PASS / 0 FAIL**; Python AST syntax, package validation and diff check PASS. No Docker create/start/exec/stop, root command, real service JSON query, real cache check, network packet attestation or CI. `SEARXNG_EXACT_IMAGE_RO_RUNTIME` remains NOT RUN; any PASS requires separately approved host execution and verified cleanup.
+
 ## 2026-10-24 — exact registry image / bounded local-inspection preparation
 
 Docker Hub and GHCR exact OCI index responses independently SHA-256 matched `e084…`; amd64 manifest `a93b…`, config `325e…` and entrypoint layer `a250…` hash checks PASS. This is registry evidence only. Existing host-attestor `--image-identity` offline test and all prior focused tests: **9 PASS / 0 FAIL**; Python syntax, package validation and diff check PASS. No privileged Docker/host invocation, local image-layer extraction, runtime container, protected-config access, real web query or CI. `LOCAL_IMAGE_METADATA`, read-only mount startup and publisher signature remain NOT VERIFIED.
