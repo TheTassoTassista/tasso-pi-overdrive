@@ -1,6 +1,10 @@
 # Phi implementation ledger
 
-## OmniRoute privileged-process attestation prepared (2026-10-24; HOST APPROVAL PENDING)
+## OmniRoute host process attestation blocked by sudo non-interactive access (2026-10-24; UNKNOWN)
+
+The operator expressly approved only the exact read-only attestation block pinned to script SHA-256 `7939f162a264d8e136ce6628443f27fba172ae70eb416f58e189fec57a3a54ff`. The full source was reviewed; the on-disk SHA matched. The approved block was run exactly once. `/usr/bin/sudo -n /usr/bin/python3 -I -B -` returned exit 1 with `sudo: a password is required` before the root Python attestor started. Thus **no privileged process census occurred**: `HOST_PROCESS_SNAPSHOT=UNKNOWN`, not PASS/FAIL; `QUARANTINE_RECOVERABLE=NO` remains. No sudoers/permission change, alternate elevation, root retry, publication, quarantine/core cleanup or recovery script preparation. NEXT: authorized host operator must arrange a separately permitted non-interactive sudo context or perform the exact approved attestation through their host procedure; no autonomous bypass. The later recovery/publication approval boundary remains separate.
+
+## OmniRoute privileged-process attestation prepared (2026-10-24; HISTORICAL)
 
 Under `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001`, prepared one fixed-path read-only host snapshot script, `scripts/omniroute-quarantine-process-attest.py` (SHA-256 `7939f162a264d8e136ce6628443f27fba172ae70eb416f58e189fec57a3a54ff`). It pins quarantine device36/inode859869, Btrfs mount ID40 and the 20466-entry metadata count; inspects `/proc` FD/cwd/root/exe/maps/mountinfo/mount namespaces without emitting argv, environment, file contents or mapped bytes; and returns `UNKNOWN` on inaccessible/racy evidence. Local non-root execution correctly refused; parser/alias regression 1/1 PASS; syntax and diff check PASS. **No root command has run.** The script and exact-byte execution command require separate explicit host-operator approval. The existing `QUARANTINE_RECOVERABLE=NO` / `HOST_PROCESS_SNAPSHOT=UNKNOWN` remains unchanged until an approved host snapshot is collected; a PASS would be temporal evidence only, not a lock against later process activity. No recovery publication, quarantine cleanup, stable switch, CI or push occurred.
 

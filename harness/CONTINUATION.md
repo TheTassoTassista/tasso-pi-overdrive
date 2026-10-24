@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-## CURRENT — privileged-process attestation ready for separate host approval (2026-10-24)
+## CURRENT — approved attestation could not start as root (2026-10-24)
+
+Operator approval covered only the SHA-pinned read-only block. Full source/hash review PASS; exact block invoked once. `sudo -n` returned exit1, `sudo: a password is required`, before launching root Python. Therefore privileged process usage remains UNKNOWN and `QUARANTINE_RECOVERABLE=NO`; no recovery implementation or publication can follow. No alternate privilege path, sudoers change, second attempt, cleanup or stable mutation. NEXT: host operator supplies a permitted non-interactive sudo context or runs the same approved attestation via their host procedure; preserve the separate approval gate for any eventual root publication. DO_NOT_REDO prior integrity audits or infer a clean process census from this refusal.
+
+## PRIOR — privileged-process attestation ready for separate host approval (2026-10-24)
 
 Prepared `scripts/omniroute-quarantine-process-attest.py` and a focused parser/alias regression without privileged execution. Current quarantine identity still device36/inode859869/mount40, target absent. The script indexes metadata only, scans privileged process references (FD/cwd/root/exe/maps/mount namespaces and same-device mount aliases), and fails closed on incomplete evidence. Local 1/1 test and non-root refusal PASS. `HOST_PROCESS_SNAPSHOT=UNKNOWN` and `QUARANTINE_RECOVERABLE=NO` remain; NEXT: present pinned digest and exact read-only command, obtain explicit operator approval, then inspect its result. Do not run root autonomously, reattempt install, publish, clean quarantine/cores or infer permanent safety from a snapshot.
 
