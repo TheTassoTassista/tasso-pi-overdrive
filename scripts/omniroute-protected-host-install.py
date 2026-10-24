@@ -4,12 +4,15 @@
 Usage: python3 -I scripts/omniroute-protected-host-install.py check
        python3 -I /root/<approved-pinned-copy>.py install
        python3 -I /root/<approved-pinned-copy>.py verify-installed
+       python3 -I -B - recover  (approved SHA-pinned script bytes on stdin)
 
 The operator must pin/check this script's SHA-256 before executing its root copy.
 No service, Phi launcher, Pi registry, credential or core-dump operation is here.
 """
 
 import ctypes
+import base64
+import binascii
 import errno
 import hashlib
 import json
@@ -26,8 +29,16 @@ MANIFEST_NAME = "derived-integrity-manifest.json"
 PAYLOAD_NAME = "squashfs-root"
 ASSET = "/opt/omniroute-bin/OmniRoute.AppImage"
 PARENT = "/opt/phi/omniroute"
+PARENT_DEV = 36
+PARENT_INO = 859868
+PARENT_MOUNT_ID = 40
 VERSION = "3.8.50"
 SIDECAR = ".manifest-3.8.50.json"
+QUARANTINE = ".incoming-3.8.50-bc71bbfe146958f9b9848a21"
+QUARANTINE_DEV = 36
+QUARANTINE_INO = 859869
+QUARANTINE_MOUNT_ID = 40
+RECOVERY_SIDECAR_SCHEMA = "phi-omniroute-recovery-sidecar-v1"
 MANIFEST_SHA256 = "cefef41509e534c51f1ef173c9fd25753fa1c86975b148829a6232ca4b9fcb9b"
 SOURCE_MANIFEST_SHA256 = "06c927c48e456beccf64f2d0bf5f73f85359d4e87cd3063ecd0c07f7c7f719b8"
 ASSET_SHA256 = "96099e33c899940ce5fd606064415c79c32d4fd75f7b58a23c640ea769347b71"
@@ -40,6 +51,14 @@ SYMLINKS = {
 }
 FLAGS = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
 DIR_FLAGS = FLAGS | os.O_DIRECTORY
+
+
+def mount_id(fd):
+    with open("/proc/self/fdinfo/" + str(fd), encoding="ascii") as stream:
+        for line in stream:
+            if line.startswith("mnt_id:"):
+                return int(line.split()[1])
+    raise RuntimeError("mount identity unavailable")
 
 
 def require(condition, message):
@@ -100,7 +119,8 @@ def read_pinned_file(parent_fd, name, expected_hash, max_size):
             data.extend(chunk)
             require(len(data) <= max_size, "pinned file grew: " + name)
         require(stat_identity(before, os.fstat(fd)), "pinned file changed during read: " + name)
-        require(hashlib.sha256(data).hexdigest() == expected_hash, "pinned digest mismatch: " + name)
+        if expected_hash is not None:
+            require(hashlib.sha256(data).hexdigest() == expected_hash, "pinned digest mismatch: " + name)
         return bytes(data)
     finally:
         os.close(fd)
@@ -191,10 +211,76 @@ def parse_manifest(raw):
     return rows, children
 
 
-def verify_or_copy_tree(root_fd, rows, children, expected_uid, expected_gid, target=False, copy_root_fd=None):
+def recovery_sidecar(raw, quarantine_stat, quarantine_mount_id):
+    require(hashlib.sha256(raw).hexdigest() == MANIFEST_SHA256,
+            "recovery manifest digest mismatch")
+    return (json.dumps({
+        "schema": RECOVERY_SIDECAR_SCHEMA,
+        "version": VERSION,
+        "manifestSha256": MANIFEST_SHA256,
+        "manifestBase64": base64.b64encode(raw).decode("ascii"),
+        "quarantineName": QUARANTINE,
+        "quarantineDev": quarantine_stat.st_dev,
+        "quarantineIno": quarantine_stat.st_ino,
+        "quarantineMountId": quarantine_mount_id,
+        "destination": PARENT + "/" + VERSION,
+    }, sort_keys=True, separators=(",", ":")) + "\n").encode("ascii")
+
+
+def unpack_sidecar(raw):
+    sidecar = json.loads(raw)
+    require(isinstance(sidecar, dict), "sidecar is not an object")
+    if sidecar.get("schema") == "phi-omniroute-derived-payload-v1":
+        require(hashlib.sha256(raw).hexdigest() == MANIFEST_SHA256,
+                "legacy sidecar digest mismatch")
+        return raw, None
+    require(sidecar.get("schema") == RECOVERY_SIDECAR_SCHEMA and
+            sidecar.get("version") == VERSION and
+            sidecar.get("manifestSha256") == MANIFEST_SHA256 and
+            sidecar.get("quarantineName") == QUARANTINE and
+            sidecar.get("quarantineDev") == QUARANTINE_DEV and
+            sidecar.get("quarantineIno") == QUARANTINE_INO and
+            sidecar.get("quarantineMountId") == QUARANTINE_MOUNT_ID and
+            sidecar.get("destination") == PARENT + "/" + VERSION and
+            set(sidecar) == {"schema", "version", "manifestSha256", "manifestBase64",
+                             "quarantineName", "quarantineDev", "quarantineIno",
+                             "quarantineMountId", "destination"},
+            "recovery sidecar binding mismatch")
+    require(raw == (json.dumps(sidecar, sort_keys=True, separators=(",", ":")) + "\n").encode("ascii"),
+            "recovery sidecar is not canonical")
+    encoded = sidecar["manifestBase64"]
+    require(isinstance(encoded, str) and len(encoded) <= 12 * 1024 * 1024,
+            "recovery sidecar manifest encoding invalid")
+    try:
+        manifest = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise RuntimeError("recovery sidecar manifest encoding invalid") from error
+    require(hashlib.sha256(manifest).hexdigest() == MANIFEST_SHA256,
+            "recovery sidecar manifest digest mismatch")
+    return manifest, (QUARANTINE_DEV, QUARANTINE_INO, QUARANTINE_MOUNT_ID)
+
+
+def verify_recovery_target_identity(target_fd, binding):
+    target_stat = os.fstat(target_fd)
+    require((target_stat.st_dev, target_stat.st_ino, mount_id(target_fd)) == binding,
+            "recovery target identity mismatch")
+
+
+def verify_or_copy_tree(root_fd, rows, children, expected_uid, expected_gid, target=False,
+                        copy_root_fd=None, expected_mount_id=None):
+    def check_recovery_metadata(fd, rel):
+        if expected_mount_id is None:
+            return
+        require(mount_id(fd) == expected_mount_id, "unexpected recovery mount: " + rel)
+        names = os.listxattr(fd)
+        require(not any(name in ("system.posix_acl_access", "system.posix_acl_default",
+                                 "security.capability") for name in names),
+                "unsafe recovery ACL/capability: " + rel)
+
     def walk(source_fd, rel, dest_fd):
         current = rows[rel]
         st = os.fstat(source_fd)
+        check_recovery_metadata(source_fd, rel)
         mode = int(current["expectedMode" if target else "sourceMode"], 8)
         require(stat.S_ISDIR(st.st_mode) and st.st_uid == expected_uid and st.st_gid == expected_gid and
                 stat.S_IMODE(st.st_mode) == mode and not (st.st_mode & 0o6000),
@@ -241,6 +327,7 @@ def verify_or_copy_tree(root_fd, rows, children, expected_uid, expected_gid, tar
                         "file type/mode/size mismatch: " + child)
                 source_child = os.open(name, FLAGS | os.O_NONBLOCK, dir_fd=source_fd)
                 try:
+                    check_recovery_metadata(source_child, child)
                     require(stat_identity(before, os.fstat(source_child)), "file replaced: " + child)
                     if dest_fd is not None:
                         dest_child = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
@@ -333,11 +420,21 @@ def verify_installed():
                 sidecar_stat.st_gid == 0 and
                 stat.S_IMODE(sidecar_stat.st_mode) == 0o600,
                 "installed sidecar owner/mode mismatch")
-        raw = read_pinned_file(parent_fd, SIDECAR, MANIFEST_SHA256, 8 * 1024 * 1024)
+        sidecar_raw = read_pinned_file(parent_fd, SIDECAR, None, 12 * 1024 * 1024)
+        raw, recovery_binding = unpack_sidecar(sidecar_raw)
         rows, children = parse_manifest(raw)
         target_fd = os.open(VERSION, DIR_FLAGS, dir_fd=parent_fd)
         try:
-            verify_or_copy_tree(target_fd, rows, children, 0, 0, target=True)
+            if recovery_binding is not None:
+                verify_recovery_target_identity(target_fd, recovery_binding)
+                try:
+                    os.stat(QUARANTINE, dir_fd=parent_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    raise RuntimeError("recovery quarantine still present after publication")
+            verify_or_copy_tree(target_fd, rows, children, 0, 0, target=True,
+                                expected_mount_id=recovery_binding[2] if recovery_binding else None)
         finally:
             os.close(target_fd)
     finally:
@@ -355,12 +452,164 @@ def no_replace_rename(parent_fd, old, new):
         raise OSError(code, os.strerror(code), new)
 
 
+def existing_root_parent():
+    for ancestor in ("/opt", "/opt/phi", PARENT):
+        fd = open_dir_chain(ancestor)
+        try:
+            st = os.fstat(fd)
+            require(st.st_uid == 0 and st.st_gid == 0 and stat.S_ISDIR(st.st_mode) and
+                    not (st.st_mode & 0o022) and
+                    not any(name.startswith("system.posix_acl_") for name in os.listxattr(fd)),
+                    "unsafe recovery ancestor: " + ancestor)
+        finally:
+            os.close(fd)
+    parent_fd = open_dir_chain(PARENT)
+    try:
+        parent_identity(parent_fd)
+        return parent_fd
+    except BaseException:
+        os.close(parent_fd)
+        raise
+
+
+def parent_identity(parent_fd, expected_uid=0, expected_gid=0):
+    pinned = os.fstat(parent_fd)
+    named_fd = open_dir_chain(PARENT)
+    try:
+        named = os.fstat(named_fd)
+        require(stat.S_ISDIR(pinned.st_mode) and pinned.st_uid == expected_uid and
+                pinned.st_gid == expected_gid and
+                not (pinned.st_mode & 0o022) and
+                not any(name.startswith("system.posix_acl_") for name in os.listxattr(parent_fd)) and
+                (pinned.st_dev, pinned.st_ino, mount_id(parent_fd)) ==
+                (PARENT_DEV, PARENT_INO, PARENT_MOUNT_ID) and
+                (named.st_dev, named.st_ino, mount_id(named_fd)) ==
+                (PARENT_DEV, PARENT_INO, PARENT_MOUNT_ID),
+                "recovery parent identity changed")
+    finally:
+        os.close(named_fd)
+
+
+def recovery_state(parent_fd):
+    present = {}
+    for name in (QUARANTINE, VERSION, SIDECAR):
+        try:
+            os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            present[name] = False
+        else:
+            present[name] = True
+    quarantine, target, sidecar = (present[name] for name in (QUARANTINE, VERSION, SIDECAR))
+    if target and sidecar and not quarantine:
+        return "VERIFY_REQUIRED"
+    if target and not sidecar:
+        return "FAIL_CLOSED_TARGET_WITHOUT_SIDECAR"
+    if sidecar and not target:
+        return "INCOMPLETE_SIDECAR_WITHOUT_TARGET"
+    if quarantine and not target and not sidecar:
+        return "QUARANTINE_ONLY"
+    if not any(present.values()):
+        return "ABSENT"
+    return "FAIL_CLOSED_CONFLICT"
+
+
+def recovery_identity(parent_fd, quarantine_fd, expected_uid=0, expected_gid=0):
+    pinned = os.fstat(quarantine_fd)
+    named = os.stat(QUARANTINE, dir_fd=parent_fd, follow_symlinks=False)
+    require(stat.S_ISDIR(pinned.st_mode) and pinned.st_uid == expected_uid and
+            pinned.st_gid == expected_gid and
+            stat.S_IMODE(pinned.st_mode) == 0o755 and
+            pinned.st_dev == QUARANTINE_DEV and pinned.st_ino == QUARANTINE_INO and
+            mount_id(quarantine_fd) == QUARANTINE_MOUNT_ID and
+            stat_identity(pinned, named), "recovery quarantine identity changed")
+    return pinned
+
+
+def recover_quarantine():
+    require(hasattr(ctypes.CDLL(None), "renameat2"), "renameat2 NOREPLACE unavailable")
+    os.umask(0o077)
+    source_fd = open_dir_chain(SOURCE)
+    try:
+        source_user = pwd.getpwnam("tasso")
+        source_stat = os.fstat(source_fd)
+        require(source_stat.st_uid == source_user.pw_uid and source_stat.st_gid == source_user.pw_gid and
+                stat.S_IMODE(source_stat.st_mode) == 0o700, "untrusted source stage")
+        manifest_stat = os.stat(MANIFEST_NAME, dir_fd=source_fd, follow_symlinks=False)
+        require(stat.S_ISREG(manifest_stat.st_mode) and
+                manifest_stat.st_uid == source_user.pw_uid and
+                manifest_stat.st_gid == source_user.pw_gid and
+                stat.S_IMODE(manifest_stat.st_mode) == 0o600,
+                "untrusted source manifest")
+        raw = read_pinned_file(source_fd, MANIFEST_NAME, MANIFEST_SHA256, 8 * 1024 * 1024)
+        rows, children = parse_manifest(raw)
+    finally:
+        os.close(source_fd)
+    verify_asset()
+    parent_fd = existing_root_parent()
+    try:
+        state = recovery_state(parent_fd)
+        require(state == "QUARANTINE_ONLY", "recovery state is not quarantine-only: " + state)
+        quarantine_fd = os.open(QUARANTINE, DIR_FLAGS, dir_fd=parent_fd)
+        try:
+            before = recovery_identity(parent_fd, quarantine_fd)
+            verify_or_copy_tree(quarantine_fd, rows, children, 0, 0, target=True,
+                                expected_mount_id=QUARANTINE_MOUNT_ID)
+            require(stat_identity(before, recovery_identity(parent_fd, quarantine_fd)),
+                    "recovery quarantine changed during verification")
+            os.fsync(quarantine_fd)
+            sidecar_bytes = recovery_sidecar(raw, before, QUARANTINE_MOUNT_ID)
+            require(len(sidecar_bytes) <= 12 * 1024 * 1024, "recovery sidecar too large")
+            sidecar_fd = os.open(SIDECAR, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                 os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=parent_fd)
+            try:
+                os.fchown(sidecar_fd, 0, 0)
+                remaining = memoryview(sidecar_bytes)
+                while remaining:
+                    written = os.write(sidecar_fd, remaining)
+                    require(written > 0, "short write to recovery sidecar")
+                    remaining = remaining[written:]
+                os.fsync(sidecar_fd)
+            finally:
+                os.close(sidecar_fd)
+            os.fsync(parent_fd)
+            parent_identity(parent_fd)
+            sidecar_stat = os.stat(SIDECAR, dir_fd=parent_fd, follow_symlinks=False)
+            require(stat.S_ISREG(sidecar_stat.st_mode) and sidecar_stat.st_uid == 0 and
+                    sidecar_stat.st_gid == 0 and stat.S_IMODE(sidecar_stat.st_mode) == 0o600 and
+                    read_pinned_file(parent_fd, SIDECAR, hashlib.sha256(sidecar_bytes).hexdigest(),
+                                     12 * 1024 * 1024) == sidecar_bytes,
+                    "recovery sidecar changed before publication")
+            require(recovery_state(parent_fd) == "INCOMPLETE_SIDECAR_WITHOUT_TARGET" and
+                    stat_identity(before, recovery_identity(parent_fd, quarantine_fd)),
+                    "recovery pre-publication state changed")
+            verify_or_copy_tree(quarantine_fd, rows, children, 0, 0, target=True,
+                                expected_mount_id=QUARANTINE_MOUNT_ID)
+            require(read_pinned_file(parent_fd, SIDECAR, hashlib.sha256(sidecar_bytes).hexdigest(),
+                                     12 * 1024 * 1024) == sidecar_bytes and
+                    stat_identity(before, recovery_identity(parent_fd, quarantine_fd)),
+                    "recovery evidence changed before publication")
+            parent_identity(parent_fd)
+            no_replace_rename(parent_fd, QUARANTINE, VERSION)
+            os.fsync(parent_fd)
+            parent_identity(parent_fd)
+        finally:
+            os.close(quarantine_fd)
+    finally:
+        os.close(parent_fd)
+    verify_installed()
+    print("HOST_INSTALL_PUBLISHED=YES " + PARENT + "/" + VERSION +
+          " (service/activation not changed)")
+
+
 def main():
-    require(len(sys.argv) == 2 and sys.argv[1] in ("check", "install", "verify-installed"),
-            "usage: check|install|verify-installed")
+    require(len(sys.argv) == 2 and sys.argv[1] in ("check", "install", "verify-installed", "recover"),
+            "usage: check|install|verify-installed|recover")
     mode = sys.argv[1]
-    if mode in ("install", "verify-installed"):
+    if mode in ("install", "verify-installed", "recover"):
         require(os.geteuid() == 0, "host operation requires separately approved root operator")
+    if mode == "recover":
+        recover_quarantine()
+        return
     if mode == "verify-installed":
         verify_asset()
         verify_installed()

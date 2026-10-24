@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-## CURRENT — attestor self-FD correction; fresh host attestation still required (2026-10-24)
+## CURRENT — OmniRoute quarantine recovery candidate; host approval pending (2026-10-24)
+
+Operator reports privileged corrected attestor PASS (336 PIDs, hits0, unknown0, entries20466, device36/inode859869/mount40; SHA `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`). Snapshot is time-bounded. Existing installer now has a fixed-object `recover` path reusing canonical verification twice around sidecar creation, exact parent/quarantine identity, root-only bound sidecar, fsync, one `RENAME_NOREPLACE`, postverify and fail-closed crash states. Focused local fixtures and package/syntax checks are the only new validation; no root publication performed. Script SHA `1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c`; exact command/rollback in `docs/omniroute-protected-host-install-plan.md`. NEXT: obtain new explicit approval of that exact script hash and command before any root invocation; then inspect actual result and post-publication gates. `HOST_INSTALL_PUBLISHED=NO`; stable Phi, Second Brain, SearXNG, auth and Campaign3 untouched. DO_NOT_REDO extraction/copy/install or historical broad audits.
+
+## PRIOR — attestor self-FD correction; fresh host attestation still required (2026-10-24)
 
 Exact code review showed the scanner's own pinned quarantine directory FD was counted as `read_fd` when `/proc` reached its PID. Local reproduction on the real quarantine showed before=`read_fd`, after=no hit for only that FD. Regression 2/2 PASS also retains detection of another same-process FD and an independent Python reader. Historical PID33386/startTicks773816 has exited; available evidence does not prove it was the attestor, so no retrospective PASS. New script SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`; earlier approved SHA invalid. No root execution or publication. `HOST_PROCESS_SNAPSHOT=UNKNOWN`, `QUARANTINE_RECOVERABLE=NO`. NEXT: fresh explicit approval and an authorized host context for the new exact-hash read-only attestation; then classify its actual result. DO_NOT_REDO integrity audits, install, extraction or stable activation.
 

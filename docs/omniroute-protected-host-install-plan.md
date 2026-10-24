@@ -1,8 +1,42 @@
 # OmniRoute 3.8.50 — protected host operation approval packet
 
-Status: **QUARANTINE_RECOVERY_DEFERRED / SPECIFIC_BLOCKER** under `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001`. The previously approved block ran once and stopped with `directory children mismatch: .` before publication. The exact quarantine `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21` remains root-owned and untouched; the versioned target and sidecar are absent. A subsequent unprivileged full-tree verification found no missing, added or changed entries, but privileged process-use absence is UNKNOWN from this unprivileged session. Thus `QUARANTINE_RECOVERABLE=NO` pending separately approved read-only host attestation. The old approval and script hash below are historical: **DO NOT RUN THE BLOCK AGAIN**. A diagnostic-only script revision has SHA-256 `b3d0ab7b16aeddee0add681e546bcc215da86d59c6c38e0e96359416fe9b8106`; it neither resolves the unexplained mismatch nor has host-execution approval. No second install, root cleanup, service activation or core removal is authorized by this packet.
+Status: **QUARANTINE_RECOVERY_PREPARED / HOST_APPROVAL_PENDING** under `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001`. The operator reports a privileged read-only process snapshot PASS (336 PIDs, 0 hits, 0 unknown, 20466 indexed entries, device36/inode859869/mount40) using the corrected attestor SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`. This is a time-bounded operator report, not continuous exclusion or a root publication. The exact quarantine remains root-owned and unpublished; target and sidecar remain absent. The historical installation failure and older script approvals below are **not reusable**. Only the new `recover` command in the pending-approval section may be considered for a separately approved root operation. No root recovery command has run.
 
-## Exact inputs and intended output
+## New one-shot quarantine recovery — exact host approval requested, NOT EXECUTED
+
+- Script: `/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py`, SHA-256 **`1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c`**. This supersedes the historical hashes only for a newly approved `recover` invocation; the original `install` path must not be invoked.
+- Existing root-owned quarantine: `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21`, expected device36/inode859869/mount40. Existing protected parent `/opt/phi/omniroute` is pinned to device36/inode859868/mount40. No payload extraction or recopy occurs.
+- Canonical derived manifest: `/home/tasso/.local/share/phi/omni-derived-stage-bsuvLtRA/derived-integrity-manifest.json`, SHA-256 `cefef41509e534c51f1ef173c9fd25753fa1c86975b148829a6232ca4b9fcb9b`, 20466 entries. Original AppImage: `/opt/omniroute-bin/OmniRoute.AppImage`, SHA-256 `96099e33c899940ce5fd606064415c79c32d4fd75f7b58a23c640ea769347b71`.
+- Authorized target only: `/opt/phi/omniroute/3.8.50`; root-owned mode0600 sidecar only: `/opt/phi/omniroute/.manifest-3.8.50.json`. The new sidecar embeds the exact digest-checked canonical manifest and binds release, quarantine name/device/inode/mount and destination. It is not a READY marker by itself.
+- The pinned-byte command below hashes the exact bytes subsequently fed to root Python; no root helper copy or mutable-file hash/execution race is involved. `sudo -n` fails without an already-authorized host context. **Do not execute this block without a new explicit approval for this exact SHA and command.**
+
+```bash
+/usr/bin/python3 -I -B - <<'PY'
+import hashlib
+import pathlib
+import subprocess
+
+path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py")
+code = path.read_bytes()
+expected = "1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c"
+if hashlib.sha256(code).hexdigest() != expected:
+    raise SystemExit("REFUSE: recovery script digest changed")
+result = subprocess.run(
+    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-", "recover"],
+    input=code,
+    check=False,
+)
+raise SystemExit(result.returncode)
+PY
+```
+
+The root transaction rechecks the original asset and canonical manifest, opens the trusted parent and exact quarantine without following symlinks, verifies all 20466 entries with the existing hash/owner/mode/type/symlink verifier plus mount/ACL/capability checks, and rechecks object identities before mutation. It creates and fsyncs only the new sidecar, fsyncs the parent, then reruns the full verifier and sidecar/identity checks immediately before one `renameat2(RENAME_NOREPLACE)` in the pinned parent and fsyncs again. Final verification requires the target's original quarantine inode/mount, an absent old quarantine name, coherent sidecar and the complete target tree. `HOST_INSTALL_PUBLISHED=YES` is printed only after this passes. Any failure exits nonzero without deleting or overwriting evidence.
+
+Crash dispositions are deliberately manual/fail-closed: quarantine only → no automatic retry; sidecar without target → incomplete, not READY; target without sidecar → fail closed; target and sidecar → reverify before PASS; any conflicting combination or binding mismatch → fail closed. Publication is atomic for the target name, **not** atomic with sidecar creation. No automatic rollback or cleanup is performed. If failure precedes rename, preserve quarantine and sidecar exactly. If target appears but postverification fails, leave it disabled and preserved; any later identity-checked no-replace rename to a separately approved rollback name requires its own concrete host approval. Since no Phi launcher/registry switch occurs, daily Phi/Second Brain need no rollback. A time-bounded process snapshot cannot exclude a later privileged writer; root-owned permissions, fresh full verification and object identity checks narrow but do not eliminate that host-level risk.
+
+## Historical original-install packet — context only; do not execute
+
+### Exact inputs and intended output
 
 - Source staging (user-owned, mutable, **not trusted by root**): `/home/tasso/.local/share/phi/omni-derived-stage-bsuvLtRA/squashfs-root`.
 - Source manifest: `/home/tasso/.local/share/phi/omni-derived-stage-bsuvLtRA/derived-integrity-manifest.json`, SHA-256 `cefef41509e534c51f1ef173c9fd25753fa1c86975b148829a6232ca4b9fcb9b`.
@@ -11,13 +45,13 @@ Status: **QUARANTINE_RECOVERY_DEFERRED / SPECIFIC_BLOCKER** under `PHI-OMNIROUTE
 - Protected target: `/opt/phi/omniroute/3.8.50`; protected manifest sidecar: `/opt/phi/omniroute/.manifest-3.8.50.json`.
 - Host installer source: `/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py`, SHA-256 `f005d4a255fd301eb9d0a8274df4d64d1f23b35884805205619964e65a95171f`.
 
-## Scope, privileges and risk
+### Scope, privileges and risk
 
 The operator needs one bounded root execution to create `/opt/phi/omniroute`, a random `.incoming-3.8.50-*` quarantine there, the root-owned 0600 manifest sidecar, and the root-owned versioned payload. There is **no** service installation, sudoers change, launcher/registry change, credential operation, model call, core cleanup or stable switch. The derived payload is not upstream byte-identical; the original release digest is provenance for its source, not a signature of the derived tree.
 
 The main risks are a mutable user source, symlink/path substitution, partial root quarantine on failure, accidental replacement of a published target, and OmniRoute's background egress. The installer pins the manifest and AppImage digests; opens every source ancestor/entry without following symlinks; copies only listed entries through directory file descriptors into a root-only same-filesystem quarantine; hashes bytes during copying; independently rescans the protected copy; enforces root ownership and 0755 directories, 0755 executable files, 0644 other files, two fixed internal symlinks and no setuid/setgid/hardlinks/special files; then uses Linux `renameat2(RENAME_NOREPLACE)` for atomic publication. An existing target or sidecar is an error, never overwritten. The root executable script must itself be copied to a protected location and hash-checked **after** copying, before execution. Any failure is fail-closed; a quarantine/sidecar may remain for exact operator review, never cleaned by a broad glob.
 
-## Historical exact commands — EXECUTED ONCE; DO NOT REUSE
+### Historical exact commands — EXECUTED ONCE; DO NOT REUSE
 
 The user-level check succeeded and the operator ran the `sudo` block once against the old pinned script. It failed closed before publication. These commands are retained only to explain that attempt; the source script has since changed for diagnostics, so its old digest check must now fail. Do not bypass or update that check without a new concrete host approval and a disposition of the unexplained failure.
 
