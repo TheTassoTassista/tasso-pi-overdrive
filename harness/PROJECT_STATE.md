@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-24 — OmniRoute quarantine recovery DEFERRED / SPECIFIC_BLOCKER
+
+Main's bounded quarantine-recovery decision is durable, but its mandatory no-process-use predicate cannot be completed without a separately approved privileged read-only process census. Current quarantine content and root ownership match the pinned manifest; target and sidecar are absent. `QUARANTINE_RECOVERABLE=NO` until privileged process-use evidence closes the UNKNOWN. No recovery code or administrative operation ran. Stable Phi/Second Brain, SearXNG, Campaign3 and user files remain unchanged. See newest progress entry.
+
 ## 2026-10-24 — OmniRoute protected install FAIL_CLOSED; cause UNKNOWN
 
 The one approved host install stopped before versioned publication with `directory children mismatch: .`; target and sidecar remain absent. The exact root-owned quarantine is retained. A fresh unprivileged full-tree read-only check matches all manifest entries, so no persistent integrity mismatch is present; the actual names seen at failure time were not logged and root cause remains UNKNOWN. Diagnostic-only script/test change preserves fail-closed behavior but invalidates the prior approved script hash. No second root attempt or cleanup is authorized; OmniRoute autostart remains disabled. Stable Second Brain-only Phi, SearXNG defer, Campaign3 and user files are unchanged. See newest progress entry.
