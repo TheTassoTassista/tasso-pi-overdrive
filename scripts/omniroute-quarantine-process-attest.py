@@ -108,7 +108,7 @@ def tree_inodes(root_fd):
     return ids, mapped
 
 
-def inspect_process(pid, ids, mapped):
+def inspect_process(pid, ids, mapped, attestor_fd=None):
     base = "/proc/" + pid
     start, state = process_identity(pid)
     if state == "Z":
@@ -134,6 +134,11 @@ def inspect_process(pid, ids, mapped):
                 item = os.stat(entry.path)
             except FileNotFoundError:
                 raise RuntimeError("fd_changed_during_snapshot")
+            # The pinned quarantine directory FD is held by this scanner itself.
+            # Exempt only that exact descriptor in this exact process; every other
+            # FD, including another read-only FD in this process, is still checked.
+            if pid == str(os.getpid()) and attestor_fd is not None and entry.name == str(attestor_fd):
+                continue
             indexed = (item.st_dev, item.st_ino) in ids
             stale_named = False
             if not indexed and item.st_dev == EXPECTED_DEV:
@@ -191,7 +196,7 @@ def main():
             unknown = []
             for pid in sorted(name for name in os.listdir("/proc") if name.isdigit()):
                 try:
-                    start, references, namespace = inspect_process(pid, ids, mapped)
+                    start, references, namespace = inspect_process(pid, ids, mapped, root_fd)
                 except (FileNotFoundError, ProcessLookupError):
                     if os.path.exists("/proc/" + pid):
                         unknown.append("pid_" + pid + "_changed")

@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-## CURRENT — approved attestation could not start as root (2026-10-24)
+## CURRENT — attestor self-FD correction; fresh host attestation still required (2026-10-24)
+
+Exact code review showed the scanner's own pinned quarantine directory FD was counted as `read_fd` when `/proc` reached its PID. Local reproduction on the real quarantine showed before=`read_fd`, after=no hit for only that FD. Regression 2/2 PASS also retains detection of another same-process FD and an independent Python reader. Historical PID33386/startTicks773816 has exited; available evidence does not prove it was the attestor, so no retrospective PASS. New script SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`; earlier approved SHA invalid. No root execution or publication. `HOST_PROCESS_SNAPSHOT=UNKNOWN`, `QUARANTINE_RECOVERABLE=NO`. NEXT: fresh explicit approval and an authorized host context for the new exact-hash read-only attestation; then classify its actual result. DO_NOT_REDO integrity audits, install, extraction or stable activation.
+
+## PRIOR — approved attestation could not start as root (2026-10-24)
 
 Operator approval covered only the SHA-pinned read-only block. Full source/hash review PASS; exact block invoked once. `sudo -n` returned exit1, `sudo: a password is required`, before launching root Python. Therefore privileged process usage remains UNKNOWN and `QUARANTINE_RECOVERABLE=NO`; no recovery implementation or publication can follow. No alternate privilege path, sudoers change, second attempt, cleanup or stable mutation. NEXT: host operator supplies a permitted non-interactive sudo context or runs the same approved attestation via their host procedure; preserve the separate approval gate for any eventual root publication. DO_NOT_REDO prior integrity audits or infer a clean process census from this refusal.
 

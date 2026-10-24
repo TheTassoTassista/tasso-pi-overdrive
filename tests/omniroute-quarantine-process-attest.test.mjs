@@ -40,3 +40,45 @@ print("HOST_ATTESTOR_PARSER_PASS")
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /HOST_ATTESTOR_PARSER_PASS/u);
 });
+
+test('only the attestor-owned quarantine FD is exempt; other Python readers remain visible', () => {
+  const probe = `
+import os, runpy, subprocess, sys, tempfile
+a = runpy.run_path(sys.argv[1], run_name="self_fd_regression")
+with tempfile.TemporaryDirectory(prefix="phi-omni-attestor-fd-") as root:
+    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        item = os.fstat(fd)
+        ids = {(item.st_dev, item.st_ino)}
+        mapped = {(os.major(item.st_dev), os.minor(item.st_dev), item.st_ino)}
+        inspect = a["inspect_process"]
+        assert "read_fd" in inspect(str(os.getpid()), ids, mapped)[1]
+        assert inspect(str(os.getpid()), ids, mapped, fd)[1] == []
+        other_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            assert "read_fd" in inspect(str(os.getpid()), ids, mapped, fd)[1]
+            child = subprocess.Popen(
+                [sys.executable, "-I", "-B", "-c",
+                 "import sys; print('READY', flush=True); sys.stdin.buffer.read(1)"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                pass_fds=(other_fd,), text=False)
+            try:
+                assert child.stdout.readline() == b"READY\\n"
+                assert "read_fd" in inspect(str(child.pid), ids, mapped, fd)[1]
+            finally:
+                child.stdin.write(b"x")
+                child.stdin.close()
+                child.stdout.close()
+                assert child.wait(timeout=5) == 0
+        finally:
+            os.close(other_fd)
+    finally:
+        os.close(fd)
+print("SELF_FD_EXACT_EXEMPTION_PASS")
+`;
+  const result = spawnSync('python3', ['-I', '-B', '-c', probe, script], {
+    encoding: 'utf8', timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /SELF_FD_EXACT_EXEMPTION_PASS/u);
+});
