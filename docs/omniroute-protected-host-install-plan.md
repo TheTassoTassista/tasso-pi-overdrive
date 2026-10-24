@@ -8,7 +8,7 @@ Status: **QUARANTINE_RECOVERY_PREPARED / HOST_APPROVAL_PENDING** under `PHI-OMNI
 - Existing root-owned quarantine: `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21`, expected device36/inode859869/mount40. Existing protected parent `/opt/phi/omniroute` is pinned to device36/inode859868/mount40. No payload extraction or recopy occurs.
 - Canonical derived manifest: `/home/tasso/.local/share/phi/omni-derived-stage-bsuvLtRA/derived-integrity-manifest.json`, SHA-256 `cefef41509e534c51f1ef173c9fd25753fa1c86975b148829a6232ca4b9fcb9b`, 20466 entries. Original AppImage: `/opt/omniroute-bin/OmniRoute.AppImage`, SHA-256 `96099e33c899940ce5fd606064415c79c32d4fd75f7b58a23c640ea769347b71`.
 - Authorized target only: `/opt/phi/omniroute/3.8.50`; root-owned mode0600 sidecar only: `/opt/phi/omniroute/.manifest-3.8.50.json`. The new sidecar embeds the exact digest-checked canonical manifest and binds release, quarantine name/device/inode/mount and destination. It is not a READY marker by itself.
-- The pinned-byte command below hashes the exact bytes subsequently fed to root Python; no root helper copy or mutable-file hash/execution race is involved. `sudo -n` fails without an already-authorized host context. **Do not execute this block without a new explicit approval for this exact SHA and command.**
+- The pinned-byte command below hashes the exact bytes subsequently fed to root Python; no root helper copy or mutable-file hash/execution race is involved. It first requires a **fresh** read-only process snapshot PASS from the corrected attestor (SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`); any nonzero/UNKNOWN/IN_USE result stops before recovery. `sudo -n` fails without an already-authorized host context. **Do not execute this block without a new explicit approval for both exact SHAs and this command.**
 
 ```bash
 /usr/bin/python3 -I -B - <<'PY'
@@ -16,21 +16,31 @@ import hashlib
 import pathlib
 import subprocess
 
-path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py")
-code = path.read_bytes()
-expected = "1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c"
-if hashlib.sha256(code).hexdigest() != expected:
+attestor_path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-quarantine-process-attest.py")
+recovery_path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py")
+attestor = attestor_path.read_bytes()
+recovery = recovery_path.read_bytes()
+if hashlib.sha256(attestor).hexdigest() != "d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56":
+    raise SystemExit("REFUSE: attestor digest changed")
+if hashlib.sha256(recovery).hexdigest() != "1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c":
     raise SystemExit("REFUSE: recovery script digest changed")
-result = subprocess.run(
-    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-", "recover"],
-    input=code,
+snapshot = subprocess.run(
+    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-"],
+    input=attestor,
     check=False,
 )
-raise SystemExit(result.returncode)
+if snapshot.returncode != 0:
+    raise SystemExit("REFUSE: fresh host process snapshot did not PASS")
+publication = subprocess.run(
+    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-", "recover"],
+    input=recovery,
+    check=False,
+)
+raise SystemExit(publication.returncode)
 PY
 ```
 
-The root transaction rechecks the original asset and canonical manifest, opens the trusted parent and exact quarantine without following symlinks, verifies all 20466 entries with the existing hash/owner/mode/type/symlink verifier plus mount/ACL/capability checks, and rechecks object identities before mutation. It creates and fsyncs only the new sidecar, fsyncs the parent, then reruns the full verifier and sidecar/identity checks immediately before one `renameat2(RENAME_NOREPLACE)` in the pinned parent and fsyncs again. Final verification requires the target's original quarantine inode/mount, an absent old quarantine name, coherent sidecar and the complete target tree. `HOST_INSTALL_PUBLISHED=YES` is printed only after this passes. Any failure exits nonzero without deleting or overwriting evidence.
+After the fresh snapshot PASS, the root transaction rechecks the original asset and canonical manifest, opens the trusted parent and exact quarantine without following symlinks, verifies all 20466 entries with the existing hash/owner/mode/type/symlink verifier plus mount/ACL/capability checks, and rechecks object identities before mutation. It creates and fsyncs only the new sidecar, fsyncs the parent, then reruns the full verifier and sidecar/identity checks immediately before one `renameat2(RENAME_NOREPLACE)` in the pinned parent and fsyncs again. Final verification requires the target's original quarantine inode/mount, an absent old quarantine name, coherent sidecar and the complete target tree. `HOST_INSTALL_PUBLISHED=YES` is printed only after this passes. Any failure exits nonzero without deleting or overwriting evidence.
 
 Crash dispositions are deliberately manual/fail-closed: quarantine only → no automatic retry; sidecar without target → incomplete, not READY; target without sidecar → fail closed; target and sidecar → reverify before PASS; any conflicting combination or binding mismatch → fail closed. Publication is atomic for the target name, **not** atomic with sidecar creation. No automatic rollback or cleanup is performed. If failure precedes rename, preserve quarantine and sidecar exactly. If target appears but postverification fails, leave it disabled and preserved; any later identity-checked no-replace rename to a separately approved rollback name requires its own concrete host approval. Since no Phi launcher/registry switch occurs, daily Phi/Second Brain need no rollback. A time-bounded process snapshot cannot exclude a later privileged writer; root-owned permissions, fresh full verification and object identity checks narrow but do not eliminate that host-level risk.
 
