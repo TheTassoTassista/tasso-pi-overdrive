@@ -83,6 +83,45 @@ class RuntimePreparationTests(unittest.TestCase):
         with self.assertRaisesRegex(RUNTIME.GateFailure, "temporary_isolation_mismatch"):
             RUNTIME.verify_isolation(item, config, cache)
 
+    def test_traceback_summary_redacts_message_and_non_image_path(self):
+        logs = ("Traceback (most recent call last):\n"
+                "  File \"/home/private/config-secret.py\", line 7, in run\n"
+                "    access_token = 'secret-value'\n"
+                "requests.exceptions.ConnectionError: https://secret.example/?key=secret-value\n"
+                "Traceback (most recent call last):\n"
+                "  File \"/usr/local/searxng/searx/search.py\", line 42, in run\n"
+                "ValueError: secret-value\n")
+        summaries = RUNTIME.traceback_summaries(logs)
+        self.assertEqual(summaries, [
+            {"exceptionType": "requests.exceptions.ConnectionError",
+             "lastFrame": {"file": "OTHER_PATH_REDACTED", "line": 7}},
+            {"exceptionType": "ValueError", "lastFrame": {"file": "searx/search.py", "line": 42}},
+        ])
+        self.assertNotIn("secret-value", str(summaries))
+        self.assertNotIn("secret.example", str(summaries))
+
+    def test_log_failure_is_unknown_not_clean_pass(self):
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        failed = types.SimpleNamespace(returncode=1, stdout=b"", stderr=b"daemon unavailable")
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=failed):
+            self.assertEqual(RUNTIME.diagnostics("name", "marker"),
+                             {"status": "UNKNOWN", "reason": "docker_logs_unavailable"})
+
+    def test_traceback_remains_fatal_diagnostic_after_json_readiness(self):
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        logs = types.SimpleNamespace(returncode=0, stdout=(
+            b"Traceback (most recent call last):\n"
+            b"  File \"/usr/local/searxng/searx/search.py\", line 42, in run\n"
+            b"RuntimeError: hidden secret in message\n"), stderr=b"")
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=logs):
+            result = RUNTIME.diagnostics("name", "marker")
+        self.assertTrue(result["logTraceback"])
+        self.assertTrue(result["runningAtDiagnostics"])
+        self.assertEqual(result["tracebackSummaries"][0]["exceptionType"], "RuntimeError")
+        self.assertNotIn("hidden secret", str(result))
+
 
 if __name__ == "__main__":
     unittest.main()

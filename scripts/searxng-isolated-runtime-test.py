@@ -10,6 +10,7 @@ import errno
 import json
 import os
 import pathlib
+import re
 import secrets
 import shutil
 import socket
@@ -279,6 +280,7 @@ def runtime_test(name, marker, config, cache, state):
         raise GateFailure("temporary_id_mismatch")
     verify_isolation(item, config, cache)
     docker("start", container_id, timeout=20)
+    state["phaseReached"] = "container_started"
     item = owned_container(name, marker)
     verify_isolation(item, config, cache)
     if item.get("State", {}).get("Running") is not True:
@@ -286,9 +288,11 @@ def runtime_test(name, marker, config, cache, state):
     network_code = probe(container_id, NETWORK_PROBE)
     if network_code:
         raise GateFailure("network_probe_exit_" + str(network_code))
+    state["phaseReached"] = "network_probe_pass"
     file_code = probe(container_id, FILE_PROBE)
     if file_code:
         raise GateFailure("file_probe_exit_" + str(file_code))
+    state["phaseReached"] = "file_probe_pass"
     until = time.monotonic() + READINESS_SECONDS
     while time.monotonic() < until:
         if probe(container_id, HEALTH_PROBE, timeout=5) == 0:
@@ -298,9 +302,11 @@ def runtime_test(name, marker, config, cache, state):
         time.sleep(1)
     else:
         raise GateFailure("server_readiness_timeout")
+    state["phaseReached"] = "health_pass"
     json_code = probe(container_id, JSON_PROBE, timeout=18)
     if json_code:
         raise GateFailure("json_probe_exit_" + str(json_code))
+    state["phaseReached"] = "json_probe_pass"
     return container_id
 
 
@@ -352,19 +358,56 @@ def cleanup(name, marker, root, root_identity, container_id_hint=None):
     return result
 
 
+def traceback_summaries(log_text):
+    """Extract bounded traceback identity, never exception messages or source lines."""
+    summaries = []
+    frame = None
+    in_traceback = False
+    for line in log_text.splitlines():
+        if "Traceback (most recent call last):" in line:
+            in_traceback = True
+            frame = None
+            continue
+        if not in_traceback:
+            continue
+        match = re.match(r'^\s*File "([^"]+)", line ([0-9]{1,7})(?:, in [A-Za-z_][A-Za-z0-9_]*)?\s*$', line)
+        if match:
+            path = match.group(1)
+            if path.startswith("/usr/local/searxng/"):
+                location = path.removeprefix("/usr/local/searxng/")
+                if not re.fullmatch(r"[A-Za-z0-9_./-]{1,160}", location) or ".." in pathlib.PurePosixPath(location).parts:
+                    location = "IMAGE_PATH_REDACTED"
+            else:
+                location = "OTHER_PATH_REDACTED"
+            frame = {"file": location, "line": int(match.group(2))}
+            continue
+        exception = re.match(r'^\s*([A-Za-z_][A-Za-z0-9_.]{0,127}(?:Error|Exception|Timeout|Failure))\s*:', line)
+        if exception:
+            summaries.append({"exceptionType": exception.group(1), "lastFrame": frame})
+            in_traceback = False
+            if len(summaries) == 3:
+                break
+    return summaries
+
+
 def diagnostics(name, marker):
     item = owned_container(name, marker)
     if item is None:
         return None
     logs = docker("logs", "--tail", "200", item["Id"], allow_failure=True)
-    text = (logs.stdout + logs.stderr).decode("utf-8", "replace").lower()
+    if logs.returncode:
+        return {"status": "UNKNOWN", "reason": "docker_logs_unavailable"}
+    raw_text = (logs.stdout + logs.stderr).decode("utf-8", "replace")
+    text = raw_text.lower()
     return {
         "exitCode": item.get("State", {}).get("ExitCode"),
+        "runningAtDiagnostics": item.get("State", {}).get("Running"),
         "oomKilled": item.get("State", {}).get("OOMKilled"),
         "logReadOnlyError": "read-only file system" in text,
         "logPermissionError": "permission denied" in text,
         "logChownError": "chown" in text and ("error" in text or "denied" in text),
         "logTraceback": "traceback" in text,
+        "tracebackSummaries": traceback_summaries(raw_text),
     }
 
 
@@ -382,7 +425,8 @@ def main():
     reason = None
     cleanup_result = None
     failure_diagnostics = None
-    state = {"createAttempted": False, "createConfirmed": False, "containerId": None}
+    state = {"createAttempted": False, "createConfirmed": False,
+             "containerId": None, "phaseReached": "preflight_pass"}
     started = time.monotonic()
     try:
         root, root_identity, config, cache = prepare_fixture()
@@ -428,6 +472,7 @@ def main():
             reason = reason or "cleanup_or_original_state_failed"
     print(json.dumps({"SEARXNG_EXACT_IMAGE_RO_RUNTIME": outcome, "reason": reason,
                       "originalUnchanged": original_unchanged, "cleanup": cleanup_result,
+                      "phaseReached": state["phaseReached"],
                       "diagnostics": failure_diagnostics,
                       "elapsedSeconds": round(time.monotonic() - started, 2)}, sort_keys=True))
     return 0 if outcome == "PASS" else 1 if outcome == "FAIL" else 2

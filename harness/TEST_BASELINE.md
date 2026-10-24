@@ -2,7 +2,7 @@
 
 ## 2026-10-24 — isolated SearXNG runtime preparation only
 
-New one-shot runtime-script offline tests **7 PASS / 0 FAIL** (fixed image/no pull/no network/no real mounts, synthetic JSON fixture, unprivileged refusal, body deadline, foreign-container refusal, Docker-inspect ambiguity and mount/network rejection), plus unchanged host-attestor focused tests **9 PASS / 0 FAIL**; Python AST syntax, package validation and diff check PASS. No Docker create/start/exec/stop, root command, real service JSON query, real cache check, network packet attestation or CI. `SEARXNG_EXACT_IMAGE_RO_RUNTIME` remains NOT RUN; any PASS requires separately approved host execution and verified cleanup.
+Operator-reported one-shot isolated runtime test **FAIL** at post-probe traceback flag (source permits no narrower traceback attribution); operator-reported cleanup PASS and original unchanged. Current focused runtime-script offline regressions **10 PASS / 0 FAIL** including redacted traceback summary and Docker-log failure UNKNOWN; Python AST syntax, package validation and diff check PASS. No Docker/root/provider call in the diagnostic update. Exact exception and source remain UNKNOWN until a separately approved fresh runtime run; no runtime PASS or real service proof.
 
 ## 2026-10-24 — exact registry image / bounded local-inspection preparation
 
