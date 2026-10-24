@@ -1,44 +1,14 @@
 # OmniRoute 3.8.50 — protected host operation approval packet
 
-Status: **QUARANTINE_RECOVERY_PREPARED / HOST_APPROVAL_PENDING** under `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001`. The operator reports a privileged read-only process snapshot PASS (336 PIDs, 0 hits, 0 unknown, 20466 indexed entries, device36/inode859869/mount40) using the corrected attestor SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`. This is a time-bounded operator report, not continuous exclusion or a root publication. The exact quarantine remains root-owned and unpublished; target and sidecar remain absent. The historical installation failure and older script approvals below are **not reusable**. Only the new `recover` command in the pending-approval section may be considered for a separately approved root operation. No root recovery command has run.
+Status: **HOST_INSTALL_PUBLISHED / RUNTIME_ISOLATED_PASS / AUTOSTART_NOT_READY** under `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001`. The operator reports a fresh privileged process snapshot PASS (337 PIDs, 0 hits, 0 unknown), followed by `VERIFY_INSTALLED_PASS` and one `HOST_INSTALL_PUBLISHED=YES` transaction. Local read-only checks confirm target device36/inode859869, absent old quarantine name, root:root0600 sidecar metadata, and a full 20466-entry canonical target verification. The root-only sidecar contents were not independently reread as UID1000. A protected, no-egress isolated runtime start/health/provenance/shutdown smoke passed, but production autostart and network enforcement remain unverified. **Do not rerun `recover` or any historical install command in this document.** Current details are in the newest `docs/phi-progress.md` entry.
 
-## New one-shot quarantine recovery — exact host approval requested, NOT EXECUTED
+## Historical quarantine recovery plan — transaction executed; obsolete draft below removed
 
-- Script: `/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py`, SHA-256 **`1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c`**. This supersedes the historical hashes only for a newly approved `recover` invocation; the original `install` path must not be invoked.
-- Existing root-owned quarantine: `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21`, expected device36/inode859869/mount40. Existing protected parent `/opt/phi/omniroute` is pinned to device36/inode859868/mount40. No payload extraction or recopy occurs.
+- Script used for the approved transaction: `/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py`, SHA-256 **`1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c`**. The original `install` path was not invoked and must not be invoked.
+- Former root-owned quarantine: `/opt/phi/omniroute/.incoming-3.8.50-bc71bbfe146958f9b9848a21`, device36/inode859869/mount40, is now absent. The published target has that same device/inode. No payload extraction or recopy occurred.
 - Canonical derived manifest: `/home/tasso/.local/share/phi/omni-derived-stage-bsuvLtRA/derived-integrity-manifest.json`, SHA-256 `cefef41509e534c51f1ef173c9fd25753fa1c86975b148829a6232ca4b9fcb9b`, 20466 entries. Original AppImage: `/opt/omniroute-bin/OmniRoute.AppImage`, SHA-256 `96099e33c899940ce5fd606064415c79c32d4fd75f7b58a23c640ea769347b71`.
 - Authorized target only: `/opt/phi/omniroute/3.8.50`; root-owned mode0600 sidecar only: `/opt/phi/omniroute/.manifest-3.8.50.json`. The new sidecar embeds the exact digest-checked canonical manifest and binds release, quarantine name/device/inode/mount and destination. It is not a READY marker by itself.
-- The pinned-byte command below hashes the exact bytes subsequently fed to root Python; no root helper copy or mutable-file hash/execution race is involved. It first requires a **fresh** read-only process snapshot PASS from the corrected attestor (SHA-256 `d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56`); any nonzero/UNKNOWN/IN_USE result stops before recovery. `sudo -n` fails without an already-authorized host context. **Do not execute this block without a new explicit approval for both exact SHAs and this command.**
-
-```bash
-/usr/bin/python3 -I -B - <<'PY'
-import hashlib
-import pathlib
-import subprocess
-
-attestor_path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-quarantine-process-attest.py")
-recovery_path = pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-protected-host-install.py")
-attestor = attestor_path.read_bytes()
-recovery = recovery_path.read_bytes()
-if hashlib.sha256(attestor).hexdigest() != "d470d6d4674aa759ecc47603fcda202f019d801afdb8aa983c585d1ff8231f56":
-    raise SystemExit("REFUSE: attestor digest changed")
-if hashlib.sha256(recovery).hexdigest() != "1b50f1ab883d44c5bff8c1ad6db1d80d22898415be7819eab0db8567a0115f3c":
-    raise SystemExit("REFUSE: recovery script digest changed")
-snapshot = subprocess.run(
-    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-"],
-    input=attestor,
-    check=False,
-)
-if snapshot.returncode != 0:
-    raise SystemExit("REFUSE: fresh host process snapshot did not PASS")
-publication = subprocess.run(
-    ["/usr/bin/sudo", "-n", "/usr/bin/python3", "-I", "-B", "-", "recover"],
-    input=recovery,
-    check=False,
-)
-raise SystemExit(publication.returncode)
-PY
-```
+- The previously proposed draft command was superseded before host execution because it did not parse the attestor JSON and could not authenticate interactively. It has been removed here to prevent accidental reuse. The operator manually ran the later single-line SHA-pinned wrapper with `sudo -v`, verified JSON PASS/zero hits/zero unknowns, and reported the result above. **No further `recover` invocation is authorized or needed.**
 
 After the fresh snapshot PASS, the root transaction rechecks the original asset and canonical manifest, opens the trusted parent and exact quarantine without following symlinks, verifies all 20466 entries with the existing hash/owner/mode/type/symlink verifier plus mount/ACL/capability checks, and rechecks object identities before mutation. It creates and fsyncs only the new sidecar, fsyncs the parent, then reruns the full verifier and sidecar/identity checks immediately before one `renameat2(RENAME_NOREPLACE)` in the pinned parent and fsyncs again. Final verification requires the target's original quarantine inode/mount, an absent old quarantine name, coherent sidecar and the complete target tree. `HOST_INSTALL_PUBLISHED=YES` is printed only after this passes. Any failure exits nonzero without deleting or overwriting evidence.
 
