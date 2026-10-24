@@ -46,8 +46,11 @@ def run_docker(*args):
 def file_identity():
     cursor = SETTINGS
     protected_path = True
+    settings_item = None
     while cursor != "/":
         item = os.lstat(cursor)
+        if cursor == SETTINGS:
+            settings_item = item
         if stat.S_ISLNK(item.st_mode) or item.st_mode & 0o022:
             raise RuntimeError("settings_path_untrusted")
         # A user-owned ancestor can replace the path after this snapshot. Keep
@@ -55,6 +58,10 @@ def file_identity():
         if item.st_uid != 0 and cursor != SETTINGS:
             protected_path = False
         cursor = os.path.dirname(cursor)
+    if not protected_path:
+        # Report Docker metadata, but never open a root-private file through
+        # user-replaceable ancestors. Its digest/JSON state stays UNKNOWN.
+        return settings_item, None, None, False
     descriptor = os.open(SETTINGS, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         item = os.fstat(descriptor)
@@ -124,7 +131,8 @@ def json_format_enabled(data):
 def assess(container, image, settings_item, settings_sha, json_enabled, protected_path):
     if not isinstance(container, dict) or not isinstance(image, dict):
         raise RuntimeError("inspect_shape_invalid")
-    if not isinstance(container.get("Config"), dict) or not isinstance(container.get("HostConfig"), dict) or not isinstance(container.get("State"), dict):
+    if (not isinstance(container.get("Config"), dict) or not isinstance(container.get("HostConfig"), dict) or
+            not isinstance(container.get("State"), dict) or not isinstance(container.get("NetworkSettings"), dict)):
         raise RuntimeError("inspect_shape_invalid")
     identity = container.get("Id", "")
     image_id = container.get("Image", "")
@@ -143,8 +151,12 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
     host = container.get("HostConfig", {})
     ports = host.get("PortBindings") or {}
     bindings = ports.get("8080/tcp") or []
-    loopback_only = len(ports) == 1 and bool(bindings) and all(
+    effective_ports = container["NetworkSettings"].get("Ports") or {}
+    effective_bindings = effective_ports.get("8080/tcp") or []
+    loopback_only = len(ports) == 1 and len(effective_ports) == 1 and bool(bindings) and bool(effective_bindings) and all(
         b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "8888" for b in bindings)
+    loopback_only = loopback_only and all(
+        b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "8888" for b in effective_bindings)
     privileged = host.get("Privileged") is True
     cap_add = host.get("CapAdd") or []
     security_opts = host.get("SecurityOpt") or []
@@ -154,7 +166,7 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
                    host.get("IpcMode") in ("", "private", None) and
                    host.get("NetworkMode") not in ("host", "none", None))
     state = container.get("State", {})
-    running = state.get("Running") is True
+    running = state.get("Running") is True and type(state.get("Pid")) is int and state["Pid"] > 0
     checks = {
         "image_repository": reference in matching_digests,
         "settings_bind": len(mounts) == 1 and len(settings_mount) == 1,
@@ -204,7 +216,8 @@ def main():
     image_list = run_docker("image", "inspect", image_id)
     if not isinstance(image_list, list) or len(image_list) != 1:
         raise RuntimeError("image_not_unique")
-    report = assess(container, image_list[0], settings, digest, json_format_enabled(data), protected_path)
+    report = assess(container, image_list[0], settings, digest,
+                    json_format_enabled(data) if data is not None else None, protected_path)
     report["dockerEndpoint"] = "unix:///var/run/docker.sock"
     report["daemonId"] = daemon_id
     print(json.dumps(report, sort_keys=True))

@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — SearXNG host-attestor safety delta
+
+Full-source review and unprivileged host metadata only. Existing attestor focused Python tests **4 PASS / 0 FAIL**, including mutable-ancestor no-open and effective Docker binding/PID rejection; Python compile, package validation and diff check PASS. Docker/root attestation, config-content/real-service query and autostart **NOT RUN**. Historical phase-1 web entrypoint18/18 remains valid on unchanged inputs; no rerun for freshness.
+
 ## 2026-10-24 — SearXNG development route, local entrypoint evidence
 
 Installed Pi extension loaded; registered `web_research.execute` used a local SearXNG-compatible JSON server. Web routing/fetch and optional-startup focus **18 PASS / 0 FAIL / 0 skip**. Installed-Pi TypeScript via existing managed compiler, package validation and changed-code syntax PASS. No real SearXNG/Docker/host attestation, provider/model call, stable activation, CI or frozen-product certification claim.

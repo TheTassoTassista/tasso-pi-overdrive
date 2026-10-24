@@ -5,6 +5,7 @@ import pathlib
 import stat
 import types
 import unittest
+from unittest.mock import patch
 
 
 SOURCE = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "searxng-host-attest.py"
@@ -28,7 +29,8 @@ class AttestorTests(unittest.TestCase):
             "HostConfig": {"Privileged": False, "CapAdd": None, "SecurityOpt": [],
                            "NetworkMode": "bridge", "PidMode": "", "IpcMode": "",
                            "PortBindings": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "8888"}]}},
-            "State": {"Running": True},
+            "NetworkSettings": {"Ports": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "8888"}]}},
+            "State": {"Running": True, "Pid": 1234},
         }
         image = {"Id": image_id, "RepoDigests": ["searxng/searxng@sha256:" + digest]}
         settings = types.SimpleNamespace(st_mode=stat.S_IFREG | 0o600, st_uid=977)
@@ -38,6 +40,19 @@ class AttestorTests(unittest.TestCase):
         self.assertTrue(ATTEST.json_format_enabled(b"search:\n  formats:\n    - html\n    - json\n"))
         self.assertFalse(ATTEST.json_format_enabled(b"search:\n  formats:\n    - html\n"))
         self.assertIsNone(ATTEST.json_format_enabled(b"search:\n  formats: &formats [html, json]\n"))
+
+    def test_unprotected_ancestor_never_opens_root_private_settings(self):
+        def fake_lstat(cursor):
+            mode = (stat.S_IFREG | 0o600) if cursor == ATTEST.SETTINGS else (stat.S_IFDIR | 0o755)
+            owner = 977 if cursor == ATTEST.SETTINGS else (1000 if cursor == str(pathlib.Path(ATTEST.SETTINGS).parent.parent) else 0)
+            return types.SimpleNamespace(st_mode=mode, st_uid=owner)
+
+        with patch.object(ATTEST.os, "lstat", side_effect=fake_lstat), patch.object(ATTEST.os, "open", side_effect=AssertionError("root file opened")):
+            settings, digest, data, protected = ATTEST.file_identity()
+        self.assertEqual(settings.st_uid, 977)
+        self.assertIsNone(digest)
+        self.assertIsNone(data)
+        self.assertFalse(protected)
 
     def test_selected_output_has_no_secret_and_requires_all_gates(self):
         container, image, settings = self.fixture()
@@ -60,6 +75,12 @@ class AttestorTests(unittest.TestCase):
         self.assertEqual(ATTEST.assess(container, image, settings, "d" * 64, True, True)["HOST_ATTESTATION"], "FAIL")
         container["Mounts"][0]["RW"] = False
         container["HostConfig"]["PortBindings"]["8080/tcp"][0]["HostIp"] = "0.0.0.0"
+        self.assertEqual(ATTEST.assess(container, image, settings, "d" * 64, True, True)["HOST_ATTESTATION"], "FAIL")
+        container["HostConfig"]["PortBindings"]["8080/tcp"][0]["HostIp"] = "127.0.0.1"
+        container["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostIp"] = "0.0.0.0"
+        self.assertEqual(ATTEST.assess(container, image, settings, "d" * 64, True, True)["HOST_ATTESTATION"], "FAIL")
+        container["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostIp"] = "127.0.0.1"
+        container["State"]["Pid"] = 0
         self.assertEqual(ATTEST.assess(container, image, settings, "d" * 64, True, True)["HOST_ATTESTATION"], "FAIL")
 
 
