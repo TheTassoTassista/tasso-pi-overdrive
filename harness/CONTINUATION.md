@@ -1,6 +1,10 @@
 # Phi — Session Continuation
 
-## CURRENT — quarantine recovery preflight stopped on privileged process visibility (2026-10-24)
+## CURRENT — privileged-process attestation ready for separate host approval (2026-10-24)
+
+Prepared `scripts/omniroute-quarantine-process-attest.py` and a focused parser/alias regression without privileged execution. Current quarantine identity still device36/inode859869/mount40, target absent. The script indexes metadata only, scans privileged process references (FD/cwd/root/exe/maps/mount namespaces and same-device mount aliases), and fails closed on incomplete evidence. Local 1/1 test and non-root refusal PASS. `HOST_PROCESS_SNAPSHOT=UNKNOWN` and `QUARANTINE_RECOVERABLE=NO` remain; NEXT: present pinned digest and exact read-only command, obtain explicit operator approval, then inspect its result. Do not run root autonomously, reattempt install, publish, clean quarantine/cores or infer permanent safety from a snapshot.
+
+## PRIOR — quarantine recovery preflight stopped on privileged process visibility (2026-10-24)
 
 Main `PHI-OMNIROUTE-QUARANTINE-RECOVERY-001` is recorded. Exact preserved quarantine device36/inode859869, Btrfs mount ID40, root:root0755, full canonical20466-entry verification PASS; asset/manifest identities, ancestors, ACL/capability/setuid/symlink/mount checks PASS; final target and sidecar absent. No-process-use gate remains UNKNOWN because this unprivileged session cannot inspect root process FDs/cwd/maps (`ptrace_scope=1`, `/proc/1/fd` root0500). Empty user-visible `lsof`/`fuser` does not close it. Per Main, `QUARANTINE_RECOVERABLE=NO`, `QUARANTINE_RECOVERY_DEFERRED / SPECIFIC_BLOCKER`; no recovery implementation, root operation, publication or cleanup. NEXT: secure exact, separately approved read-only host-operator process-use census bound to current quarantine identity; then reassess before coding recovery. DO_NOT_REDO original extraction/copy/install or historical tests. Newest progress entry has evidence; old script hash remains `b3d0ab7b16aeddee0add681e546bcc215da86d59c6c38e0e96359416fe9b8106`.
 
