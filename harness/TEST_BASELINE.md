@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — exact registry image / bounded local-inspection preparation
+
+Docker Hub and GHCR exact OCI index responses independently SHA-256 matched `e084…`; amd64 manifest `a93b…`, config `325e…` and entrypoint layer `a250…` hash checks PASS. This is registry evidence only. Existing host-attestor `--image-identity` offline test and all prior focused tests: **9 PASS / 0 FAIL**; Python syntax, package validation and diff check PASS. No privileged Docker/host invocation, local image-layer extraction, runtime container, protected-config access, real web query or CI. `LOCAL_IMAGE_METADATA`, read-only mount startup and publisher signature remain NOT VERIFIED.
+
 ## 2026-10-24 — SearXNG selected-input attestor correction
 
 Existing read-only attestor targeted offline regressions: **8 PASS / 0 FAIL** (two exact mounts, hostile path, loopback request/effective state, unexpected image, local digest not independent provenance, UNKNOWN config/JSON, no secret-value output). Python AST syntax, package validation and `git diff --check` PASS. No privileged attestor rerun, host mutation, real service query, transaction/rollback fixture, CI or paid provider call. The old 18/18 Phase-1 web entrypoint proof is reused on unchanged inputs; no new claim of live SearXNG availability.

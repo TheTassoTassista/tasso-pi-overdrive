@@ -1,6 +1,8 @@
 """Offline checks for the fixed, read-only SearXNG host attestor."""
 
 import importlib.util
+import contextlib
+import io
 import pathlib
 import stat
 import types
@@ -149,6 +151,48 @@ class AttestorTests(unittest.TestCase):
         self.assertTrue(report["checks"]["image_repository"])
         self.assertFalse(report["checks"]["image_provenance"])
         self.assertEqual(report["imageProvenance"], "local_docker_metadata_only")
+
+    def test_exact_image_mode_is_bound_redacted_and_never_opens_settings(self):
+        container, image, _settings = self.fixture()
+        container["Id"] = ATTEST.EXPECTED_CONTAINER_ID
+        container["Image"] = ATTEST.EXPECTED_IMAGE_ID
+        container["Config"].update({"Entrypoint": ["/usr/local/searxng/entrypoint.sh"], "Cmd": None,
+                                    "User": None, "Env": ["SECRET=not-for-output", "FORCE_OWNERSHIP=false",
+                                                           "__SEARXNG_CONFIG_PATH=/etc/searxng",
+                                                           "__SEARXNG_DATA_PATH=/var/cache/searxng"]})
+        image.update({"Id": ATTEST.EXPECTED_IMAGE_ID, "RepoDigests": [ATTEST.EXPECTED_INDEX_DIGEST],
+                      "Os": "linux", "Architecture": "amd64", "RootFS": {"Layers": ["sha256:abc"]},
+                      "Config": {"Entrypoint": ["/usr/local/searxng/entrypoint.sh"], "Cmd": None,
+                                 "User": None, "Env": ["SECRET=not-for-output",
+                                                       "__SEARXNG_CONFIG_PATH=/etc/searxng",
+                                                       "__SEARXNG_DATA_PATH=/var/cache/searxng"]}})
+        selected = ATTEST.exact_image_inputs(container, image, ATTEST.EXPECTED_DAEMON_ID)
+        self.assertEqual(selected["LOCAL_IMAGE_METADATA"], "PASS")
+        self.assertEqual(selected["forceOwnership"], "false")
+        self.assertTrue(selected["checks"]["image_entrypoint"])
+        self.assertNotIn("not-for-output", str(selected))
+        with self.assertRaisesRegex(RuntimeError, "exact_image_identity_mismatch"):
+            ATTEST.exact_image_inputs(container, image, "other-daemon")
+
+        output = io.StringIO()
+        def fake_docker(*args):
+            if args == ("container", "inspect", ATTEST.NAME):
+                return [container]
+            if args == ("info", "--format", "{{json .ID}}"):
+                return ATTEST.EXPECTED_DAEMON_ID
+            if args == ("image", "inspect", ATTEST.EXPECTED_IMAGE_ID):
+                return [image]
+            raise AssertionError(args)
+
+        socket_item = types.SimpleNamespace(st_mode=stat.S_IFSOCK | 0o660, st_uid=0)
+        with (patch.object(ATTEST.sys, "argv", [str(SOURCE), "--image-identity"]),
+              patch.object(ATTEST.os, "geteuid", return_value=0),
+              patch.object(ATTEST.os, "lstat", return_value=socket_item),
+              patch.object(ATTEST, "run_docker", side_effect=fake_docker),
+              patch.object(ATTEST, "file_identity", side_effect=AssertionError("settings opened")),
+              contextlib.redirect_stdout(output)):
+            self.assertEqual(ATTEST.main(), 0)
+        self.assertNotIn("not-for-output", output.getvalue())
 
 
 if __name__ == "__main__":

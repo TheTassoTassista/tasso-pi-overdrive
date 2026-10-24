@@ -22,6 +22,10 @@ NAME = "pi-overdrive-searxng"
 SETTINGS = "/home/tasso/.local/share/pi-overdrive/searxng/config/settings.yml"
 DATA = "/home/tasso/.local/share/pi-overdrive/searxng/data"
 IMAGE_REPOSITORY = "searxng/searxng"
+EXPECTED_DAEMON_ID = "b64b0d52-95ab-4b1a-a971-5f09a4d6e36d"
+EXPECTED_CONTAINER_ID = "9cd6dd06e03d1ae28161e72df26301f43d9167671e1c1e90646e87ba804ca6e3"
+EXPECTED_IMAGE_ID = "sha256:e084201aa606fafce2151c8dc2844c9c3309025e90fbe7163b4f5e5183e474f0"
+EXPECTED_INDEX_DIGEST = "searxng/searxng@" + EXPECTED_IMAGE_ID
 # Must be filled only from independent, authenticated image provenance.
 # Local Docker RepoDigests are observations, not the trust anchor.
 TRUSTED_IMAGE_DIGEST = None
@@ -179,6 +183,69 @@ def remediation_inputs(container, image):
     }
 
 
+def exact_image_inputs(container, image, daemon_id):
+    """Read-only, fixed-object image facts; never emit raw environment or argv."""
+    if (daemon_id != EXPECTED_DAEMON_ID or not isinstance(container, dict) or
+            container.get("Id") != EXPECTED_CONTAINER_ID or
+            container.get("Name") != "/" + NAME or
+            container.get("Image") != EXPECTED_IMAGE_ID or
+            not isinstance(image, dict) or image.get("Id") != EXPECTED_IMAGE_ID):
+        raise RuntimeError("exact_image_identity_mismatch")
+    image_config = image.get("Config")
+    container_config = container.get("Config")
+    if not isinstance(image_config, dict) or not isinstance(container_config, dict):
+        raise RuntimeError("image_config_invalid")
+    image_env = image_config.get("Env")
+    container_env = container_config.get("Env")
+    if (not isinstance(image_env, list) or not isinstance(container_env, list) or
+            any(not isinstance(value, str) for value in image_env + container_env)):
+        raise RuntimeError("image_env_invalid")
+
+    def classified_env(values, key, expected=None):
+        selected = [value.partition("=")[2] for value in values if value.partition("=")[0] == key]
+        if not selected:
+            return "UNSET"
+        if len(selected) != 1:
+            return "OTHER"
+        if expected is not None:
+            return "EXPECTED" if selected[0] == expected else "OTHER"
+        return selected[0] if selected[0] in ("true", "false") else "OTHER"
+
+    rootfs = image.get("RootFS")
+    diff_ids = rootfs.get("Layers") if isinstance(rootfs, dict) else None
+    if not isinstance(diff_ids, list):
+        raise RuntimeError("image_rootfs_invalid")
+    repo_digests = image.get("RepoDigests")
+    if not isinstance(repo_digests, list):
+        raise RuntimeError("image_digest_invalid")
+    checks = {
+        "index_digest_present": EXPECTED_INDEX_DIGEST in repo_digests,
+        "linux_amd64": image.get("Os") == "linux" and image.get("Architecture") == "amd64",
+        "image_entrypoint": image_config.get("Entrypoint") == ["/usr/local/searxng/entrypoint.sh"],
+        "container_entrypoint": container_config.get("Entrypoint") == ["/usr/local/searxng/entrypoint.sh"],
+        "image_command_empty": image_config.get("Cmd") in (None, []),
+        "container_command_empty": container_config.get("Cmd") in (None, []),
+        "image_config_path": classified_env(image_env, "__SEARXNG_CONFIG_PATH", "/etc/searxng") == "EXPECTED",
+        "image_data_path": classified_env(image_env, "__SEARXNG_DATA_PATH", "/var/cache/searxng") == "EXPECTED",
+        "container_config_path": classified_env(container_env, "__SEARXNG_CONFIG_PATH", "/etc/searxng") == "EXPECTED",
+        "container_data_path": classified_env(container_env, "__SEARXNG_DATA_PATH", "/var/cache/searxng") == "EXPECTED",
+    }
+    return {
+        "LOCAL_IMAGE_METADATA": "PASS" if all(checks.values()) else "FAIL",
+        "daemonId": daemon_id,
+        "containerId": container["Id"],
+        "imageId": image["Id"],
+        "checks": checks,
+        "repoDigestCount": len(repo_digests),
+        "imageUserDefaultRoot": image_config.get("User") in (None, "", "0", "root"),
+        "containerUserDefaultRoot": container_config.get("User") in (None, "", "0", "root"),
+        "forceOwnership": classified_env(container_env, "FORCE_OWNERSHIP"),
+        "imageEnvCount": len(image_env),
+        "containerEnvCount": len(container_env),
+        "rootfsLayerCount": len(diff_ids),
+    }
+
+
 def assess(container, image, settings_item, settings_sha, json_enabled, protected_path, trusted_image_digest=None):
     if not isinstance(container, dict) or not isinstance(image, dict):
         raise RuntimeError("inspect_shape_invalid")
@@ -263,14 +330,15 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--remediation-inputs"]):
+    if sys.argv[1:] not in ([], ["--remediation-inputs"], ["--image-identity"]):
         raise RuntimeError("argument_forbidden")
     if os.geteuid() != 0:
         raise RuntimeError("host_operator_required")
     sock = os.lstat(SOCKET)
     if not stat.S_ISSOCK(sock.st_mode) or sock.st_uid != 0 or sock.st_mode & 0o002:
         raise RuntimeError("docker_socket_untrusted")
-    settings, digest, data, protected_path = file_identity()
+    if sys.argv[1:] != ["--image-identity"]:
+        settings, digest, data, protected_path = file_identity()
     container_list = run_docker("container", "inspect", NAME)
     if not isinstance(container_list, list) or len(container_list) != 1:
         raise RuntimeError("container_not_unique")
@@ -284,6 +352,10 @@ def main():
     image_list = run_docker("image", "inspect", image_id)
     if not isinstance(image_list, list) or len(image_list) != 1:
         raise RuntimeError("image_not_unique")
+    if sys.argv[1:] == ["--image-identity"]:
+        report = exact_image_inputs(container, image_list[0], daemon_id)
+        print(json.dumps(report, sort_keys=True))
+        return 0 if report["LOCAL_IMAGE_METADATA"] == "PASS" else 1
     report = assess(container, image_list[0], settings, digest,
                     json_format_enabled(data) if data is not None else None, protected_path, TRUSTED_IMAGE_DIGEST)
     if sys.argv[1:] == ["--remediation-inputs"]:
