@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — final optional-services local closure
+
+New fixed SearXNG host-attestor offline regressions: Python unittest **3/3 PASS** (strict JSON-format recognition, selected-output redaction, spoofed identity/bind/port/security rejection). Unchanged optional-startup and web-routing suites rerun **15/15 PASS**; Python compile, package validation and `git diff --check` PASS. Privileged Docker attestation and real SearXNG query **NOT EXECUTED**. No new OmniRoute lifecycle test was claimed: prior real transient-systemd private/host-namespace split remains the decisive failure. No CI, provider/model call or stable activation. The test count is local and does not update the frozen product certification baseline.
+
 ## 2026-10-23 — OmniRoute protected-install preparation
 
 Existing AppImage digest/version/size unchanged. New offline bwrap extraction exit0; SHA-256 manifest of all 16861 files, 3603 directories and 3 symlinks generated and checked. Source archive path traversal scan: 20466 entries, 0 unsafe paths. Extracted special/SUID/SGID/capability scan: 0; **one external absolute broken symlink** in upstream archive, so install gate FAIL. No root publication or native lifecycle, spoof/reuse/network/health test. Package validation/diff check run for documentation checkpoint; historical launcher8/8 and Second Brain proof reused on unchanged inputs. Core dumps still pending operator unlink; no provider/model call or CI.
