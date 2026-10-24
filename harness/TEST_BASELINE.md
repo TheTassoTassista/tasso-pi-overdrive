@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — SearXNG development route, local entrypoint evidence
+
+Installed Pi extension loaded; registered `web_research.execute` used a local SearXNG-compatible JSON server. Web routing/fetch and optional-startup focus **18 PASS / 0 FAIL / 0 skip**. Installed-Pi TypeScript via existing managed compiler, package validation and changed-code syntax PASS. No real SearXNG/Docker/host attestation, provider/model call, stable activation, CI or frozen-product certification claim.
+
 ## 2026-10-24 — final optional-services local closure
 
 New fixed SearXNG host-attestor offline regressions: Python unittest **3/3 PASS** (strict JSON-format recognition, selected-output redaction, spoofed identity/bind/port/security rejection). Unchanged optional-startup and web-routing suites rerun **15/15 PASS**; Python compile, package validation and `git diff --check` PASS. Privileged Docker attestation and real SearXNG query **NOT EXECUTED**. No new OmniRoute lifecycle test was claimed: prior real transient-systemd private/host-namespace split remains the decisive failure. No CI, provider/model call or stable activation. The test count is local and does not update the frozen product certification baseline.

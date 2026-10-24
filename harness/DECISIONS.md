@@ -1,5 +1,9 @@
 # Phi — Architecture Decision Log
 
+## 2026-10-24 — PHI-OPTIONAL-SERVICES-REAL-INTEGRATION-001 (user-supplied Φ Main decision; phase 1)
+
+Decision: **APPROVE_BOUNDED_IMPLEMENTATION / FAST DEFAULT**. Implement an explicit, default-off SearXNG route inside the existing Phi web router and prove the real registered search entrypoint against a local JSON fixture before any Docker/container work. This phase supersedes only the earlier sequencing restriction on development-code integration; it does not attest the real SearXNG service, authorize its startup/autostart, change stable Phi, or relax host/config provenance gates. Preserve Brave/Perplexity selection, fallback, cost and credentials; no CI, push, merge, deploy, privileged operation or provider call.
+
 ## 2026-10-24 — PHI-OPTIONAL-SERVICES-FINAL-RESOLUTION-001 (Φ Main)
 
 Decision: **BOUNDED IMPLEMENTATION / EVIDENCE-BASED CLOSURE**. One final OmniRoute path may reuse only the existing optional coordinator, managed lifecycle and supported isolation; protected executable, instance and socket identity, effective network policy and client access are mandatory. If that path requires a new bridge, supervisor, privilege or router-incompatible isolation, close autostart as manual-only without a second strategy. Independently prepare one fixed-container, read-only, host-approved SearXNG Docker/config attestation; no standing Docker grant. Only after trusted host attestation and a reachable JSON endpoint may the existing web router gain an explicit, default-off SearXNG route. Keep Brave/Perplexity, policy, stable Phi, Second Brain, Campaign 3 and qualified product unchanged. No CI/push/merge/deploy/paid inference.

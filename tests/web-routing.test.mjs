@@ -107,6 +107,24 @@ test("invalid providers fail before network and cross-check is isolated, dedupli
   assert.deepEqual(routed.details.selected_provider, ["brave", "perplexity"]);
 });
 
+test("SearXNG cannot become an automatic primary or fallback; explicit requests never call paid routes", async () => {
+  assert.throws(() => resolveWebPolicy(baseConfig, { WEB_SEARCH_PROVIDER: "searxng" }), /Unsupported web provider/u);
+  const calls = [];
+  const config = { ...baseConfig, apiKeys: { brave: "fixture-a", perplexity: "fixture-b" } };
+  const direct = await executeWebRoute({ query: "local", provider: "searxng" }, {
+    config, environment: {}, search: async (provider) => {
+      calls.push(provider);
+      return result(provider, 1);
+    },
+  });
+  assert.equal(direct.status, "PASS");
+  assert.deepEqual(calls, ["searxng"]);
+  assert.equal(direct.details.fallback_used, false);
+  calls.length = 0;
+  await executeWebRoute({ query: "default" }, { config, environment: {}, search: async (provider) => { calls.push(provider); return result(provider); } });
+  assert.deepEqual(calls, ["brave"]);
+});
+
 test("provider errors, malformed responses, timeouts, and unsafe result URLs are sanitized into receipt codes", async () => {
   const config = { ...baseConfig, apiKeys: { brave: "fixture-a", perplexity: "fixture-b" } };
   const broken = dependencies(config, { brave: new Error("remote body must not escape"), perplexity: null });
