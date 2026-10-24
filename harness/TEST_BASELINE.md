@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — SearXNG selected-input attestor correction
+
+Existing read-only attestor targeted offline regressions: **8 PASS / 0 FAIL** (two exact mounts, hostile path, loopback request/effective state, unexpected image, local digest not independent provenance, UNKNOWN config/JSON, no secret-value output). Python AST syntax, package validation and `git diff --check` PASS. No privileged attestor rerun, host mutation, real service query, transaction/rollback fixture, CI or paid provider call. The old 18/18 Phase-1 web entrypoint proof is reused on unchanged inputs; no new claim of live SearXNG availability.
+
 ## 2026-10-24 — SearXNG remediation-input diagnostic
 
 Existing host attestor selected-output extension: Python tests **5 PASS / 0 FAIL**, including secret-value redaction, selected mounts/ports and prior fail-closed predicates; Python syntax, package validation and diff check PASS. Operator's prior read-only attestation is reported FAIL; the new selected-input host invocation is **NOT RUN**. No Docker/root invocation by Work Execution, real JSON query, CI, provider call, stable switch or autostart.

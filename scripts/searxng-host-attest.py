@@ -20,7 +20,11 @@ DOCKER = "/usr/bin/docker"
 SOCKET = "/var/run/docker.sock"
 NAME = "pi-overdrive-searxng"
 SETTINGS = "/home/tasso/.local/share/pi-overdrive/searxng/config/settings.yml"
+DATA = "/home/tasso/.local/share/pi-overdrive/searxng/data"
 IMAGE_REPOSITORY = "searxng/searxng"
+# Must be filled only from independent, authenticated image provenance.
+# Local Docker RepoDigests are observations, not the trust anchor.
+TRUSTED_IMAGE_DIGEST = None
 SETTINGS_OWNER = 977  # Observed local systemd-network UID; fixed for this host only.
 MAX_OUTPUT = 2_000_000
 
@@ -175,7 +179,7 @@ def remediation_inputs(container, image):
     }
 
 
-def assess(container, image, settings_item, settings_sha, json_enabled, protected_path):
+def assess(container, image, settings_item, settings_sha, json_enabled, protected_path, trusted_image_digest=None):
     if not isinstance(container, dict) or not isinstance(image, dict):
         raise RuntimeError("inspect_shape_invalid")
     if (not isinstance(container.get("Config"), dict) or not isinstance(container.get("HostConfig"), dict) or
@@ -190,20 +194,32 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
     reference = container.get("Config", {}).get("Image")
     digests = image.get("RepoDigests", [])
     matching_digests = sorted(d for d in digests if isinstance(d, str) and
-                              re.fullmatch(IMAGE_REPOSITORY + r"@sha256:[0-9a-f]{64}", d))
+                              re.fullmatch(r"(?:docker.io/)?" + IMAGE_REPOSITORY + r"@sha256:[0-9a-f]{64}", d))
+    normalized_reference = reference.removeprefix("docker.io/") if isinstance(reference, str) else ""
+    repository_ok = bool(matching_digests) and bool(re.fullmatch(
+        IMAGE_REPOSITORY + r"(?::[A-Za-z0-9_.-]+|@sha256:[0-9a-f]{64})", normalized_reference))
+    provenance_ok = (isinstance(trusted_image_digest, str) and
+                     re.fullmatch(r"sha256:[0-9a-f]{64}", trusted_image_digest) is not None and
+                     any(d.endswith("@" + trusted_image_digest) for d in matching_digests))
     mounts = container.get("Mounts", [])
-    settings_mount = [m for m in mounts if m.get("Type") == "bind" and m.get("RW") is False and
-                      ((m.get("Source") == SETTINGS and m.get("Destination") == "/etc/searxng/settings.yml") or
-                       (m.get("Source") == os.path.dirname(SETTINGS) and m.get("Destination") == "/etc/searxng"))]
+    if not isinstance(mounts, list) or any(not isinstance(m, dict) for m in mounts):
+        raise RuntimeError("inspect_shape_invalid")
+    settings_mount = [m for m in mounts if m.get("Type") == "bind" and
+                      m.get("Source") == os.path.dirname(SETTINGS) and m.get("Destination") == "/etc/searxng"]
+    data_mount = [m for m in mounts if m.get("Type") == "bind" and
+                  m.get("Source") == DATA and m.get("Destination") == "/var/cache/searxng"]
+    mounts_exact = len(mounts) == 2 and len(settings_mount) == 1 and len(data_mount) == 1
     host = container.get("HostConfig", {})
     ports = host.get("PortBindings") or {}
     bindings = ports.get("8080/tcp") or []
     effective_ports = container["NetworkSettings"].get("Ports") or {}
     effective_bindings = effective_ports.get("8080/tcp") or []
-    loopback_only = len(ports) == 1 and len(effective_ports) == 1 and bool(bindings) and bool(effective_bindings) and all(
+    requested_loopback = len(ports) == 1 and bool(bindings) and all(
         b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "8888" for b in bindings)
-    loopback_only = loopback_only and all(
-        b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "8888" for b in effective_bindings)
+    running_state = container.get("State", {})
+    running = running_state.get("Running") is True and type(running_state.get("Pid")) is int and running_state["Pid"] > 0
+    effective_loopback = (len(effective_ports) == 1 and bool(effective_bindings) and all(
+        b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "8888" for b in effective_bindings)) if running else None
     privileged = host.get("Privileged") is True
     cap_add = host.get("CapAdd") or []
     security_opts = host.get("SecurityOpt") or []
@@ -212,25 +228,28 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
                    host.get("PidMode") in ("", "private", None) and
                    host.get("IpcMode") in ("", "private", None) and
                    host.get("NetworkMode") not in ("host", "none", None))
-    state = container.get("State", {})
-    running = state.get("Running") is True and type(state.get("Pid")) is int and state["Pid"] > 0
     checks = {
-        "image_repository": reference in matching_digests,
-        "settings_bind": len(mounts) == 1 and len(settings_mount) == 1,
+        "image_repository": repository_ok,
+        "image_provenance": provenance_ok,
+        "settings_bind": mounts_exact,
+        "config_read_only": settings_mount[0].get("RW") is False if mounts_exact else False,
+        "cache_writable": data_mount[0].get("RW") is True if mounts_exact else False,
         "settings_private": settings_item.st_mode & 0o077 == 0,
         "settings_owner": settings_item.st_uid == SETTINGS_OWNER,
         "settings_protected_path": protected_path,
-        "json_format": json_enabled is True,
-        "loopback_port": loopback_only,
+        "json_format": None if json_enabled is None else json_enabled is True,
+        "requested_loopback_port": requested_loopback,
+        "effective_loopback_port": effective_loopback,
         "not_privileged": security_ok,
         "running": running,
     }
+    attestation = "FAIL" if False in checks.values() else "UNKNOWN" if None in checks.values() else "PASS"
     return {
-        "HOST_ATTESTATION": "PASS" if all(checks.values()) else "FAIL",
+        "HOST_ATTESTATION": attestation,
         "containerId": identity,
         "imageId": image_id,
         "imageDigest": matching_digests[0] if matching_digests else None,
-        "imageProvenance": "local_docker_metadata_only",
+        "imageProvenance": "independent_digest_matched" if provenance_ok else "local_docker_metadata_only",
         "settingsSha256": settings_sha,
         "settingsOwner": settings_item.st_uid,
         "settingsMode": oct(stat.S_IMODE(settings_item.st_mode)),
@@ -266,13 +285,13 @@ def main():
     if not isinstance(image_list, list) or len(image_list) != 1:
         raise RuntimeError("image_not_unique")
     report = assess(container, image_list[0], settings, digest,
-                    json_format_enabled(data) if data is not None else None, protected_path)
+                    json_format_enabled(data) if data is not None else None, protected_path, TRUSTED_IMAGE_DIGEST)
     if sys.argv[1:] == ["--remediation-inputs"]:
         report["remediationInputs"] = remediation_inputs(container, image_list[0])
     report["dockerEndpoint"] = "unix:///var/run/docker.sock"
     report["daemonId"] = daemon_id
     print(json.dumps(report, sort_keys=True))
-    return 0 if report["HOST_ATTESTATION"] == "PASS" else 1
+    return {"PASS": 0, "FAIL": 1, "UNKNOWN": 2}[report["HOST_ATTESTATION"]]
 
 
 if __name__ == "__main__":
