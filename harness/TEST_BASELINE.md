@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-24 — SearXNG remediation-input diagnostic
+
+Existing host attestor selected-output extension: Python tests **5 PASS / 0 FAIL**, including secret-value redaction, selected mounts/ports and prior fail-closed predicates; Python syntax, package validation and diff check PASS. Operator's prior read-only attestation is reported FAIL; the new selected-input host invocation is **NOT RUN**. No Docker/root invocation by Work Execution, real JSON query, CI, provider call, stable switch or autostart.
+
 ## 2026-10-24 — SearXNG host-attestor safety delta
 
 Full-source review and unprivileged host metadata only. Existing attestor focused Python tests **4 PASS / 0 FAIL**, including mutable-ancestor no-open and effective Docker binding/PID rejection; Python compile, package validation and diff check PASS. Docker/root attestation, config-content/real-service query and autostart **NOT RUN**. Historical phase-1 web entrypoint18/18 remains valid on unchanged inputs; no rerun for freshness.

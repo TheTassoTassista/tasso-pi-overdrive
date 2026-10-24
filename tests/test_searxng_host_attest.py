@@ -83,6 +83,21 @@ class AttestorTests(unittest.TestCase):
         container["State"]["Pid"] = 0
         self.assertEqual(ATTEST.assess(container, image, settings, "d" * 64, True, True)["HOST_ATTESTATION"], "FAIL")
 
+    def test_remediation_inputs_are_bounded_and_do_not_print_secrets(self):
+        container, image, _settings = self.fixture()
+        container["Config"]["Env"] = ["SECRET=not-for-output", "TOKEN=also-private"]
+        container["Mounts"].append({"Type": "volume", "Source": "/var/lib/docker/volumes/searxng-data/_data",
+                                     "Destination": "/var/cache/searxng", "Name": "searxng-data", "RW": True})
+        selected = ATTEST.remediation_inputs(container, image)
+        self.assertEqual(selected["environmentCount"], 2)
+        self.assertEqual(selected["mounts"][1]["name"], "searxng-data")
+        self.assertEqual(selected["effectivePorts"][0]["hosts"][0]["address"], "127.0.0.1")
+        self.assertNotIn("SECRET", str(selected))
+        self.assertNotIn("TOKEN", str(selected))
+        container["Mounts"].append({"Type": "bind", "Source": "/private/path with spaces",
+                                     "Destination": "/etc/other", "RW": False})
+        self.assertIsNone(ATTEST.remediation_inputs(container, image)["mounts"][2]["source"])
+
 
 if __name__ == "__main__":
     unittest.main()

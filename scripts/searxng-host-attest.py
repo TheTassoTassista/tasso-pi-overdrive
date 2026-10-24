@@ -128,6 +128,53 @@ def json_format_enabled(data):
     return "json" in values if formats_indent is not None and values else None
 
 
+def remediation_inputs(container, image):
+    """Selected Docker metadata needed to plan, never raw inspect/env/arguments."""
+    def safe(value):
+        return value if isinstance(value, str) and len(value) <= 256 and re.fullmatch(r"[A-Za-z0-9_./:@-]+", value) else None
+
+    def bindings(value):
+        if not isinstance(value, dict) or len(value) > 8:
+            return None
+        output = []
+        for port, entries in sorted(value.items()):
+            if not safe(port) or entries is not None and (not isinstance(entries, list) or len(entries) > 8):
+                return None
+            if any(not isinstance(item, dict) for item in (entries or [])):
+                return None
+            output.append({"containerPort": port, "hosts": [
+                {"address": safe(item.get("HostIp")), "port": safe(item.get("HostPort"))}
+                for item in (entries or [])
+            ]})
+        return output
+
+    mounts = container.get("Mounts")
+    selected_mounts = None if not isinstance(mounts, list) or len(mounts) > 8 or any(not isinstance(item, dict) for item in mounts) else [
+        {"type": safe(item.get("Type")), "source": safe(item.get("Source")),
+         "destination": safe(item.get("Destination")), "name": safe(item.get("Name")) if item.get("Name") else None,
+         "readOnly": item.get("RW") is False}
+        for item in mounts
+    ]
+    config = container.get("Config") or {}
+    host = container.get("HostConfig") or {}
+    network = container.get("NetworkSettings") or {}
+    return {
+        "imageReference": safe(config.get("Image")),
+        "repoDigests": [safe(value) for value in (image.get("RepoDigests") or [])[:8]],
+        "repoDigestCount": len(image.get("RepoDigests") or []),
+        "repoTags": [safe(value) for value in (image.get("RepoTags") or [])[:8]],
+        "mounts": selected_mounts,
+        "requestedPorts": bindings(host.get("PortBindings") or {}),
+        "effectivePorts": bindings(network.get("Ports") or {}),
+        "networkMode": safe(host.get("NetworkMode")),
+        "containerUser": safe(config.get("User")),
+        "readOnlyRootfs": host.get("ReadonlyRootfs") is True,
+        "restartPolicy": safe((host.get("RestartPolicy") or {}).get("Name")),
+        "environmentCount": len(config.get("Env") or []),
+        "composeManaged": "com.docker.compose.project" in (config.get("Labels") or {}),
+    }
+
+
 def assess(container, image, settings_item, settings_sha, json_enabled, protected_path):
     if not isinstance(container, dict) or not isinstance(image, dict):
         raise RuntimeError("inspect_shape_invalid")
@@ -197,6 +244,8 @@ def assess(container, image, settings_item, settings_sha, json_enabled, protecte
 
 
 def main():
+    if sys.argv[1:] not in ([], ["--remediation-inputs"]):
+        raise RuntimeError("argument_forbidden")
     if os.geteuid() != 0:
         raise RuntimeError("host_operator_required")
     sock = os.lstat(SOCKET)
@@ -218,6 +267,8 @@ def main():
         raise RuntimeError("image_not_unique")
     report = assess(container, image_list[0], settings, digest,
                     json_format_enabled(data) if data is not None else None, protected_path)
+    if sys.argv[1:] == ["--remediation-inputs"]:
+        report["remediationInputs"] = remediation_inputs(container, image_list[0])
     report["dockerEndpoint"] = "unix:///var/run/docker.sock"
     report["daemonId"] = daemon_id
     print(json.dumps(report, sort_keys=True))
