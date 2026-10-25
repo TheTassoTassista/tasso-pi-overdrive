@@ -1,8 +1,12 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG verified-staging publication-only recovery
+
+Operator-reported previous script SHA `5de269ce4fd2695ccf238ed0a2ad9704072f583d7116094dcac905af5eaf72d8` `inspect-staging`: **PASS_SNAPSHOT**, parent `(36,880620)`, incoming `(36,880621)`, exact settings SHA, original stopped/candidate absent; creator UNKNOWN and publication unauthorized. New `recover` mode on the existing script is not host-executed. `python3 -B -m unittest tests.test_searxng_protected_host_remediate`: **35 PASS / 0 FAIL**, no root/Docker. Added positive real local no-replace publication and CLI dispatch; marker/hash/symlink/target/mount and original-state failures, post-snapshot change, approved-identity mismatch, fsync failure, concurrent no-overwrite conflict, interruption after rename and no automatic retry. Python AST, `node scripts/validate-package.mjs`, `git diff --check` PASS. New administrative script SHA-256 `1c36aea60569839a9485a46e400dc339f79aafc193682caabcbc4110856ee8fe`. No sudo, Docker mutation, host publication, service start or real runtime proof; separate operator approval required.
+
 ## 2026-10-25 — SearXNG source/cache cross-boot mount identity correction
 
-`python -B -m unittest tests.test_searxng_protected_host_remediate`: **26 PASS / 0 FAIL**, no root/Docker. New regressions prove current-mount device renumbering no longer rejects unchanged pinned inodes, while wrong source/cache inode, different leaf mount ID and a changed named-chain mount ID reject; existing digest, symlink, no-overwrite and staging fail-closed tests retained. Python AST parse, `node scripts/validate-package.mjs` and `git diff --check` PASS. Current `scripts/searxng-protected-host-remediate.py` SHA-256 `5de269ce4fd2695ccf238ed0a2ad9704072f583d7116094dcac905af5eaf72d8`. No approved host execution of these bytes; staging integrity/current source hash remain UNKNOWN and publication remains blocked.
+`python -B -m unittest tests.test_searxng_protected_host_remediate`: **26 PASS / 0 FAIL**, no root/Docker. New regressions prove current-mount device renumbering no longer rejects unchanged pinned inodes, while wrong source/cache inode, different leaf mount ID and a changed named-chain mount ID reject; existing digest, symlink, no-overwrite and staging fail-closed tests retained. Python AST parse, `node scripts/validate-package.mjs` and `git diff --check` PASS. The script SHA-256 at this checkpoint was `5de269ce4fd2695ccf238ed0a2ad9704072f583d7116094dcac905af5eaf72d8`. Host execution of these bytes occurred later, as recorded in the newer entry above; no publication was authorized by this local fix alone.
 
 ## 2026-10-25 — SearXNG inspect-staging precondition diagnostics
 

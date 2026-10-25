@@ -3,8 +3,9 @@
 
 `apply` copies the previously reviewed settings bytes into a protected, no-replace
 target and creates one STOPPED Docker candidate. It never starts or deletes one.
-`status`, `inspect`, and `inspect-staging` are read-only. Any interrupted/ambiguous state requires
-manual disposition.
+`recover` only publishes an already-attested incoming tree, without creating or
+starting a container. `status`, `inspect`, and `inspect-staging` are read-only.
+Any interrupted/ambiguous state requires manual disposition.
 Run only from SHA-256-checked bytes in the host operator's terminal.
 """
 
@@ -36,6 +37,10 @@ CACHE_SOURCE = "/home/tasso/.local/share/pi-overdrive/searxng/data"
 PARENT = "/opt/phi/searxng"
 INCOMING = ".incoming-e084201aa606"
 TARGET = "candidate-e084201aa606"
+# The separately reported host PASS_SNAPSHOT authorizes preparation for these
+# exact objects only. A changed mount/device or inode requires new host review.
+RECOVERY_PARENT_ID = (36, 880620)
+RECOVERY_INCOMING_ID = (36, 880621)
 CANDIDATE = "phi-searxng-candidate-e084201aa606"
 LABEL = "phi.searxng.protected-candidate"
 LABEL_VALUE = SOURCE_SHA256
@@ -697,8 +702,87 @@ def inspect_staging(phi_fd):
         os.close(parent_fd)
 
 
+def sync_staging(parent_fd):
+    """Make the preexisting verified tree durable before its no-replace rename."""
+    stage_fd = os.open(INCOMING, DIR_FLAGS, dir_fd=parent_fd)
+    try:
+        config_fd = os.open("config", DIR_FLAGS, dir_fd=stage_fd)
+        cache_fd = os.open("cache", DIR_FLAGS, dir_fd=stage_fd)
+        try:
+            for directory_fd, name in ((config_fd, "settings.yml"),
+                                       (stage_fd, ".phi-candidate.json")):
+                file_fd = os.open(name, FILE_FLAGS, dir_fd=directory_fd)
+                try:
+                    os.fsync(file_fd)
+                finally:
+                    os.close(file_fd)
+            fsync_dir(config_fd)
+            fsync_dir(cache_fd)
+        finally:
+            os.close(cache_fd)
+            os.close(config_fd)
+        fsync_dir(stage_fd)
+    finally:
+        os.close(stage_fd)
+    fsync_dir(parent_fd)
+
+
+def recover_staging(phi_fd):
+    """Freshly attest and publish exactly one incoming tree; never create Docker state."""
+    snapshot = inspect_staging(phi_fd)
+    require(snapshot["STAGING_INTEGRITY"] == "PASS_SNAPSHOT",
+            "recovery_precondition_" + snapshot.get("failedPredicate", "unknown"))
+    require((snapshot["parentDev"], snapshot["parentIno"]) == RECOVERY_PARENT_ID,
+            "recovery_parent_not_approved")
+    require((snapshot["stagingDev"], snapshot["stagingIno"]) == RECOVERY_INCOMING_ID,
+            "recovery_staging_not_approved")
+    parent_fd = os.open("searxng", DIR_FLAGS, dir_fd=phi_fd)
+    try:
+        parent = os.fstat(parent_fd)
+        require((parent.st_dev, parent.st_ino) ==
+                (snapshot["parentDev"], snapshot["parentIno"]) and
+                parent.st_uid == parent.st_gid == 0 and
+                stat.S_IMODE(parent.st_mode) == 0o710 and
+                mount_id(parent_fd) == mount_id(phi_fd) and
+                sorted(os.listdir(parent_fd)) == [INCOMING] and
+                no_entry(parent_fd, TARGET), "recovery_parent_changed")
+        verify_acl(PARENT, "traverse")
+        identity = verify_tree(parent_fd, INCOMING)
+        require(identity == (snapshot["stagingDev"], snapshot["stagingIno"]),
+                "recovery_staging_changed")
+        sync_staging(parent_fd)
+        require(verify_tree(parent_fd, INCOMING) == identity and
+                same(parent, os.fstat(parent_fd)) and
+                same(parent, os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)) and
+                sorted(os.listdir(parent_fd)) == [INCOMING] and
+                no_entry(parent_fd, TARGET), "recovery_state_changed_before_publish")
+        source_bytes()
+        check_cache()
+        fixed_docker_state()
+        require(verify_tree(parent_fd, INCOMING) == identity and
+                same(parent, os.fstat(parent_fd)) and
+                same(parent, os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)) and
+                mount_id(parent_fd) == mount_id(phi_fd) and
+                sorted(os.listdir(parent_fd)) == [INCOMING],
+                "recovery_state_changed_before_publish")
+        rename_noreplace(parent_fd, INCOMING, TARGET)
+        fsync_dir(parent_fd)
+        require(no_entry(parent_fd, INCOMING) and
+                verify_tree(parent_fd, TARGET) == identity and
+                sorted(os.listdir(parent_fd)) == [TARGET], "recovery_postpublish_invalid")
+        fixed_docker_state()
+        return {"SEARXNG_HOST_REMEDIATION": "PUBLISHED_NO_CANDIDATE",
+                "target": PARENT + "/" + TARGET,
+                "targetDev": identity[0], "targetIno": identity[1],
+                "configSha256": SOURCE_SHA256, "candidateCreated": False,
+                "serviceStarted": False}
+    finally:
+        os.close(parent_fd)
+
+
 def main():
-    require(len(sys.argv) == 2 and sys.argv[1] in ("apply", "status", "inspect", "inspect-staging"),
+    require(len(sys.argv) == 2 and sys.argv[1] in
+            ("apply", "status", "inspect", "inspect-staging", "recover"),
             "mode_invalid")
     require(os.geteuid() == 0, "host_operator_required")
     original_umask = os.umask(0o077)
@@ -714,6 +798,10 @@ def main():
                 report = inspect_staging(phi_fd)
                 print(json.dumps(report, sort_keys=True))
                 return 0 if report["STAGING_INTEGRITY"] == "PASS_SNAPSHOT" else 1
+            if sys.argv[1] == "recover":
+                report = recover_staging(phi_fd)
+                print(json.dumps(report, sort_keys=True))
+                return 0
             if sys.argv[1] == "status":
                 if no_entry(phi_fd, "searxng"):
                     print(json.dumps({"SEARXNG_HOST_STATE": "ABSENT"}))
