@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG one-shot protected host candidate
+
+`python3 -B -m unittest tests.test_searxng_protected_host_remediate`: **16 PASS / 0 FAIL** without root or Docker. Covers exact source bytes/hash, symlink/path-replacement refusal, cache changes, existing target, interrupted staging/manual classification, native no-replace success/conflict, ordered one-shot apply, candidate and original Docker identity/mount/privilege/environment checks, bounded stopped/no-pull create arguments, secret redaction, positive local staging fixture and real numeric-UID ACL behavior. Python AST, package validation and diff check PASS. Exact administrative script SHA-256 `6abaddad08b529aa75e8b782650126220f36782bf889e2ec121f80fcd3dbaf66`. No privileged transaction, real protected target, Docker candidate or runtime assertion has been executed by Work Execution. Historical preflight and route/image tests were not rerun on unchanged inputs.
+
 ## 2026-10-25 — SearXNG preflight override classification correction
 
 Changed-only `python3 -B -m unittest tests.test_searxng_remediation_preflight`: **10 PASS / 0 FAIL**; Python AST, package validation and diff check PASS. Exact revised script SHA-256 `ce6c1334d2008face5ef916346ba6aecf9b58d5caa95de616187e2b2178f14c3`. Regression confirms replaceable ancestors force overall FAIL even when the read-only source snapshot succeeds. No privileged preflight, Docker operation, configuration read, CI or provider call. Prior 38/38 broader focused tests remain historical evidence for unchanged paths, not rerun. Root mutation, runtime PASS and real JSON service remain unverified.
