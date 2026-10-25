@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG offline runtime fixture correction
+
+Third operator-reported SHA `59bcb174…` isolated runtime: FAIL on three redacted `ConnectionError` entries after JSON200; cleanup PASS, historical endpoint/phase UNKNOWN. New SHA `55a64a536aa7542b2b9a44a17800e833b76473d92cf0283fbbafb2c33570c852` fixture/probe regressions **20 PASS / 0 FAIL** without Docker; Python AST, package validation and diff check PASS. No host trial of new bytes; overall runtime remains FAIL/NOT VERIFIED, and real-service attestation/configuration remains pending separate host authority.
+
 ## 2026-10-25 — SearXNG traceback observability
 
 Second operator-reported exact-image isolated runtime: **FAIL** after JSON probe (`logTraceback=true`, no parsed summary), cleanup PASS. Historical exception/type/source UNKNOWN because old logs were not retained. Current local runtime-script regressions **17 PASS / 0 FAIL** cover conventional/prefixed/multiline/incomplete/word-only/nontraditional/sensitive log forms and fail-closed legacy flags; Python AST syntax, package validation and diff check PASS. No new Docker/root/CI/provider call. A new exact-hash, operator-approved runtime run remains necessary for real exception classification; no runtime PASS claimed.

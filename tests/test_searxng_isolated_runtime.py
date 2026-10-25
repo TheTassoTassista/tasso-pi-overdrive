@@ -1,7 +1,10 @@
 """No-Docker regression checks for the one-shot SearXNG runtime test."""
 
 import importlib.util
+import io
+import json
 import pathlib
+import stat
 import types
 import unittest
 from unittest.mock import patch
@@ -31,18 +34,89 @@ class RuntimePreparationTests(unittest.TestCase):
     def test_fixture_is_synthetic_and_enables_json(self):
         with patch.object(RUNTIME.secrets, "token_urlsafe", return_value="synthetic-only-key"):
             fixture = RUNTIME.fixture_text()
-        self.assertIn("use_default_settings: true", fixture)
+        self.assertIn("    keep_only: []", fixture)
+        self.assertIn("    engine: demo_offline", fixture)
+        self.assertIn("    disabled: false", fixture)
+        self.assertIn("  url: false", fixture)
+        self.assertIn("  autocomplete: ''", fixture)
         self.assertIn("    - json", fixture)
         self.assertIn("synthetic-only-key", fixture)
         self.assertNotIn("/home/tasso", fixture)
         for source in (RUNTIME.FILE_PROBE, RUNTIME.NETWORK_PROBE, RUNTIME.HEALTH_PROBE, RUNTIME.JSON_PROBE):
             compile(source, "<container-probe>", "exec")
 
+    def test_json_probe_requires_offline_engine_result(self):
+        class Response(io.BytesIO):
+            status = 200
+
+        for payload, expected_exit in (
+            ({"results": [{"engines": ["phi offline fixture"]}], "unresponsive_engines": []}, None),
+            ({"results": [], "unresponsive_engines": []}, 47),
+            ({"results": [{"engines": ["phi offline fixture"]}], "unresponsive_engines": ["failed"]}, 47),
+            ({"results": [{"engines": ["duckduckgo"]}], "unresponsive_engines": []}, 48),
+        ):
+            with self.subTest(payload=payload), patch("urllib.request.urlopen", return_value=Response(
+                    json.dumps(payload).encode())):
+                if expected_exit is None:
+                    exec(RUNTIME.JSON_PROBE, {})
+                else:
+                    with self.assertRaises(SystemExit) as failure:
+                        exec(RUNTIME.JSON_PROBE, {})
+                    self.assertEqual(failure.exception.code, expected_exit)
+
+    def test_pre_json_log_error_aborts_before_search(self):
+        item = {"Id": "a" * 64, "State": {"Running": True}, "Config": {"User": "977:977"},
+                "HostConfig": {"NetworkMode": "none", "PortBindings": None, "Privileged": False},
+                "Mounts": [{"Source": "/run/test/config", "Destination": "/etc/searxng", "RW": False},
+                           {"Source": "/run/test/cache", "Destination": "/var/cache/searxng", "RW": True}]}
+        clean = {key: False for key in ("logReadOnlyError", "logPermissionError", "logChownError",
+                                         "logTraceback", "logException", "oomKilled")}
+        bad = dict(clean, logException=True)
+        created = types.SimpleNamespace(stdout=("a" * 64).encode())
+        state = {"createAttempted": False, "createConfirmed": False, "containerId": None,
+                 "phaseReached": "preflight_pass", "preJsonDiagnostics": None}
+        with patch.object(RUNTIME, "docker", return_value=created), \
+             patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "probe", return_value=0) as probe, \
+             patch.object(RUNTIME, "diagnostics", return_value=bad):
+            with self.assertRaisesRegex(RUNTIME.GateFailure, "pre_json_runtime_log_or_oom_error"):
+                RUNTIME.runtime_test("name", "marker", pathlib.Path("/run/test/config"),
+                                     pathlib.Path("/run/test/cache"), state)
+        self.assertEqual(state["phaseReached"], "health_pass")
+        self.assertEqual(state["preJsonDiagnostics"], bad)
+        self.assertNotIn(RUNTIME.JSON_PROBE, [call.args[1] for call in probe.call_args_list])
+
+        state = {"createAttempted": False, "createConfirmed": False, "containerId": None,
+                 "phaseReached": "preflight_pass", "preJsonDiagnostics": None}
+        with patch.object(RUNTIME, "docker", return_value=created), \
+             patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "probe", return_value=0) as probe, \
+             patch.object(RUNTIME, "diagnostics", return_value=clean):
+            self.assertEqual(RUNTIME.runtime_test("name", "marker", pathlib.Path("/run/test/config"),
+                                                  pathlib.Path("/run/test/cache"), state), "a" * 64)
+        self.assertEqual(state["phaseReached"], "json_probe_pass")
+        self.assertIn(RUNTIME.JSON_PROBE, [call.args[1] for call in probe.call_args_list])
+
     def test_unprivileged_execution_fails_before_docker(self):
         with patch.object(RUNTIME.os, "geteuid", return_value=1000), \
              patch.object(RUNTIME, "docker", side_effect=AssertionError("Docker accessed")):
             with self.assertRaisesRegex(RUNTIME.GateFailure, "host_operator_required"):
                 RUNTIME.preflight()
+
+    def test_preflight_rejects_image_valkey_override_without_exposing_value(self):
+        image = {"Id": RUNTIME.IMAGE_ID, "RepoDigests": [RUNTIME.INDEX_REF],
+                 "Os": "linux", "Architecture": "amd64",
+                 "Config": {"Entrypoint": ["/usr/local/searxng/entrypoint.sh"],
+                            "Env": ["SEARXNG_VALKEY_URL=valkey://private-secret"]}}
+        sock = types.SimpleNamespace(st_mode=stat.S_IFSOCK | 0o660, st_uid=0)
+        with patch.object(RUNTIME.os, "geteuid", return_value=0), \
+             patch.object(RUNTIME.os, "lstat", return_value=sock), \
+             patch.object(RUNTIME, "original_identity", return_value=(
+                 RUNTIME.ORIGINAL_ID, "/" + RUNTIME.ORIGINAL_NAME, RUNTIME.IMAGE_ID, "false")), \
+             patch.object(RUNTIME, "docker_json", side_effect=[RUNTIME.DAEMON_ID, [image]]):
+            with self.assertRaisesRegex(RUNTIME.GateFailure, "image_external_cache_override") as failure:
+                RUNTIME.preflight()
+        self.assertNotIn("private-secret", str(failure.exception))
 
     def test_expired_body_deadline_never_launches_docker(self):
         with patch.object(RUNTIME, "BODY_DEADLINE", 0), \

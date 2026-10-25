@@ -102,17 +102,32 @@ def preflight():
             images[0].get("Os") != "linux" or images[0].get("Architecture") != "amd64" or
             images[0].get("Config", {}).get("Entrypoint") != ["/usr/local/searxng/entrypoint.sh"]):
         raise GateFailure("local_image_identity_mismatch")
+    # Image-level environment must not silently override the offline fixture.
+    image_env = images[0].get("Config", {}).get("Env") or []
+    if any(entry.split("=", 1)[0] in ("SEARXNG_VALKEY_URL", "SEARXNG_REDIS_URL")
+           and entry.partition("=")[2] for entry in image_env if isinstance(entry, str)):
+        raise GateFailure("image_external_cache_override")
 
 
 def fixture_text():
     # Synthetic key is never printed or copied from the installed service.
     key = secrets.token_urlsafe(32)
     return (
-        "use_default_settings: true\n"
+        "use_default_settings:\n"
+        "  engines:\n"
+        "    keep_only: []\n"
+        "engines:\n"
+        "  - name: phi offline fixture\n"
+        "    engine: demo_offline\n"
+        "    shortcut: phi\n"
+        "    disabled: false\n"
         "server:\n"
         "  secret_key: '" + key + "'\n"
         "  limiter: false\n"
+        "valkey:\n"
+        "  url: false\n"
         "search:\n"
+        "  autocomplete: ''\n"
         "  formats:\n"
         "    - html\n"
         "    - json\n"
@@ -257,6 +272,11 @@ except (UnicodeDecodeError, ValueError):
     raise SystemExit(45)
 if not isinstance(data, dict) or not isinstance(data.get('results'), list):
     raise SystemExit(16)
+if data.get('unresponsive_engines') or not data['results']:
+    raise SystemExit(47)
+if not any('phi offline fixture' in result.get('engines', []) for result in data['results']
+           if isinstance(result, dict)):
+    raise SystemExit(48)
 print('JSON_API_PASS')
 '''
 
@@ -303,6 +323,11 @@ def runtime_test(name, marker, config, cache, state):
     else:
         raise GateFailure("server_readiness_timeout")
     state["phaseReached"] = "health_pass"
+    state["preJsonDiagnostics"] = diagnostics(name, marker)
+    if state["preJsonDiagnostics"] is None or state["preJsonDiagnostics"].get("status") == "UNKNOWN":
+        raise GateFailure("pre_json_runtime_logs_unavailable")
+    if fatal_runtime_diagnostics(state["preJsonDiagnostics"]):
+        raise GateFailure("pre_json_runtime_log_or_oom_error")
     json_code = probe(container_id, JSON_PROBE, timeout=18)
     if json_code:
         raise GateFailure("json_probe_exit_" + str(json_code))
@@ -460,7 +485,7 @@ def main():
     cleanup_result = None
     failure_diagnostics = None
     state = {"createAttempted": False, "createConfirmed": False,
-             "containerId": None, "phaseReached": "preflight_pass"}
+             "containerId": None, "phaseReached": "preflight_pass", "preJsonDiagnostics": None}
     started = time.monotonic()
     try:
         root, root_identity, config, cache = prepare_fixture()
@@ -506,6 +531,7 @@ def main():
     print(json.dumps({"SEARXNG_EXACT_IMAGE_RO_RUNTIME": outcome, "reason": reason,
                       "originalUnchanged": original_unchanged, "cleanup": cleanup_result,
                       "phaseReached": state["phaseReached"],
+                      "preJsonDiagnostics": state["preJsonDiagnostics"],
                       "diagnostics": failure_diagnostics,
                       "elapsedSeconds": round(time.monotonic() - started, 2)}, sort_keys=True))
     return 0 if outcome == "PASS" else 1 if outcome == "FAIL" else 2
