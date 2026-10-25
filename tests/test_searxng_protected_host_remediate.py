@@ -21,6 +21,63 @@ SPEC.loader.exec_module(REMEDY)
 
 
 class ProtectedRemediationTests(unittest.TestCase):
+    @contextlib.contextmanager
+    def staged_fixture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp) / "searxng"
+            parent.mkdir(mode=0o710)
+            stage = parent / REMEDY.INCOMING
+            config = stage / "config"
+            cache = stage / "cache"
+            stage.mkdir(mode=0o710)
+            config.mkdir(mode=0o710)
+            cache.mkdir(mode=0o700)
+            payload = b"search:\n  formats:\n    - json\n"
+            digest = hashlib.sha256(payload).hexdigest()
+            settings = config / "settings.yml"
+            settings.write_bytes(payload)
+            settings.chmod(0o640)
+            marker = stage / ".phi-candidate.json"
+            marker.write_text(json.dumps({"schema": "phi-searxng-candidate-v1",
+                "image": REMEDY.IMAGE_ID, "original": REMEDY.ORIGINAL_ID,
+                "sourceSha256": digest}, sort_keys=True), encoding="ascii")
+            marker.chmod(0o600)
+            real_fstat, real_stat = os.fstat, os.stat
+            def root_metadata(value):
+                fields = {key: getattr(value, key) for key in
+                    ("st_dev", "st_ino", "st_mode", "st_uid", "st_gid", "st_size",
+                     "st_mtime_ns", "st_ctime_ns", "st_nlink")}
+                fields.update(st_uid=0, st_gid=0)
+                return types.SimpleNamespace(**fields)
+            def spoof_fstat(item):
+                value = real_fstat(item)
+                path = pathlib.Path(os.readlink(f"/proc/self/fd/{item}"))
+                if path.is_relative_to(parent) and "cache" not in path.parts:
+                    return root_metadata(value)
+                return value
+            def spoof_stat(*args, **kwargs):
+                value = real_stat(*args, **kwargs)
+                path = (pathlib.Path(os.readlink(f"/proc/self/fd/{kwargs['dir_fd']}")) / args[0]
+                        if kwargs.get("dir_fd") is not None else pathlib.Path(args[0]))
+                if path.is_relative_to(parent) and "cache" not in path.parts:
+                    return root_metadata(value)
+                return value
+            fd = os.open(parent, REMEDY.DIR_FLAGS)
+            phi_fd = os.open(tmp, REMEDY.DIR_FLAGS)
+            try:
+                with patch.object(REMEDY, "PARENT", str(parent)), \
+                     patch.object(REMEDY, "SOURCE_SHA256", digest), \
+                     patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())), \
+                     patch.object(REMEDY.os, "fstat", side_effect=spoof_fstat), \
+                     patch.object(REMEDY.os, "stat", side_effect=spoof_stat), \
+                     patch.object(REMEDY.os, "listxattr", return_value=[]), \
+                     patch.object(REMEDY, "mount_id", return_value=40), \
+                     patch.object(REMEDY, "verify_acl"):
+                    yield parent, stage, settings, marker, fd, phi_fd
+            finally:
+                os.close(fd)
+                os.close(phi_fd)
+
     def docker_fixture(self):
         image_env = ["SECRET=not-for-output", "__SEARXNG_CONFIG_PATH=/etc/searxng"]
         image = {"Id": REMEDY.IMAGE_ID, "Config": {"Env": image_env[:],
@@ -175,6 +232,80 @@ class ProtectedRemediationTests(unittest.TestCase):
                 self.assertEqual(REMEDY.status(fd), "AMBIGUOUS_MANUAL")
             finally:
                 os.close(fd)
+
+    def test_complete_staging_and_published_tree_use_same_verifier(self):
+        with self.staged_fixture() as (parent, stage, settings, marker, fd, _phi_fd):
+            identity = REMEDY.verify_tree(fd, REMEDY.INCOMING)
+            self.assertEqual(identity, (stage.stat().st_dev, stage.stat().st_ino))
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            self.assertEqual(REMEDY.verify_tree(fd, REMEDY.TARGET), identity)
+            self.assertFalse(stage.exists())
+            self.assertTrue((parent / REMEDY.TARGET).is_dir())
+
+    def test_staging_incomplete_marker_hash_and_symlink_fail_closed(self):
+        with self.staged_fixture() as (parent, stage, settings, marker, fd, _phi_fd):
+            original_marker = marker.read_bytes()
+            marker.unlink()
+            with self.assertRaises(REMEDY.GateError):
+                REMEDY.verify_tree(fd, REMEDY.INCOMING)
+            marker.write_bytes(original_marker)
+            marker.chmod(0o600)
+            marker.write_text('{"schema":"altered"}', encoding="ascii")
+            with self.assertRaisesRegex(REMEDY.GateError, "target_marker_mismatch"):
+                REMEDY.verify_tree(fd, REMEDY.INCOMING)
+            marker.write_bytes(original_marker + b" ")
+            with self.assertRaisesRegex(REMEDY.GateError, "target_marker_mismatch"):
+                REMEDY.verify_tree(fd, REMEDY.INCOMING)
+            marker.write_bytes(original_marker)
+            with patch.object(REMEDY, "SOURCE_SHA256", "0" * 64):
+                with self.assertRaisesRegex(REMEDY.GateError, "protected_file_digest_invalid"):
+                    REMEDY.verify_tree(fd, REMEDY.INCOMING)
+            settings.unlink()
+            settings.symlink_to("/etc/passwd")
+            with self.assertRaises(OSError):
+                REMEDY.verify_tree(fd, REMEDY.INCOMING)
+
+    def test_read_only_staging_inspection_rechecks_original_and_rejects_target(self):
+        with self.staged_fixture() as (parent, stage, settings, marker, fd, phi_fd):
+            parent_stat = os.fstat(fd)
+            stage_open = os.open(stage, REMEDY.DIR_FLAGS)
+            try:
+                stage_stat = os.fstat(stage_open)
+            finally:
+                os.close(stage_open)
+            snapshot = {"hostParent": "PRESENT", "parent": {
+                "protected": True, "dev": parent_stat.st_dev, "ino": parent_stat.st_ino,
+                "mtimeNs": parent_stat.st_mtime_ns, "ctimeNs": parent_stat.st_ctime_ns},
+                "transactionState": "INCOMING_MANUAL", "knownEntries": {
+                    REMEDY.INCOMING: {"dev": stage_stat.st_dev, "ino": stage_stat.st_ino}},
+                "unexpectedEntryCount": 0, "sourceIntegrity": "PASS",
+                "originalCacheIntegrity": "PASS",
+                "originalDockerAndCandidateAbsence": "PASS"}
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes"), \
+                 patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state") as docker_state:
+                result = REMEDY.inspect_staging(phi_fd)
+                self.assertEqual(result["STAGING_INTEGRITY"], "PASS_SNAPSHOT")
+                self.assertIs(result["publicationAuthorized"], False)
+                self.assertEqual(docker_state.call_count, 1)
+                snapshot["parent"]["protected"] = False
+                with self.assertRaisesRegex(REMEDY.GateError,
+                                            "staging_parent_or_original_untrusted"):
+                    REMEDY.inspect_staging(phi_fd)
+                snapshot["parent"]["protected"] = True
+                (parent / REMEDY.TARGET).mkdir()
+                with self.assertRaisesRegex(REMEDY.GateError,
+                                            "staging_parent_or_target_changed"):
+                    REMEDY.inspect_staging(phi_fd)
+                (parent / REMEDY.TARGET).rmdir()
+                refreshed = os.fstat(fd)
+                snapshot["parent"]["mtimeNs"] = refreshed.st_mtime_ns
+                snapshot["parent"]["ctimeNs"] = refreshed.st_ctime_ns
+                with patch.object(REMEDY, "verify_tree", return_value=(36, 999999)):
+                    with self.assertRaisesRegex(REMEDY.GateError, "staging_identity_changed"):
+                        REMEDY.inspect_staging(phi_fd)
+                self.assertFalse((parent / REMEDY.TARGET).exists())
 
     def test_original_daemon_container_mount_and_env_mismatch(self):
         original, image = self.docker_fixture()

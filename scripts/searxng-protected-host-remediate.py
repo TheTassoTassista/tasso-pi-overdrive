@@ -3,7 +3,7 @@
 
 `apply` copies the previously reviewed settings bytes into a protected, no-replace
 target and creates one STOPPED Docker candidate. It never starts or deletes one.
-`status` and `inspect` are read-only. Any interrupted/ambiguous state requires
+`status`, `inspect`, and `inspect-staging` are read-only. Any interrupted/ambiguous state requires
 manual disposition.
 Run only from SHA-256-checked bytes in the host operator's terminal.
 """
@@ -362,28 +362,64 @@ def verify_file(parent_fd, name, digest, uid, gid):
         os.close(fd)
 
 
-def verify_published(parent_fd):
-    target_fd = os.open(TARGET, DIR_FLAGS, dir_fd=parent_fd)
+def verify_tree(parent_fd, tree_name):
+    require(tree_name in (INCOMING, TARGET), "tree_name_invalid")
+    target_fd = os.open(tree_name, DIR_FLAGS, dir_fd=parent_fd)
     try:
         target = os.fstat(target_fd)
-        require(target.st_uid == target.st_gid == 0 and
+        require(stat.S_ISDIR(target.st_mode) and target.st_uid == target.st_gid == 0 and
+                stat.S_IMODE(target.st_mode) == 0o710 and
+                target.st_dev == os.fstat(parent_fd).st_dev and
+                mount_id(target_fd) == mount_id(parent_fd) and
+                set(os.listxattr(target_fd)) <= {"system.posix_acl_access"} and
                 sorted(os.listdir(target_fd)) == [".phi-candidate.json", "cache", "config"],
                 "target_structure_invalid")
         verify_acl(PARENT, "traverse")
-        verify_acl(PARENT + "/" + TARGET, "traverse")
+        tree_path = PARENT + "/" + tree_name
+        verify_acl(tree_path, "traverse")
         config_fd = os.open("config", DIR_FLAGS, dir_fd=target_fd)
         cache_fd = os.open("cache", DIR_FLAGS, dir_fd=target_fd)
         try:
             config, cache = os.fstat(config_fd), os.fstat(cache_fd)
-            require(config.st_uid == config.st_gid == 0 and
+            require(stat.S_ISDIR(config.st_mode) and
+                    config.st_uid == config.st_gid == 0 and
+                    stat.S_IMODE(config.st_mode) == 0o710 and
+                    config.st_dev == target.st_dev and
+                    mount_id(config_fd) == mount_id(target_fd) and
+                    set(os.listxattr(config_fd)) <= {"system.posix_acl_access"} and
+                    stat.S_ISDIR(cache.st_mode) and
                     (cache.st_uid, cache.st_gid) == SOURCE_UID_GID and
                     stat.S_IMODE(cache.st_mode) == 0o700 and
+                    cache.st_dev == target.st_dev and
+                    mount_id(cache_fd) == mount_id(target_fd) and
+                    not os.listxattr(cache_fd) and
                     sorted(os.listdir(config_fd)) == ["settings.yml"] and
                     not os.listdir(cache_fd),
                     "target_metadata_invalid")
-            verify_acl(PARENT + "/" + TARGET + "/config", "traverse")
-            verify_acl(PARENT + "/" + TARGET + "/config/settings.yml", "read")
+            verify_acl(tree_path + "/config", "traverse")
+            verify_acl(tree_path + "/config/settings.yml", "read")
             verify_file(config_fd, "settings.yml", SOURCE_SHA256, 0, 0)
+            settings_fd = os.open("settings.yml", FILE_FLAGS, dir_fd=config_fd)
+            try:
+                settings = os.fstat(settings_fd)
+                require(stat.S_ISREG(settings.st_mode) and settings.st_nlink == 1 and
+                        settings.st_uid == settings.st_gid == 0 and
+                        stat.S_IMODE(settings.st_mode) == 0o640 and
+                        settings.st_dev == target.st_dev and
+                        mount_id(settings_fd) == mount_id(target_fd) and
+                        set(os.listxattr(settings_fd)) <= {"system.posix_acl_access"} and
+                        same(settings, os.stat("settings.yml", dir_fd=config_fd,
+                                                    follow_symlinks=False)),
+                        "target_settings_metadata_invalid")
+            finally:
+                os.close(settings_fd)
+            require(same(config, os.fstat(config_fd)) and
+                    same(config, os.stat("config", dir_fd=target_fd, follow_symlinks=False)) and
+                    same(cache, os.fstat(cache_fd)) and
+                    same(cache, os.stat("cache", dir_fd=target_fd, follow_symlinks=False)) and
+                    not os.listdir(cache_fd) and
+                    sorted(os.listdir(config_fd)) == ["settings.yml"],
+                    "target_children_changed")
         finally:
             os.close(cache_fd)
             os.close(config_fd)
@@ -391,16 +427,34 @@ def verify_published(parent_fd):
         try:
             marker_stat = os.fstat(marker_fd)
             require(stat.S_ISREG(marker_stat.st_mode) and marker_stat.st_uid == marker_stat.st_gid == 0 and
-                    stat.S_IMODE(marker_stat.st_mode) == 0o600 and marker_stat.st_size <= 4096,
+                    marker_stat.st_nlink == 1 and stat.S_IMODE(marker_stat.st_mode) == 0o600 and
+                    marker_stat.st_dev == target.st_dev and
+                    mount_id(marker_fd) == mount_id(target_fd) and
+                    not os.listxattr(marker_fd) and 0 < marker_stat.st_size <= 4096,
                     "target_marker_metadata_invalid")
-            marker = json.loads(os.read(marker_fd, 4096))
+            raw = os.read(marker_fd, 4097)
+            require(len(raw) == marker_stat.st_size and
+                    same(marker_stat, os.fstat(marker_fd)) and
+                    same(marker_stat, os.stat(".phi-candidate.json", dir_fd=target_fd,
+                                                   follow_symlinks=False)),
+                    "target_marker_changed")
         finally:
             os.close(marker_fd)
-        require(marker == {"schema": "phi-searxng-candidate-v1", "image": IMAGE_ID,
-                           "original": ORIGINAL_ID, "sourceSha256": SOURCE_SHA256},
+        marker = {"schema": "phi-searxng-candidate-v1", "image": IMAGE_ID,
+                  "original": ORIGINAL_ID, "sourceSha256": SOURCE_SHA256}
+        require(raw == json.dumps(marker, sort_keys=True).encode("ascii"),
                 "target_marker_mismatch")
+        require(sorted(os.listdir(target_fd)) == [".phi-candidate.json", "cache", "config"] and
+                same(target, os.fstat(target_fd)) and
+                same(target, os.stat(tree_name, dir_fd=parent_fd, follow_symlinks=False)),
+                "target_identity_changed")
+        return (target.st_dev, target.st_ino)
     finally:
         os.close(target_fd)
+
+
+def verify_published(parent_fd):
+    return verify_tree(parent_fd, TARGET)
 
 
 def candidate_state():
@@ -506,6 +560,7 @@ def inspect_parent(phi_fd):
             "dev": parent.st_dev, "ino": parent.st_ino,
             "uid": parent.st_uid, "gid": parent.st_gid,
             "mode": oct(stat.S_IMODE(parent.st_mode)),
+            "mtimeNs": parent.st_mtime_ns, "ctimeNs": parent.st_ctime_ns,
             "sameMountAsPhi": mount_id(parent_fd) == mount_id(phi_fd),
             "acl": parent_acl, "protected": protected},
             "knownEntries": entries, "unexpectedEntryCount": len(set(names) - expected_names)})
@@ -533,8 +588,56 @@ def inspect_parent(phi_fd):
     return report
 
 
+def inspect_staging(phi_fd):
+    """Full selected-object attestation; no publication or Docker mutation."""
+    parent_report = inspect_parent(phi_fd)
+    require(parent_report.get("hostParent") == "PRESENT" and
+            parent_report["parent"]["protected"] and
+            parent_report["transactionState"] == "INCOMING_MANUAL" and
+            set(parent_report["knownEntries"]) == {INCOMING} and
+            parent_report["unexpectedEntryCount"] == 0 and
+            all(parent_report[key] == "PASS" for key in
+                ("sourceIntegrity", "originalCacheIntegrity", "originalDockerAndCandidateAbsence")),
+            "staging_parent_or_original_untrusted")
+    parent_fd = os.open("searxng", DIR_FLAGS, dir_fd=phi_fd)
+    try:
+        parent = os.fstat(parent_fd)
+        require((parent.st_dev, parent.st_ino) ==
+                (parent_report["parent"]["dev"], parent_report["parent"]["ino"]) and
+                parent.st_uid == parent.st_gid == 0 and
+                stat.S_IMODE(parent.st_mode) == 0o710 and
+                parent.st_mtime_ns == parent_report["parent"]["mtimeNs"] and
+                parent.st_ctime_ns == parent_report["parent"]["ctimeNs"] and
+                mount_id(parent_fd) == mount_id(phi_fd) and
+                set(os.listxattr(parent_fd)) <= {"system.posix_acl_access"} and
+                no_entry(parent_fd, TARGET), "staging_parent_or_target_changed")
+        verify_acl(PARENT, "traverse")
+        stage_identity = verify_tree(parent_fd, INCOMING)
+        require(stage_identity ==
+                (parent_report["knownEntries"][INCOMING]["dev"],
+                 parent_report["knownEntries"][INCOMING]["ino"]),
+                "staging_identity_changed")
+        source_bytes()
+        check_cache()
+        fixed_docker_state()
+        require(verify_tree(parent_fd, INCOMING) == stage_identity and
+                no_entry(parent_fd, TARGET) and
+                same(parent, os.fstat(parent_fd)) and
+                same(parent, os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)) and
+                sorted(os.listdir(parent_fd)) == [INCOMING],
+                "staging_changed_during_inspection")
+        return {"STAGING_INTEGRITY": "PASS_SNAPSHOT", "parentDev": parent.st_dev,
+                "parentIno": parent.st_ino, "stagingDev": stage_identity[0],
+                "stagingIno": stage_identity[1], "sourceSha256": SOURCE_SHA256,
+                "originalAndCandidateState": "PASS_STOPPED_AND_CANDIDATE_ABSENT",
+                "historicalCreator": "UNKNOWN", "publicationAuthorized": False}
+    finally:
+        os.close(parent_fd)
+
+
 def main():
-    require(len(sys.argv) == 2 and sys.argv[1] in ("apply", "status", "inspect"), "mode_invalid")
+    require(len(sys.argv) == 2 and sys.argv[1] in ("apply", "status", "inspect", "inspect-staging"),
+            "mode_invalid")
     require(os.geteuid() == 0, "host_operator_required")
     original_umask = os.umask(0o077)
     try:
@@ -545,6 +648,9 @@ def main():
                 report = inspect_parent(phi_fd)
                 print(json.dumps(report, sort_keys=True))
                 return 0 if report["HOST_PARENT_INSPECTION"] == "TRUSTED_EMPTY_SNAPSHOT" else 1
+            if sys.argv[1] == "inspect-staging":
+                print(json.dumps(inspect_staging(phi_fd), sort_keys=True))
+                return 0
             if sys.argv[1] == "status":
                 if no_entry(phi_fd, "searxng"):
                     print(json.dumps({"SEARXNG_HOST_STATE": "ABSENT"}))

@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG incoming staging read-only verifier
+
+`python -B -m unittest tests.test_searxng_protected_host_remediate`: **21 PASS / 0 FAIL** with no root/Docker. New fixtures cover complete incoming verification, same verifier after native no-replace publication, absent/altered/noncanonical marker, hash mismatch, symlink, target conflict, stale identity and untrusted parent; existing no-overwrite/partial-state tests retained. AST syntax, package validation and `git diff --check` PASS. Exact current `scripts/searxng-protected-host-remediate.py` SHA-256 `f1a6ffb093a65d3b0ce244710ab7f13dbb36982160a5af6d22b02d1617d0c526`. This hash has **not** been approved for a host run. Operator-reported earlier parent snapshot is not full staged integrity; actual staging remains UNKNOWN until new read-only host inspection. No recovery mutation or host-side execution.
+
 ## 2026-10-25 — SearXNG parent-exists read-only diagnostic
 
 Approved original `apply` SHA `e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949` failed closed before any write. Current existing installer adds only read-only `inspect`, with protected-empty vs untrusted/foreign/symlink/partial/target/replaced-parent classification and fixed candidate absence. `python -m unittest tests/test_searxng_protected_host_remediate.py`: **18 PASS / 0 FAIL**, no Docker/root; `python -m py_compile` syntax PASS; package validation PASS; diff check PASS. Current script SHA-256 `a1a758eefbc7bcacbfe3d9ae41fe1a355033d3201820892c736850698b5d7a0d`. No privileged inspection performed; actual parent contents remain UNKNOWN. Old script hash/approval is historical only, not approval for new bytes or a new `apply`.
