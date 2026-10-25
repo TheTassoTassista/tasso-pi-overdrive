@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG host-remediation read-only preparation
+
+`python3 -B -m unittest tests.test_searxng_remediation_preflight tests.test_searxng_host_attest tests.test_searxng_isolated_runtime`: **38 PASS / 0 FAIL** without root/Docker. New tests cover exact Docker identity, stopped state, two binds/loopback, environment-value redaction/equality, conservative JSON classification, pinned source/symlink rejection, cache nonempty refusal and snapshot-vs-transaction readiness. New preflight SHA `32213e2faa0abf525e39a2947f6c556a5259dfb90086a3805277fec968c36c55`; Python AST, package validation and diff check PASS. Script not run against host Docker/private settings. No CI/provider call, publication, real JSON query, full RO runtime PASS or stable activation. Host-owned digest/JSON/env/cache predicates remain UNKNOWN until separately approved read-only execution.
+
 ## 2026-10-25 — SearXNG pre-JSON ConnectionError static diagnosis
 
 Operator-reported exact-image run of SHA `55a64a53…`: **FAIL** at health with three stderr `ConnectionError` signals before JSON, process live, no reported RO/permission/chown/OOM flag, cleanup/original unchanged PASS. Historical logger/destination not retained; precise source UNKNOWN. Current detector-only SHA `ee7c97ea33003336545e0979e84328d9e62dbab4a2f8b61c9f185ee6cc24d339` distinguishes the exact caught upstream network-retry WARNING without making it nonfatal. Focused no-Docker regressions **22 PASS / 0 FAIL**; Python AST, package validation, diff check PASS. No new Docker/root/CI/provider call. Filesystem/health probes passed in the reported trial; JSON and full runtime PASS were not reached. No blind fourth host test authorized or proposed.
