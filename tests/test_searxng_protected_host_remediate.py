@@ -656,6 +656,88 @@ class ProtectedRemediationTests(unittest.TestCase):
                     REMEDY.recover_staging(phi_fd)
                 rename.assert_not_called()
 
+    def test_postpublish_reason_only_after_rename_and_fsync(self):
+        for changed in ("incoming_recreated", "identity_changed", "extra_entry"):
+            with self.subTest(changed=changed), self.staged_fixture() as (
+                    parent, stage, settings, marker, fd, phi_fd):
+                snapshot = self.incoming_snapshot(parent, stage, fd)
+                original_rename = REMEDY.rename_noreplace
+                original_verify = REMEDY.verify_tree
+                def publish_and_change(parent_fd, old, new):
+                    original_rename(parent_fd, old, new)
+                    if changed == "incoming_recreated":
+                        (parent / REMEDY.INCOMING).mkdir()
+                    elif changed == "extra_entry":
+                        (parent / "foreign-entry").write_bytes(b"preserve")
+                def verify_with_changed_identity(parent_fd, name):
+                    actual = original_verify(parent_fd, name)
+                    if changed == "identity_changed" and name == REMEDY.TARGET:
+                        return (actual[0], actual[1] + 1)
+                    return actual
+                with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                     patch.object(REMEDY, "source_bytes"), \
+                     patch.object(REMEDY, "check_cache"), \
+                     patch.object(REMEDY, "fixed_docker_state"), \
+                     patch.object(REMEDY, "rename_noreplace",
+                                  side_effect=publish_and_change), \
+                     patch.object(REMEDY, "verify_tree",
+                                  side_effect=verify_with_changed_identity):
+                    with self.assertRaisesRegex(REMEDY.GateError,
+                                                "recovery_postpublish_invalid"):
+                        REMEDY.recover_staging(phi_fd)
+                self.assertEqual(stage.exists(), changed == "incoming_recreated")
+                self.assertTrue((parent / REMEDY.TARGET).exists())
+
+    def test_read_only_parent_inspection_reports_postpublish_predicate_safely(self):
+        with self.staged_fixture() as (parent, stage, settings, marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            with patch.object(REMEDY, "source_bytes"), \
+                 patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "candidate_state", return_value="ABSENT"):
+                report = REMEDY.inspect_parent(phi_fd)
+                self.assertEqual(report["transactionState"], "PUBLISHED_NO_CANDIDATE")
+                self.assertTrue(all(report["postPublishChecks"].values()))
+            with patch.object(REMEDY, "source_bytes"), \
+                 patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "status",
+                              side_effect=REMEDY.GateError("target_marker_mismatch")):
+                report = REMEDY.inspect_parent(phi_fd)
+                self.assertEqual(report["transactionReason"], "target_marker_mismatch")
+                self.assertFalse(report["postPublishChecks"]["targetVerifiedNoCandidate"])
+            with patch.object(REMEDY, "source_bytes"), \
+                 patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "status", side_effect=OSError("secret-value")):
+                report = REMEDY.inspect_parent(phi_fd)
+                self.assertEqual(report["transactionReason"], "read_or_inspect_unavailable")
+                self.assertNotIn("secret-value", json.dumps(report))
+
+    def test_inspect_cli_dispatch_remains_read_only_on_nonempty_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fd = os.open(tmp, REMEDY.DIR_FLAGS)
+            output = io.StringIO()
+            try:
+                report = {"HOST_PARENT_INSPECTION": "FAIL_CLOSED_MANUAL",
+                          "postPublishChecks": {"targetPresent": True}}
+                with patch.object(REMEDY.sys, "argv", [str(SCRIPT), "inspect"]), \
+                     patch.object(REMEDY.os, "geteuid", return_value=0), \
+                     patch.object(REMEDY, "protected_opt_fd", return_value=[fd]), \
+                     patch.object(REMEDY, "inspect_parent", return_value=report), \
+                     patch.object(REMEDY, "recover_staging") as recover, \
+                     patch.object(REMEDY, "stage_copy") as stage, \
+                     patch.object(REMEDY, "docker") as docker, \
+                     contextlib.redirect_stdout(output):
+                    self.assertEqual(REMEDY.main(), 1)
+                self.assertEqual(json.loads(output.getvalue()), report)
+                recover.assert_not_called()
+                stage.assert_not_called()
+                docker.assert_not_called()
+            finally:
+                with contextlib.suppress(OSError):
+                    os.close(fd)
+
     def test_original_daemon_container_mount_and_env_mismatch(self):
         original, image = self.docker_fixture()
         original["Config"]["Env"] = original["Config"]["Env"] * 8

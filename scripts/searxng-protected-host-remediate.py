@@ -606,8 +606,23 @@ def inspect_parent(phi_fd):
             "knownEntries": entries, "unexpectedEntryCount": len(set(names) - expected_names)})
         try:
             report["transactionState"] = status(parent_fd)
-        except (GateError, OSError, ValueError, subprocess.TimeoutExpired):
+        except GateError as error:
             report["transactionState"] = "FAIL_CLOSED_MANUAL"
+            report["transactionReason"] = str(error)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            report["transactionState"] = "FAIL_CLOSED_MANUAL"
+            report["transactionReason"] = "read_or_inspect_unavailable"
+        target_info = entries.get(TARGET)
+        report["postPublishChecks"] = {
+            "incomingAbsent": INCOMING not in names,
+            "targetPresent": TARGET in names,
+            "targetIdentityApproved": bool(target_info and
+                                           (target_info["dev"], target_info["ino"]) ==
+                                           RECOVERY_INCOMING_ID),
+            "onlyTargetEntry": names == [TARGET],
+            "targetVerifiedNoCandidate": report["transactionState"] ==
+                                         "PUBLISHED_NO_CANDIDATE",
+        }
         named_after = os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)
         parent_checks["stableDescriptor"] = same(parent, os.fstat(parent_fd))
         parent_checks["namedIdentityAfter"] = same(parent, named_after)
