@@ -91,14 +91,64 @@ class RuntimePreparationTests(unittest.TestCase):
                 "Traceback (most recent call last):\n"
                 "  File \"/usr/local/searxng/searx/search.py\", line 42, in run\n"
                 "ValueError: secret-value\n")
-        summaries = RUNTIME.traceback_summaries(logs)
-        self.assertEqual(summaries, [
-            {"exceptionType": "requests.exceptions.ConnectionError",
+        signals = RUNTIME.log_signals(logs, "docker_logs_stdout")
+        self.assertEqual(signals["detectionOrigin"], "python_header")
+        self.assertEqual(signals["summaries"], [
+            {"source": "docker_logs_stdout", "origin": "python_traceback",
+             "exceptionType": "requests.exceptions.ConnectionError",
              "lastFrame": {"file": "OTHER_PATH_REDACTED", "line": 7}},
-            {"exceptionType": "ValueError", "lastFrame": {"file": "searx/search.py", "line": 42}},
+            {"source": "docker_logs_stdout", "origin": "python_traceback",
+             "exceptionType": "ValueError", "lastFrame": {"file": "searx/search.py", "line": 42}},
         ])
-        self.assertNotIn("secret-value", str(summaries))
-        self.assertNotIn("secret.example", str(summaries))
+        self.assertNotIn("secret-value", str(signals))
+        self.assertNotIn("secret.example", str(signals))
+        self.assertNotIn("config-secret.py", str(signals))
+
+    def test_prefixed_multiline_traceback_is_classified(self):
+        logs = ("2026-10-24 [error] traceback (most recent call last):\n"
+                "2026-10-24 [error]   File \"/usr/local/searxng/searx/search.py\", line 91, in search\n"
+                "2026-10-24 [error]     secret_source_line\n"
+                "2026-10-24 [error] urllib.error.URLError: secret message\n")
+        signals = RUNTIME.log_signals(logs, "docker_logs_stderr")
+        self.assertEqual(signals["detectionOrigin"], "python_header")
+        self.assertEqual(signals["summaries"], [{
+            "source": "docker_logs_stderr", "origin": "python_traceback",
+            "exceptionType": "urllib.error.URLError",
+            "lastFrame": {"file": "searx/search.py", "line": 91},
+        }])
+        self.assertNotIn("secret", str(signals))
+
+    def test_incomplete_traceback_stays_unclassified_not_pass(self):
+        signals = RUNTIME.log_signals(
+            "Traceback (most recent call last):\n  File \"/private/secret.py\", line 2\n",
+            "docker_logs_stdout")
+        self.assertTrue(signals["tracebackDetected"])
+        self.assertEqual(signals["summaries"], [])
+        self.assertEqual(signals["unclassifiedReason"], "header_without_recognized_exception_in_window")
+
+    def test_word_only_traceback_stays_unclassified_not_pass(self):
+        signals = RUNTIME.log_signals("logger mentions traceback only", "docker_logs_stderr")
+        self.assertTrue(signals["tracebackDetected"])
+        self.assertEqual(signals["detectionOrigin"], "substring_only")
+        self.assertEqual(signals["unclassifiedReason"], "substring_without_python_header")
+        self.assertEqual(signals["summaries"], [])
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        logs = types.SimpleNamespace(returncode=0, stdout=b"", stderr=b"logger mentions traceback only")
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=logs):
+            result = RUNTIME.diagnostics("name", "marker")
+        self.assertTrue(RUNTIME.fatal_runtime_diagnostics(result))
+        self.assertEqual(result["tracebackSummaries"], [])
+
+    def test_exception_without_traditional_header_is_classified(self):
+        signals = RUNTIME.log_signals("[ERROR] RuntimeError: hidden detail", "docker_logs_stderr")
+        self.assertFalse(signals["tracebackDetected"])
+        self.assertTrue(signals["exceptionDetected"])
+        self.assertEqual(signals["summaries"], [{
+            "source": "docker_logs_stderr", "origin": "exception_line_candidate_without_header",
+            "exceptionType": "RuntimeError", "lastFrame": None,
+        }])
+        self.assertNotIn("hidden detail", str(signals))
 
     def test_log_failure_is_unknown_not_clean_pass(self):
         item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
@@ -120,7 +170,41 @@ class RuntimePreparationTests(unittest.TestCase):
         self.assertTrue(result["logTraceback"])
         self.assertTrue(result["runningAtDiagnostics"])
         self.assertEqual(result["tracebackSummaries"][0]["exceptionType"], "RuntimeError")
+        self.assertEqual(result["logDetections"][0]["source"], "docker_logs_stdout")
+        self.assertTrue(RUNTIME.fatal_runtime_diagnostics(result))
         self.assertNotIn("hidden secret", str(result))
+
+    def test_nontraditional_exception_remains_fatal(self):
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        logs = types.SimpleNamespace(returncode=0, stdout=b"", stderr=b"[ERROR] RuntimeError: private detail\n")
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=logs):
+            result = RUNTIME.diagnostics("name", "marker")
+        self.assertFalse(result["logTraceback"])
+        self.assertTrue(result["logException"])
+        self.assertTrue(RUNTIME.fatal_runtime_diagnostics(result))
+        self.assertEqual(result["logDetections"][0]["source"], "docker_logs_stderr")
+        self.assertNotIn("private detail", str(result))
+
+    def test_invalid_utf8_is_reported_without_raw_log_or_pass(self):
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        logs = types.SimpleNamespace(returncode=0, stdout=b"traceback \xff private-value", stderr=b"")
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=logs):
+            result = RUNTIME.diagnostics("name", "marker")
+        self.assertTrue(result["logTraceback"])
+        self.assertTrue(RUNTIME.fatal_runtime_diagnostics(result))
+        self.assertTrue(result["logDetections"][0]["utf8ReplacementObserved"])
+        self.assertNotIn("private-value", str(result))
+
+    def test_all_existing_security_log_flags_remain_fatal(self):
+        flags = ("logReadOnlyError", "logPermissionError", "logChownError",
+                 "logTraceback", "logException", "oomKilled")
+        for flag in flags:
+            with self.subTest(flag=flag):
+                diagnostics = {name: name == flag for name in flags}
+                self.assertTrue(RUNTIME.fatal_runtime_diagnostics(diagnostics))
+        self.assertFalse(RUNTIME.fatal_runtime_diagnostics({name: False for name in flags}))
 
 
 if __name__ == "__main__":

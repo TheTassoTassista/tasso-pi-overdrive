@@ -358,20 +358,21 @@ def cleanup(name, marker, root, root_identity, container_id_hint=None):
     return result
 
 
-def traceback_summaries(log_text):
-    """Extract bounded traceback identity, never exception messages or source lines."""
+def log_signals(log_text, source):
+    """Classify bounded log evidence without returning raw lines or messages."""
     summaries = []
     frame = None
     in_traceback = False
+    python_header = False
+    traceback_detected = "traceback" in log_text.lower()
     for line in log_text.splitlines():
-        if "Traceback (most recent call last):" in line:
+        if re.search(r"Traceback \(most recent call last\):", line, re.IGNORECASE):
             in_traceback = True
+            python_header = True
             frame = None
             continue
-        if not in_traceback:
-            continue
-        match = re.match(r'^\s*File "([^"]+)", line ([0-9]{1,7})(?:, in [A-Za-z_][A-Za-z0-9_]*)?\s*$', line)
-        if match:
+        match = re.search(r'\bFile "([^"]+)", line ([0-9]{1,7})\b', line) if in_traceback else None
+        if match is not None:
             path = match.group(1)
             if path.startswith("/usr/local/searxng/"):
                 location = path.removeprefix("/usr/local/searxng/")
@@ -381,13 +382,28 @@ def traceback_summaries(log_text):
                 location = "OTHER_PATH_REDACTED"
             frame = {"file": location, "line": int(match.group(2))}
             continue
-        exception = re.match(r'^\s*([A-Za-z_][A-Za-z0-9_.]{0,127}(?:Error|Exception|Timeout|Failure))\s*:', line)
-        if exception:
-            summaries.append({"exceptionType": exception.group(1), "lastFrame": frame})
+        exception = re.search(r'(?<![A-Za-z0-9_.])([A-Za-z_][A-Za-z0-9_.]{0,127}(?:Error|Exception|Timeout|Failure))\s*:', line)
+        if exception is not None and len(summaries) < 3:
+            summaries.append({"source": source,
+                              "origin": "python_traceback" if in_traceback else "exception_line_candidate_without_header",
+                              "exceptionType": exception.group(1), "lastFrame": frame if in_traceback else None})
             in_traceback = False
-            if len(summaries) == 3:
-                break
-    return summaries
+    if python_header:
+        origin = "python_header"
+    elif traceback_detected:
+        origin = "substring_only"
+    elif summaries:
+        origin = "exception_line_candidate_without_header"
+    else:
+        origin = "none"
+    if traceback_detected and not summaries:
+        unclassified = "header_without_recognized_exception_in_window" if python_header else "substring_without_python_header"
+    else:
+        unclassified = None
+    return {"source": source, "tracebackDetected": traceback_detected,
+            "utf8ReplacementObserved": "\ufffd" in log_text,
+            "detectionOrigin": origin, "unclassifiedReason": unclassified,
+            "exceptionDetected": bool(summaries), "summaries": summaries}
 
 
 def diagnostics(name, marker):
@@ -397,8 +413,18 @@ def diagnostics(name, marker):
     logs = docker("logs", "--tail", "200", item["Id"], allow_failure=True)
     if logs.returncode:
         return {"status": "UNKNOWN", "reason": "docker_logs_unavailable"}
-    raw_text = (logs.stdout + logs.stderr).decode("utf-8", "replace")
-    text = raw_text.lower()
+    streams = [log_signals(logs.stdout.decode("utf-8", "replace"), "docker_logs_stdout"),
+               log_signals(logs.stderr.decode("utf-8", "replace"), "docker_logs_stderr")]
+    text = (logs.stdout + logs.stderr).decode("utf-8", "replace").lower()
+    summaries = [summary for stream in streams for summary in stream["summaries"]][:3]
+    traceback_detected = "traceback" in text
+    detections = [{key: stream[key] for key in (
+                  "source", "detectionOrigin", "unclassifiedReason", "utf8ReplacementObserved")}
+                  for stream in streams if stream["tracebackDetected"] or stream["exceptionDetected"]]
+    if traceback_detected and not any(stream["tracebackDetected"] for stream in streams):
+        detections.append({"source": "docker_logs_combined", "detectionOrigin": "cross_stream_boundary",
+                           "unclassifiedReason": "substring_split_across_streams",
+                           "utf8ReplacementObserved": any(stream["utf8ReplacementObserved"] for stream in streams)})
     return {
         "exitCode": item.get("State", {}).get("ExitCode"),
         "runningAtDiagnostics": item.get("State", {}).get("Running"),
@@ -406,9 +432,17 @@ def diagnostics(name, marker):
         "logReadOnlyError": "read-only file system" in text,
         "logPermissionError": "permission denied" in text,
         "logChownError": "chown" in text and ("error" in text or "denied" in text),
-        "logTraceback": "traceback" in text,
-        "tracebackSummaries": traceback_summaries(raw_text),
+        "logTraceback": traceback_detected,
+        "logException": any(stream["exceptionDetected"] for stream in streams),
+        "logDetections": detections,
+        "tracebackSummaries": summaries,
     }
+
+
+def fatal_runtime_diagnostics(result):
+    return any(result[key] for key in (
+        "logReadOnlyError", "logPermissionError", "logChownError",
+        "logTraceback", "logException", "oomKilled"))
 
 
 def main():
@@ -445,8 +479,7 @@ def main():
             if failure_diagnostics is None or failure_diagnostics.get("status") == "UNKNOWN":
                 outcome = "UNKNOWN"
                 reason = "runtime_logs_unavailable"
-            elif any(failure_diagnostics[key] for key in (
-                    "logReadOnlyError", "logPermissionError", "logChownError", "logTraceback", "oomKilled")):
+            elif fatal_runtime_diagnostics(failure_diagnostics):
                 outcome = "FAIL"
                 reason = "runtime_log_or_oom_error"
         try:

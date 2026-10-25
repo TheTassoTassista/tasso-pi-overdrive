@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG traceback observability
+
+Second operator-reported exact-image isolated runtime: **FAIL** after JSON probe (`logTraceback=true`, no parsed summary), cleanup PASS. Historical exception/type/source UNKNOWN because old logs were not retained. Current local runtime-script regressions **17 PASS / 0 FAIL** cover conventional/prefixed/multiline/incomplete/word-only/nontraditional/sensitive log forms and fail-closed legacy flags; Python AST syntax, package validation and diff check PASS. No new Docker/root/CI/provider call. A new exact-hash, operator-approved runtime run remains necessary for real exception classification; no runtime PASS claimed.
+
 ## 2026-10-24 — isolated SearXNG runtime preparation only
 
 Operator-reported one-shot isolated runtime test **FAIL** at post-probe traceback flag (source permits no narrower traceback attribution); operator-reported cleanup PASS and original unchanged. Current focused runtime-script offline regressions **10 PASS / 0 FAIL** including redacted traceback summary and Docker-log failure UNKNOWN; Python AST syntax, package validation and diff check PASS. No Docker/root/provider call in the diagnostic update. Exact exception and source remain UNKNOWN until a separately approved fresh runtime run; no runtime PASS or real service proof.
