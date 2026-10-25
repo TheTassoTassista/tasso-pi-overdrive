@@ -1,0 +1,13 @@
+[Unit]
+Description=Uninstalled Phi namespace-bridge probe proxy
+Requires=phi-bridge-backend.service
+After=phi-bridge-backend.service
+JoinsNamespaceOf=phi-bridge-backend.service
+
+[Service]
+Type=notify
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:20128
+PrivateNetwork=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+Restart=no
