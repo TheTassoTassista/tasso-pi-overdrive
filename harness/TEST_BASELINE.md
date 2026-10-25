@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG source/cache cross-boot mount identity correction
+
+`python -B -m unittest tests.test_searxng_protected_host_remediate`: **26 PASS / 0 FAIL**, no root/Docker. New regressions prove current-mount device renumbering no longer rejects unchanged pinned inodes, while wrong source/cache inode, different leaf mount ID and a changed named-chain mount ID reject; existing digest, symlink, no-overwrite and staging fail-closed tests retained. Python AST parse, `node scripts/validate-package.mjs` and `git diff --check` PASS. Current `scripts/searxng-protected-host-remediate.py` SHA-256 `5de269ce4fd2695ccf238ed0a2ad9704072f583d7116094dcac905af5eaf72d8`. No approved host execution of these bytes; staging integrity/current source hash remain UNKNOWN and publication remains blocked.
+
 ## 2026-10-25 — SearXNG inspect-staging precondition diagnostics
 
 `python -B -m unittest tests.test_searxng_protected_host_remediate`: **22 PASS / 0 FAIL**, no root/Docker. Covers protected existing staging, untrusted parent, source/cache/Docker failures, incompatible state, target collision, identity change, symlink/marker/hash, plus nonzero failed-inspection exit and no mutation dispatch. AST syntax, package validation and `git diff --check` PASS. Current `scripts/searxng-protected-host-remediate.py` SHA-256 `19afa0a6f5e0fc2db359eeac9ffeb005bd224f122cbd3852eeb339799b83b72d`. The older `f1a6ffb0…` operator run remains FAIL with unknown specific predicate; this new hash has no host approval or run. No full staging integrity proof or recovery mutation.

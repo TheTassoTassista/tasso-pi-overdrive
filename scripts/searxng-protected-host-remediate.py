@@ -19,11 +19,14 @@ import sys
 
 SOURCE_PARTS = ("home", "tasso", ".local", "share", "pi-overdrive", "searxng", "config")
 SOURCE_NAME = "settings.yml"
-SOURCE_ID = (52, 2442310)
+# st_dev is assigned to the mount and can change across boots. Pin the inode
+# historically observed on /home, then require the live /home mount throughout
+# the descriptor chain within each transaction.
+SOURCE_INO = 2442310
 SOURCE_UID_GID = (977, 977)
 SOURCE_SHA256 = "4655b183b0aba92b5a9f60febb50d939ef6e8289b2ba657739c20bb148a2b31e"
 CACHE_PARTS = SOURCE_PARTS[:-1] + ("data",)
-CACHE_ID = (52, 2442309)
+CACHE_INO = 2442309
 DAEMON_ID = "b64b0d52-95ab-4b1a-a971-5f09a4d6e36d"
 ORIGINAL_ID = "9cd6dd06e03d1ae28161e72df26301f43d9167671e1c1e90646e87ba804ca6e3"
 ORIGINAL_NAME = "pi-overdrive-searxng"
@@ -83,6 +86,21 @@ def verify_chain(opened, parts):
         require(stat.S_ISDIR(named.st_mode) and
                 (pinned.st_dev, pinned.st_ino) == (named.st_dev, named.st_ino),
                 "source_or_cache_path_replaced")
+        named_fd = os.open(part, DIR_FLAGS, dir_fd=opened[index])
+        try:
+            require(mount_id(named_fd) == mount_id(opened[index + 1]) and
+                    same(pinned, os.fstat(named_fd)), "source_or_cache_path_replaced")
+        finally:
+            os.close(named_fd)
+
+
+def same_source_mount(opened):
+    """Reject bind mounts and cross-device substitutions below the opened /home."""
+    require(len(opened) >= 2, "source_mount_identity_unavailable")
+    anchor = opened[1]
+    anchor_dev, anchor_mount = os.fstat(anchor).st_dev, mount_id(anchor)
+    return all(os.fstat(fd).st_dev == anchor_dev and mount_id(fd) == anchor_mount
+               for fd in opened[1:])
 
 
 def source_bytes():
@@ -94,10 +112,11 @@ def source_bytes():
         opened.append(fd)
         before = os.fstat(fd)
         require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and
-                (before.st_dev, before.st_ino) == SOURCE_ID and
+                before.st_ino == SOURCE_INO and
                 (before.st_uid, before.st_gid) == SOURCE_UID_GID and
                 stat.S_IMODE(before.st_mode) == 0o600 and before.st_size <= MAX_BYTES,
                 "source_identity_changed")
+        require(same_source_mount(opened), "source_mount_changed")
         data = bytearray()
         while len(data) <= MAX_BYTES:
             block = os.read(fd, min(65536, MAX_BYTES + 1 - len(data)))
@@ -109,6 +128,12 @@ def source_bytes():
         named = os.stat(SOURCE_NAME, dir_fd=parent, follow_symlinks=False)
         require(same(before, named) and sorted(os.listdir(parent)) == [SOURCE_NAME],
                 "source_path_replaced")
+        named_fd = os.open(SOURCE_NAME, FILE_FLAGS, dir_fd=parent)
+        try:
+            require(mount_id(named_fd) == mount_id(fd) and
+                    same(before, os.fstat(named_fd)), "source_path_replaced")
+        finally:
+            os.close(named_fd)
         verify_chain(opened[:-1], SOURCE_PARTS)
         return bytes(data)
     finally:
@@ -119,9 +144,10 @@ def check_cache():
     opened = open_chain(CACHE_PARTS)
     try:
         item = os.fstat(opened[-1])
-        require(stat.S_ISDIR(item.st_mode) and (item.st_dev, item.st_ino) == CACHE_ID and
+        require(stat.S_ISDIR(item.st_mode) and item.st_ino == CACHE_INO and
                 (item.st_uid, item.st_gid) == SOURCE_UID_GID and
                 stat.S_IMODE(item.st_mode) == 0o755, "cache_identity_changed")
+        require(same_source_mount(opened), "cache_mount_changed")
         require(not os.listdir(opened[-1]), "cache_no_longer_empty")
         named = os.stat(CACHE_PARTS[-1], dir_fd=opened[-2], follow_symlinks=False)
         require(same(item, named), "cache_path_replaced")

@@ -106,7 +106,7 @@ class ProtectedRemediationTests(unittest.TestCase):
             settings.chmod(0o600)
             item = settings.stat()
             with patch.object(REMEDY, "SOURCE_PARTS", base.parts[1:]), \
-                 patch.object(REMEDY, "SOURCE_ID", (item.st_dev, item.st_ino)), \
+                 patch.object(REMEDY, "SOURCE_INO", item.st_ino), \
                  patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())), \
                  patch.object(REMEDY, "SOURCE_SHA256", hashlib.sha256(payload).hexdigest()):
                 self.assertEqual(REMEDY.source_bytes(), payload)
@@ -127,19 +127,97 @@ class ProtectedRemediationTests(unittest.TestCase):
                 with self.assertRaises(FileNotFoundError):
                     REMEDY.verify_chain([0, 0], ("swapped",))
 
+    def test_source_requires_pinned_inode_and_live_home_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = pathlib.Path(tmp) / "config"
+            base.mkdir()
+            payload = b"search:\n  formats:\n    - json\n"
+            settings = base / "settings.yml"
+            settings.write_bytes(payload)
+            settings.chmod(0o600)
+            with patch.object(REMEDY, "SOURCE_PARTS", base.parts[1:]), \
+                 patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())), \
+                 patch.object(REMEDY, "SOURCE_SHA256", hashlib.sha256(payload).hexdigest()):
+                with patch.object(REMEDY, "SOURCE_INO", settings.stat().st_ino + 1):
+                    with self.assertRaisesRegex(REMEDY.GateError, "source_identity_changed"):
+                        REMEDY.source_bytes()
+                with patch.object(REMEDY, "SOURCE_INO", settings.stat().st_ino), \
+                     patch.object(REMEDY, "mount_id", side_effect=lambda fd:
+                         41 if os.readlink(f"/proc/self/fd/{fd}") == str(settings) else 40):
+                    with self.assertRaisesRegex(REMEDY.GateError, "source_mount_changed"):
+                        REMEDY.source_bytes()
+
     def test_cache_changed_or_symlink_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = pathlib.Path(tmp) / "data"
             base.mkdir()
             item = base.stat()
             with patch.object(REMEDY, "CACHE_PARTS", base.parts[1:]), \
-                 patch.object(REMEDY, "CACHE_ID", (item.st_dev, item.st_ino)), \
+                 patch.object(REMEDY, "CACHE_INO", item.st_ino), \
                  patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())):
                 REMEDY.check_cache()
                 (base / "user-state").write_text("preserve", encoding="utf-8")
                 with self.assertRaisesRegex(REMEDY.GateError, "cache_no_longer_empty"):
                     REMEDY.check_cache()
                 self.assertEqual((base / "user-state").read_text(encoding="utf-8"), "preserve")
+
+    def test_cache_requires_pinned_inode_and_live_home_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = pathlib.Path(tmp) / "data"
+            base.mkdir()
+            with patch.object(REMEDY, "CACHE_PARTS", base.parts[1:]), \
+                 patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())):
+                with patch.object(REMEDY, "CACHE_INO", base.stat().st_ino + 1):
+                    with self.assertRaisesRegex(REMEDY.GateError, "cache_identity_changed"):
+                        REMEDY.check_cache()
+                with patch.object(REMEDY, "CACHE_INO", base.stat().st_ino), \
+                     patch.object(REMEDY, "mount_id", side_effect=lambda fd:
+                         41 if os.readlink(f"/proc/self/fd/{fd}") == str(base) else 40):
+                    with self.assertRaisesRegex(REMEDY.GateError, "cache_mount_changed"):
+                        REMEDY.check_cache()
+
+    def test_source_and_cache_accept_current_mount_device_after_renumber(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            config, cache = root / "config", root / "data"
+            config.mkdir()
+            cache.mkdir()
+            payload = b"search:\n  formats:\n    - json\n"
+            settings = config / "settings.yml"
+            settings.write_bytes(payload)
+            settings.chmod(0o600)
+            real_fstat, real_stat = os.fstat, os.stat
+            fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_gid", "st_size",
+                      "st_mtime_ns", "st_ctime_ns", "st_nlink")
+            def renumber(item):
+                values = {key: getattr(item, key) for key in fields}
+                values["st_dev"] += 1000
+                return types.SimpleNamespace(**values)
+            with patch.object(REMEDY, "SOURCE_PARTS", config.parts[1:]), \
+                 patch.object(REMEDY, "CACHE_PARTS", cache.parts[1:]), \
+                 patch.object(REMEDY, "SOURCE_INO", settings.stat().st_ino), \
+                 patch.object(REMEDY, "CACHE_INO", cache.stat().st_ino), \
+                 patch.object(REMEDY, "SOURCE_UID_GID", (os.getuid(), os.getgid())), \
+                 patch.object(REMEDY, "SOURCE_SHA256", hashlib.sha256(payload).hexdigest()), \
+                 patch.object(REMEDY.os, "fstat", side_effect=lambda fd: renumber(real_fstat(fd))), \
+                 patch.object(REMEDY.os, "stat", side_effect=lambda *a, **kw:
+                     renumber(real_stat(*a, **kw))):
+                self.assertEqual(REMEDY.source_bytes(), payload)
+                REMEDY.check_cache()
+
+    def test_named_chain_recheck_rejects_same_inode_on_different_mount(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parts = pathlib.Path(tmp).parts[1:]
+            opened = REMEDY.open_chain(parts)
+            try:
+                original_mount_id = REMEDY.mount_id
+                with patch.object(REMEDY, "mount_id", side_effect=lambda fd:
+                     41 if fd not in opened else original_mount_id(fd)):
+                    with self.assertRaisesRegex(REMEDY.GateError,
+                                                "source_or_cache_path_replaced"):
+                        REMEDY.verify_chain(opened, parts)
+            finally:
+                REMEDY.close_all(opened)
 
     def test_target_existing_including_symlink_rejects_before_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
