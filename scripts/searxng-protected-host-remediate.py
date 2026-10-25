@@ -37,6 +37,7 @@ LABEL = "phi.searxng.protected-candidate"
 LABEL_VALUE = SOURCE_SHA256
 DOCKER = "/usr/bin/docker"
 SOCKET = "/var/run/docker.sock"
+CHILD_ENV = {"PATH": "/usr/bin:/bin", "HOME": "/nonexistent", "LC_ALL": "C"}
 DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 FILE_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK
 MAX_BYTES = 1_000_000
@@ -137,7 +138,7 @@ def docker(*args, missing_ok=False):
     require(allowed, "docker_operation_forbidden")
     result = subprocess.run([DOCKER, "--host", "unix://" + SOCKET, *args],
                             capture_output=True, timeout=20, check=False,
-                            env={"PATH": "/usr/bin:/bin", "HOME": "/nonexistent", "LC_ALL": "C"})
+                            env=CHILD_ENV)
     require(len(result.stdout) <= 2_000_000 and len(result.stderr) <= 8192,
             "docker_output_unbounded")
     if result.returncode:
@@ -245,7 +246,7 @@ def no_entry(parent_fd, name):
 def verify_acl(path, expected):
     require(path.startswith(PARENT + "/") or path == PARENT, "acl_path_invalid")
     result = subprocess.run(["/usr/bin/getfacl", "-ncp", path],
-                            capture_output=True, timeout=8, check=False)
+                            capture_output=True, timeout=8, check=False, env=CHILD_ENV)
     require(result.returncode == 0 and len(result.stdout) <= 4096, "acl_verify_unavailable")
     entries = {line for line in result.stdout.decode("ascii", "strict").splitlines() if line and not line.startswith("#")}
     want = ({"user::rwx", "user:977:--x", "group::---", "mask::--x", "other::---"}
@@ -258,7 +259,7 @@ def acl(path, expected):
     require(path.startswith(PARENT + "/") or path == PARENT, "acl_path_invalid")
     modify = "u:977:--x" if expected == "traverse" else "u:977:r--"
     result = subprocess.run(["/usr/bin/setfacl", "-m", modify, path],
-                            capture_output=True, timeout=8, check=False)
+                            capture_output=True, timeout=8, check=False, env=CHILD_ENV)
     require(result.returncode == 0, "acl_apply_failed")
     verify_acl(path, expected)
 
