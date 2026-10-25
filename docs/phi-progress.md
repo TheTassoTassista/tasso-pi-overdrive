@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## SearXNG read-only preflight command preparation — override classification (2026-10-25)
+
+The previously prepared SHA `32213e2f…` had one overly strict inference: full container/image environment equality was used as a proxy for safe recreation. The current bounded revision distinguishes image defaults, the exact upstream-compatible `FORCE_OWNERSHIP=false` override, dangerous config/network/proxy overrides, and other review-required differences without printing values or arbitrary key names. Duplicate/invalid keys fail closed. It also reports source/cache mutable-ancestor trust as FAIL independently of successful read-only snapshot, and reports cache identity/emptiness. It remains fixed-object and strictly read-only; no host invocation, Docker/root action or publication has occurred. Focused changed tests and exact new SHA are recorded in `harness/TEST_BASELINE.md`. The historical three pre-JSON `ConnectionError` remain UNKNOWN. Any future mutation must independently revalidate the exact snapshot and still requires a separate host approval.
+
 ## SearXNG host-remediation candidate — privileged inputs still missing (2026-10-25)
 
 The historical three pre-JSON `ConnectionError` entries are formally **UNKNOWN**: redacted receipts omit logger, call site, destination and original lines; the disposable container/logs were removed. Do not retry an equivalent runtime test or change the log parser without new evidence. The route, exact registry/image metadata, existing bind/port facts and partial isolated filesystem/health evidence are reused, not promoted to full RO/runtime PASS.

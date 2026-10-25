@@ -44,12 +44,16 @@ def source_snapshot():
     """Pin every path component; reject changed identity/metadata and never write."""
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     opened = []
+    path_protected = True
     try:
         parent = os.open("/", flags)
         opened.append(parent)
-        for part in SOURCE_PARTS:
+        for index, part in enumerate(SOURCE_PARTS):
             parent = os.open(part, flags, dir_fd=parent)
             opened.append(parent)
+            item = os.fstat(parent)
+            if index < len(SOURCE_PARTS) - 1:
+                path_protected &= item.st_uid == 0 and not item.st_mode & 0o022
         require(sorted(os.listdir(parent)) == [SOURCE_FILE], "source_entries_changed")
         fd = os.open(SOURCE_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
         opened.append(fd)
@@ -72,7 +76,7 @@ def source_snapshot():
         named = os.stat(SOURCE_FILE, dir_fd=parent, follow_symlinks=False)
         require((named.st_dev, named.st_ino) == SOURCE_DEV_INO,
                 "source_replaced_during_read")
-        return bytes(data)
+        return bytes(data), path_protected
     finally:
         for fd in reversed(opened):
             os.close(fd)
@@ -81,17 +85,23 @@ def source_snapshot():
 def cache_empty_snapshot():
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     opened = []
+    path_protected = True
     try:
         parent = os.open("/", flags)
         opened.append(parent)
-        for part in SOURCE_PARTS[:-1] + ("data",):
+        parts = SOURCE_PARTS[:-1] + ("data",)
+        for index, part in enumerate(parts):
             parent = os.open(part, flags, dir_fd=parent)
             opened.append(parent)
+            ancestor = os.fstat(parent)
+            if index < len(parts) - 1:
+                path_protected &= ancestor.st_uid == 0 and not ancestor.st_mode & 0o022
         item = os.fstat(parent)
         require((item.st_dev, item.st_ino) == CACHE_DEV_INO and
-                (item.st_uid, item.st_gid) == SOURCE_UID_GID,
+                (item.st_uid, item.st_gid) == SOURCE_UID_GID and
+                stat.S_IMODE(item.st_mode) == 0o755,
                 "cache_identity_changed")
-        return not os.listdir(parent)
+        return not os.listdir(parent), path_protected
     finally:
         for fd in reversed(opened):
             os.close(fd)
@@ -184,16 +194,46 @@ def classify_docker(daemon, containers, images):
             not (host.get("CapAdd") or []) and
             (host.get("RestartPolicy") or {}).get("Name") in ("no", ""),
             "original_host_contract_changed")
-    env = config.get("Env")
-    image_env = image_config.get("Env")
-    require(isinstance(env, list) and isinstance(image_env, list) and
-            all(isinstance(value, str) for value in env + image_env),
-            "environment_shape_invalid")
+    environment = classify_environment(config.get("Env"), image_config.get("Env"))
     return {"identity": "PASS", "originalStopped": True,
             "mountsAndLoopback": "PASS",
-            "environmentEqualsImage": env == image_env,
+            "environment": environment,
             "imageEntrypointUnchanged": config.get("Entrypoint") == image_config.get("Entrypoint") and
                                          config.get("Cmd") == image_config.get("Cmd")}
+
+
+def classify_environment(container_env, image_env):
+    """Classify changed keys without emitting keys not on the narrow allowlist or any values."""
+    def parse(entries):
+        require(isinstance(entries, list) and len(entries) <= 128 and
+                all(isinstance(entry, str) and len(entry) <= 8192 and "=" in entry for entry in entries),
+                "environment_shape_invalid")
+        parsed = {}
+        for entry in entries:
+            key, value = entry.split("=", 1)
+            require(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) is not None and key not in parsed,
+                    "environment_key_ambiguous")
+            parsed[key] = value
+        return parsed
+
+    current, baseline = parse(container_env), parse(image_env)
+    changed = {key for key in current.keys() | baseline.keys() if current.get(key) != baseline.get(key)}
+    allowed = changed == {"FORCE_OWNERSHIP"} and current.get("FORCE_OWNERSHIP") == "false"
+    dangerous_prefixes = ("SEARXNG_", "__SEARXNG_", "GRANIAN_", "DOCKER_")
+    dangerous_keys = {"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+                      "http_proxy", "https_proxy", "all_proxy", "no_proxy"}
+    other = changed - ({"FORCE_OWNERSHIP"} if allowed else set())
+    dangerous_count = sum(key.startswith(dangerous_prefixes) or key in dangerous_keys
+                          for key in other)
+    # Unknown overrides are not automatically dangerous, but cannot be dropped
+    # from a future container. No secret-bearing names or values enter the receipt.
+    return {"imageCount": len(baseline), "containerCount": len(current),
+            "differenceCount": len(changed),
+            "allowedForceOwnershipFalse": allowed,
+            "dangerousOverrideCount": dangerous_count,
+            "reviewRequiredCount": len(other) - dangerous_count,
+            "recreationClass": "IMAGE_PLUS_FORCE_OWNERSHIP_FALSE" if allowed else
+                               "IMAGE_DEFAULTS" if not changed else "REVIEW_REQUIRED"}
 
 
 def main():
@@ -202,20 +242,30 @@ def main():
     sock = os.lstat(SOCKET)
     require(stat.S_ISSOCK(sock.st_mode) and sock.st_uid == 0 and not sock.st_mode & 0o002,
             "docker_socket_untrusted")
-    source = source_snapshot()
-    cache_empty = cache_empty_snapshot()
+    source, path_protected = source_snapshot()
+    cache_empty, cache_path_protected = cache_empty_snapshot()
     docker_state = classify_docker(docker_json("info", "--format", "{{json .ID}}"),
                                    docker_json("container", "inspect", ORIGINAL_NAME),
                                    docker_json("image", "inspect", IMAGE_ID))
-    report = {"SEARXNG_REMEDIATION_PREFLIGHT": "PASS", "sourceSnapshot": "PASS",
+    report = {"SEARXNG_REMEDIATION_PREFLIGHT": "UNKNOWN", "sourceSnapshot": "PASS",
               "sourceSha256": hashlib.sha256(source).hexdigest(),
-              "jsonFormat": json_format_state(source), "cacheEmpty": cache_empty,
+              "sourcePathTrust": "PASS" if path_protected else "FAIL_REPLACEABLE_ANCESTOR",
+              "jsonFormat": json_format_state(source), "cacheIdentity": "PASS",
+              "cacheEmpty": cache_empty,
+              "cachePathTrust": "PASS" if cache_path_protected else "FAIL_REPLACEABLE_ANCESTOR",
               **docker_state}
-    report["transactionPredicatesReady"] = (report["jsonFormat"] == "ENABLED" and cache_empty and
-                                            docker_state["environmentEqualsImage"] and
-                                            docker_state["imageEntrypointUnchanged"])
+    report["candidateInputsSufficient"] = (report["jsonFormat"] == "ENABLED" and cache_empty and
+                                           docker_state["environment"]["recreationClass"] != "REVIEW_REQUIRED" and
+                                           docker_state["imageEntrypointUnchanged"])
+    if not path_protected or not cache_path_protected:
+        report["SEARXNG_REMEDIATION_PREFLIGHT"] = "FAIL"
+        report["reason"] = "replaceable_host_path"
+    elif report["candidateInputsSufficient"]:
+        report["SEARXNG_REMEDIATION_PREFLIGHT"] = "PASS"
+    else:
+        report["reason"] = "candidate_inputs_insufficient"
     print(json.dumps(report, sort_keys=True))
-    return 0
+    return {"PASS": 0, "FAIL": 1, "UNKNOWN": 2}[report["SEARXNG_REMEDIATION_PREFLIGHT"]]
 
 
 if __name__ == "__main__":

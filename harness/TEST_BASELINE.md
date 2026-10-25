@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG preflight override classification correction
+
+Changed-only `python3 -B -m unittest tests.test_searxng_remediation_preflight`: **10 PASS / 0 FAIL**; Python AST, package validation and diff check PASS. Exact revised script SHA-256 `ce6c1334d2008face5ef916346ba6aecf9b58d5caa95de616187e2b2178f14c3`. Regression confirms replaceable ancestors force overall FAIL even when the read-only source snapshot succeeds. No privileged preflight, Docker operation, configuration read, CI or provider call. Prior 38/38 broader focused tests remain historical evidence for unchanged paths, not rerun. Root mutation, runtime PASS and real JSON service remain unverified.
+
 ## 2026-10-25 — SearXNG host-remediation read-only preparation
 
 `python3 -B -m unittest tests.test_searxng_remediation_preflight tests.test_searxng_host_attest tests.test_searxng_isolated_runtime`: **38 PASS / 0 FAIL** without root/Docker. New tests cover exact Docker identity, stopped state, two binds/loopback, environment-value redaction/equality, conservative JSON classification, pinned source/symlink rejection, cache nonempty refusal and snapshot-vs-transaction readiness. New preflight SHA `32213e2faa0abf525e39a2947f6c556a5259dfb90086a3805277fec968c36c55`; Python AST, package validation and diff check PASS. Script not run against host Docker/private settings. No CI/provider call, publication, real JSON query, full RO runtime PASS or stable activation. Host-owned digest/JSON/env/cache predicates remain UNKNOWN until separately approved read-only execution.
