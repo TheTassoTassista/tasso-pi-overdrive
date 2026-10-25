@@ -409,14 +409,23 @@ def log_signals(log_text, source):
             continue
         exception = re.search(r'(?<![A-Za-z0-9_.])([A-Za-z_][A-Za-z0-9_.]{0,127}(?:Error|Exception|Timeout|Failure))\s*:', line)
         if exception is not None and len(summaries) < 3:
+            # This exact upstream warning describes a caught/retried curl error,
+            # not an uncaught Python exception. It still fails the no-network gate.
+            network_retry_warning = bool(re.search(
+                r'\bWARNING:searx\.network(?:\.[A-Za-z0-9_.-]+)?: '
+                r'ConnectionError: the server has disconnected, retrying\s*$', line))
             summaries.append({"source": source,
-                              "origin": "python_traceback" if in_traceback else "exception_line_candidate_without_header",
+                              "origin": "python_traceback" if in_traceback else
+                                        "handled_network_retry_warning" if network_retry_warning else
+                                        "exception_line_candidate_without_header",
                               "exceptionType": exception.group(1), "lastFrame": frame if in_traceback else None})
             in_traceback = False
     if python_header:
         origin = "python_header"
     elif traceback_detected:
         origin = "substring_only"
+    elif summaries and all(summary["origin"] == "handled_network_retry_warning" for summary in summaries):
+        origin = "handled_network_retry_warning"
     elif summaries:
         origin = "exception_line_candidate_without_header"
     else:

@@ -224,6 +224,31 @@ class RuntimePreparationTests(unittest.TestCase):
         }])
         self.assertNotIn("hidden detail", str(signals))
 
+    def test_upstream_network_retry_warning_is_distinct_but_still_fatal(self):
+        warning = ("2026-10-25 10:00:00 WARNING:searx.network.__DEFAULT__: "
+                   "ConnectionError: the server has disconnected, retrying\n")
+        signals = RUNTIME.log_signals(warning, "docker_logs_stderr")
+        self.assertEqual(signals["detectionOrigin"], "handled_network_retry_warning")
+        self.assertEqual(signals["summaries"], [{
+            "source": "docker_logs_stderr", "origin": "handled_network_retry_warning",
+            "exceptionType": "ConnectionError", "lastFrame": None,
+        }])
+        self.assertNotIn("10:00:00", str(signals))
+        item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
+        logs = types.SimpleNamespace(returncode=0, stdout=b"", stderr=warning.encode())
+        with patch.object(RUNTIME, "owned_container", return_value=item), \
+             patch.object(RUNTIME, "docker", return_value=logs):
+            result = RUNTIME.diagnostics("name", "marker")
+        self.assertTrue(RUNTIME.fatal_runtime_diagnostics(result))
+        self.assertEqual(result["tracebackSummaries"][0]["origin"], "handled_network_retry_warning")
+
+    def test_other_connectionerror_line_remains_unclassified_and_fatal(self):
+        signals = RUNTIME.log_signals(
+            "WARNING:unknown.service: ConnectionError: private endpoint unavailable",
+            "docker_logs_stderr")
+        self.assertEqual(signals["summaries"][0]["origin"], "exception_line_candidate_without_header")
+        self.assertTrue(signals["exceptionDetected"])
+
     def test_log_failure_is_unknown_not_clean_pass(self):
         item = {"Id": "a" * 64, "State": {"ExitCode": 0, "Running": True, "OOMKilled": False}}
         failed = types.SimpleNamespace(returncode=1, stdout=b"", stderr=b"daemon unavailable")

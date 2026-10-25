@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG pre-JSON ConnectionError static diagnosis
+
+Operator-reported exact-image run of SHA `55a64a53…`: **FAIL** at health with three stderr `ConnectionError` signals before JSON, process live, no reported RO/permission/chown/OOM flag, cleanup/original unchanged PASS. Historical logger/destination not retained; precise source UNKNOWN. Current detector-only SHA `ee7c97ea33003336545e0979e84328d9e62dbab4a2f8b61c9f185ee6cc24d339` distinguishes the exact caught upstream network-retry WARNING without making it nonfatal. Focused no-Docker regressions **22 PASS / 0 FAIL**; Python AST, package validation, diff check PASS. No new Docker/root/CI/provider call. Filesystem/health probes passed in the reported trial; JSON and full runtime PASS were not reached. No blind fourth host test authorized or proposed.
+
 ## 2026-10-25 — SearXNG offline runtime fixture correction
 
 Third operator-reported SHA `59bcb174…` isolated runtime: FAIL on three redacted `ConnectionError` entries after JSON200; cleanup PASS, historical endpoint/phase UNKNOWN. New SHA `55a64a536aa7542b2b9a44a17800e833b76473d92cf0283fbbafb2c33570c852` fixture/probe regressions **20 PASS / 0 FAIL** without Docker; Python AST, package validation and diff check PASS. No host trial of new bytes; overall runtime remains FAIL/NOT VERIFIED, and real-service attestation/configuration remains pending separate host authority.
