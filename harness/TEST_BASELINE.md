@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG inspect-staging precondition diagnostics
+
+`python -B -m unittest tests.test_searxng_protected_host_remediate`: **22 PASS / 0 FAIL**, no root/Docker. Covers protected existing staging, untrusted parent, source/cache/Docker failures, incompatible state, target collision, identity change, symlink/marker/hash, plus nonzero failed-inspection exit and no mutation dispatch. AST syntax, package validation and `git diff --check` PASS. Current `scripts/searxng-protected-host-remediate.py` SHA-256 `19afa0a6f5e0fc2db359eeac9ffeb005bd224f122cbd3852eeb339799b83b72d`. The older `f1a6ffb0…` operator run remains FAIL with unknown specific predicate; this new hash has no host approval or run. No full staging integrity proof or recovery mutation.
+
 ## 2026-10-25 — SearXNG incoming staging read-only verifier
 
 `python -B -m unittest tests.test_searxng_protected_host_remediate`: **21 PASS / 0 FAIL** with no root/Docker. New fixtures cover complete incoming verification, same verifier after native no-replace publication, absent/altered/noncanonical marker, hash mismatch, symlink, target conflict, stale identity and untrusted parent; existing no-overwrite/partial-state tests retained. AST syntax, package validation and `git diff --check` PASS. Exact current `scripts/searxng-protected-host-remediate.py` SHA-256 `f1a6ffb093a65d3b0ce244710ab7f13dbb36982160a5af6d22b02d1617d0c526`. This hash has **not** been approved for a host run. Operator-reported earlier parent snapshot is not full staged integrity; actual staging remains UNKNOWN until new read-only host inspection. No recovery mutation or host-side execution.

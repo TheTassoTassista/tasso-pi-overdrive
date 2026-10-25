@@ -522,10 +522,15 @@ def inspect_parent(phi_fd):
         parent = os.fstat(parent_fd)
         named_before = os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)
         parent_acl = "PASS"
+        parent_acl_reason = None
         try:
             verify_acl(PARENT, "traverse")
-        except (GateError, OSError, subprocess.TimeoutExpired):
+        except GateError as error:
             parent_acl = "FAIL_OR_UNKNOWN"
+            parent_acl_reason = str(error)
+        except (OSError, subprocess.TimeoutExpired):
+            parent_acl = "FAIL_OR_UNKNOWN"
+            parent_acl_reason = "acl_read_unavailable"
         names = sorted(os.listdir(parent_fd))
         expected_names = {INCOMING, TARGET}
         entries = {}
@@ -549,27 +554,33 @@ def inspect_parent(phi_fd):
                 finally:
                     os.close(child_fd)
             entries[name] = info
-        protected = (stat.S_ISDIR(parent.st_mode) and
-                     parent.st_uid == parent.st_gid == 0 and
-                     stat.S_IMODE(parent.st_mode) == 0o710 and
-                     parent.st_dev == os.fstat(phi_fd).st_dev and
-                     mount_id(parent_fd) == mount_id(phi_fd) and parent_acl == "PASS" and
-                     same(parent, named_before) and
-                     set(os.listxattr(parent_fd)) <= {"system.posix_acl_access"})
+        parent_checks = {
+            "directory": stat.S_ISDIR(parent.st_mode),
+            "rootOwnership": parent.st_uid == parent.st_gid == 0,
+            "mode0710": stat.S_IMODE(parent.st_mode) == 0o710,
+            "sameDeviceAsPhi": parent.st_dev == os.fstat(phi_fd).st_dev,
+            "sameMountAsPhi": mount_id(parent_fd) == mount_id(phi_fd),
+            "acl": parent_acl == "PASS",
+            "namedIdentityBefore": same(parent, named_before),
+            "noUnexpectedXattrs": set(os.listxattr(parent_fd)) <= {"system.posix_acl_access"},
+        }
         report.update({"hostParent": "PRESENT", "parent": {
             "dev": parent.st_dev, "ino": parent.st_ino,
             "uid": parent.st_uid, "gid": parent.st_gid,
             "mode": oct(stat.S_IMODE(parent.st_mode)),
             "mtimeNs": parent.st_mtime_ns, "ctimeNs": parent.st_ctime_ns,
-            "sameMountAsPhi": mount_id(parent_fd) == mount_id(phi_fd),
-            "acl": parent_acl, "protected": protected},
+            "sameMountAsPhi": parent_checks["sameMountAsPhi"],
+            "acl": parent_acl, "aclReason": parent_acl_reason,
+            "checks": parent_checks, "protected": False},
             "knownEntries": entries, "unexpectedEntryCount": len(set(names) - expected_names)})
         try:
             report["transactionState"] = status(parent_fd)
         except (GateError, OSError, ValueError, subprocess.TimeoutExpired):
             report["transactionState"] = "FAIL_CLOSED_MANUAL"
         named_after = os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)
-        protected = protected and same(parent, os.fstat(parent_fd)) and same(parent, named_after)
+        parent_checks["stableDescriptor"] = same(parent, os.fstat(parent_fd))
+        parent_checks["namedIdentityAfter"] = same(parent, named_after)
+        protected = all(parent_checks.values())
         report["parent"]["protected"] = protected
     finally:
         os.close(parent_fd)
@@ -578,8 +589,12 @@ def inspect_parent(phi_fd):
         try:
             check()
             report[label] = "PASS"
-        except (GateError, OSError, ValueError, subprocess.TimeoutExpired):
+        except GateError as error:
             report[label] = "FAIL_OR_UNKNOWN"
+            report[label + "Reason"] = str(error)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            report[label] = "FAIL_OR_UNKNOWN"
+            report[label + "Reason"] = "read_or_inspect_unavailable"
     report["HOST_PARENT_INSPECTION"] = (
         "TRUSTED_EMPTY_SNAPSHOT" if protected and not names and
         all(report[key] == "PASS" for key in
@@ -591,14 +606,35 @@ def inspect_parent(phi_fd):
 def inspect_staging(phi_fd):
     """Full selected-object attestation; no publication or Docker mutation."""
     parent_report = inspect_parent(phi_fd)
-    require(parent_report.get("hostParent") == "PRESENT" and
-            parent_report["parent"]["protected"] and
-            parent_report["transactionState"] == "INCOMING_MANUAL" and
-            set(parent_report["knownEntries"]) == {INCOMING} and
-            parent_report["unexpectedEntryCount"] == 0 and
-            all(parent_report[key] == "PASS" for key in
-                ("sourceIntegrity", "originalCacheIntegrity", "originalDockerAndCandidateAbsence")),
-            "staging_parent_or_original_untrusted")
+    checks = (
+        ("host_parent_present", parent_report.get("hostParent") == "PRESENT"),
+        ("host_parent_protected", parent_report.get("parent", {}).get("protected") is True),
+        ("incoming_transaction_state", parent_report.get("transactionState") == "INCOMING_MANUAL"),
+        ("incoming_only_known_entry", set(parent_report.get("knownEntries", {})) == {INCOMING}),
+        ("no_unexpected_parent_entries", parent_report.get("unexpectedEntryCount") == 0),
+        ("original_source_integrity", parent_report.get("sourceIntegrity") == "PASS"),
+        ("original_cache_integrity", parent_report.get("originalCacheIntegrity") == "PASS"),
+        ("original_docker_and_candidate_absence",
+         parent_report.get("originalDockerAndCandidateAbsence") == "PASS"),
+    )
+    for predicate, passed in checks:
+        if not passed:
+            return {"STAGING_INTEGRITY": "FAIL_CLOSED_MANUAL", "failedPredicate": predicate,
+                    "parentChecks": parent_report.get("parent", {}).get("checks"),
+                    "parentAclReason": parent_report.get("parent", {}).get("aclReason"),
+                    "transactionState": parent_report.get("transactionState", "UNKNOWN"),
+                    "knownIncoming": INCOMING in parent_report.get("knownEntries", {}),
+                    "knownTarget": TARGET in parent_report.get("knownEntries", {}),
+                    "unexpectedEntryCount": parent_report.get("unexpectedEntryCount"),
+                    "sourceIntegrity": parent_report.get("sourceIntegrity", "UNKNOWN"),
+                    "sourceReason": parent_report.get("sourceIntegrityReason"),
+                    "originalCacheIntegrity": parent_report.get("originalCacheIntegrity", "UNKNOWN"),
+                    "originalCacheReason": parent_report.get("originalCacheIntegrityReason"),
+                    "originalDockerAndCandidateAbsence": parent_report.get(
+                        "originalDockerAndCandidateAbsence", "UNKNOWN"),
+                    "originalDockerReason": parent_report.get(
+                        "originalDockerAndCandidateAbsenceReason"),
+                    "publicationAuthorized": False}
     parent_fd = os.open("searxng", DIR_FLAGS, dir_fd=phi_fd)
     try:
         parent = os.fstat(parent_fd)
@@ -649,8 +685,9 @@ def main():
                 print(json.dumps(report, sort_keys=True))
                 return 0 if report["HOST_PARENT_INSPECTION"] == "TRUSTED_EMPTY_SNAPSHOT" else 1
             if sys.argv[1] == "inspect-staging":
-                print(json.dumps(inspect_staging(phi_fd), sort_keys=True))
-                return 0
+                report = inspect_staging(phi_fd)
+                print(json.dumps(report, sort_keys=True))
+                return 0 if report["STAGING_INTEGRITY"] == "PASS_SNAPSHOT" else 1
             if sys.argv[1] == "status":
                 if no_entry(phi_fd, "searxng"):
                     print(json.dumps({"SEARXNG_HOST_STATE": "ABSENT"}))

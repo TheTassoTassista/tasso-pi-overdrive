@@ -290,10 +290,20 @@ class ProtectedRemediationTests(unittest.TestCase):
                 self.assertIs(result["publicationAuthorized"], False)
                 self.assertEqual(docker_state.call_count, 1)
                 snapshot["parent"]["protected"] = False
-                with self.assertRaisesRegex(REMEDY.GateError,
-                                            "staging_parent_or_original_untrusted"):
-                    REMEDY.inspect_staging(phi_fd)
+                self.assertEqual(REMEDY.inspect_staging(phi_fd)["failedPredicate"],
+                                 "host_parent_protected")
                 snapshot["parent"]["protected"] = True
+                for field, expected in (("sourceIntegrity", "original_source_integrity"),
+                                        ("originalCacheIntegrity", "original_cache_integrity"),
+                                        ("originalDockerAndCandidateAbsence",
+                                         "original_docker_and_candidate_absence")):
+                    snapshot[field] = "FAIL_OR_UNKNOWN"
+                    self.assertEqual(REMEDY.inspect_staging(phi_fd)["failedPredicate"], expected)
+                    snapshot[field] = "PASS"
+                snapshot["transactionState"] = "AMBIGUOUS_MANUAL"
+                self.assertEqual(REMEDY.inspect_staging(phi_fd)["failedPredicate"],
+                                 "incoming_transaction_state")
+                snapshot["transactionState"] = "INCOMING_MANUAL"
                 (parent / REMEDY.TARGET).mkdir()
                 with self.assertRaisesRegex(REMEDY.GateError,
                                             "staging_parent_or_target_changed"):
@@ -306,6 +316,30 @@ class ProtectedRemediationTests(unittest.TestCase):
                     with self.assertRaisesRegex(REMEDY.GateError, "staging_identity_changed"):
                         REMEDY.inspect_staging(phi_fd)
                 self.assertFalse((parent / REMEDY.TARGET).exists())
+
+    def test_inspect_staging_precondition_failure_exits_nonzero_without_mutation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fd = os.open(tmp, REMEDY.DIR_FLAGS)
+            output = io.StringIO()
+            try:
+                with patch.object(REMEDY.sys, "argv", [str(SCRIPT), "inspect-staging"]), \
+                     patch.object(REMEDY.os, "geteuid", return_value=0), \
+                     patch.object(REMEDY, "protected_opt_fd", return_value=[fd]), \
+                     patch.object(REMEDY, "inspect_staging", return_value={
+                         "STAGING_INTEGRITY": "FAIL_CLOSED_MANUAL",
+                         "failedPredicate": "original_source_integrity"}), \
+                     patch.object(REMEDY, "stage_copy") as stage_copy, \
+                     patch.object(REMEDY, "docker") as docker, \
+                     contextlib.redirect_stdout(output):
+                    self.assertEqual(REMEDY.main(), 1)
+                self.assertEqual(json.loads(output.getvalue())["failedPredicate"],
+                                 "original_source_integrity")
+                stage_copy.assert_not_called()
+                docker.assert_not_called()
+            finally:
+                # main owns and closes descriptors returned by protected_opt_fd.
+                with contextlib.suppress(OSError):
+                    os.close(fd)
 
     def test_original_daemon_container_mount_and_env_mismatch(self):
         original, image = self.docker_fixture()
@@ -498,8 +532,9 @@ class ProtectedRemediationTests(unittest.TestCase):
                                      "FAIL_CLOSED_MANUAL")
                     fake["swap"] = False
                     fake["uid"] = 1000
-                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
-                                     "FAIL_CLOSED_MANUAL")
+                    untrusted = REMEDY.inspect_parent(fd)
+                    self.assertEqual(untrusted["HOST_PARENT_INSPECTION"], "FAIL_CLOSED_MANUAL")
+                    self.assertIs(untrusted["parent"]["checks"]["rootOwnership"], False)
                     fake["uid"] = 0
                     fake["mode"] = 0o777
                     self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
@@ -538,6 +573,7 @@ class ProtectedRemediationTests(unittest.TestCase):
                 self.assertEqual(result["HOST_PARENT_INSPECTION"], "FAIL_CLOSED_MANUAL")
                 self.assertEqual(result["transactionState"], "INCOMING_MANUAL")
                 self.assertEqual(result["sourceIntegrity"], "FAIL_OR_UNKNOWN")
+                self.assertEqual(result["sourceIntegrityReason"], "changed")
             finally:
                 os.close(fd)
 
