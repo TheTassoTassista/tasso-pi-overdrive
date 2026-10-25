@@ -321,6 +321,95 @@ class ProtectedRemediationTests(unittest.TestCase):
             self.assertEqual(json.loads(output.getvalue())["SEARXNG_HOST_REMEDIATION"],
                              "PUBLISHED_STOPPED_CANDIDATE")
 
+    def test_parent_inspection_absent_and_trusted_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            phi = pathlib.Path(tmp)
+            fd = os.open(phi, REMEDY.DIR_FLAGS)
+            try:
+                self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"], "FAIL")
+                parent = phi / "searxng"
+                parent.mkdir()
+                fake = {"mode": 0o710, "uid": 0, "gid": 0, "swap": False}
+                real_fstat = os.fstat
+                def protected_stat(item):
+                    value = real_fstat(item)
+                    if pathlib.Path(os.readlink(f"/proc/self/fd/{item}")) != parent:
+                        return value
+                    return types.SimpleNamespace(**{key: getattr(value, key) for key in
+                        ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")},
+                        st_mode=stat.S_IFDIR | fake["mode"],
+                        st_uid=fake["uid"], st_gid=fake["gid"])
+                real_stat = os.stat
+                named_calls = [0]
+                def protected_named(*args, **kwargs):
+                    value = real_stat(*args, **kwargs)
+                    if args[0] != "searxng":
+                        return value
+                    named_calls[0] += 1
+                    return types.SimpleNamespace(**{key: getattr(value, key) for key in
+                        ("st_dev", "st_size", "st_mtime_ns", "st_ctime_ns")},
+                        st_ino=value.st_ino + (1 if fake["swap"] and named_calls[0] % 2 == 0 else 0),
+                        st_mode=stat.S_IFDIR | fake["mode"],
+                        st_uid=fake["uid"], st_gid=fake["gid"])
+                with patch.object(REMEDY.os, "fstat", side_effect=protected_stat), \
+                     patch.object(REMEDY.os, "stat", side_effect=protected_named), \
+                     patch.object(REMEDY.os, "listxattr", return_value=["system.posix_acl_access"]), \
+                     patch.object(REMEDY, "verify_acl"), \
+                     patch.object(REMEDY, "mount_id", return_value=40), \
+                     patch.object(REMEDY, "source_bytes"), \
+                     patch.object(REMEDY, "check_cache"), \
+                     patch.object(REMEDY, "fixed_docker_state"), \
+                     patch.object(REMEDY, "status", return_value="PARENT_EMPTY_MANUAL"):
+                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
+                                     "TRUSTED_EMPTY_SNAPSHOT")
+                    fake["swap"] = True
+                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
+                                     "FAIL_CLOSED_MANUAL")
+                    fake["swap"] = False
+                    fake["uid"] = 1000
+                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
+                                     "FAIL_CLOSED_MANUAL")
+                    fake["uid"] = 0
+                    fake["mode"] = 0o777
+                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
+                                     "FAIL_CLOSED_MANUAL")
+                    fake["mode"] = 0o710
+                    (parent / REMEDY.TARGET).mkdir()
+                    self.assertEqual(REMEDY.inspect_parent(fd)["HOST_PARENT_INSPECTION"],
+                                     "FAIL_CLOSED_MANUAL")
+                    (parent / REMEDY.TARGET).rmdir()
+                    (parent / "foreign").write_text("preserved", encoding="utf-8")
+                    result = REMEDY.inspect_parent(fd)
+                    self.assertEqual(result["HOST_PARENT_INSPECTION"], "FAIL_CLOSED_MANUAL")
+                    self.assertEqual(result["unexpectedEntryCount"], 1)
+                    self.assertEqual((parent / "foreign").read_text(encoding="utf-8"), "preserved")
+            finally:
+                os.close(fd)
+
+    def test_parent_inspection_rejects_symlink_partial_and_source_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            phi = pathlib.Path(tmp)
+            fd = os.open(phi, REMEDY.DIR_FLAGS)
+            try:
+                parent = phi / "searxng"
+                parent.symlink_to("/etc")
+                with self.assertRaises(OSError):
+                    REMEDY.inspect_parent(fd)
+                parent.unlink()
+                parent.mkdir()
+                (parent / REMEDY.INCOMING).mkdir()
+                with patch.object(REMEDY, "verify_acl"), \
+                     patch.object(REMEDY, "mount_id", return_value=40), \
+                     patch.object(REMEDY, "source_bytes", side_effect=REMEDY.GateError("changed")), \
+                     patch.object(REMEDY, "check_cache"), \
+                     patch.object(REMEDY, "fixed_docker_state"):
+                    result = REMEDY.inspect_parent(fd)
+                self.assertEqual(result["HOST_PARENT_INSPECTION"], "FAIL_CLOSED_MANUAL")
+                self.assertEqual(result["transactionState"], "INCOMING_MANUAL")
+                self.assertEqual(result["sourceIntegrity"], "FAIL_OR_UNKNOWN")
+            finally:
+                os.close(fd)
+
 
 if __name__ == "__main__":
     unittest.main()

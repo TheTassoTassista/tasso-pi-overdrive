@@ -1,6 +1,6 @@
 # SearXNG protected-config remediation candidate — host approval pending
 
-Status: `SEARXNG_HOST_REMEDIATION_PREPARED / HOST_APPROVAL_PENDING`. No root command from Work Execution, and no stable/autostart activation.
+Status: `FAIL_CLOSED_MANUAL / host_parent_already_exists`; read-only parent inspection requires separate host approval. No root command from Work Execution, and no stable/autostart activation. The original one-shot apply command and SHA below are historical and **must not be rerun**. Current read-only inspection SHA is recorded in `harness/TEST_BASELINE.md`; no preexisting parent will be reused until fresh in-transaction trust checks are implemented and separately approved.
 
 The three historical pre-JSON `ConnectionError` signals cannot be attributed from the retained receipt. Logger, call site, destination and original container logs are unavailable after owned cleanup. No further parser change or equivalent Docker retry is justified. An exact caught upstream network-retry warning is possible, not proven for those three entries, and remains fatal to the isolated no-network gate.
 
@@ -18,11 +18,11 @@ The three historical pre-JSON `ConnectionError` signals cannot be attributed fro
 
 This preflight was run by the host operator, not Work Execution. Its result is not authority to publish. The exact protected-host transaction below needs its own approval.
 
-## Exact protected-host transaction prepared, not executed
+## Historical protected-host transaction — executed once and rejected, DO NOT REPEAT
 
-`scripts/searxng-protected-host-remediate.py` SHA-256 `e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949` is a one-shot fixed-object script. It supports `apply` and read-only `status`; it has no delete, start, stop, pull, retry, or automatic recovery path. The source is exactly the single `settings.yml` file; extra source entries fail closed. The fixed original cache is never copied or touched and must still be empty immediately before mutation. The operator must approve the exact SHA and command separately.
+The historical `scripts/searxng-protected-host-remediate.py` SHA-256 `e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949` was approved and executed once; it failed closed on `host_parent_already_exists` before mutation. The command below is an audit record, **not** an executable instruction or remaining approval. The current script has changed to add read-only `inspect`; `apply` still rejects an existing parent. It has no delete, start, stop, pull, retry, or automatic recovery path. The source is exactly the single `settings.yml` file; extra source entries fail closed. The fixed original cache is never copied or touched and must still be empty immediately before any future mutation.
 
-Exact one-line Fish/Bash command for separate operator approval; **not executed by Work Execution**. The wrapper reads the script once, hashes those same bytes, authenticates with `sudo -v`, then feeds only those approved bytes to isolated root Python:
+Historical one-line Fish/Bash command, **already spent; do not rerun**. Work Execution did not execute it:
 
 ```text
 /usr/bin/python3 -I -c 'import hashlib,pathlib,subprocess,sys; b=pathlib.Path("/home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/searxng-protected-host-remediate.py").read_bytes(); hashlib.sha256(b).hexdigest()=="e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949" or sys.exit("SCRIPT_HASH_MISMATCH"); subprocess.run(["/usr/bin/sudo","-v"],check=True); sys.exit(subprocess.run(["/usr/bin/sudo","/usr/bin/python3","-I","-","apply"],input=b).returncode)'

@@ -3,7 +3,8 @@
 
 `apply` copies the previously reviewed settings bytes into a protected, no-replace
 target and creates one STOPPED Docker candidate. It never starts or deletes one.
-`status` is read-only. Any interrupted/ambiguous state requires manual disposition.
+`status` and `inspect` are read-only. Any interrupted/ambiguous state requires
+manual disposition.
 Run only from SHA-256-checked bytes in the host operator's terminal.
 """
 
@@ -268,6 +269,14 @@ def fsync_dir(fd):
     os.fsync(fd)
 
 
+def mount_id(fd):
+    with open("/proc/self/fdinfo/" + str(fd), encoding="ascii") as stream:
+        for line in stream:
+            if line.startswith("mnt_id:"):
+                return int(line.split()[1])
+    raise GateError("mount_identity_unavailable")
+
+
 def rename_noreplace(parent_fd, old, new):
     libc = ctypes.CDLL(None, use_errno=True)
     require(hasattr(libc, "renameat2"), "noreplace_unavailable")
@@ -448,14 +457,94 @@ def status(parent_fd):
     return "PARENT_EMPTY_MANUAL"
 
 
+def inspect_parent(phi_fd):
+    """Selected metadata only: no raw config, environment, Docker inspect or unknown names."""
+    report = {"HOST_PARENT_INSPECTION": "UNKNOWN", "hostParent": "ABSENT"}
+    if no_entry(phi_fd, "searxng"):
+        report["HOST_PARENT_INSPECTION"] = "FAIL"
+        return report
+    parent_fd = os.open("searxng", DIR_FLAGS, dir_fd=phi_fd)
+    try:
+        parent = os.fstat(parent_fd)
+        named_before = os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)
+        parent_acl = "PASS"
+        try:
+            verify_acl(PARENT, "traverse")
+        except (GateError, OSError, subprocess.TimeoutExpired):
+            parent_acl = "FAIL_OR_UNKNOWN"
+        names = sorted(os.listdir(parent_fd))
+        expected_names = {INCOMING, TARGET}
+        entries = {}
+        for name in (INCOMING, TARGET):
+            if name not in names:
+                continue
+            item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            info = {"type": "directory" if stat.S_ISDIR(item.st_mode) else
+                    "symlink" if stat.S_ISLNK(item.st_mode) else "other",
+                    "dev": item.st_dev, "ino": item.st_ino, "uid": item.st_uid,
+                    "gid": item.st_gid, "mode": oct(stat.S_IMODE(item.st_mode))}
+            if stat.S_ISDIR(item.st_mode):
+                child_fd = os.open(name, DIR_FLAGS, dir_fd=parent_fd)
+                try:
+                    child_names = os.listdir(child_fd)
+                    info["directEntries"] = {"config": "config" in child_names,
+                                             "cache": "cache" in child_names,
+                                             "marker": ".phi-candidate.json" in child_names,
+                                             "otherCount": len(set(child_names) -
+                                                               {"config", "cache", ".phi-candidate.json"})}
+                finally:
+                    os.close(child_fd)
+            entries[name] = info
+        protected = (stat.S_ISDIR(parent.st_mode) and
+                     parent.st_uid == parent.st_gid == 0 and
+                     stat.S_IMODE(parent.st_mode) == 0o710 and
+                     parent.st_dev == os.fstat(phi_fd).st_dev and
+                     mount_id(parent_fd) == mount_id(phi_fd) and parent_acl == "PASS" and
+                     same(parent, named_before) and
+                     set(os.listxattr(parent_fd)) <= {"system.posix_acl_access"})
+        report.update({"hostParent": "PRESENT", "parent": {
+            "dev": parent.st_dev, "ino": parent.st_ino,
+            "uid": parent.st_uid, "gid": parent.st_gid,
+            "mode": oct(stat.S_IMODE(parent.st_mode)),
+            "sameMountAsPhi": mount_id(parent_fd) == mount_id(phi_fd),
+            "acl": parent_acl, "protected": protected},
+            "knownEntries": entries, "unexpectedEntryCount": len(set(names) - expected_names)})
+        try:
+            report["transactionState"] = status(parent_fd)
+        except (GateError, OSError, ValueError, subprocess.TimeoutExpired):
+            report["transactionState"] = "FAIL_CLOSED_MANUAL"
+        named_after = os.stat("searxng", dir_fd=phi_fd, follow_symlinks=False)
+        protected = protected and same(parent, os.fstat(parent_fd)) and same(parent, named_after)
+        report["parent"]["protected"] = protected
+    finally:
+        os.close(parent_fd)
+    for label, check in (("sourceIntegrity", source_bytes), ("originalCacheIntegrity", check_cache),
+                         ("originalDockerAndCandidateAbsence", fixed_docker_state)):
+        try:
+            check()
+            report[label] = "PASS"
+        except (GateError, OSError, ValueError, subprocess.TimeoutExpired):
+            report[label] = "FAIL_OR_UNKNOWN"
+    report["HOST_PARENT_INSPECTION"] = (
+        "TRUSTED_EMPTY_SNAPSHOT" if protected and not names and
+        all(report[key] == "PASS" for key in
+            ("sourceIntegrity", "originalCacheIntegrity", "originalDockerAndCandidateAbsence")) else
+        "FAIL_CLOSED_MANUAL")
+    return report
+
+
 def main():
-    require(len(sys.argv) == 2 and sys.argv[1] in ("apply", "status"), "mode_invalid")
+    require(len(sys.argv) == 2 and sys.argv[1] in ("apply", "status", "inspect"), "mode_invalid")
     require(os.geteuid() == 0, "host_operator_required")
     original_umask = os.umask(0o077)
     try:
         opt = protected_opt_fd()
         try:
             phi_fd = opt[-1]
+            if sys.argv[1] == "inspect":
+                report = inspect_parent(phi_fd)
+                print(json.dumps(report, sort_keys=True))
+                return 0 if report["HOST_PARENT_INSPECTION"] == "TRUSTED_EMPTY_SNAPSHOT" else 1
             if sys.argv[1] == "status":
                 if no_entry(phi_fd, "searxng"):
                     print(json.dumps({"SEARXNG_HOST_STATE": "ABSENT"}))

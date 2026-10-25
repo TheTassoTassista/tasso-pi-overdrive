@@ -1,5 +1,9 @@
 # Phi — Test Baseline
 
+## 2026-10-25 — SearXNG parent-exists read-only diagnostic
+
+Approved original `apply` SHA `e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949` failed closed before any write. Current existing installer adds only read-only `inspect`, with protected-empty vs untrusted/foreign/symlink/partial/target/replaced-parent classification and fixed candidate absence. `python -m unittest tests/test_searxng_protected_host_remediate.py`: **18 PASS / 0 FAIL**, no Docker/root; `python -m py_compile` syntax PASS; package validation PASS; diff check PASS. Current script SHA-256 `a1a758eefbc7bcacbfe3d9ae41fe1a355033d3201820892c736850698b5d7a0d`. No privileged inspection performed; actual parent contents remain UNKNOWN. Old script hash/approval is historical only, not approval for new bytes or a new `apply`.
+
 ## 2026-10-25 — SearXNG one-shot protected host candidate
 
 `python3 -B -m unittest tests.test_searxng_protected_host_remediate`: **16 PASS / 0 FAIL** without root or Docker. Covers exact source bytes/hash, symlink/path-replacement refusal, cache changes, existing target, interrupted staging/manual classification, native no-replace success/conflict, ordered one-shot apply, candidate and original Docker identity/mount/privilege/environment checks, bounded stopped/no-pull create arguments, secret redaction, positive local staging fixture and real numeric-UID ACL behavior. Python AST, package validation and diff check PASS. Exact administrative script SHA-256 `e6a224ca3eb3c99aad693a777e1d5fc710a32f64f1506ea5bf27b392d8a78949`. No privileged transaction, real protected target, Docker candidate or runtime assertion has been executed by Work Execution. Historical preflight and route/image tests were not rerun on unchanged inputs.
