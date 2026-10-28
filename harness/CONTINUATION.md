@@ -1,5 +1,13 @@
 # Phi — Session Continuation
 
+## CURRENT — OmniRoute direct use remains unverified and unsafe to enable (2026-10-28)
+
+Starting state: branch `feature/phi-optional-services-startup`, HEAD `413b17117907a634948e332c322e757773ef930d`; the existing untracked `logs/` was preserved. The installed OmniRoute AppRun was observed as root-owned, mode 0755, SHA-256 `74aefdd18cdc66837ef6ef55381d95a2dcd33b1149c2b3a003350f36761a7db7`. A process scan found no OmniRoute process and no listener on `127.0.0.1:20128` at that observation. No process was launched.
+
+The Pi provider extension is registered as `omniroute` with OpenAI-compatible API and model IDs from the routing catalog, using `OMNIROUTER_BASE_URL`/`OMNIROUTER_API_KEY`; this confirms registration only, not a runtime request. Startup policy stays `omniroute=deferred`. The existing launcher can start and attest a local PID/listener, but its real process runs on the host outside the Worker/Tester Bubblewrap boundary. That startup check does not authenticate every later TCP client/connection or prevent a same-UID process from substituting the loopback listener after the check. The existing sandbox protects its command descendants, not Pi or its trusted extensions. The recorded Main decision therefore still applies: no safe, already-supported direct request transport is demonstrated.
+
+No OmniRoute, provider, or external network call was made; no service, credential, stable CLI, SearXNG, or Second Brain was changed. No code test was needed or run. **OmniRoute remains manual-only/deferred**; explicit provider registration is present, but end-to-end Phi→OmniRoute response, streaming/cancellation, and model runtime selection are unverified. Do not enable the route/autostart or spend another architecture cycle unless a newly available existing mechanism binds each Pi request to the attested process without the same-UID spoof boundary. This is an evidence update, not a change to the earlier Main decision.
+
 ## CURRENT — FAST DEFAULT preference; SearXNG autostart blocked on verified host authority (2026-10-28)
 
 Permanent execution preference is recorded in repository `AGENTS.md`: prioritize shortest safe path, implement bounded authorized work before reports, reuse valid evidence, avoid repeated checks and new architecture, and preserve all security/approval boundaries.
