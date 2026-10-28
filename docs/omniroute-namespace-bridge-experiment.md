@@ -1,6 +1,6 @@
 # OmniRoute namespace bridge — design-only experiment
 
-Current decision: `OMNIROUTE_DEFER / UNRESOLVED_SECURITY_BOUNDARY` (2026-10-25). These files are **not installed or activated**. They are a falsifiable transport fixture, not an OmniRoute or Phi integration. The earlier design-only analysis below remains historical; the live trust-boundary finding follows.
+Current decision: `OMNIROUTE_DEFER / UNRESOLVED_SECURITY_BOUNDARY` (2026-10-25). Release closure for the current optional-services candidate (2026-10-28): **manual-only; no supported, attested Phi request path or autostart is claimed**. These files are **not installed or activated**. They are a falsifiable transport fixture, not an OmniRoute or Phi integration. The earlier design-only analysis below remains historical; the live trust-boundary finding follows.
 
 ## Main trust-boundary decision — A versus B
 
