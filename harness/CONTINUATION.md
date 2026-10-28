@@ -1,5 +1,17 @@
 # Phi — Session Continuation
 
+## CURRENT — FAST DEFAULT preference; SearXNG autostart blocked on verified host authority (2026-10-28)
+
+Permanent execution preference is recorded in repository `AGENTS.md`: prioritize shortest safe path, implement bounded authorized work before reports, reuse valid evidence, avoid repeated checks and new architecture, and preserve all security/approval boundaries.
+
+SearXNG remains available through the explicit `web_research` route based on the already-recorded live smoke. This task did not stop or restart the shared container. The candidate coordinator (`lib/phi-optional-startup.mjs`) does not start SearXNG; its result is `DEFERRED_SECURITY_BOUNDARY`. The separate launcher `scripts/pi-launcher.sh` has a SearXNG path, but it performs `sudo -n /usr/bin/docker start` by container name and then health polling; it does not bind the start to the expected container ID. The actual CLI startup path is the optional-services coordinator, so the legacy launcher startup does not prove a safe or low-latency on-demand path from `web_research`.
+
+Current session evidence: regular user UID is 1000, not in the Docker group; `/var/run/docker.sock` is root:docker mode 0660 and not writable. No sudo or Docker command was run. A real stopped→start→JSON test was therefore not performed, and no autostart code was changed. The single remaining SearXNG blocker is a noninteractive, narrowly scoped host start/identity-verification capability tied to the attested expected container identity; generic Docker access or an unverified name-only start is not acceptable. Resolve that host authorization separately, then implement/retest the existing-path integration without prompting during ordinary Phi use.
+
+OmniRoute stays manual-only/deferred per the existing decision. Current policy remains `omniroute=deferred`; the coordinator fails closed. This task did not launch it or reopen the same-UID bridge design. No source/runtime/stable-install changes were made. Prior stable SearXNG and Second Brain evidence is reused, not re-run.
+
+Current checkpoint: branch `feature/phi-optional-services-startup`, starting HEAD `09964ca6649b805860bf1e95b44726ca5fb5efc2`; pre-existing untracked `logs/` preserved and not staged. No tests or host actions have been run for SearXNG startup. Exact next action: obtain the narrowly scoped host capability above; then add a bounded, fail-soft SearXNG start on the existing first-use/optional-services path, with identity verification before start and JSON probe after readiness. Do not stop a healthy shared service to simulate cold start.
+
 ## CURRENT — stable Phi + Second Brain runtime verified (2026-10-28)
 
 Authorized candidate HEAD `4c0031167f97838f977dd519397beea1b098264c`, branch `feature/phi-optional-services-startup`, was verified before promotion. The corrected full gate remains the already-recorded **1201 total / 863 PASS / 0 FAIL / 338 skipped**, exit0; syntax, TypeScript and package validation passed. Do not rerun it for this runtime-only activation. Full stdout/stderr/exit/meta remain under `logs/release-gate-2026-10-28/npm-run-check-correct-path.*`.
