@@ -21,6 +21,20 @@ SPEC.loader.exec_module(REMEDY)
 
 
 class ProtectedRemediationTests(unittest.TestCase):
+    def published_snapshot(self, parent, target, fd):
+        parent_stat, target_stat = os.fstat(fd), os.stat(target)
+        return {"parent": {"protected": True, "dev": parent_stat.st_dev,
+                           "ino": parent_stat.st_ino, "mtimeNs": parent_stat.st_mtime_ns,
+                           "ctimeNs": parent_stat.st_ctime_ns},
+                "transactionState": "PUBLISHED_NO_CANDIDATE", "unexpectedEntryCount": 0,
+                "knownEntries": {REMEDY.TARGET: {"dev": target_stat.st_dev,
+                                                 "ino": target_stat.st_ino}},
+                "postPublishChecks": {key: True for key in
+                    ("incomingAbsent", "onlyTargetEntry", "targetIdentityApproved",
+                     "targetPresent", "targetVerifiedNoCandidate")},
+                "sourceIntegrity": "PASS", "originalCacheIntegrity": "PASS",
+                "originalDockerAndCandidateAbsence": "PASS"}
+
     def incoming_snapshot(self, parent, stage, fd):
         parent_stat = os.fstat(fd)
         stage_stat = os.stat(stage)
@@ -783,6 +797,168 @@ class ProtectedRemediationTests(unittest.TestCase):
         self.assertNotIn(REMEDY.CONFIG_SOURCE, str(args))
         self.assertNotIn(REMEDY.CACHE_SOURCE, str(args))
 
+    def test_create_candidate_from_published_tree_only_once_and_stopped(self):
+        with self.staged_fixture() as (parent, stage, settings, marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            target = parent / REMEDY.TARGET
+            snapshot = self.published_snapshot(parent, target, fd)
+            settings = target / "config" / "settings.yml"
+            original_bytes = settings.read_bytes()
+            created_id = "a" * 64
+            calls = []
+            def docker_call(*args, **_kwargs):
+                calls.append(args)
+                if args == REMEDY.create_argv():
+                    return created_id
+                if args == ("container", "inspect", REMEDY.CANDIDATE):
+                    return [{"Id": created_id}]
+                self.fail("unexpected Docker operation")
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes", return_value=original_bytes), \
+                 patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state") as fixed, \
+                 patch.object(REMEDY, "candidate_state", return_value="STOPPED_ATTESTED"), \
+                 patch.object(REMEDY, "status", return_value="PUBLISHED_CANDIDATE_STOPPED"), \
+                 patch.object(REMEDY, "docker", side_effect=docker_call), \
+                 patch.object(REMEDY, "stage_copy") as stage_copy, \
+                 patch.object(REMEDY, "recover_staging") as recover:
+                result = REMEDY.create_candidate(phi_fd)
+            self.assertEqual(result["candidateId"], created_id)
+            self.assertFalse(result["serviceStarted"])
+            self.assertEqual(calls.count(REMEDY.create_argv()), 1)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(fixed.call_count, 2)
+            stage_copy.assert_not_called()
+            recover.assert_not_called()
+            self.assertEqual(settings.read_bytes(), original_bytes)
+            self.assertFalse(stage.exists())
+
+    def test_create_candidate_preconditions_fail_before_docker(self):
+        for change in ("candidate_already_present", "target_identity", "parent_identity",
+                       "source", "cache", "docker", "unexpected_entry", "post_check"):
+            with self.subTest(change=change), self.staged_fixture() as (
+                    parent, stage, _settings, _marker, fd, phi_fd):
+                REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+                snapshot = self.published_snapshot(parent, parent / REMEDY.TARGET, fd)
+                if change == "candidate_already_present":
+                    snapshot["transactionState"] = "PUBLISHED_CANDIDATE_STOPPED"
+                elif change == "target_identity":
+                    snapshot["knownEntries"][REMEDY.TARGET]["ino"] += 1
+                elif change == "parent_identity":
+                    snapshot["parent"]["ino"] += 1
+                elif change in ("source", "cache", "docker"):
+                    snapshot[{"source": "sourceIntegrity", "cache": "originalCacheIntegrity",
+                              "docker": "originalDockerAndCandidateAbsence"}[change]] = "FAIL_OR_UNKNOWN"
+                elif change == "unexpected_entry":
+                    snapshot["unexpectedEntryCount"] = 1
+                else:
+                    snapshot["postPublishChecks"]["onlyTargetEntry"] = False
+                with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                     patch.object(REMEDY, "docker") as docker:
+                    with self.assertRaises(REMEDY.GateError):
+                        REMEDY.create_candidate(phi_fd)
+                    docker.assert_not_called()
+
+    def test_create_candidate_fresh_validation_rejects_changed_tree_and_original(self):
+        for change in ("settings", "symlink", "extra", "cache", "daemon"):
+            with self.subTest(change=change), self.staged_fixture() as (
+                    parent, stage, settings, _marker, fd, phi_fd):
+                REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+                snapshot = self.published_snapshot(parent, parent / REMEDY.TARGET, fd)
+                settings = parent / REMEDY.TARGET / "config" / "settings.yml"
+                if change == "settings":
+                    settings.write_bytes(b"changed")
+                elif change == "symlink":
+                    settings.unlink()
+                    settings.symlink_to("/etc/passwd")
+                elif change == "extra":
+                    (parent / "foreign").write_bytes(b"preserve")
+                source_error = REMEDY.GateError("source_identity_changed") if change == "cache" else None
+                docker_error = REMEDY.GateError("docker_identity_unavailable") if change == "daemon" else None
+                with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                     patch.object(REMEDY, "source_bytes", side_effect=source_error), \
+                     patch.object(REMEDY, "check_cache"), \
+                     patch.object(REMEDY, "fixed_docker_state", side_effect=docker_error), \
+                     patch.object(REMEDY, "docker") as docker:
+                    with self.assertRaises((REMEDY.GateError, OSError)):
+                        REMEDY.create_candidate(phi_fd)
+                    docker.assert_not_called()
+
+    def test_create_candidate_rechecks_tree_after_concurrent_cache_change(self):
+        with self.staged_fixture() as (parent, stage, _settings, _marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            snapshot = self.published_snapshot(parent, parent / REMEDY.TARGET, fd)
+            cache_entry = parent / REMEDY.TARGET / "cache" / "concurrent-entry"
+            def concurrent_change():
+                cache_entry.write_text("preserve", encoding="utf-8")
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes"), patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state", side_effect=concurrent_change), \
+                patch.object(REMEDY, "docker") as docker:
+                with self.assertRaisesRegex(REMEDY.GateError,
+                                            "target_metadata_invalid"):
+                    REMEDY.create_candidate(phi_fd)
+                docker.assert_not_called()
+            self.assertEqual(cache_entry.read_text(encoding="utf-8"), "preserve")
+            self.assertTrue((parent / REMEDY.TARGET).exists())
+            self.assertFalse(stage.exists())
+
+    def test_create_candidate_partial_docker_failure_never_retries_or_cleans(self):
+        with self.staged_fixture() as (parent, stage, settings, _marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            snapshot = self.published_snapshot(parent, parent / REMEDY.TARGET, fd)
+            calls = []
+            def uncertain_create(*args):
+                calls.append(args)
+                raise REMEDY.GateError("docker_read_or_create_failed")
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes"), patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "docker", side_effect=uncertain_create):
+                with self.assertRaisesRegex(REMEDY.GateError,
+                                            "candidate_create_outcome_unknown"):
+                    REMEDY.create_candidate(phi_fd)
+            self.assertEqual(calls, [REMEDY.create_argv()])
+            self.assertTrue((parent / REMEDY.TARGET).exists())
+            self.assertFalse(stage.exists())
+
+    def test_create_candidate_postcreate_mismatch_retains_state_for_manual_review(self):
+        with self.staged_fixture() as (parent, stage, _settings, _marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            snapshot = self.published_snapshot(parent, parent / REMEDY.TARGET, fd)
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes"), patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "docker", return_value="a" * 64) as docker, \
+                 patch.object(REMEDY, "candidate_state", return_value="ABSENT"):
+                with self.assertRaisesRegex(REMEDY.GateError, "candidate_postcreate_invalid"):
+                    REMEDY.create_candidate(phi_fd)
+            docker.assert_called_once_with(*REMEDY.create_argv())
+            self.assertTrue((parent / REMEDY.TARGET).exists())
+
+    def test_create_candidate_cli_dispatch_never_calls_apply_or_recover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fd = os.open(tmp, REMEDY.DIR_FLAGS)
+            output = io.StringIO()
+            try:
+                with patch.object(REMEDY.sys, "argv", [str(SCRIPT), "create-candidate"]), \
+                     patch.object(REMEDY.os, "geteuid", return_value=0), \
+                     patch.object(REMEDY, "protected_opt_fd", return_value=[fd]), \
+                     patch.object(REMEDY, "create_candidate", return_value={
+                         "SEARXNG_HOST_REMEDIATION": "PUBLISHED_STOPPED_CANDIDATE"}) as create, \
+                     patch.object(REMEDY, "stage_copy") as stage_copy, \
+                     patch.object(REMEDY, "recover_staging") as recover, \
+                     contextlib.redirect_stdout(output):
+                    self.assertEqual(REMEDY.main(), 0)
+                create.assert_called_once_with(fd)
+                stage_copy.assert_not_called()
+                recover.assert_not_called()
+                self.assertEqual(json.loads(output.getvalue())["SEARXNG_HOST_REMEDIATION"],
+                                 "PUBLISHED_STOPPED_CANDIDATE")
+            finally:
+                with contextlib.suppress(OSError):
+                    os.close(fd)
+
     def test_real_acl_uses_numeric_uid_and_keeps_other_access_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             parent = pathlib.Path(tmp) / "protected"
@@ -832,14 +1008,28 @@ class ProtectedRemediationTests(unittest.TestCase):
                     ("image", "inspect", REMEDY.IMAGE_ID): [image]}[args]
         with patch.object(REMEDY, "docker", side_effect=response):
             self.assertEqual(REMEDY.candidate_state(), "STOPPED_ATTESTED")
-            candidate["Mounts"].append({"Type": "bind", "Source": "/foreign",
-                                         "Destination": "/other", "RW": True})
-            with self.assertRaisesRegex(REMEDY.GateError, "candidate_identity_or_contract_changed"):
-                REMEDY.candidate_state()
-            candidate["Mounts"].pop()
-            candidate["HostConfig"]["CapDrop"] = []
-            with self.assertRaisesRegex(REMEDY.GateError, "candidate_identity_or_contract_changed"):
-                REMEDY.candidate_state()
+            failures = (
+                lambda: candidate["Mounts"].append({"Type": "bind", "Source": "/foreign",
+                                                     "Destination": "/other", "RW": True}),
+                lambda: candidate["HostConfig"].update(CapDrop=[]),
+                lambda: candidate["HostConfig"].update(NetworkMode="host"),
+                lambda: candidate["HostConfig"].update(Devices=[{"PathOnHost": "/dev/null"}]),
+                lambda: candidate["HostConfig"].update(SecurityOpt=["seccomp=unconfined",
+                                                                       "no-new-privileges:true"]),
+                lambda: candidate["HostConfig"].update(PortBindings={}),
+                lambda: candidate["State"].update(Running=True, Pid=123),
+                lambda: image["Config"]["Env"].append("FORCE_OWNERSHIP=true"),
+            )
+            for mutate in failures:
+                with self.subTest(mutate=mutate):
+                    pristine_candidate = json.loads(json.dumps(candidate))
+                    pristine_env = image["Config"]["Env"][:]
+                    mutate()
+                    with self.assertRaises(REMEDY.GateError):
+                        REMEDY.candidate_state()
+                    candidate.clear()
+                    candidate.update(pristine_candidate)
+                    image["Config"]["Env"] = pristine_env
 
     def test_protected_copy_hash_check_rejects_modified_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,7 +4,9 @@
 `apply` copies the previously reviewed settings bytes into a protected, no-replace
 target and creates one STOPPED Docker candidate. It never starts or deletes one.
 `recover` only publishes an already-attested incoming tree, without creating or
-starting a container. `status`, `inspect`, and `inspect-staging` are read-only.
+starting a container. `create-candidate` only creates one STOPPED container from
+the already-published, freshly attested tree. `status`, `inspect`, and
+`inspect-staging` are read-only.
 Any interrupted/ambiguous state requires manual disposition.
 Run only from SHA-256-checked bytes in the host operator's terminal.
 """
@@ -217,6 +219,7 @@ def fixed_docker_state(expect_candidate_absent=True):
     require(isinstance(config, dict) and isinstance(image_config, dict) and
             environment_map(config.get("Env")) == environment_map(image_config.get("Env")) and
             len(config["Env"]) == 16 and
+            "FORCE_OWNERSHIP" not in environment_map(image_config.get("Env")) and
             config.get("Entrypoint") == image_config.get("Entrypoint") ==
             ["/usr/local/searxng/entrypoint.sh"] and config.get("Cmd") == image_config.get("Cmd"),
             "original_image_config_changed")
@@ -508,6 +511,8 @@ def candidate_state():
                 (PARENT + "/" + TARGET + "/cache", "/var/cache/searxng", True)}
     host = candidate.get("HostConfig", {})
     config = candidate.get("Config", {})
+    require(isinstance(host, dict) and isinstance(config, dict),
+            "candidate_inspect_invalid")
     require(candidate.get("Name") == "/" + CANDIDATE and candidate.get("Image") == IMAGE_ID and
             config.get("Labels", {}).get(LABEL) == LABEL_VALUE and
             config.get("User") == "977:977" and
@@ -516,9 +521,11 @@ def candidate_state():
             candidate.get("State", {}).get("Running") is False and
             candidate.get("State", {}).get("Pid") == 0 and
             host.get("NetworkMode") == "bridge" and host.get("Privileged") is False and
-            "ALL" in (host.get("CapDrop") or []) and
+            host.get("CapDrop") == ["ALL"] and
             not host.get("CapAdd") and
-            "no-new-privileges:true" in (host.get("SecurityOpt") or []) and
+            not host.get("Devices") and not host.get("DeviceRequests") and
+            not host.get("Binds") and
+            host.get("SecurityOpt") == ["no-new-privileges:true"] and
             (host.get("RestartPolicy") or {}).get("Name") == "no" and
             host.get("PortBindings") == {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "8888"}]} and
             len(mounts) == 2 and all(m.get("Type") == "bind" for m in mounts) and
@@ -795,9 +802,85 @@ def recover_staging(phi_fd):
         os.close(parent_fd)
 
 
+def create_candidate(phi_fd):
+    """Create once from a published tree; never publish, start, clean or retry."""
+    snapshot = inspect_parent(phi_fd)
+    parent_snapshot = snapshot.get("parent")
+    entries_snapshot = snapshot.get("knownEntries")
+    post_publish = snapshot.get("postPublishChecks")
+    require(isinstance(snapshot, dict) and isinstance(parent_snapshot, dict) and
+            isinstance(entries_snapshot, dict) and isinstance(post_publish, dict) and
+            parent_snapshot.get("protected") is True and
+            snapshot.get("transactionState") == "PUBLISHED_NO_CANDIDATE" and
+            snapshot.get("unexpectedEntryCount") == 0 and
+            all(post_publish.get(key) is True for key in
+                ("incomingAbsent", "onlyTargetEntry", "targetIdentityApproved",
+                 "targetPresent", "targetVerifiedNoCandidate")) and
+            all(snapshot.get(key) == "PASS" for key in
+                ("sourceIntegrity", "originalCacheIntegrity",
+                 "originalDockerAndCandidateAbsence")),
+            "candidate_published_precondition_failed")
+    require(isinstance(entries_snapshot.get(TARGET), dict) and
+            (parent_snapshot.get("dev"), parent_snapshot.get("ino")) == RECOVERY_PARENT_ID and
+            (entries_snapshot[TARGET].get("dev"),
+             entries_snapshot[TARGET].get("ino")) == RECOVERY_INCOMING_ID and
+            isinstance(parent_snapshot.get("mtimeNs"), int) and
+            isinstance(parent_snapshot.get("ctimeNs"), int),
+            "candidate_approved_identity_changed")
+    parent_fd = os.open("searxng", DIR_FLAGS, dir_fd=phi_fd)
+    try:
+        parent = os.fstat(parent_fd)
+
+        def recheck_tree():
+            require((parent.st_dev, parent.st_ino) == RECOVERY_PARENT_ID and
+                    parent.st_uid == parent.st_gid == 0 and
+                    stat.S_IMODE(parent.st_mode) == 0o710 and
+                    mount_id(parent_fd) == mount_id(phi_fd) and
+                    set(os.listxattr(parent_fd)) <= {"system.posix_acl_access"} and
+                    sorted(os.listdir(parent_fd)) == [TARGET] and
+                    same(parent, os.fstat(parent_fd)) and
+                    same(parent, os.stat("searxng", dir_fd=phi_fd,
+                                         follow_symlinks=False)) and
+                    verify_published(parent_fd) == RECOVERY_INCOMING_ID,
+                    "candidate_published_tree_changed")
+
+        require(same(parent, os.stat("searxng", dir_fd=phi_fd,
+                                     follow_symlinks=False)) and
+                parent.st_mtime_ns == parent_snapshot["mtimeNs"] and
+                parent.st_ctime_ns == parent_snapshot["ctimeNs"],
+                "candidate_parent_changed_after_snapshot")
+        recheck_tree()
+        source_bytes()
+        check_cache()
+        fixed_docker_state()
+        recheck_tree()
+        # The only Docker mutation. A timeout/nonzero/malformed result can still
+        # have created the object; leave it untouched for exact-state inspection.
+        try:
+            created = docker(*create_argv())
+        except (GateError, OSError, subprocess.TimeoutExpired, ValueError) as error:
+            raise GateError("candidate_create_outcome_unknown") from error
+        require(candidate_state() == "STOPPED_ATTESTED" and
+                docker("container", "inspect", CANDIDATE)[0].get("Id") == created,
+                "candidate_postcreate_invalid")
+        fixed_docker_state(expect_candidate_absent=False)
+        recheck_tree()
+        source_bytes()
+        check_cache()
+        require(status(parent_fd) == "PUBLISHED_CANDIDATE_STOPPED",
+                "candidate_final_classification_failed")
+        return {"SEARXNG_HOST_REMEDIATION": "PUBLISHED_STOPPED_CANDIDATE",
+                "candidateId": created, "targetDev": RECOVERY_INCOMING_ID[0],
+                "targetIno": RECOVERY_INCOMING_ID[1], "configSha256": SOURCE_SHA256,
+                "serviceStarted": False}
+    finally:
+        os.close(parent_fd)
+
+
 def main():
     require(len(sys.argv) == 2 and sys.argv[1] in
-            ("apply", "status", "inspect", "inspect-staging", "recover"),
+            ("apply", "status", "inspect", "inspect-staging", "recover",
+             "create-candidate"),
             "mode_invalid")
     require(os.geteuid() == 0, "host_operator_required")
     original_umask = os.umask(0o077)
@@ -815,6 +898,10 @@ def main():
                 return 0 if report["STAGING_INTEGRITY"] == "PASS_SNAPSHOT" else 1
             if sys.argv[1] == "recover":
                 report = recover_staging(phi_fd)
+                print(json.dumps(report, sort_keys=True))
+                return 0
+            if sys.argv[1] == "create-candidate":
+                report = create_candidate(phi_fd)
                 print(json.dumps(report, sort_keys=True))
                 return 0
             if sys.argv[1] == "status":
