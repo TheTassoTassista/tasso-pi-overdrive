@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
+import { createOmniRouteStream, OMNIROUTE_TLS_ORIGIN } from "../lib/omniroute-tls.mjs";
 import routingPolicy from "../config/routing-policy.json" with { type: "json" };
 
 type CatalogModel = {
@@ -26,11 +28,12 @@ export default function omnirouteProvider(pi: ExtensionAPI): void {
       compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
     }));
   pi.registerProvider("omniroute", {
-    name: "OmniRoute (existing local gateway)",
-    baseUrl: "$OMNIROUTER_BASE_URL",
+    name: "OmniRoute (verified local HTTPS)",
+    baseUrl: `${OMNIROUTE_TLS_ORIGIN}/v1`,
     apiKey: "$OMNIROUTER_API_KEY",
     authHeader: true,
     api: "openai-completions",
+    streamSimple: createOmniRouteStream(streamSimple),
     models,
   });
 }
