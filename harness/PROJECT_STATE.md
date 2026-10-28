@@ -1,5 +1,9 @@
 # Phi — Current Project State
 
+## 2026-10-28 — Optional-services release candidate status
+
+The corrected full `npm run check` is **1201 total: 863 PASS, 0 FAIL, 338 skipped**, exit0, with typecheck, syntax and package validation included; streams are retained in `logs/release-gate-2026-10-28/npm-run-check-correct-path.*`. The SearXNG identity fix/E4 test-anchor correction is local commit `6b95eec`. The active `phi` launcher still targets versioned package `90fc48609853`, and Pi package registration still names that target. The target's entrypoint and Second Brain startup/manager/config match the candidate; its SearXNG web policy and two routing/fetch helpers do not. Candidate SearXNG is explicit-only via `web_research` and fixture-tested; the operator-reported live container/JSON result is not freshly bound to a Docker identity here. Second Brain remains fail-soft on the existing manager; OmniRoute remains manual-only. No stable files, Pi settings, credentials, host services, Docker objects or providers were modified. Stable activation needs one separately authorized versioned-target + package-registration + launcher retarget with the old target preserved for rollback. See the newest `harness/CONTINUATION.md` and `docs/phi-progress.md` entry.
+
 ## 2026-10-24 — OmniRoute quarantine recovery DEFERRED / SPECIFIC_BLOCKER
 
 Main's bounded quarantine-recovery decision is durable, but its mandatory no-process-use predicate cannot be completed without a separately approved privileged read-only process census. Current quarantine content and root ownership match the pinned manifest; target and sidecar are absent. `QUARANTINE_RECOVERABLE=NO` until privileged process-use evidence closes the UNKNOWN. No recovery code or administrative operation ran. Stable Phi/Second Brain, SearXNG, Campaign3 and user files remain unchanged. See newest progress entry.
