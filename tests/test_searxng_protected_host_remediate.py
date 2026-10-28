@@ -817,8 +817,8 @@ class ProtectedRemediationTests(unittest.TestCase):
                  patch.object(REMEDY, "source_bytes", return_value=original_bytes), \
                  patch.object(REMEDY, "check_cache"), \
                  patch.object(REMEDY, "fixed_docker_state") as fixed, \
-                 patch.object(REMEDY, "candidate_state", return_value="STOPPED_ATTESTED"), \
-                 patch.object(REMEDY, "status", return_value="PUBLISHED_CANDIDATE_STOPPED"), \
+                 patch.object(REMEDY, "candidate_state", return_value="STOPPED_ATTESTED") as candidate_state, \
+                 patch.object(REMEDY, "status", return_value="PUBLISHED_CANDIDATE_STOPPED") as status, \
                  patch.object(REMEDY, "docker", side_effect=docker_call), \
                  patch.object(REMEDY, "stage_copy") as stage_copy, \
                  patch.object(REMEDY, "recover_staging") as recover:
@@ -828,10 +828,116 @@ class ProtectedRemediationTests(unittest.TestCase):
             self.assertEqual(calls.count(REMEDY.create_argv()), 1)
             self.assertEqual(len(calls), 2)
             self.assertEqual(fixed.call_count, 2)
+            candidate_state.assert_called_once_with(expected_id=created_id)
+            status.assert_called_once()
+            self.assertEqual(status.call_args.kwargs,
+                             {"expected_candidate_id": created_id})
             stage_copy.assert_not_called()
             recover.assert_not_called()
             self.assertEqual(settings.read_bytes(), original_bytes)
             self.assertFalse(stage.exists())
+
+    def test_create_candidate_rejects_replacement_before_final_attestation(self):
+        with self.staged_fixture() as (parent, stage, _settings, _marker, fd, phi_fd):
+            REMEDY.rename_noreplace(fd, REMEDY.INCOMING, REMEDY.TARGET)
+            target = parent / REMEDY.TARGET
+            snapshot = self.published_snapshot(parent, target, fd)
+            created_id, replacement_id = "a" * 64, "b" * 64
+            _original, image = self.docker_fixture()
+            root = REMEDY.PARENT + "/" + REMEDY.TARGET
+
+            def candidate(container_id):
+                return {"Id": container_id, "Name": "/" + REMEDY.CANDIDATE,
+                        "Image": REMEDY.IMAGE_ID,
+                        "State": {"Status": "created", "Running": False, "Pid": 0},
+                        "Config": {"Labels": {REMEDY.LABEL: REMEDY.LABEL_VALUE},
+                                   "User": "977:977",
+                                   "Entrypoint": image["Config"]["Entrypoint"],
+                                   "Cmd": None,
+                                   "Env": image["Config"]["Env"] +
+                                          ["FORCE_OWNERSHIP=false"]},
+                        "Mounts": [{"Type": "bind", "Source": root + "/config",
+                                    "Destination": "/etc/searxng", "RW": False},
+                                   {"Type": "bind", "Source": root + "/cache",
+                                    "Destination": "/var/cache/searxng", "RW": True}],
+                        "HostConfig": {"NetworkMode": "bridge", "Privileged": False,
+                                       "CapDrop": ["ALL"], "CapAdd": None,
+                                       "Devices": None, "DeviceRequests": None,
+                                       "Binds": None,
+                                       "SecurityOpt": ["no-new-privileges:true"],
+                                       "RestartPolicy": {"Name": "no"},
+                                       "PortBindings": {"8080/tcp": [
+                                           {"HostIp": "127.0.0.1", "HostPort": "8888"}]}}}
+
+            objects = {created_id: candidate(created_id),
+                       replacement_id: candidate(replacement_id)}
+            candidate_inspects = 0
+            calls = []
+
+            def docker_call(*args, **_kwargs):
+                nonlocal candidate_inspects
+                calls.append(args)
+                if args == REMEDY.create_argv():
+                    return created_id
+                if args == ("info", "--format", "{{json .ID}}"):
+                    return REMEDY.DAEMON_ID
+                if args == ("image", "inspect", REMEDY.IMAGE_ID):
+                    return [image]
+                if args == ("container", "inspect", REMEDY.CANDIDATE):
+                    candidate_inspects += 1
+                    if candidate_inspects == 1:
+                        return [objects[created_id]]  # initial candidate attestation
+                    if candidate_inspects == 2:
+                        return [{"Id": created_id}]  # immediate exact-ID comparison
+                    if candidate_inspects == 3:
+                        return [objects[replacement_id]]  # final attestation sees replacement
+                self.fail(f"unexpected Docker operation: {args!r}")
+
+            with patch.object(REMEDY, "inspect_parent", return_value=snapshot), \
+                 patch.object(REMEDY, "source_bytes"), patch.object(REMEDY, "check_cache"), \
+                 patch.object(REMEDY, "fixed_docker_state"), \
+                 patch.object(REMEDY, "docker", side_effect=docker_call), \
+                 patch.object(REMEDY, "stage_copy") as stage_copy, \
+                 patch.object(REMEDY, "recover_staging") as recover:
+                with self.assertRaisesRegex(REMEDY.GateError, "candidate_identity_changed"):
+                    REMEDY.create_candidate(phi_fd)
+
+            self.assertEqual(calls.count(REMEDY.create_argv()), 1)
+            self.assertEqual([call[0] for call in calls
+                              if call[0] in ("create", "start", "stop", "rm")], ["create"])
+            stage_copy.assert_not_called()
+            recover.assert_not_called()
+            self.assertIn(created_id, objects)
+            self.assertIn(replacement_id, objects)
+            self.assertTrue(target.is_dir())
+            self.assertFalse(stage.exists())
+
+    def test_candidate_expected_id_missing_or_uninspectable_fails_closed(self):
+        expected_id = "a" * 64
+        def missing(*args, **_kwargs):
+            return REMEDY.DAEMON_ID if args == (
+                "info", "--format", "{{json .ID}}") else None
+
+        with self.subTest(result="missing"):
+            with patch.object(REMEDY, "docker", side_effect=missing) as docker:
+                with self.assertRaisesRegex(REMEDY.GateError, "candidate_identity_missing"):
+                    REMEDY.candidate_state(expected_id=expected_id)
+                docker.assert_has_calls([
+                    unittest.mock.call("info", "--format", "{{json .ID}}"),
+                    unittest.mock.call("container", "inspect", REMEDY.CANDIDATE,
+                                       missing_ok=True)])
+                self.assertEqual(docker.call_count, 2)
+
+        def unreadable(*args, **_kwargs):
+            if args == ("info", "--format", "{{json .ID}}"):
+                return REMEDY.DAEMON_ID
+            raise REMEDY.GateError("docker_read_or_create_failed")
+
+        with self.subTest(result="unreadable"):
+            with patch.object(REMEDY, "docker", side_effect=unreadable) as docker:
+                with self.assertRaisesRegex(REMEDY.GateError, "docker_read_or_create_failed"):
+                    REMEDY.candidate_state(expected_id=expected_id)
+                self.assertEqual(docker.call_count, 2)
 
     def test_create_candidate_preconditions_fail_before_docker(self):
         for change in ("candidate_already_present", "target_identity", "parent_identity",
@@ -988,8 +1094,9 @@ class ProtectedRemediationTests(unittest.TestCase):
     def test_candidate_attestation_rejects_extra_mount_or_privilege(self):
         original, image = self.docker_fixture()
         root = REMEDY.PARENT + "/" + REMEDY.TARGET
-        candidate = {"Name": "/" + REMEDY.CANDIDATE, "Image": REMEDY.IMAGE_ID,
-                     "State": {"Running": False, "Pid": 0},
+        candidate = {"Id": "a" * 64, "Name": "/" + REMEDY.CANDIDATE,
+                     "Image": REMEDY.IMAGE_ID,
+                     "State": {"Status": "created", "Running": False, "Pid": 0},
                      "Config": {"Labels": {REMEDY.LABEL: REMEDY.LABEL_VALUE}, "User": "977:977",
                                 "Entrypoint": image["Config"]["Entrypoint"], "Cmd": None,
                                 "Env": image["Config"]["Env"] + ["FORCE_OWNERSHIP=false"]},
@@ -1018,6 +1125,7 @@ class ProtectedRemediationTests(unittest.TestCase):
                                                                        "no-new-privileges:true"]),
                 lambda: candidate["HostConfig"].update(PortBindings={}),
                 lambda: candidate["State"].update(Running=True, Pid=123),
+                lambda: candidate["State"].update(Status="exited", Running=False, Pid=0),
                 lambda: image["Config"]["Env"].append("FORCE_OWNERSHIP=true"),
             )
             for mutate in failures:

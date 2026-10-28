@@ -491,14 +491,17 @@ def verify_published(parent_fd):
     return verify_tree(parent_fd, TARGET)
 
 
-def candidate_state():
+def candidate_state(expected_id=None):
     require(docker("info", "--format", "{{json .ID}}") == DAEMON_ID,
             "candidate_daemon_changed")
     item = docker("container", "inspect", CANDIDATE, missing_ok=True)
     if item is None:
+        require(expected_id is None, "candidate_identity_missing")
         return "ABSENT"
     require(isinstance(item, list) and len(item) == 1, "candidate_inspect_invalid")
     candidate = item[0]
+    if expected_id is not None:
+        require(candidate.get("Id") == expected_id, "candidate_identity_changed")
     images = docker("image", "inspect", IMAGE_ID)
     require(isinstance(images, list) and len(images) == 1 and images[0].get("Id") == IMAGE_ID,
             "candidate_image_changed")
@@ -518,6 +521,7 @@ def candidate_state():
             config.get("User") == "977:977" and
             config.get("Entrypoint") == image_config.get("Entrypoint") and
             config.get("Cmd") == image_config.get("Cmd") and
+            candidate.get("State", {}).get("Status") == "created" and
             candidate.get("State", {}).get("Running") is False and
             candidate.get("State", {}).get("Pid") == 0 and
             host.get("NetworkMode") == "bridge" and host.get("Privileged") is False and
@@ -535,7 +539,7 @@ def candidate_state():
     return "STOPPED_ATTESTED"
 
 
-def status(parent_fd):
+def status(parent_fd, expected_candidate_id=None):
     incoming = not no_entry(parent_fd, INCOMING)
     target = not no_entry(parent_fd, TARGET)
     if incoming and target:
@@ -544,7 +548,7 @@ def status(parent_fd):
         return "INCOMING_MANUAL"
     if target:
         verify_published(parent_fd)
-        candidate = candidate_state()
+        candidate = candidate_state(expected_id=expected_candidate_id)
         return "PUBLISHED_CANDIDATE_STOPPED" if candidate == "STOPPED_ATTESTED" else "PUBLISHED_NO_CANDIDATE"
     return "PARENT_EMPTY_MANUAL"
 
@@ -860,14 +864,15 @@ def create_candidate(phi_fd):
             created = docker(*create_argv())
         except (GateError, OSError, subprocess.TimeoutExpired, ValueError) as error:
             raise GateError("candidate_create_outcome_unknown") from error
-        require(candidate_state() == "STOPPED_ATTESTED" and
+        require(candidate_state(expected_id=created) == "STOPPED_ATTESTED" and
                 docker("container", "inspect", CANDIDATE)[0].get("Id") == created,
                 "candidate_postcreate_invalid")
         fixed_docker_state(expect_candidate_absent=False)
         recheck_tree()
         source_bytes()
         check_cache()
-        require(status(parent_fd) == "PUBLISHED_CANDIDATE_STOPPED",
+        require(status(parent_fd, expected_candidate_id=created) ==
+                "PUBLISHED_CANDIDATE_STOPPED",
                 "candidate_final_classification_failed")
         return {"SEARXNG_HOST_REMEDIATION": "PUBLISHED_STOPPED_CANDIDATE",
                 "candidateId": created, "targetDev": RECOVERY_INCOMING_ID[0],

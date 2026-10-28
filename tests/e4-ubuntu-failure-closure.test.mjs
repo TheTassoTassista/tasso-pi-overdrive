@@ -15,7 +15,7 @@ const expected = [
   'lsp-write-guard.test.mjs:161',
   'persistent-eval.test.mjs:37', 'persistent-eval.test.mjs:48', 'persistent-eval.test.mjs:87',
   'persistent-eval.test.mjs:110', 'persistent-eval.test.mjs:124', 'persistent-eval.test.mjs:141',
-  'pi-launcher.test.mjs:140', 'sandbox.test.mjs:11',
+  'pi-launcher.test.mjs:142', 'sandbox.test.mjs:11',
 ].map((id) => `tests/${id}`);
 
 test('Preflight 2 closure ledger accounts for all 29 exact failures once without promoting proposed fixes', () => {
