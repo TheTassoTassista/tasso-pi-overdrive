@@ -231,3 +231,24 @@ test("the operator candidate is digest-pinned, internal, TLS-key protected, and 
 	const backendCreate = script.slice(script.indexOf("backend_id=$(docker create"), script.indexOf("# Start the backend"));
 	assert.doesNotMatch(backendCreate, /--publish/u);
 });
+
+test("candidate Caddyfile generation emits a valid unescaped matcher and recovery only accepts the known prior typo", () => {
+	const scriptPath = new URL("../scripts/omniroute-docker-candidate.sh", import.meta.url);
+	const script = readFileSync(scriptPath, "utf8");
+	const caddyfile = execFileSync("bash", [scriptPath.pathname, "--render-caddyfile", "20128"], { encoding: "utf8" });
+	assert.match(caddyfile, /^\t@unauthorized not header Authorization "Bearer \{\$OMNIROUTE_PROXY_TOKEN\}"$/mu);
+	assert.doesNotMatch(caddyfile, /\\@unauthorized/u);
+	const knownBrokenCaddyfile = execFileSync("bash", ["-c", 'expected="$1"; known_bad=${expected/@unauthorized/\\\\@unauthorized}; printf "%s" "$known_bad"', "fixture", caddyfile], { encoding: "utf8" });
+	assert.equal(knownBrokenCaddyfile, caddyfile.replace("@unauthorized", "\\@unauthorized"));
+	assert.match(caddyfile, /^\trespond @unauthorized "unauthorized" 401$/mu);
+	assert.match(caddyfile, /^\treverse_proxy 127\.0\.0\.1:20128$/mu);
+	assert.match(script, /cmp -s <\(printf '%s' "\$known_bad_caddy"\) "\$ROOT\/Caddyfile"/u);
+	assert.match(script, /existing_caddyfile_unrecognized_preserved/u);
+	assert.match(script, /existing_proxy_token_unreadable_preserved/u);
+	assert.match(script, /--resume-existing/u);
+	assert.match(script, /resume_protected_host_config_missing_no_new_credentials_requested/u);
+	assert.match(script, /"INITIAL_PASSWORD"/u);
+	assert.match(script, /sanitized diagnostic follows/u);
+	assert.match(script, /Diagnostic omitted because redaction could not be guaranteed/u);
+	assert.doesNotMatch(script, /docker (?:rm|network rm)\b/u);
+});

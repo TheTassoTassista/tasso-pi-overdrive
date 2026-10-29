@@ -21,13 +21,35 @@ backend_id=''
 edge_started=0
 backend_started=0
 completed=0
+caddy_log=''
 
 fail() { printf 'OMNIROUTE_CANDIDATE=FAIL reason=%s\n' "$1" >&2; exit 1; }
 log() { printf 'OMNIROUTE_CANDIDATE=%s\n' "$1"; }
 
+render_caddyfile() {
+	local port=$1
+	printf ':8443 {\n\ttls /etc/caddy/tls.crt /etc/caddy/tls.key\n\t@unauthorized not header Authorization "Bearer {$OMNIROUTE_PROXY_TOKEN}"\n\trespond @unauthorized "unauthorized" 401\n\treverse_proxy 127.0.0.1:%s\n}\n' "$port"
+}
+
+# Harmless offline fixture hook used by regression tests; it does not access
+# Docker, host paths, or any operator secrets.
+if [[ ${1:-} == '--render-caddyfile' ]]; then
+	[[ $# -eq 2 && $2 == "$BACKEND_PORT" ]] || fail 'invalid_caddyfile_fixture_arguments'
+	render_caddyfile "$BACKEND_PORT"
+	exit 0
+fi
+resume_existing=0
+if [[ ${1:-} == '--resume-existing' && $# -eq 1 ]]; then
+	resume_existing=1
+elif [[ $# -ne 0 ]]; then
+	fail 'unsupported_arguments'
+fi
+
 on_exit() {
 	local status=$?
+	if [[ -n "$caddy_log" && -f "$caddy_log" && ! -L "$caddy_log" ]]; then rm -f -- "$caddy_log"; fi
 	if (( status != 0 && completed == 0 )); then
+		if [[ -e "$ROOT" || -L "$ROOT" ]]; then printf 'OMNIROUTE_CANDIDATE=PROTECTED_HOST_CONFIG_PRESERVED path=%s\n' "$ROOT" >&2; fi
 		# Stop only exact IDs created by this invocation. Never remove anything.
 		if (( backend_started == 1 )) && [[ -n "$backend_id" ]]; then docker stop --time 5 "$backend_id" >/dev/null 2>&1 || true; fi
 		if (( edge_started == 1 )) && [[ -n "$edge_id" ]]; then docker stop --time 5 "$edge_id" >/dev/null 2>&1 || true; fi
@@ -46,7 +68,7 @@ context=$(docker context show 2>/dev/null) || fail 'docker_context_unavailable'
 socket=$(docker context inspect default --format '{{(index .Endpoints "docker").Host}}' 2>/dev/null) || fail 'docker_endpoint_unavailable'
 [[ "$socket" == unix:///var/run/docker.sock ]] || fail 'docker_endpoint_not_system_socket'
 daemon_id=$(docker info --format '{{.ID}}' 2>/dev/null) || fail 'docker_daemon_unavailable'
-[[ "$daemon_id" =~ ^[A-Z0-9:]{8,}$ ]] || fail 'docker_daemon_identity_invalid'
+[[ "$daemon_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] || fail 'docker_daemon_identity_invalid'
 
 # OmniRoute must already be local under the exact operator-supplied digest.
 omni_id=$(docker image inspect "$OMNI_TAG" --format '{{.Id}}' 2>/dev/null) || fail 'approved_omniroute_image_not_local'
@@ -58,7 +80,10 @@ resolved_omni_id=$(docker image inspect "$OMNI_IMAGE" --format '{{.Id}}' 2>/dev/
 docker container inspect "$EDGE_NAME" >/dev/null 2>&1 && fail 'edge_name_already_exists'
 docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
 docker network inspect "$NETWORK" >/dev/null 2>&1 && fail 'network_already_exists'
-[[ ! -e "$ROOT" && ! -L "$ROOT" ]] || fail 'protected_host_path_already_exists'
+root_exists=0
+if [[ -e "$ROOT" || -L "$ROOT" ]]; then root_exists=1; fi
+if (( resume_existing == 1 && root_exists == 0 )); then fail 'resume_protected_host_config_missing_no_new_credentials_requested'; fi
+if (( root_exists == 1 )) && { [[ ! -d "$ROOT" ]] || [[ -L "$ROOT" ]]; }; then fail 'existing_protected_path_not_a_directory_preserved'; fi
 [[ -z "$(ss -Hln 'sport = :20129' 2>/dev/null)" ]] || fail 'loopback_tls_port_already_in_use'
 
 # Pull only the auxiliary TLS edge at a fixed digest; never pull OmniRoute.
@@ -69,56 +94,185 @@ fi
 caddy_id=$(docker image inspect "$CADDY_IMAGE" --format '{{.Id}}' 2>/dev/null) || fail 'pinned_caddy_image_unavailable'
 [[ "$caddy_id" =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'caddy_image_identity_invalid'
 
-printf 'Inserisci un bearer token esadecimale casuale di almeno 64 caratteri. Non verrà mostrato né registrato.\n' >&2
-IFS= read -r -s -p 'Bearer token candidato: ' proxy_token || fail 'token_input_failed'
-printf '\n' >&2
-[[ "$proxy_token" =~ ^[a-fA-F0-9]{64,}$ ]] || fail 'bearer_token_must_be_at_least_256_random_bits_hex'
+prepare_protected_config() {
+	if (( root_exists == 1 )); then
+		# A prior run can reach the Caddy validation gate after creating these
+		# files. Reuse them only when the full expected object set, ownership,
+		# modes, and secret schema match; never ask for replacement secrets.
+		python3 - "$ROOT" <<'PY' || fail 'existing_protected_config_untrusted_preserved'
+import os, re, stat, sys
+root = sys.argv[1]
+expected_names = {"Caddyfile", "backend.env", "ca.crt", "caddy.env", "tls.key"}
+try:
+    root_stat = os.lstat(root)
+    if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode) or (root_stat.st_uid, root_stat.st_gid, stat.S_IMODE(root_stat.st_mode)) != (0, 0, 0o755): raise ValueError
+    if set(os.listdir(root)) != expected_names: raise ValueError
+    files = {}
+    modes = {"Caddyfile": 0o644, "backend.env": 0o600, "ca.crt": 0o644, "caddy.env": 0o600, "tls.key": 0o600}
+    for name, mode in modes.items():
+        path = os.path.join(root, name)
+        before = os.lstat(path)
+        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or (before.st_uid, before.st_gid, stat.S_IMODE(before.st_mode), before.st_nlink) != (0, 0, mode, 1): raise ValueError
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            opened = os.fstat(fd)
+            data = b""
+            while True:
+                part = os.read(fd, 65536)
+                if not part: break
+                data += part
+                if len(data) > 1024 * 1024: raise ValueError
+            after = os.fstat(fd)
+            named = os.lstat(path)
+            if (opened.st_dev, opened.st_ino, opened.st_size) != (after.st_dev, after.st_ino, after.st_size) or (named.st_dev, named.st_ino) != (opened.st_dev, opened.st_ino): raise ValueError
+            files[name] = data
+        finally: os.close(fd)
+    def parse_env(data):
+        text = data.decode("ascii")
+        if not text.endswith("\n") or "\r" in text or "\x00" in text: raise ValueError
+        rows = [line.split("=", 1) for line in text.splitlines()]
+        if any(len(row) != 2 or not row[0] for row in rows): raise ValueError
+        parsed = dict(rows)
+        if len(parsed) != len(rows): raise ValueError
+        return parsed
+    proxy = parse_env(files["caddy.env"])
+    if set(proxy) != {"OMNIROUTE_PROXY_TOKEN"} or not re.fullmatch(r"[A-Fa-f0-9]{64,4096}", proxy["OMNIROUTE_PROXY_TOKEN"]): raise ValueError
+    backend = parse_env(files["backend.env"])
+    expected = {"JWT_SECRET", "API_KEY_SECRET", "INITIAL_PASSWORD", "FORCE_OWNERSHIP", "REQUIRE_API_KEY", "HOSTNAME", "PORT", "BASE_URL", "NEXT_PUBLIC_BASE_URL", "AUTH_COOKIE_SECURE"}
+    if set(backend) != expected: raise ValueError
+    if not re.fullmatch(r"[a-f0-9]{64}", backend["JWT_SECRET"]) or not re.fullmatch(r"[a-f0-9]{64}", backend["API_KEY_SECRET"]): raise ValueError
+    if not re.fullmatch(r"[A-Za-z0-9._~!@#%+=-]{24,}", backend["INITIAL_PASSWORD"]): raise ValueError
+    for key, value in {"FORCE_OWNERSHIP":"false", "REQUIRE_API_KEY":"false", "HOSTNAME":"127.0.0.1", "PORT":"20128", "BASE_URL":"http://127.0.0.1:20128", "NEXT_PUBLIC_BASE_URL":"https://127.0.0.1:20129", "AUTH_COOKIE_SECURE":"true"}.items():
+        if backend[key] != value: raise ValueError
+except Exception:
+    print("OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=FAIL_CLOSED", file=sys.stderr)
+    raise SystemExit(1)
+print("OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=PASS")
+PY
+		local expected_caddy known_bad_caddy old_identity temp_caddy
+		expected_caddy=$(render_caddyfile "$BACKEND_PORT")
+		known_bad_caddy=${expected_caddy/@unauthorized/\\@unauthorized}
+		old_identity=$(stat -c '%d:%i' "$ROOT/Caddyfile") || fail 'existing_caddyfile_identity_unavailable_preserved'
+		if cmp -s <(printf '%s' "$expected_caddy") "$ROOT/Caddyfile"; then
+			log 'EXISTING_PROTECTED_CONFIG_REUSED'
+		elif cmp -s <(printf '%s' "$known_bad_caddy") "$ROOT/Caddyfile"; then
+			# The only repair allowed is the known erroneous literal backslash
+			# before the Caddy matcher. Any other content remains untouched.
+			temp_caddy=$(mktemp "$ROOT/.Caddyfile.recovery.XXXXXX") || fail 'caddyfile_recovery_temp_failed_preserved'
+			printf '%s' "$expected_caddy" > "$temp_caddy"
+			chown root:root "$temp_caddy" && chmod 0644 "$temp_caddy" || fail 'caddyfile_recovery_metadata_failed_preserved'
+			[[ $(stat -c '%d' "$temp_caddy") == "${old_identity%%:*}" ]] || fail 'caddyfile_recovery_cross_filesystem'
+			[[ $(stat -c '%d:%i' "$ROOT/Caddyfile") == "$old_identity" ]] || fail 'caddyfile_changed_during_recovery_preserved'
+			mv -T -- "$temp_caddy" "$ROOT/Caddyfile" || fail 'caddyfile_recovery_publish_failed_preserved'
+			log 'KNOWN_CADDYFILE_ESCAPE_CORRECTED'
+		else
+			fail 'existing_caddyfile_unrecognized_preserved'
+		fi
+		proxy_token=$(awk -F= '$1 == "OMNIROUTE_PROXY_TOKEN" { print substr($0, index($0, "=") + 1) }' "$ROOT/caddy.env") || fail 'existing_proxy_token_unreadable_preserved'
+		[[ -n "$proxy_token" ]] || fail 'existing_proxy_token_missing_preserved'
+	else
+		(( resume_existing == 0 )) || fail 'resume_protected_host_config_missing_no_new_credentials_requested'
+		printf 'Inserisci un bearer token esadecimale casuale di almeno 64 caratteri. Non verrà mostrato né registrato.\n' >&2
+		IFS= read -r -s -p 'Bearer token candidato: ' proxy_token || fail 'token_input_failed'
+		printf '\n' >&2
+		[[ "$proxy_token" =~ ^[a-fA-F0-9]{64,}$ ]] || fail 'bearer_token_must_be_at_least_256_random_bits_hex'
 
-printf 'Inserisci la password iniziale dell’account amministratore OmniRoute (almeno 24 caratteri). Non verrà mostrata né registrata.\n' >&2
-IFS= read -r -s -p 'Password iniziale: ' initial_password || fail 'admin_password_input_failed'
-printf '\n' >&2
-[[ "$initial_password" =~ ^[A-Za-z0-9._~!@#%+=-]{24,}$ ]] || fail 'admin_password_must_be_24_plus_safe_ascii_characters'
+		printf 'Inserisci la password iniziale dell’account amministratore OmniRoute (almeno 24 caratteri). Non verrà mostrata né registrata.\n' >&2
+		IFS= read -r -s -p 'Password iniziale: ' initial_password || fail 'admin_password_input_failed'
+		printf '\n' >&2
+		[[ "$initial_password" =~ ^[A-Za-z0-9._~!@#%+=-]{24,}$ ]] || fail 'admin_password_must_be_24_plus_safe_ascii_characters'
 
-# Caddy is the only published container. The backend shares its isolated
-# network namespace and binds to that namespace's IPv4 loopback only.
-install -d -o root -g root -m 0755 "$ROOT"
-[[ $(stat -c '%u:%g:%a' "$ROOT") == '0:0:755' ]] || fail 'protected_directory_metadata_mismatch'
+		# Exclusive mkdir prevents overwriting a raced-in object. /etc itself is
+		# root-owned and non-user-writable; a collision fails without touching it.
+		mkdir -m 0755 -- "$ROOT" || fail 'protected_directory_create_failed_no_overwrite'
+		[[ ! -L "$ROOT" && $(stat -c '%u:%g:%a' "$ROOT") == '0:0:755' ]] || fail 'protected_directory_metadata_mismatch'
 
-openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 365 \
-	-keyout "$ROOT/tls.key" -out "$ROOT/ca.crt" -subj '/CN=127.0.0.1' \
-	-addext 'subjectAltName=IP:127.0.0.1' \
-	-addext 'basicConstraints=critical,CA:TRUE' \
-	-addext 'keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign' >/dev/null 2>&1 || fail 'tls_certificate_generation_failed'
-chmod 0600 "$ROOT/tls.key"
-chmod 0644 "$ROOT/ca.crt"
-openssl verify -CAfile "$ROOT/ca.crt" -verify_ip 127.0.0.1 "$ROOT/ca.crt" >/dev/null 2>&1 || fail 'tls_certificate_ip_verification_failed'
-cert_pub=$(openssl x509 -in "$ROOT/ca.crt" -pubkey -noout | sha256sum | awk '{print $1}')
-key_pub=$(openssl pkey -in "$ROOT/tls.key" -pubout 2>/dev/null | sha256sum | awk '{print $1}')
-[[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || fail 'tls_key_certificate_mismatch'
+		openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 365 \
+			-keyout "$ROOT/tls.key" -out "$ROOT/ca.crt" -subj '/CN=127.0.0.1' \
+			-addext 'subjectAltName=IP:127.0.0.1' \
+			-addext 'basicConstraints=critical,CA:TRUE' \
+			-addext 'keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign' >/dev/null 2>&1 || fail 'tls_certificate_generation_failed'
+		chmod 0600 "$ROOT/tls.key"
+		chmod 0644 "$ROOT/ca.crt"
+		openssl verify -CAfile "$ROOT/ca.crt" -verify_ip 127.0.0.1 "$ROOT/ca.crt" >/dev/null 2>&1 || fail 'tls_certificate_ip_verification_failed'
+		cert_pub=$(openssl x509 -in "$ROOT/ca.crt" -pubkey -noout | sha256sum | awk '{print $1}')
+		key_pub=$(openssl pkey -in "$ROOT/tls.key" -pubout 2>/dev/null | sha256sum | awk '{print $1}')
+		[[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || fail 'tls_key_certificate_mismatch'
 
-# Token is enforced by Caddy at the only host-facing endpoint. The OmniRoute
-# backend has no published port; API auth inside it is disabled only because
-# the isolated Caddy edge performs the bearer check before proxying.
-printf 'OMNIROUTE_PROXY_TOKEN=%s\n' "$proxy_token" > "$ROOT/caddy.env"
-printf 'JWT_SECRET=%s\nAPI_KEY_SECRET=%s\nINITIAL_PASSWORD=%s\nFORCE_OWNERSHIP=false\nREQUIRE_API_KEY=false\nHOSTNAME=127.0.0.1\nPORT=%s\nBASE_URL=http://127.0.0.1:%s\nNEXT_PUBLIC_BASE_URL=https://127.0.0.1:%s\nAUTH_COOKIE_SECURE=true\n' \
-	"$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$initial_password" "$BACKEND_PORT" "$BACKEND_PORT" "$HOST_PORT" > "$ROOT/backend.env"
-printf ':8443 {\n\ttls /etc/caddy/tls.crt /etc/caddy/tls.key\n\t@unauthorized not header Authorization "Bearer {$OMNIROUTE_PROXY_TOKEN}"\n\trespond @unauthorized "unauthorized" 401\n\treverse_proxy 127.0.0.1:%s\n}\n' "$BACKEND_PORT" > "$ROOT/Caddyfile"
-chown root:root "$ROOT" "$ROOT/ca.crt" "$ROOT/tls.key" "$ROOT/caddy.env" "$ROOT/backend.env" "$ROOT/Caddyfile"
-chmod 0600 "$ROOT/caddy.env" "$ROOT/backend.env"
-chmod 0644 "$ROOT/Caddyfile"
-[[ $(stat -c '%u:%g:%a' "$ROOT/tls.key") == '0:0:600' ]] || fail 'tls_private_key_permissions_mismatch'
-[[ $(stat -c '%u:%g:%a' "$ROOT/caddy.env") == '0:0:600' && $(stat -c '%u:%g:%a' "$ROOT/backend.env") == '0:0:600' ]] || fail 'secret_file_permissions_mismatch'
-[[ $(stat -c '%u:%g:%a' "$ROOT/ca.crt") == '0:0:644' ]] || fail 'client_ca_permissions_mismatch'
+		# Token is enforced by Caddy at the only host-facing endpoint. The OmniRoute
+		# backend has no published port; API auth inside it is disabled only because
+		# the isolated Caddy edge performs the bearer check before proxying.
+		printf 'OMNIROUTE_PROXY_TOKEN=%s\n' "$proxy_token" > "$ROOT/caddy.env"
+		printf 'JWT_SECRET=%s\nAPI_KEY_SECRET=%s\nINITIAL_PASSWORD=%s\nFORCE_OWNERSHIP=false\nREQUIRE_API_KEY=false\nHOSTNAME=127.0.0.1\nPORT=%s\nBASE_URL=http://127.0.0.1:%s\nNEXT_PUBLIC_BASE_URL=https://127.0.0.1:%s\nAUTH_COOKIE_SECURE=true\n' \
+			"$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$initial_password" "$BACKEND_PORT" "$BACKEND_PORT" "$HOST_PORT" > "$ROOT/backend.env"
+		render_caddyfile "$BACKEND_PORT" > "$ROOT/Caddyfile"
+		chown root:root "$ROOT" "$ROOT/ca.crt" "$ROOT/tls.key" "$ROOT/caddy.env" "$ROOT/backend.env" "$ROOT/Caddyfile"
+		chmod 0600 "$ROOT/caddy.env" "$ROOT/backend.env"
+		chmod 0644 "$ROOT/Caddyfile"
+	fi
+
+	# Validate the reused/generated credentials and certificate without exposing
+	# their contents; all cases remain fail-closed.
+	[[ ! -L "$ROOT" && $(stat -c '%u:%g:%a' "$ROOT") == '0:0:755' ]] || fail 'protected_directory_metadata_mismatch'
+	for entry in ca.crt tls.key caddy.env backend.env Caddyfile; do
+		[[ ! -L "$ROOT/$entry" && -f "$ROOT/$entry" ]] || fail 'protected_config_entry_not_regular'
+	done
+	[[ $(stat -c '%u:%g:%a' "$ROOT/tls.key") == '0:0:600' ]] || fail 'tls_private_key_permissions_mismatch'
+	[[ $(stat -c '%u:%g:%a' "$ROOT/caddy.env") == '0:0:600' && $(stat -c '%u:%g:%a' "$ROOT/backend.env") == '0:0:600' ]] || fail 'secret_file_permissions_mismatch'
+	[[ $(stat -c '%u:%g:%a' "$ROOT/ca.crt") == '0:0:644' ]] || fail 'client_ca_permissions_mismatch'
+	openssl verify -CAfile "$ROOT/ca.crt" -verify_ip 127.0.0.1 "$ROOT/ca.crt" >/dev/null 2>&1 || fail 'tls_certificate_ip_verification_failed'
+	cert_pub=$(openssl x509 -in "$ROOT/ca.crt" -pubkey -noout | sha256sum | awk '{print $1}')
+	key_pub=$(openssl pkey -in "$ROOT/tls.key" -pubout 2>/dev/null | sha256sum | awk '{print $1}')
+	[[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || fail 'tls_key_certificate_mismatch'
+}
+
+prepare_protected_config
 
 # Validate Caddy's actual Caddyfile with the pinned image, no network and only
 # disposable tmpfs state. This creates and auto-removes one short-lived validator.
-docker run --rm --pull=never --network none --read-only --user 0:0 \
-	--cap-drop ALL --security-opt no-new-privileges \
-	--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-	--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
-	--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
-	--mount "type=bind,src=$ROOT/tls.key,dst=/etc/caddy/tls.key,readonly" \
-	--env-file "$ROOT/caddy.env" --entrypoint caddy "$CADDY_IMAGE" validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || fail 'caddy_config_validation_failed'
+validate_caddyfile() {
+	caddy_log=$(mktemp /run/phi-omniroute-caddy-validate.XXXXXX) || fail 'caddy_diagnostic_temp_unavailable'
+	chmod 0600 "$caddy_log" || fail 'caddy_diagnostic_permissions_failed'
+	if docker run --rm --pull=never --network none --read-only --user 0:0 \
+		--cap-drop ALL --security-opt no-new-privileges \
+		--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+		--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
+		--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
+		--mount "type=bind,src=$ROOT/tls.key,dst=/etc/caddy/tls.key,readonly" \
+		--env-file "$ROOT/caddy.env" --entrypoint caddy "$CADDY_IMAGE" validate --config /etc/caddy/Caddyfile --adapter caddyfile >"$caddy_log" 2>&1; then
+		rm -f -- "$caddy_log"
+		caddy_log=''
+		log 'CADDYFILE_VALIDATION_PASS'
+		return 0
+	fi
+	printf 'Caddy validation failed; sanitized diagnostic follows (token/password values are redacted):\n' >&2
+	if ! python3 - "$caddy_log" "$ROOT/caddy.env" "$ROOT/backend.env" <<'PY'
+import re, sys
+try:
+    diagnostic = open(sys.argv[1], "r", encoding="utf-8", errors="replace").read(65536)
+    secrets = []
+    for path in sys.argv[2:]:
+        with open(path, "r", encoding="ascii") as stream:
+            for row in stream:
+                key, sep, value = row.rstrip("\n").partition("=")
+                if sep and key in {"OMNIROUTE_PROXY_TOKEN", "JWT_SECRET", "API_KEY_SECRET", "INITIAL_PASSWORD"} and value:
+                    secrets.append(value)
+    for secret in sorted(secrets, key=len, reverse=True):
+        diagnostic = diagnostic.replace(secret, "[REDACTED]")
+    diagnostic = re.sub(r"(?i)(bearer\s+)[a-f0-9]{32,}", r"\1[REDACTED]", diagnostic)
+    diagnostic = re.sub(r"(?i)((?:token|password|secret)\s*[=:]\s*)[^\s,;]+", r"\1[REDACTED]", diagnostic)
+    diagnostic = "".join(char if char in "\n\t" or ord(char) >= 32 else "?" for char in diagnostic)
+    print(diagnostic[:4096].rstrip())
+except Exception:
+    raise SystemExit(1)
+PY
+	then
+		printf 'Diagnostic omitted because redaction could not be guaranteed.\n' >&2
+	fi
+	fail 'caddy_config_validation_failed'
+}
+
+validate_caddyfile
 
 network_id=$(docker network create --driver bridge --internal --label phi.omniroute.candidate=true "$NETWORK") || fail 'candidate_network_create_failed'
 [[ "$network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'candidate_network_create_returned_invalid_id'
