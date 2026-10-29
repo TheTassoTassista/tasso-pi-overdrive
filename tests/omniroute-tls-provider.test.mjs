@@ -206,7 +206,8 @@ test("the production route remains opt-in and does not rewrite the configured de
 	assert.equal(policy.omniroute, "deferred");
 	assert.equal(settings.defaultModel, "gpt-6-sol");
 	const source = readFileSync(new URL("../extensions/omniroute.ts", import.meta.url), "utf8");
-	assert.match(source, /import \{ streamSimple \} from "@earendil-works\/pi-ai\/api\/openai-completions"/u);
+	assert.doesNotMatch(source, /from "@earendil-works\/pi-ai\/api\/openai-completions"/u);
+	assert.match(source, /loadPiOpenAiCompletionsStreamSimple\(\)/u);
 	assert.match(source, /createOmniRouteStream\(streamSimple\)/u);
 	assert.match(source, /apiKey: "\$OMNIROUTER_API_KEY"/u);
 });
@@ -222,6 +223,10 @@ test("the operator candidate is digest-pinned, internal, TLS-key protected, and 
 	assert.ok(script.indexOf('docker start "$edge_id"') < script.indexOf('backend_id=$(docker create'), "the network-namespace owner must run before the backend joins it");
 	assert.match(script, /--entrypoint caddy "\$CADDY_IMAGE" validate/u);
 	assert.match(script, /--entrypoint caddy "\$CADDY_IMAGE" run/u);
+	const caddyValidation = script.slice(script.indexOf("if docker run --rm --pull=never"), script.indexOf("--entrypoint caddy \"$CADDY_IMAGE\" validate"));
+	const edgeCreate = script.slice(script.indexOf('edge_id=$(docker create'), script.indexOf('# The namespace-sharing target'));
+	assert.match(caddyValidation, /--cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges/u);
+	assert.match(edgeCreate, /--cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges/u);
 	assert.match(script, /--mount "type=bind,src=\$ROOT\/tls\.key,dst=\/etc\/caddy\/tls\.key,readonly"/u);
 	assert.match(script, /chmod 0600 "\$ROOT\/tls\.key"/u);
 	assert.match(script, /\[\[ "\$unauth_status" == 401 \]\]/u);
@@ -229,6 +234,8 @@ test("the operator candidate is digest-pinned, internal, TLS-key protected, and 
 	assert.doesNotMatch(script, /docker (?:rm|network rm)\b/u);
 	assert.doesNotMatch(script, /docker pull "\$OMNI_IMAGE"/u);
 	const backendCreate = script.slice(script.indexOf("backend_id=$(docker create"), script.indexOf("# Start the backend"));
+	assert.match(backendCreate, /--cap-drop ALL --security-opt no-new-privileges/u);
+	assert.doesNotMatch(backendCreate, /--cap-add\b/u);
 	assert.doesNotMatch(backendCreate, /--publish/u);
 });
 
@@ -242,7 +249,7 @@ test("candidate Caddyfile generation emits a valid unescaped matcher and recover
 	assert.equal(knownBrokenCaddyfile, caddyfile.replace("@unauthorized", "\\@unauthorized"));
 	assert.match(caddyfile, /^\trespond @unauthorized "unauthorized" 401$/mu);
 	assert.match(caddyfile, /^\treverse_proxy 127\.0\.0\.1:20128$/mu);
-	assert.match(script, /cmp -s <\(printf '%s' "\$known_bad_caddy"\) "\$ROOT\/Caddyfile"/u);
+	assert.match(script, /cmp -s <\(printf '%s(?:\\n|\n)' "\$known_bad_caddy"\) "\$ROOT\/Caddyfile"/u);
 	assert.match(script, /existing_caddyfile_unrecognized_preserved/u);
 	assert.match(script, /existing_proxy_token_unreadable_preserved/u);
 	assert.match(script, /--resume-existing/u);

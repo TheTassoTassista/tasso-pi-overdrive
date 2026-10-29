@@ -153,13 +153,16 @@ PY
 		expected_caddy=$(render_caddyfile "$BACKEND_PORT")
 		known_bad_caddy=${expected_caddy/@unauthorized/\\@unauthorized}
 		old_identity=$(stat -c '%d:%i' "$ROOT/Caddyfile") || fail 'existing_caddyfile_identity_unavailable_preserved'
-		if cmp -s <(printf '%s' "$expected_caddy") "$ROOT/Caddyfile"; then
+		if cmp -s <(printf '%s
+' "$expected_caddy") "$ROOT/Caddyfile"; then
 			log 'EXISTING_PROTECTED_CONFIG_REUSED'
-		elif cmp -s <(printf '%s' "$known_bad_caddy") "$ROOT/Caddyfile"; then
+		elif cmp -s <(printf '%s
+' "$known_bad_caddy") "$ROOT/Caddyfile"; then
 			# The only repair allowed is the known erroneous literal backslash
 			# before the Caddy matcher. Any other content remains untouched.
 			temp_caddy=$(mktemp "$ROOT/.Caddyfile.recovery.XXXXXX") || fail 'caddyfile_recovery_temp_failed_preserved'
-			printf '%s' "$expected_caddy" > "$temp_caddy"
+			printf '%s
+' "$expected_caddy" > "$temp_caddy"
 			chown root:root "$temp_caddy" && chmod 0644 "$temp_caddy" || fail 'caddyfile_recovery_metadata_failed_preserved'
 			[[ $(stat -c '%d' "$temp_caddy") == "${old_identity%%:*}" ]] || fail 'caddyfile_recovery_cross_filesystem'
 			[[ $(stat -c '%d:%i' "$ROOT/Caddyfile") == "$old_identity" ]] || fail 'caddyfile_changed_during_recovery_preserved'
@@ -234,7 +237,7 @@ validate_caddyfile() {
 	caddy_log=$(mktemp /run/phi-omniroute-caddy-validate.XXXXXX) || fail 'caddy_diagnostic_temp_unavailable'
 	chmod 0600 "$caddy_log" || fail 'caddy_diagnostic_permissions_failed'
 	if docker run --rm --pull=never --network none --read-only --user 0:0 \
-		--cap-drop ALL --security-opt no-new-privileges \
+		--cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges \
 		--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
 		--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
 		--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
@@ -281,7 +284,7 @@ network_facts=$(docker network inspect --format '{{.Id}}|{{.Driver}}|{{.Internal
 
 edge_id=$(docker create --name "$EDGE_NAME" --label phi.omniroute.candidate=true \
 	--network "$NETWORK" --publish "127.0.0.1:${HOST_PORT}:8443/tcp" \
-	--restart no --read-only --user 0:0 --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 \
+	--restart no --read-only --user 0:0 --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --pids-limit 128 \
 	--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
 	--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
 	--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \

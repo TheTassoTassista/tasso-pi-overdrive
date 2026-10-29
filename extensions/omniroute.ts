@@ -1,6 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
-import { createOmniRouteStream, OMNIROUTE_TLS_ORIGIN } from "../lib/omniroute-tls.mjs";
+import { createOmniRouteStream, loadPiOpenAiCompletionsStreamSimple, OMNIROUTE_TLS_ORIGIN } from "../lib/omniroute-tls.mjs";
 import routingPolicy from "../config/routing-policy.json" with { type: "json" };
 
 type CatalogModel = {
@@ -14,6 +13,7 @@ type CatalogModel = {
 };
 
 export default function omnirouteProvider(pi: ExtensionAPI): void {
+  const streamSimple = loadPiOpenAiCompletionsStreamSimple();
   const models = Object.values(routingPolicy.models as Record<string, CatalogModel>)
     .filter((model) => model.source === "OmniRoute" && model.catalogId)
     .map((model) => ({
