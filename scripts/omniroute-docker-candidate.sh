@@ -10,11 +10,13 @@ readonly OMNI_DIGEST='sha256:085c57adf499a8aaa9f35ccde95c0df9c11bd9ecd18d6c9edbf
 readonly OMNI_IMAGE="diegosouzapw/omniroute@${OMNI_DIGEST}"
 readonly CADDY_IMAGE='docker.io/library/caddy@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f'
 readonly ROOT='/etc/phi-omniroute-candidate'
-readonly NETWORK='phi-omniroute-candidate-3_8_50'
-readonly EDGE_NAME='phi-omniroute-candidate-edge-3_8_50'
-readonly BACKEND_NAME='phi-omniroute-candidate-backend-3_8_50'
 readonly HOST_PORT='20129'
 readonly BACKEND_PORT='20128'
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
+readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
+readonly POLICY_SCRIPT_SHA256='26c3ef95b5bc32f7d39333c0504dca8d3abaa3c1356f4b2ff43e48a367c61fb2'
+readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
 
 edge_id=''
 backend_id=''
@@ -22,6 +24,9 @@ edge_started=0
 backend_started=0
 completed=0
 caddy_log=''
+egress_probe_report=''
+models_file=''
+inspect_file=''
 
 fail() { printf 'OMNIROUTE_CANDIDATE=FAIL reason=%s\n' "$1" >&2; exit 1; }
 log() { printf 'OMNIROUTE_CANDIDATE=%s\n' "$1"; }
@@ -39,27 +44,51 @@ if [[ ${1:-} == '--render-caddyfile' ]]; then
 	exit 0
 fi
 resume_existing=0
-if [[ ${1:-} == '--resume-existing' && $# -eq 1 ]]; then
-	resume_existing=1
-elif [[ $# -ne 0 ]]; then
-	fail 'unsupported_arguments'
+egress_candidate=0
+while (($#)); do
+	case "$1" in
+		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
+		--egress-candidate) (( egress_candidate == 0 )) || fail 'duplicate_egress_flag'; egress_candidate=1 ;;
+		*) fail 'unsupported_arguments' ;;
+	esac
+	shift
+done
+if (( egress_candidate == 1 )); then
+	readonly NETWORK='phi-omniroute-egress-candidate-v1'
+	readonly EDGE_NAME='phi-omniroute-egress-edge-v1'
+	readonly BACKEND_NAME='phi-omniroute-egress-backend-v1'
+	readonly NETWORK_LABEL='phi.omniroute.candidate.egress=v1'
+else
+	readonly NETWORK='phi-omniroute-candidate-3_8_50'
+	readonly EDGE_NAME='phi-omniroute-candidate-edge-3_8_50'
+	readonly BACKEND_NAME='phi-omniroute-candidate-backend-3_8_50'
+	readonly NETWORK_LABEL='phi.omniroute.candidate=true'
 fi
 
 on_exit() {
 	local status=$?
 	if [[ -n "$caddy_log" && -f "$caddy_log" && ! -L "$caddy_log" ]]; then rm -f -- "$caddy_log"; fi
+	if [[ -n "$egress_probe_report" && -f "$egress_probe_report" && ! -L "$egress_probe_report" ]]; then rm -f -- "$egress_probe_report"; fi
+	if [[ -n "$models_file" && -f "$models_file" && ! -L "$models_file" ]]; then rm -f -- "$models_file"; fi
+	if [[ -n "$inspect_file" && -f "$inspect_file" && ! -L "$inspect_file" ]]; then rm -f -- "$inspect_file"; fi
 	if (( status != 0 && completed == 0 )); then
 		if [[ -e "$ROOT" || -L "$ROOT" ]]; then printf 'OMNIROUTE_CANDIDATE=PROTECTED_HOST_CONFIG_PRESERVED path=%s\n' "$ROOT" >&2; fi
 		# Stop only exact IDs created by this invocation. Never remove anything.
 		if (( backend_started == 1 )) && [[ -n "$backend_id" ]]; then docker stop --time 5 "$backend_id" >/dev/null 2>&1 || true; fi
 		if (( edge_started == 1 )) && [[ -n "$edge_id" ]]; then docker stop --time 5 "$edge_id" >/dev/null 2>&1 || true; fi
-		printf 'OMNIROUTE_CANDIDATE=PARTIAL_STATE_PRESERVED edge_id=%s backend_id=%s\n' "${edge_id:-none}" "${backend_id:-none}" >&2
+		printf 'OMNIROUTE_CANDIDATE=PARTIAL_STATE_PRESERVED network_id=%s edge_id=%s backend_id=%s egress_policy=retained\n' "${network_id:-none}" "${edge_id:-none}" "${backend_id:-none}" >&2
 	fi
 }
 trap on_exit EXIT
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail 'run_from_authorized_host_terminal_with_sudo'
-for command in docker openssl curl ss sha256sum install python3; do command -v "$command" >/dev/null 2>&1 || fail "missing_host_command_${command}"; done
+for command in docker openssl curl ss sha256sum install python3 ip; do command -v "$command" >/dev/null 2>&1 || fail "missing_host_command_${command}"; done
+if (( egress_candidate == 1 )); then
+	[[ "$POLICY_SCRIPT_SHA256" != TO_BE_PINNED ]] || fail 'egress_policy_script_digest_not_pinned'
+	printf '%s  %s\n' "$POLICY_SCRIPT_SHA256" "$POLICY_SCRIPT" | sha256sum --check --status || fail 'egress_policy_script_digest_mismatch'
+	[[ "$EGRESS_PROBE_SHA256" != TO_BE_PINNED ]] || fail 'egress_probe_script_digest_not_pinned'
+	printf '%s  %s\n' "$EGRESS_PROBE_SHA256" "$EGRESS_PROBE_SCRIPT" | sha256sum --check --status || fail 'egress_probe_script_digest_mismatch'
+fi
 
 # Pin the local Docker context/daemon to the system Docker socket. Do not fall
 # back to a user's context, remote daemon, rootless daemon, or implicit pull.
@@ -86,8 +115,11 @@ if (( resume_existing == 1 && root_exists == 0 )); then fail 'resume_protected_h
 if (( root_exists == 1 )) && { [[ ! -d "$ROOT" ]] || [[ -L "$ROOT" ]]; }; then fail 'existing_protected_path_not_a_directory_preserved'; fi
 [[ -z "$(ss -Hln 'sport = :20129' 2>/dev/null)" ]] || fail 'loopback_tls_port_already_in_use'
 
-# Pull only the auxiliary TLS edge at a fixed digest; never pull OmniRoute.
+# Reuse only the already-present edge image for this egress experiment. This
+# operation never pulls or changes any image; the legacy mode retains its
+# previously documented pinned-Caddy pull fallback.
 if ! docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1; then
+	if (( egress_candidate == 1 )); then fail 'pinned_caddy_image_not_local_no_pull_attempted'; fi
 	log 'PULLING_PINNED_CADDY_EDGE_IMAGE'
 	docker pull "$CADDY_IMAGE" >/dev/null || fail 'pinned_caddy_image_pull_failed'
 fi
@@ -277,14 +309,59 @@ PY
 
 validate_caddyfile
 
-network_id=$(docker network create --driver bridge --internal --label phi.omniroute.candidate=true "$NETWORK") || fail 'candidate_network_create_failed'
-[[ "$network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'candidate_network_create_returned_invalid_id'
-network_facts=$(docker network inspect --format '{{.Id}}|{{.Driver}}|{{.Internal}}|{{.Attachable}}' "$NETWORK") || fail 'candidate_network_inspect_failed'
-[[ "$network_facts" == "$network_id|bridge|true|false" ]] || fail 'candidate_network_isolation_mismatch'
+if (( egress_candidate == 1 )); then
+	policy_result=$(python3 "$POLICY_SCRIPT" preflight --daemon-id "$daemon_id") || fail 'egress_policy_host_preflight_failed'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=READY\ backend=*\ host_ipv4_count=*\ egress=* ]] || fail 'egress_policy_host_preflight_receipt_invalid'
+	log "$policy_result"
+fi
 
-edge_id=$(docker create --name "$EDGE_NAME" --label phi.omniroute.candidate=true \
+if (( egress_candidate == 1 )); then
+	# The new bridge has no endpoint while the candidate-specific deny policy is
+	# installed. It is never made externally usable before the policy verifies.
+	network_id=$(docker network create --driver bridge --ipv6=false --label "$NETWORK_LABEL" --opt com.docker.network.bridge.enable_ip_masquerade=true "$NETWORK") || fail 'egress_candidate_network_create_failed'
+else
+	network_id=$(docker network create --driver bridge --internal --label "$NETWORK_LABEL" "$NETWORK") || fail 'candidate_network_create_failed'
+fi
+[[ "$network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'candidate_network_create_returned_invalid_id'
+if (( egress_candidate == 1 )); then
+	policy_result=$(python3 "$POLICY_SCRIPT" apply --network-id "$network_id" --daemon-id "$daemon_id") || fail 'egress_policy_application_or_verification_failed'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=APPLIED\ backend=*\ network="${network_id:0:12}"\ bridge=*\ subnet=*\ gateway=*\ egress=* ]] || fail 'egress_policy_apply_receipt_invalid'
+	log "$policy_result"
+	policy_backend=${policy_result#*backend=}
+	policy_backend=${policy_backend%% *}
+	policy_bridge=${policy_result#*bridge=}
+	policy_bridge=${policy_bridge%% *}
+	policy_subnet=${policy_result#*subnet=}
+	policy_subnet=${policy_subnet%% *}
+	policy_gateway=${policy_result#*gateway=}
+	policy_gateway=${policy_gateway%% *}
+	policy_egress=${policy_result#*egress=}
+	python3 - "$network_id" "$policy_bridge" "$policy_subnet" "$policy_gateway" "$policy_egress" <<'PY' || fail 'egress_policy_network_facts_invalid'
+import ipaddress, re, sys
+network, bridge, subnet, gateway, egress = sys.argv[1:]
+if not re.fullmatch(r"[a-f0-9]{64}", network) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", bridge) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", egress): raise SystemExit(1)
+parsed = ipaddress.ip_network(subnet, strict=True)
+if parsed.version != 4 or ipaddress.ip_address(gateway) not in parsed: raise SystemExit(1)
+PY
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_reverification_failed'
+	log "$policy_result"
+else
+	network_facts=$(docker network inspect --format '{{.Id}}|{{.Driver}}|{{.Internal}}|{{.Attachable}}' "$NETWORK") || fail 'candidate_network_inspect_failed'
+	[[ "$network_facts" == "$network_id|bridge|true|false" ]] || fail 'candidate_network_isolation_mismatch'
+fi
+
+edge_label='phi.omniroute.candidate=true'
+backend_label='phi.omniroute.candidate=true'
+network_sysctl=()
+if (( egress_candidate == 1 )); then
+	edge_label='phi.omniroute.candidate.egress=v1'
+	backend_label='phi.omniroute.candidate.egress=v1'
+	network_sysctl+=(--sysctl net.ipv6.conf.all.disable_ipv6=1 --sysctl net.ipv6.conf.default.disable_ipv6=1)
+fi
+
+edge_id=$(docker create --name "$EDGE_NAME" --label "$edge_label" \
 	--network "$NETWORK" --publish "127.0.0.1:${HOST_PORT}:8443/tcp" \
-	--restart no --read-only --user 0:0 --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --pids-limit 128 \
+	"${network_sysctl[@]}" --restart no --read-only --user 0:0 --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --pids-limit 128 \
 	--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
 	--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
 	--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
@@ -292,13 +369,20 @@ edge_id=$(docker create --name "$EDGE_NAME" --label phi.omniroute.candidate=true
 	--env-file "$ROOT/caddy.env" --entrypoint caddy "$CADDY_IMAGE" run --config /etc/caddy/Caddyfile --adapter caddyfile) || fail 'edge_create_failed'
 [[ "$edge_id" =~ ^[a-f0-9]{64}$ ]] || fail 'edge_create_returned_invalid_id'
 
+if (( egress_candidate == 1 )); then
+	# Before any process starts, require this exact edge ID to be the only
+	# network endpoint. The backend later shares this namespace, not the bridge.
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_or_endpoint_identity_verification_failed'
+	log "$policy_result"
+fi
+
 # The namespace-sharing target must already be running so Docker can attach
 # the backend to its live network namespace. The edge stays bounded/fail-soft:
 # its upstream returns unavailable until the backend below is started.
 edge_started=1
 docker start "$edge_id" >/dev/null || fail 'edge_start_failed'
 
-backend_id=$(docker create --name "$BACKEND_NAME" --label phi.omniroute.candidate=true \
+backend_id=$(docker create --name "$BACKEND_NAME" --label "$backend_label" \
 	--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
 	--env-file "$ROOT/backend.env" "$OMNI_IMAGE") || fail 'backend_create_failed'
 [[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'backend_create_returned_invalid_id'
@@ -306,6 +390,31 @@ backend_id=$(docker create --name "$BACKEND_NAME" --label phi.omniroute.candidat
 # Start the backend by exact ID. Do not retry or remove either container.
 backend_started=1
 docker start "$backend_id" >/dev/null || fail 'backend_start_failed'
+
+if (( egress_candidate == 1 )); then
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_post_start_verification_failed'
+	log "$policy_result"
+	probe_counters_before=$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_counter_snapshot_failed'
+	host_ips_json=$(ip -j -4 address show | python3 -c 'import ipaddress,json,sys; data=json.load(sys.stdin); vals=sorted({str(ipaddress.IPv4Address(x["local"])) for d in data for x in d.get("addr_info",[]) if x.get("family")=="inet"}); assert 0<len(vals)<=64; print(json.dumps(vals,separators=(",",":")))') || fail 'host_ipv4_snapshot_failed'
+	probe_code=$(<"$EGRESS_PROBE_SCRIPT")
+	egress_probe_report=$(mktemp /run/phi-omniroute-egress-probe.XXXXXX) || fail 'egress_probe_report_create_failed'
+	chmod 0600 "$egress_probe_report" || fail 'egress_probe_report_permissions_failed'
+	docker exec "$backend_id" node -e "$probe_code" "$policy_gateway" "$host_ips_json" > "$egress_probe_report" || fail 'egress_runtime_probe_failed'
+	python3 - "$probe_counters_before" "$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id")" "$egress_probe_report" <<'PY' || fail 'egress_runtime_counters_not_proven'
+import json,sys
+before,after,report=(json.loads(x) for x in sys.argv[1:])
+if not all(report.values()): raise SystemExit(1)
+def increased(name): return after.get(name,0)>before.get(name,0)
+if not increased("allowed_tcp443"): raise SystemExit(1)
+if not increased("blocked_tcp_other") and not increased("blocked_all_other_egress"): raise SystemExit(1)
+if not increased("blocked_udp443"): raise SystemExit(1)
+if not increased("blocked_other") and not increased("blocked_all_other_egress"): raise SystemExit(1)
+if not increased("blocked_special"): raise SystemExit(1)
+if not increased("blocked_host_input") and not increased("blocked_host_local") and not increased("blocked_host_original"): raise SystemExit(1)
+print("OMNIROUTE_EGRESS_RUNTIME_PROBES=PASS")
+PY
+	log 'EGRESS_POLICY_RUNTIME_PROBES_PASS'
+fi
 
 wait_status() {
 	local code=$1
@@ -328,7 +437,6 @@ wrong_status=$(curl --noproxy '*' --silent --output /dev/null --write-out '%{htt
 [[ "$wrong_status" == 401 ]] || fail 'invalid_bearer_not_rejected'
 
 models_file=$(mktemp)
-trap 'rm -f -- "$models_file"; on_exit' EXIT
 models_status=$(curl --noproxy '*' --silent --show-error --output "$models_file" --write-out '%{http_code}' \
 	--connect-timeout 1 --max-time 10 --cacert "$ROOT/ca.crt" -H "Authorization: Bearer $proxy_token" \
 	"https://127.0.0.1:${HOST_PORT}/v1/models" 2>/dev/null || true)
@@ -341,6 +449,7 @@ if not isinstance(value, dict) or not isinstance(value.get('data'), list):
     raise SystemExit(1)
 PY
 rm -f -- "$models_file"
+models_file=''
 
 # Confirm server-side and Docker topology, without printing environment values.
 edge_facts=$(docker inspect --format '{{.Id}}|{{.Image}}|{{.State.Status}}|{{.HostConfig.NetworkMode}}|{{json .HostConfig.PortBindings}}|{{.HostConfig.RestartPolicy.Name}}' "$edge_id") || fail 'edge_postcreate_inspect_failed'
@@ -358,6 +467,36 @@ if b[:4] != [backend_id,omni_id,'running',f'container:{edge_id}'] or b[5] != 'no
 if json.loads(b[4]) not in (None,{}): raise SystemExit(1)
 if list(json.loads(edge_networks)) != [network]: raise SystemExit(1)
 PY
+
+if (( egress_candidate == 1 )); then
+	inspect_file=$(mktemp)
+	docker inspect "$edge_id" "$backend_id" > "$inspect_file" || fail 'egress_candidate_security_inspect_failed'
+	python3 - "$inspect_file" "$edge_id" "$backend_id" "$NETWORK" "$ROOT" "$edge_label" "$backend_label" <<'PY' || fail 'egress_candidate_security_mismatch'
+import json,sys
+path,edge_id,backend_id,network,root,edge_label,backend_label=sys.argv[1:]
+with open(path,"rb") as stream: rows=json.load(stream)
+if len(rows)!=2 or rows[0].get("Id")!=edge_id or rows[1].get("Id")!=backend_id: raise SystemExit(1)
+edge,backend=rows
+e=edge["HostConfig"]; b=backend["HostConfig"]
+if e.get("Privileged") or e.get("CapDrop")!=["ALL"] or e.get("CapAdd")!=["NET_BIND_SERVICE"] or not e.get("ReadonlyRootfs") or e.get("RestartPolicy",{}).get("Name")!="no": raise SystemExit(1)
+if not any(x in {"no-new-privileges:true","no-new-privileges"} for x in (e.get("SecurityOpt") or [])): raise SystemExit(1)
+if e.get("NetworkMode")!=network or e.get("PortBindings")!={"8443/tcp":[{"HostIp":"127.0.0.1","HostPort":"20129"}]}: raise SystemExit(1)
+if (edge.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
+if (backend.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
+sysctls=e.get("Sysctls") or {}
+if sysctls.get("net.ipv6.conf.all.disable_ipv6")!="1" or sysctls.get("net.ipv6.conf.default.disable_ipv6")!="1": raise SystemExit(1)
+mounts={(x.get("Source"),x.get("Destination"),x.get("RW")) for x in (edge.get("Mounts") or [])}
+expected={(root+"/Caddyfile","/etc/caddy/Caddyfile",False),(root+"/ca.crt","/etc/caddy/tls.crt",False),(root+"/tls.key","/etc/caddy/tls.key",False)}
+if mounts!=expected: raise SystemExit(1)
+if b.get("Privileged") or b.get("CapDrop")!=["ALL"] or b.get("CapAdd") not in (None,[]): raise SystemExit(1)
+if not any(x in {"no-new-privileges:true","no-new-privileges"} for x in (b.get("SecurityOpt") or [])): raise SystemExit(1)
+if b.get("NetworkMode")!="container:"+edge_id or b.get("RestartPolicy",{}).get("Name")!="no" or b.get("PortBindings") not in (None,{}): raise SystemExit(1)
+if (backend.get("Mounts") or []) or (backend.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
+print("OMNIROUTE_CANDIDATE_SECURITY_ATTESTATION=PASS")
+PY
+	rm -f -- "$inspect_file"
+	inspect_file=''
+fi
 
 network_facts=$(docker inspect --format '{{json .NetworkSettings.Networks}}' "$edge_id") || fail 'edge_ip_unavailable'
 edge_ip=$(python3 - "$network_facts" "$NETWORK" <<'PY'
@@ -387,27 +526,43 @@ if(!owner) process.exit(3); process.stdout.write(JSON.stringify({listeners,owner
 ') || fail 'backend_loopback_listener_attestation_failed'
 printf '%s' "$socket_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["owner"]["pid"] > 0 and d["owner"]["exe"] and d["listeners"][0]["local"].startswith("0100007F:")' || fail 'backend_socket_owner_invalid'
 
-# Internal networks have no default route. Also probe public IPv4/IPv6 via the
-# backend namespace. Docker's internal network does not block host-gateway access;
-# this is an explicit residual boundary and is not described as total egress proof.
-route_json=$(docker exec "$backend_id" node -e '
+if (( egress_candidate == 1 )); then
+	# A default route is expected on this non-internal bridge; the installed
+	# candidate-only filter, not route absence, is the egress security boundary.
+	route_json=$(docker exec "$backend_id" node -e '
+const fs=require("node:fs");let ipv4Default=false,ipv6Default=false;
+try { for(const row of fs.readFileSync("/proc/net/route","utf8").trim().split("\n").slice(1)) { const c=row.trim().split(/\s+/); if(c[1]==="00000000"&&c[7]==="00000000"&&(parseInt(c[3],16)&1)!==0) ipv4Default=true; } } catch {}
+try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").trim().split("\n")) { const c=row.trim().split(/\s+/); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00") ipv6Default=true; } } catch {}
+process.stdout.write(JSON.stringify({ipv4Default,ipv6Default}));if(!ipv4Default||ipv6Default)process.exitCode=2;
+') || fail 'egress_candidate_route_state_invalid'
+	[[ "$route_json" == '{"ipv4Default":true,"ipv6Default":false}' ]] || fail 'egress_candidate_route_state_invalid'
+	egress_json=$(<"$egress_probe_report")
+else
+	# Internal-network baseline retained for the prior non-egress candidate mode.
+	route_json=$(docker exec "$backend_id" node -e '
 const fs=require("node:fs");let ipv4Default=false,ipv6Default=false;
 try { for(const row of fs.readFileSync("/proc/net/route","utf8").trim().split("\n").slice(1)) { const c=row.trim().split(/\s+/); if(c[1]==="00000000"&&c[7]==="00000000"&&(parseInt(c[3],16)&1)!==0) ipv4Default=true; } } catch {}
 try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").trim().split("\n")) { const c=row.trim().split(/\s+/); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00") ipv6Default=true; } } catch {}
 process.stdout.write(JSON.stringify({ipv4Default,ipv6Default}));if(ipv4Default||ipv6Default)process.exitCode=2;
 ') || fail 'backend_default_route_present_or_unreadable'
-[[ "$route_json" == '{"ipv4Default":false,"ipv6Default":false}' ]] || fail 'unexpected_default_route'
-egress_json=$(docker exec "$backend_id" node -e '
+	[[ "$route_json" == '{"ipv4Default":false,"ipv6Default":false}' ]] || fail 'unexpected_default_route'
+	egress_json=$(docker exec "$backend_id" node -e '
 const net=require("node:net");
 function probe(host,family){return new Promise(resolve=>{const s=net.connect({host,port:443,family}); let done=false; const finish=value=>{if(done)return;done=true;s.destroy();resolve(value)}; s.setTimeout(1200,()=>finish("blocked")); s.once("connect",()=>finish("reachable")); s.once("error",()=>finish("blocked"));});}
 Promise.all([probe("1.1.1.1",4),probe("2606:4700:4700::1111",6)]).then(([ipv4,ipv6])=>{process.stdout.write(JSON.stringify({ipv4,ipv6}));if(ipv4!=="blocked"||ipv6!=="blocked")process.exitCode=2;});
 ') || fail 'public_egress_probe_failed_or_reachable'
-[[ "$egress_json" == '{"ipv4":"blocked","ipv6":"blocked"}' ]] || fail 'public_egress_not_blocked'
+	[[ "$egress_json" == '{"ipv4":"blocked","ipv6":"blocked"}' ]] || fail 'public_egress_not_blocked'
+fi
 
 log 'CREATED_RUNNING_HEALTHY'
 printf 'daemonId=%s\nedgeContainerId=%s\nbackendContainerId=%s\nimageId=%s\nedgeImageId=%s\nnetwork=%s\nendpoint=https://127.0.0.1:%s\nbackendBinding=verified_namespace_loopback_only\nunauthenticatedHttp=401\ninvalidBearerHttp=401\nauthenticatedHealthHttp=200\nmodelsEndpointHttp=%s\nprivateKey=0600_root_only\nPhiBearerToken=operator_supplied_not_printed\nexternalProviderInference=NOT_PERFORMED\n' \
 	"$daemon_id" "$edge_id" "$backend_id" "$omni_id" "$caddy_id" "$NETWORK" "$HOST_PORT" "$models_status"
 printf 'socketAttestation=%s\n' "$socket_json"
 printf 'publicEgressProbe=%s\n' "$egress_json"
-printf 'LIMITATION=docker_internal_network_blocks_external_routes_but_host_gateway_access_is_not_proven_blocked\n'
+if (( egress_candidate == 1 )); then
+	printf 'egressFirewallBackend=%s\negressPolicy=TCP443_PUBLIC_IPV4_ONLY_DNS_DOCKER_RESOLVER\negressPolicyRuntime=PROBED\n' "$policy_backend"
+	printf 'egressPolicyNetworkId=%s\negressPolicyBridge=%s\negressPolicySubnet=%s\negressPolicyInterface=%s\n' "$network_id" "$policy_bridge" "$policy_subnet" "$policy_egress"
+else
+	printf 'LIMITATION=docker_internal_network_blocks_external_routes_but_host_gateway_access_is_not_proven_blocked\n'
+fi
 completed=1
