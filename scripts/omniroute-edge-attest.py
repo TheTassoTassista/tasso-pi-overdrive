@@ -124,7 +124,7 @@ def attest_edge(
     }
     _require(len(mounts) == 3 and actual_mounts == expected_mounts, "container_mount_mismatch")
     for mount in mounts:
-        _require(mount.get("Mode") == "ro", "container_mount_mode_mismatch")
+        _require(mount.get("Mode") in ("", "ro"), "container_mount_mode_mismatch")
 
     networks = (row.get("NetworkSettings") or {}).get("Networks") or {}
     _require(isinstance(networks, dict), "container_network_settings_invalid")

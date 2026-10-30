@@ -18,7 +18,7 @@ readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
 readonly EDGE_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-edge-attest.py"
 readonly POLICY_SCRIPT_SHA256='58ac39dd9cc0b6f4997e2618c4492b7acf6d61ab0ae75de18161ff9da85bef6f'
 readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
-readonly EDGE_ATTEST_SHA256='288f238158dad3ba32507028403cbc27f157c6a70293ae3dcf39d4c4ec0224e8'
+readonly EDGE_ATTEST_SHA256='30e2ce6b83bd896930cb9d15c2779006dd01d0073d2c3271176b3f770d7904b8'
 
 edge_id=''
 backend_id=''
