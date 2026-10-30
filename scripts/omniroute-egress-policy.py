@@ -619,7 +619,7 @@ def _counter_snapshot(network_id: str, facts: NetworkFacts, backend: str) -> dic
 
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("preflight", "apply", "verify", "counters", "rollback"))
+    parser.add_argument("action", choices=("preflight", "apply", "verify", "facts", "counters", "rollback"))
     parser.add_argument("--network-id")
     parser.add_argument("--daemon-id", required=True)
     parser.add_argument("--bridge")
@@ -670,7 +670,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
             _verify_iptables(args.network_id, facts)
         print(f"OMNIROUTE_EGRESS_POLICY=APPLIED backend={backend} network={args.network_id[:12]} bridge={facts.bridge} subnet={facts.subnet} gateway={facts.gateway} egress={facts.egress_interface}")
         return 0
-    if args.action == "verify":
+    if args.action in {"verify", "facts"}:
         facts = _network_facts(args.network_id, require_empty=args.expect_empty)
         if args.expected_endpoint_id and facts.containers != (args.expected_endpoint_id,):
             raise PolicyError("docker_network_endpoint_identity_mismatch")
@@ -679,7 +679,10 @@ def _main(argv: Sequence[str] | None = None) -> int:
             _verify_nft(args.network_id, facts)
         else:
             _verify_iptables(args.network_id, facts)
-        print(f"OMNIROUTE_EGRESS_POLICY=VERIFIED backend={backend} network={args.network_id[:12]}")
+        if args.action == "facts":
+            print(f"OMNIROUTE_EGRESS_POLICY=VERIFIED backend={backend} network={args.network_id[:12]} bridge={facts.bridge} subnet={facts.subnet} gateway={facts.gateway} egress={facts.egress_interface}")
+        else:
+            print(f"OMNIROUTE_EGRESS_POLICY=VERIFIED backend={backend} network={args.network_id[:12]}")
         return 0
     if args.action == "counters":
         facts = _network_facts(args.network_id, require_empty=False)

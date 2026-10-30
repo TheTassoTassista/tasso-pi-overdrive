@@ -15,8 +15,10 @@ readonly BACKEND_PORT='20128'
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
 readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
-readonly POLICY_SCRIPT_SHA256='833962c7b35c508841fff531a547b977dcef12745eb3615721ce4b90a6be0078'
+readonly EDGE_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-edge-attest.py"
+readonly POLICY_SCRIPT_SHA256='58ac39dd9cc0b6f4997e2618c4492b7acf6d61ab0ae75de18161ff9da85bef6f'
 readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
+readonly EDGE_ATTEST_SHA256='bf191d409cfd6c1c369e609e065e5d44bc9b26a16f3bf9e9ec18384b08d4e959'
 
 edge_id=''
 backend_id=''
@@ -46,6 +48,7 @@ fi
 resume_existing=0
 egress_candidate=0
 resume_egress_network_id=''
+resume_edge_container_id=''
 while (($#)); do
 	case "$1" in
 		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
@@ -54,6 +57,13 @@ while (($#)); do
 			(($# >= 2)) || fail 'resume_egress_network_id_missing'
 			[[ -z "$resume_egress_network_id" ]] || fail 'duplicate_resume_egress_network_id'
 			resume_egress_network_id=$2
+			shift
+			;;
+		--resume-edge-container-id)
+			(($# >= 2)) || fail 'resume_edge_container_id_missing'
+			[[ -z "$resume_edge_container_id" ]] || fail 'duplicate_resume_edge_container_id'
+			[[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_edge_container_id_invalid'
+			resume_edge_container_id=$2
 			shift
 			;;
 		*) fail 'unsupported_arguments' ;;
@@ -75,6 +85,10 @@ if (( egress_candidate == 1 && resume_existing == 1 )); then
 	[[ "$resume_egress_network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_egress_network_id_required'
 elif [[ -n "$resume_egress_network_id" ]]; then
 	fail 'resume_egress_network_id_requires_egress_resume_mode'
+fi
+if [[ -n "$resume_edge_container_id" ]]; then
+	(( egress_candidate == 1 && resume_existing == 1 )) || fail 'resume_edge_id_requires_egress_resume_mode'
+	[[ "$resume_edge_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_edge_container_id_invalid'
 fi
 
 on_exit() {
@@ -100,6 +114,8 @@ if (( egress_candidate == 1 )); then
 	printf '%s  %s\n' "$POLICY_SCRIPT_SHA256" "$POLICY_SCRIPT" | sha256sum --check --status || fail 'egress_policy_script_digest_mismatch'
 	[[ "$EGRESS_PROBE_SHA256" != TO_BE_PINNED ]] || fail 'egress_probe_script_digest_not_pinned'
 	printf '%s  %s\n' "$EGRESS_PROBE_SHA256" "$EGRESS_PROBE_SCRIPT" | sha256sum --check --status || fail 'egress_probe_script_digest_mismatch'
+	[[ "$EDGE_ATTEST_SHA256" != TO_BE_PINNED ]] || fail 'edge_attestation_script_digest_not_pinned'
+	printf '%s  %s\n' "$EDGE_ATTEST_SHA256" "$EDGE_ATTEST_SCRIPT" | sha256sum --check --status || fail 'edge_attestation_script_digest_mismatch'
 fi
 
 # Pin the local Docker context/daemon to the system Docker socket. Do not fall
@@ -118,7 +134,12 @@ omni_digests=$(docker image inspect "$OMNI_TAG" --format '{{json .RepoDigests}}'
 resolved_omni_id=$(docker image inspect "$OMNI_IMAGE" --format '{{.Id}}' 2>/dev/null) || fail 'approved_omniroute_digest_unavailable_locally'
 [[ "$resolved_omni_id" == "$omni_id" ]] || fail 'omniroute_tag_digest_disagreement'
 
-docker container inspect "$EDGE_NAME" >/dev/null 2>&1 && fail 'edge_name_already_exists'
+if [[ -n "$resume_edge_container_id" ]]; then
+	existing_edge_id=$(docker container inspect --format '{{.Id}}' "$EDGE_NAME" 2>/dev/null) || fail 'resume_edge_container_name_missing_preserved'
+	[[ "$existing_edge_id" == "$resume_edge_container_id" ]] || fail 'resume_edge_container_name_identity_mismatch_preserved'
+else
+	docker container inspect "$EDGE_NAME" >/dev/null 2>&1 && fail 'edge_name_already_exists'
+fi
 docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
 if [[ -n "$resume_egress_network_id" ]]; then
 	network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_missing_preserved'
@@ -401,20 +422,34 @@ if (( egress_candidate == 1 )); then
 	network_sysctl+=(--sysctl net.ipv6.conf.all.disable_ipv6=1 --sysctl net.ipv6.conf.default.disable_ipv6=1)
 fi
 
-edge_id=$(docker create --name "$EDGE_NAME" --label "$edge_label" \
-	--network "$NETWORK" --publish "127.0.0.1:${HOST_PORT}:8443/tcp" \
-	"${network_sysctl[@]}" --restart no --read-only --user 0:0 --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --pids-limit 128 \
-	--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-	--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
-	--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
-	--mount "type=bind,src=$ROOT/tls.key,dst=/etc/caddy/tls.key,readonly" \
-	--env-file "$ROOT/caddy.env" --entrypoint caddy "$CADDY_IMAGE" run --config /etc/caddy/Caddyfile --adapter caddyfile) || fail 'edge_create_failed'
-[[ "$edge_id" =~ ^[a-f0-9]{64}$ ]] || fail 'edge_create_returned_invalid_id'
+if [[ -n "$resume_edge_container_id" ]]; then
+	# Resume only the operator-specified immutable ID. The name lookup above is
+	# an additional consistency check, never the authority for identity.
+	edge_id=$resume_edge_container_id
+	log "RESUMING_EXACT_EDGE_ID_${edge_id:0:12}"
+else
+	edge_id=$(docker create --name "$EDGE_NAME" --label "$edge_label" \
+		--network "$NETWORK" --publish "127.0.0.1:${HOST_PORT}:8443/tcp" \
+		"${network_sysctl[@]}" --restart no --read-only --user 0:0 --cap-drop ALL --cap-add NET_BIND_SERVICE --security-opt no-new-privileges --pids-limit 128 \
+		--tmpfs /data:rw,noexec,nosuid,size=16m --tmpfs /config:rw,noexec,nosuid,size=16m --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+		--mount "type=bind,src=$ROOT/Caddyfile,dst=/etc/caddy/Caddyfile,readonly" \
+		--mount "type=bind,src=$ROOT/ca.crt,dst=/etc/caddy/tls.crt,readonly" \
+		--mount "type=bind,src=$ROOT/tls.key,dst=/etc/caddy/tls.key,readonly" \
+		--env-file "$ROOT/caddy.env" --entrypoint caddy "$CADDY_IMAGE" run --config /etc/caddy/Caddyfile --adapter caddyfile) || fail 'edge_create_failed'
+	[[ "$edge_id" =~ ^[a-f0-9]{64}$ ]] || fail 'edge_create_returned_invalid_id'
+fi
 
 if (( egress_candidate == 1 )); then
-	# Before any process starts, require this exact edge ID to be the only
-	# network endpoint. The backend later shares this namespace, not the bridge.
-	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_or_endpoint_identity_verification_failed'
+	# docker create does not activate a network endpoint. Attest the created
+	# object by exact ID and its requested network configuration before start,
+	# while policy verification still requires the network endpoint set empty.
+	docker inspect --format '{{json .}}' "$edge_id" | python3 "$EDGE_ATTEST_SCRIPT" \
+		--expected-id "$edge_id" --expected-image-id "$caddy_id" --expected-image-ref "$CADDY_IMAGE" \
+		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase pre-start \
+		|| fail 'edge_prestart_identity_or_configuration_attestation_failed_preserved'
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_prestart_or_empty_endpoint_verification_failed_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_prestart_receipt_invalid_preserved'
 	log "$policy_result"
 fi
 
@@ -423,6 +458,32 @@ fi
 # its upstream returns unavailable until the backend below is started.
 edge_started=1
 docker start "$edge_id" >/dev/null || fail 'edge_start_failed'
+
+if (( egress_candidate == 1 )); then
+	# This is intentionally the first inspection after docker start: the running
+	# snapshot must now contain the exact network and a real endpoint ID. Only
+	# then may the firewall verifier accept this exact endpoint.
+	docker inspect --format '{{json .}}' "$edge_id" | python3 "$EDGE_ATTEST_SCRIPT" \
+		--expected-id "$edge_id" --expected-image-id "$caddy_id" --expected-image-ref "$CADDY_IMAGE" \
+		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase post-start \
+		|| fail 'edge_poststart_identity_or_endpoint_attestation_failed_preserved'
+	policy_result=$(python3 "$POLICY_SCRIPT" facts --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_post_edge_start_verification_failed_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ bridge=*\ subnet=*\ gateway=*\ egress=* ]] || fail 'egress_policy_post_edge_start_receipt_invalid_preserved'
+	policy_backend=${policy_result#*backend=}; policy_backend=${policy_backend%% *}
+	policy_bridge=${policy_result#*bridge=}; policy_bridge=${policy_bridge%% *}
+	policy_subnet=${policy_result#*subnet=}; policy_subnet=${policy_subnet%% *}
+	policy_gateway=${policy_result#*gateway=}; policy_gateway=${policy_gateway%% *}
+	policy_egress=${policy_result#*egress=}; policy_egress=${policy_egress%% *}
+	python3 - "$network_id" "$policy_bridge" "$policy_subnet" "$policy_gateway" "$policy_egress" <<'PY' || fail 'egress_policy_network_facts_invalid_preserved'
+import ipaddress, re, sys
+network, bridge, subnet, gateway, egress = sys.argv[1:]
+if not re.fullmatch(r"[a-f0-9]{64}", network) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", bridge) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", egress): raise SystemExit(1)
+parsed = ipaddress.ip_network(subnet, strict=True)
+if parsed.version != 4 or ipaddress.ip_address(gateway) not in parsed: raise SystemExit(1)
+PY
+	log "$policy_result"
+fi
 
 backend_id=$(docker create --name "$BACKEND_NAME" --label "$backend_label" \
 	--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \

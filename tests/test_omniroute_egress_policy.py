@@ -1,4 +1,6 @@
 import importlib.util
+import contextlib
+import io
 import pathlib
 import shlex
 import sys
@@ -10,6 +12,10 @@ SPEC = importlib.util.spec_from_file_location("omniroute_egress_policy", ROOT / 
 POLICY = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = POLICY
 SPEC.loader.exec_module(POLICY)
+EDGE_SPEC = importlib.util.spec_from_file_location("omniroute_edge_attest", ROOT / "scripts" / "omniroute-edge-attest.py")
+EDGE = importlib.util.module_from_spec(EDGE_SPEC)
+sys.modules[EDGE_SPEC.name] = EDGE
+EDGE_SPEC.loader.exec_module(EDGE)
 
 NETWORK_ID = "a" * 64
 DAEMON_ID = "01234567-89ab-cdef-0123-456789abcdef"
@@ -51,6 +57,20 @@ class RuntimeFactTests(unittest.TestCase):
         for live_restore in ("true", ""):
             with self.subTest(live_restore=live_restore), self.assertRaisesRegex(POLICY.PolicyError, "live_restore"):
                 POLICY.validate_runtime_facts("29.8.1", "nftables", DAEMON_ID, DAEMON_ID, live_restore)
+
+    def test_facts_action_reverifies_policy_and_returns_read_only_resume_metadata(self):
+        edge_id = "c" * 64
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (edge_id,), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        output = io.StringIO()
+        args = ["facts", "--network-id", NETWORK_ID, "--daemon-id", DAEMON_ID, "--expected-endpoint-id", edge_id]
+        with patch.object(POLICY.os, "geteuid", return_value=0), patch.object(POLICY, "_docker_facts", return_value=(DAEMON_ID, "29.8.1", "iptables")), patch.object(POLICY, "_network_facts", return_value=facts), patch.object(POLICY, "_verify_iptables") as verify, patch.object(POLICY, "_iptables_apply", side_effect=AssertionError("facts must not mutate firewall")), contextlib.redirect_stdout(output):
+            self.assertEqual(POLICY._main(args), 0)
+        verify.assert_called_once_with(NETWORK_ID, facts)
+        self.assertEqual(output.getvalue().strip(), f"OMNIROUTE_EGRESS_POLICY=VERIFIED backend=iptables network={NETWORK_ID[:12]} bridge={BRIDGE} subnet={SUBNET} gateway=172.29.88.1 egress={EGRESS_INTERFACE}")
+
+        mismatch = ["facts", "--network-id", NETWORK_ID, "--daemon-id", DAEMON_ID, "--expected-endpoint-id", "b" * 64]
+        with patch.object(POLICY.os, "geteuid", return_value=0), patch.object(POLICY, "_docker_facts", return_value=(DAEMON_ID, "29.8.1", "iptables")), patch.object(POLICY, "_network_facts", return_value=facts), self.assertRaisesRegex(POLICY.PolicyError, "endpoint_identity"):
+            POLICY._main(mismatch)
 
     def test_network_identity_security_and_empty_first_endpoint_gate(self):
         facts = POLICY.validate_network_payload(payload(), NETWORK_ID, require_empty=True)
@@ -302,6 +322,116 @@ class RulePlanTests(unittest.TestCase):
         self.assertEqual(names, POLICY.policy_names(NETWORK_ID))
         self.assertNotEqual(names, POLICY.policy_names("b" * 64))
         self.assertTrue(all(len(name) <= 28 for name in names.values() if name.isupper()))
+
+
+class EdgeAttestationTests(unittest.TestCase):
+    edge_id = "f" * 64
+    image_id = "sha256:" + "d" * 64
+    network_id = "a" * 64
+    endpoint_id = "e" * 64
+    network_name = "phi-omniroute-egress-candidate-v1"
+    edge_name = "phi-omniroute-egress-edge-v1"
+    image_ref = "docker.io/library/caddy@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f"
+    root = "/etc/phi-omniroute-candidate"
+
+    def edge_snapshot(self, *, phase="pre-start"):
+        running = phase == "post-start"
+        network = {
+            "NetworkID": self.network_id if running else "",
+            "EndpointID": self.endpoint_id if running else "",
+            "IPAddress": "172.29.88.2" if running else "",
+            "GlobalIPv6Address": "",
+        }
+        return {
+            "Id": self.edge_id,
+            "Name": "/" + self.edge_name,
+            "Image": self.image_id,
+            "Config": {
+                "Image": self.image_ref,
+                "User": "0:0",
+                "Entrypoint": ["caddy"],
+                "Cmd": ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+                "Labels": {"phi.omniroute.candidate.egress": "v1"},
+            },
+            "State": {"Status": "running", "Running": True, "Pid": 23} if running else {"Status": "created", "Running": False, "Pid": 0},
+            "HostConfig": {
+                "NetworkMode": self.network_name,
+                "Privileged": False,
+                "ReadonlyRootfs": True,
+                "CapDrop": ["ALL"],
+                "CapAdd": ["NET_BIND_SERVICE"],
+                "RestartPolicy": {"Name": "no"},
+                "SecurityOpt": ["no-new-privileges:true"],
+                "PidsLimit": 128,
+                "PortBindings": {"8443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "20129"}]},
+                "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "1", "net.ipv6.conf.default.disable_ipv6": "1"},
+                "Tmpfs": {name: "rw,noexec,nosuid,size=16m" for name in ("/data", "/config", "/tmp")},
+            },
+            "Mounts": [
+                {"Source": self.root + "/Caddyfile", "Destination": "/etc/caddy/Caddyfile", "Type": "bind", "RW": False, "Mode": "ro"},
+                {"Source": self.root + "/ca.crt", "Destination": "/etc/caddy/tls.crt", "Type": "bind", "RW": False, "Mode": "ro"},
+                {"Source": self.root + "/tls.key", "Destination": "/etc/caddy/tls.key", "Type": "bind", "RW": False, "Mode": "ro"},
+            ],
+            "NetworkSettings": {"Networks": {self.network_name: network}},
+        }
+
+    def attest(self, snapshot, phase):
+        EDGE.attest_edge(
+            snapshot,
+            expected_id=self.edge_id,
+            expected_image_id=self.image_id,
+            expected_image_ref=self.image_ref,
+            network_id=self.network_id,
+            network_name=self.network_name,
+            container_name=self.edge_name,
+            root=self.root,
+            label_key="phi.omniroute.candidate.egress",
+            label_value="v1",
+            host_port="20129",
+            phase=phase,
+        )
+
+    def test_created_edge_without_endpoint_is_valid_prestart_resume_state(self):
+        snapshot = self.edge_snapshot()
+        self.assertEqual(snapshot["NetworkSettings"]["Networks"][self.network_name]["EndpointID"], "")
+        self.attest(snapshot, "pre-start")
+        snapshot["NetworkSettings"]["Networks"][self.network_name]["EndpointID"] = self.endpoint_id
+        with self.assertRaisesRegex(EDGE.AttestationError, "endpoint_exists_before_start"):
+            self.attest(snapshot, "pre-start")
+
+    def test_started_edge_requires_endpoint_assigned_to_exact_network(self):
+        self.attest(self.edge_snapshot(phase="post-start"), "post-start")
+        missing = self.edge_snapshot(phase="post-start")
+        missing["NetworkSettings"]["Networks"][self.network_name]["EndpointID"] = ""
+        with self.assertRaisesRegex(EDGE.AttestationError, "endpoint_id"):
+            self.attest(missing, "post-start")
+        wrong_network = self.edge_snapshot(phase="post-start")
+        wrong_network["NetworkSettings"]["Networks"][self.network_name]["NetworkID"] = "b" * 64
+        with self.assertRaisesRegex(EDGE.AttestationError, "network_id_mismatch"):
+            self.attest(wrong_network, "post-start")
+
+    def test_wrong_or_replaced_container_identity_fails_closed(self):
+        replacement = self.edge_snapshot()
+        replacement["Id"] = "b" * 64
+        with self.assertRaisesRegex(EDGE.AttestationError, "identity_mismatch"):
+            self.attest(replacement, "pre-start")
+        with self.assertRaisesRegex(EDGE.AttestationError, "inspect_shape_invalid"):
+            self.attest(None, "pre-start")
+        disappeared = self.edge_snapshot()
+        disappeared["State"] = {"Status": "removing", "Running": False, "Pid": 0}
+        with self.assertRaisesRegex(EDGE.AttestationError, "not_created"):
+            self.attest(disappeared, "pre-start")
+
+    def test_partial_resume_accepts_only_exact_created_edge_and_config(self):
+        snapshot = self.edge_snapshot()
+        self.attest(snapshot, "pre-start")
+        snapshot["HostConfig"]["NetworkMode"] = "bridge"
+        with self.assertRaisesRegex(EDGE.AttestationError, "network_mode_mismatch"):
+            self.attest(snapshot, "pre-start")
+        snapshot = self.edge_snapshot()
+        snapshot["Config"]["Labels"]["phi.omniroute.candidate.egress"] = "other"
+        with self.assertRaisesRegex(EDGE.AttestationError, "label_mismatch"):
+            self.attest(snapshot, "pre-start")
 
 
 if __name__ == "__main__":

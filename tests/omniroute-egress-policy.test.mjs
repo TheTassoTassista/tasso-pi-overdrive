@@ -8,11 +8,12 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const policyScript = path.join(root, "scripts", "omniroute-egress-policy.py");
+const edgeAttestScript = path.join(root, "scripts", "omniroute-edge-attest.py");
 const candidateScript = path.join(root, "scripts", "omniroute-docker-candidate.sh");
 const probeScript = path.join(root, "scripts", "omniroute-egress-probe.cjs");
 
 test("OmniRoute egress policy planners reject unsafe metadata and generate focused deny-by-default rules", () => {
-	const result = spawnSync("python3", [path.join(root, "tests", "test_omniroute_egress_policy.py")], { encoding: "utf8", timeout: 10000 });
+	const result = spawnSync("python3", [path.join(root, "tests", "test_omniroute_egress_policy.py")], { encoding: "utf8", timeout: 10000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
 	assert.equal(result.error, undefined, result.error?.message);
 	assert.equal(result.status, 0, result.stdout + "\n" + result.stderr);
 });
@@ -22,10 +23,13 @@ test("candidate installs its network policy before endpoint creation and restric
 	const probe = readFileSync(probeScript, "utf8");
 	const helperDigest = source.match(/POLICY_SCRIPT_SHA256='([a-f0-9]{64})'/u)?.[1];
 	const probeDigest = source.match(/EGRESS_PROBE_SHA256='([a-f0-9]{64})'/u)?.[1];
+	const edgeAttestDigest = source.match(/EDGE_ATTEST_SHA256='([a-f0-9]{64})'/u)?.[1];
 	assert.ok(helperDigest);
 	assert.ok(probeDigest);
+	assert.ok(edgeAttestDigest);
 	assert.equal(createHash("sha256").update(readFileSync(policyScript)).digest("hex"), helperDigest);
 	assert.equal(createHash("sha256").update(readFileSync(probeScript)).digest("hex"), probeDigest);
+	assert.equal(createHash("sha256").update(readFileSync(edgeAttestScript)).digest("hex"), edgeAttestDigest);
 	const networkStart = source.indexOf("network_id=$(docker network create --driver bridge --ipv6=false");
 	const networkEnd = source.indexOf("edge_label='phi.omniroute.candidate=true'", networkStart);
 	assert.ok(networkStart >= 0 && networkEnd > networkStart);
@@ -46,6 +50,34 @@ test("candidate installs its network policy before endpoint creation and restric
 	for (const check of ["publicIpv4Tcp443", "publicIpv4Tcp80Blocked", "udp443Blocked", "directTcpDnsBlocked", "directUdpDnsBlocked", "privateIpv4Blocked", "metadataIpv4Blocked", "dockerGatewayBlocked", "hostIpv4Blocked", "ipv6Disabled", "ipv6Unassigned", "ipv6NoDefaultRoute", "ipv6EgressBlocked"]) {
 		assert.ok(probe.includes(check), "missing probe " + check);
 	}
+});
+
+test("egress edge startup attests the exact created ID before start and the assigned endpoint immediately after", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	assert.ok(source.includes("--resume-edge-container-id"));
+	assert.ok(source.includes('edge_id=$resume_edge_container_id'));
+	const resumeStart = source.indexOf('if [[ -n "$resume_edge_container_id" ]]; then', source.indexOf("edge_label='phi.omniroute.candidate=true'"));
+	const createAt = source.indexOf('edge_id=$(docker create --name "$EDGE_NAME"', resumeStart);
+	const resumeElse = source.indexOf("else\n\tedge_id=$(docker create", resumeStart);
+	assert.ok(resumeStart >= 0 && resumeElse > resumeStart);
+	assert.ok(createAt < 0 || createAt >= resumeElse, "resume branch must not create a duplicate edge");
+	const startAt = source.indexOf('docker start "$edge_id"');
+	const preAttestAt = source.lastIndexOf('"$EDGE_ATTEST_SCRIPT"', startAt);
+	const prePolicyAt = source.lastIndexOf('verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty', startAt);
+	assert.ok(preAttestAt >= 0 && prePolicyAt > preAttestAt);
+	assert.ok(source.slice(preAttestAt, startAt).includes('--phase pre-start'));
+	assert.ok(!source.slice(preAttestAt, startAt).includes('--expected-endpoint-id'));
+	const postAttestAt = source.indexOf('"$EDGE_ATTEST_SCRIPT"', startAt);
+	const postPolicyAt = source.indexOf('facts --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id"', startAt);
+	const backendCreateAt = source.indexOf('backend_id=$(docker create', startAt);
+	assert.ok(postAttestAt > startAt && postPolicyAt > postAttestAt && backendCreateAt > postPolicyAt);
+	assert.ok(source.slice(postAttestAt, postPolicyAt).includes('--phase post-start'));
+	const betweenStartAndAttestation = source.slice(startAt, postAttestAt);
+	assert.equal((betweenStartAndAttestation.match(/^\s*docker (?:create|exec|start|stop)\b/gmu) || []).length, 1, "no backend or other Docker mutation may precede immediate edge inspection");
+	assert.ok(betweenStartAndAttestation.includes('docker start "$edge_id" >/dev/null || fail \'edge_start_failed\''));
+	assert.ok(betweenStartAndAttestation.includes('docker inspect --format \'{{json .}}\' "$edge_id"'));
+	assert.ok(!/docker (?:rm|container\s+rm)\b/u.test(source));
+	assert.ok(source.includes('edge_started=1\ndocker start "$edge_id"'));
 });
 
 test("resume mode attests the exact existing candidate network and policy before any new Docker mutation", () => {
