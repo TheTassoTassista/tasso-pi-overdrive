@@ -81,7 +81,7 @@ def attest_edge(
     _require(host.get("Privileged") is False, "container_privileged")
     _require(host.get("ReadonlyRootfs") is True, "container_rootfs_not_readonly")
     _require(host.get("CapDrop") == ["ALL"], "container_cap_drop_mismatch")
-    _require(host.get("CapAdd") == ["NET_BIND_SERVICE"], "container_cap_add_mismatch")
+    _require(host.get("CapAdd") in (["NET_BIND_SERVICE"], ["CAP_NET_BIND_SERVICE"]), "container_cap_add_mismatch")
     _require(host.get("RestartPolicy", {}).get("Name") == "no", "container_restart_policy_mismatch")
     _require(
         any(value in {"no-new-privileges:true", "no-new-privileges"} for value in (host.get("SecurityOpt") or [])),
