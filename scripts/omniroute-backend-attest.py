@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -29,6 +30,8 @@ def attest_backend(
     label_key: str,
     label_value: str,
     phase: str,
+    expected_auth_mode: str | None = None,
+    expected_api_key_sha256: str | None = None,
 ) -> None:
     _require(phase in {"pre-start", "post-start"}, "phase_invalid")
     _require(isinstance(expected_id, str) and re.fullmatch(r"[a-f0-9]{64}", expected_id) is not None, "expected_container_id_invalid")
@@ -36,6 +39,12 @@ def attest_backend(
     _require(isinstance(expected_image_id, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", expected_image_id) is not None, "expected_image_id_invalid")
     _require(isinstance(expected_image_ref, str) and re.fullmatch(r"diegosouzapw/omniroute@sha256:[a-f0-9]{64}", expected_image_ref) is not None, "expected_image_ref_invalid")
     _require(isinstance(payload, dict), "inspect_shape_invalid")
+
+    _require(expected_auth_mode in {None, "legacy", "enforced"}, "expected_auth_mode_invalid")
+    if expected_auth_mode == "enforced":
+        _require(isinstance(expected_api_key_sha256, str) and re.fullmatch(r"[a-f0-9]{64}", expected_api_key_sha256) is not None, "expected_api_key_digest_invalid")
+    else:
+        _require(expected_api_key_sha256 is None, "unexpected_api_key_digest")
 
     row = payload
     _require(row.get("Id") == expected_id, "container_identity_mismatch")
@@ -47,6 +56,23 @@ def attest_backend(
     _require(config.get("Image") == expected_image_ref, "container_image_reference_mismatch")
     labels = config.get("Labels") or {}
     _require(isinstance(labels, dict) and labels.get(label_key) == label_value, "container_label_mismatch")
+    if expected_auth_mode is not None:
+        env_rows = config.get("Env")
+        _require(isinstance(env_rows, list) and all(isinstance(item, str) for item in env_rows), "container_environment_shape_invalid")
+        env: dict[str, str] = {}
+        for item in env_rows:
+            key, separator, value = item.partition("=")
+            _require(bool(separator) and bool(key) and key not in env, "container_environment_invalid")
+            env[key] = value
+        if expected_auth_mode == "legacy":
+            _require(env.get("REQUIRE_API_KEY") == "false", "legacy_api_key_policy_mismatch")
+            _require(not env.get("OMNIROUTE_API_KEY") and not env.get("ROUTER_API_KEY"), "legacy_api_key_unexpected")
+        else:
+            _require(env.get("REQUIRE_API_KEY") == "true", "api_key_policy_not_enforced")
+            actual_api_key = env.get("OMNIROUTE_API_KEY", "")
+            _require(bool(actual_api_key), "configured_api_key_missing")
+            _require(hashlib.sha256(actual_api_key.encode("utf-8")).hexdigest() == expected_api_key_sha256, "configured_api_key_digest_mismatch")
+            _require(not env.get("ROUTER_API_KEY"), "unexpected_alternate_api_key")
 
     state = row.get("State") or {}
     _require(isinstance(state, dict), "container_state_shape_invalid")
@@ -85,6 +111,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--label-key", required=True)
     parser.add_argument("--label-value", required=True)
     parser.add_argument("--phase", choices=("pre-start", "post-start"), required=True)
+    parser.add_argument("--expected-auth-mode", choices=("legacy", "enforced"))
+    parser.add_argument("--expected-api-key-sha256")
     args = parser.parse_args(argv)
     try:
         attest_backend(
@@ -97,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
             label_key=args.label_key,
             label_value=args.label_value,
             phase=args.phase,
+            expected_auth_mode=args.expected_auth_mode,
+            expected_api_key_sha256=args.expected_api_key_sha256,
         )
     except (AttestationError, json.JSONDecodeError, OSError):
         print("OMNIROUTE_BACKEND_ATTESTATION=FAIL_CLOSED", file=sys.stderr)

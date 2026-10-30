@@ -1,9 +1,14 @@
 import importlib.util
 import contextlib
+import hashlib
 import io
+import json
+import os
 import pathlib
 import shlex
+import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -24,6 +29,10 @@ REPORT_SPEC = importlib.util.spec_from_file_location("omniroute_egress_probe_rep
 REPORT = importlib.util.module_from_spec(REPORT_SPEC)
 sys.modules[REPORT_SPEC.name] = REPORT
 REPORT_SPEC.loader.exec_module(REPORT)
+TLS_REPORT_SPEC = importlib.util.spec_from_file_location("omniroute_tls_health_report", ROOT / "scripts" / "omniroute-tls-health-report.py")
+TLS_REPORT = importlib.util.module_from_spec(TLS_REPORT_SPEC)
+sys.modules[TLS_REPORT_SPEC.name] = TLS_REPORT
+TLS_REPORT_SPEC.loader.exec_module(TLS_REPORT)
 
 NETWORK_ID = "a" * 64
 DAEMON_ID = "01234567-89ab-cdef-0123-456789abcdef"
@@ -120,6 +129,259 @@ class RulePlanTests(unittest.TestCase):
         self.assertLess(rendered.index("allowed_tcp443"), rendered.index("blocked_all_other_egress"))
         self.assertLess(rendered.index("blocked_host_original"), rendered.index("allowed_tcp443"))
         self.assertNotIn("docker-bridges", rendered)
+
+    def test_input_exception_is_only_candidate_tcp_established_reply_before_host_local_drop(self):
+        names = POLICY.policy_names(NETWORK_ID)
+        plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        reply = next(row for row in plan if row[0] == "iptables" and names["input"] in row and "--ctstate" in row)
+        local_drop = next(row for row in plan if row[0] == "iptables" and names["input"] in row and names["HOSTLOCAL"] in row)
+        self.assertLess(plan.index(reply), plan.index(local_drop))
+        expected = POLICY._iptables_rule_semantics(reply[reply.index("-A"):], expected_chain=names["input"])
+        pairs = dict(expected[1])
+        self.assertEqual(pairs["-i"], BRIDGE)
+        self.assertEqual(pairs["-s"], SUBNET)
+        self.assertEqual(pairs["-p"], "tcp")
+        self.assertEqual(pairs["--ctstate"], "ESTABLISHED")
+        self.assertEqual(pairs["--ctdir"], "REPLY")
+        self.assertEqual(pairs["--dst-type"], "LOCAL")
+        self.assertEqual(pairs["-j"], "RETURN")
+        self.assertNotIn("--ctorigdst", pairs)
+        self.assertNotIn("--ctorigdstport", pairs)
+
+        def matches_input_reply(*, bridge=BRIDGE, source=SUBNET, protocol="tcp", state="ESTABLISHED", direction="REPLY", destination_type="LOCAL", ipv6=False):
+            return not ipv6 and (
+                pairs.get("-i") == bridge
+                and pairs.get("-s") == source
+                and pairs.get("-p") == protocol
+                and pairs.get("--ctstate") == state
+                and pairs.get("--ctdir") == direction
+                and pairs.get("--dst-type") == destination_type
+            )
+
+        self.assertTrue(matches_input_reply(), "the host-initiated TLS flow's candidate reply may return to ordinary INPUT rules")
+        for scenario in (
+            {"state": "NEW", "direction": "ORIGINAL"},  # gateway/local access initiated by candidate
+            {"state": "NEW", "direction": "ORIGINAL", "destination_type": "UNICAST"},  # metadata destination
+            {"state": "NEW", "direction": "ORIGINAL", "destination_type": "UNICAST"},  # private destination
+            {"state": "INVALID", "direction": "ORIGINAL"},
+            {"ipv6": True},
+            {"bridge": "br-attacker"},
+            {"source": "172.29.89.0/24"},
+        ):
+            with self.subTest(flow=scenario):
+                self.assertFalse(matches_input_reply(**scenario))
+        for option, wrong in (
+            ("--ctstate", "NEW"), ("--ctstate", "INVALID"), ("--ctdir", "ORIGINAL"),
+            ("-i", "br-attacker"), ("-s", "172.29.89.0/24"), ("-p", "udp"),
+            ("--dst-type", "UNICAST"), ("-j", "ACCEPT"),
+        ):
+            mutated = list(reply[reply.index("-A"):])
+            mutated[mutated.index(option) + 1] = wrong
+            with self.subTest(option=option, wrong=wrong):
+                self.assertNotEqual(POLICY._iptables_rule_semantics(mutated, expected_chain=names["input"]), expected)
+
+        rendered = POLICY.render_nft_batch(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        nft_reply = next(line for line in rendered.splitlines() if "allowed_host_reply" in line)
+        nft_drop = next(line for line in rendered.splitlines() if "blocked_host_input" in line)
+        self.assertLess(rendered.index(nft_reply), rendered.index(nft_drop))
+        for old, new in (
+            ("ct state established", "ct state new"),
+            ("ct state established", "ct state invalid"),
+            ("ct direction reply", "ct direction original"),
+            (f'iifname "{BRIDGE}"', 'iifname "br-attacker"'),
+            ("ip saddr " + SUBNET, "ip saddr 172.29.89.0/24"),
+            ("meta l4proto tcp", "meta l4proto udp"),
+            ("fib daddr type local", "fib daddr type unicast"),
+            ("return comment", "accept comment"),
+            ("ip saddr " + SUBNET, "ip6 saddr 2001:db8::/64"),
+        ):
+            self.assertIn(old, nft_reply)
+            mutated_reply = nft_reply.replace(old, new, 1)
+            mutated = rendered.replace(nft_reply, mutated_reply, 1)
+            with self.subTest(nft_old=old, nft_new=new), patch.object(POLICY, "_run", return_value=mutated), self.assertRaisesRegex(POLICY.PolicyError, "rule_semantics"):
+                POLICY._verify_nft(NETWORK_ID, POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE))
+
+        # Gateway traffic is host-local but NEW/ORIGINAL, so it cannot use
+        # this exception. Metadata/private destinations remain in the existing
+        # forward deny chain; IPv6 is disabled and is not matched by this rule.
+        special_chain = POLICY.policy_names(NETWORK_ID)["SPECIAL"]
+        self.assertTrue(any(row[0] == "iptables" and "-A" in row and special_chain in row and "-j" in row and row[-1] == "DROP" for row in plan))
+        for protected in ("172.29.88.1", "169.254.169.254", "10.0.0.1", "192.168.1.1"):
+            address = POLICY.ipaddress.ip_address(protected)
+            protected_ranges = [cidr for cidr in (*POLICY.SPECIAL_V4, SUBNET, *DOCKER_SUBNETS) if address in POLICY.ipaddress.ip_network(cidr)]
+            self.assertTrue(protected_ranges, protected)
+            self.assertTrue(any(
+                row[0] == "iptables" and "-d" in row and row[row.index("-d") + 1] in protected_ranges
+                and "-j" in row and row[row.index("-j") + 1] == special_chain
+                for row in plan
+            ), protected)
+        self.assertFalse(any(row[0] == "ip6tables" for row in plan))
+        self.assertIn("ip saddr " + SUBNET, nft_reply)
+        self.assertNotIn("ip6 saddr", nft_reply)
+
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        names = POLICY.policy_names(NETWORK_ID)
+        outputs = {
+            "DOCKER-USER": ["-N DOCKER-USER", f'-A DOCKER-USER -i {BRIDGE} -s {SUBNET} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:candidate_egress" -j {names["main"]}'],
+            "INPUT": ["-P INPUT ACCEPT", f'-A INPUT -i {BRIDGE} -s {SUBNET} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:blocked_host_input" -j {names["input"]}'],
+        }
+        created = [names[key] for key in POLICY.IPTABLES_TARGETS] + [names["main"], names["input"]]
+        for chain in created:
+            outputs[chain] = ["-N " + chain]
+            outputs[chain].extend(shlex.join(command[command.index("-A"):]) for command in plan if "-A" in command and command[command.index("-A") + 1] == chain)
+
+        def fake_run(argv, **_kwargs):
+            if "-S" in argv and argv[-1] in outputs:
+                return "\n".join(outputs[argv[-1]])
+            raise AssertionError("unexpected command")
+
+        input_chain = names["input"]
+        original_input = list(outputs[input_chain])
+        for option, wrong in (
+            ("--ctstate", "NEW"), ("--ctstate", "INVALID"), ("--ctdir", "ORIGINAL"),
+            ("-i", "br-attacker"), ("-s", "172.29.89.0/24"), ("-p", "udp"),
+            ("--dst-type", "UNICAST"), ("-j", "ACCEPT"),
+        ):
+            tokens = shlex.split(original_input[1])
+            tokens[tokens.index(option) + 1] = wrong
+            outputs[input_chain][1] = shlex.join(tokens)
+            with self.subTest(iptables_option=option, iptables_wrong=wrong), patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+                POLICY._verify_iptables(NETWORK_ID, facts)
+            outputs[input_chain] = list(original_input)
+
+        outputs[input_chain] = [*original_input, original_input[1]]
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        outputs[input_chain] = list(original_input)
+
+        outputs[input_chain][1], outputs[input_chain][2] = outputs[input_chain][2], outputs[input_chain][1]
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+
+    def test_input_policy_migration_is_exact_idempotent_and_preserves_unrecognized_state(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", ("f" * 64,), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        state = {"migrated": False}
+        verified = []
+
+        def verify(_network_id, _facts, _backend, *, established_reply=True):
+            verified.append(established_reply)
+            if established_reply and not state["migrated"]:
+                raise POLICY.PolicyError("legacy_policy")
+            if not established_reply and state["migrated"]:
+                raise POLICY.PolicyError("new_policy")
+
+        def mutate(argv, **_kwargs):
+            self.assertEqual(argv[0:6], ["iptables", "-w", "-t", "filter", "-I", POLICY.policy_names(NETWORK_ID)["input"]])
+            self.assertEqual(argv[6], "1")
+            self.assertEqual(argv.count("-I"), 1)
+            self.assertIn("--ctstate", argv)
+            self.assertIn("ESTABLISHED", argv)
+            self.assertIn("--ctdir", argv)
+            self.assertIn("REPLY", argv)
+            self.assertIn("--dst-type", argv)
+            self.assertIn("LOCAL", argv)
+            state["migrated"] = True
+            return ""
+
+        with patch.object(POLICY, "_verify_firewall", side_effect=verify), patch.object(POLICY, "_run", side_effect=mutate) as run:
+            self.assertEqual(POLICY._input_migration_preflight(NETWORK_ID, facts, "iptables"), "LEGACY_VERIFIED")
+            self.assertTrue(POLICY._migrate_input_reply(NETWORK_ID, facts, "iptables"))
+            POLICY._verify_firewall(NETWORK_ID, facts, "iptables")
+            self.assertEqual(POLICY._input_migration_preflight(NETWORK_ID, facts, "iptables"), "VERIFIED")
+            self.assertFalse(POLICY._migrate_input_reply(NETWORK_ID, facts, "iptables"))
+        self.assertEqual(verified, [True, False, True, False, True, True, True, True])
+        self.assertEqual(run.call_count, 1)
+
+        with patch.object(POLICY, "_verify_firewall", side_effect=POLICY.PolicyError("unexpected firewall state")), patch.object(POLICY, "_run") as run:
+            with self.assertRaisesRegex(POLICY.PolicyError, "precondition_unrecognized"):
+                POLICY._migrate_input_reply(NETWORK_ID, facts, "iptables")
+        run.assert_not_called()
+
+    def test_input_policy_migration_failure_does_not_retry_or_cleanup(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", ("f" * 64,), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        verified = []
+
+        def verify(_network_id, _facts, _backend, *, established_reply=True):
+            verified.append(established_reply)
+            if established_reply:
+                raise POLICY.PolicyError("not_current_yet")
+            if len(verified) > 2:
+                raise POLICY.PolicyError("postverify_failed")
+
+        with patch.object(POLICY, "_verify_firewall", side_effect=verify), patch.object(POLICY, "_run") as mutate:
+            with self.assertRaisesRegex(POLICY.PolicyError, "postverify_failed_state_preserved"):
+                POLICY._migrate_input_reply(NETWORK_ID, facts, "iptables")
+        self.assertEqual(mutate.call_count, 1)
+        self.assertEqual(verified, [True, False, True])
+
+    def test_input_policy_migration_preflight_classifies_only_exact_old_or_new_policy(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        with patch.object(POLICY, "_verify_firewall") as verify:
+            self.assertEqual(POLICY._input_migration_preflight(NETWORK_ID, facts, "iptables"), "VERIFIED")
+            verify.assert_called_once_with(NETWORK_ID, facts, "iptables")
+        with patch.object(POLICY, "_verify_firewall", side_effect=[POLICY.PolicyError("not_new"), None]) as verify:
+            self.assertEqual(POLICY._input_migration_preflight(NETWORK_ID, facts, "iptables"), "LEGACY_VERIFIED")
+            self.assertEqual(verify.call_count, 2)
+        with patch.object(POLICY, "_verify_firewall", side_effect=POLICY.PolicyError("unexpected")), patch.object(POLICY, "_run") as mutate:
+            with self.assertRaisesRegex(POLICY.PolicyError, "preflight_unrecognized"):
+                POLICY._input_migration_preflight(NETWORK_ID, facts, "iptables")
+            mutate.assert_not_called()
+
+    def test_nft_input_policy_migration_and_rollback_are_single_rule_operations(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        state = {"migrated": False}
+
+        def verify(_network_id, _facts, _backend, *, established_reply=True):
+            if established_reply and not state["migrated"]:
+                raise POLICY.PolicyError("legacy")
+            if not established_reply and state["migrated"]:
+                raise POLICY.PolicyError("current")
+
+        def insert(argv, *, input_text=None, **_kwargs):
+            self.assertEqual(argv, ["nft", "-f", "-"])
+            self.assertIn("insert rule inet", input_text)
+            self.assertIn("ct state established ct direction reply", input_text)
+            self.assertIn(f'ip saddr {SUBNET}', input_text)
+            self.assertIn("fib daddr type local meta l4proto tcp", input_text)
+            self.assertIn("return", input_text)
+            state["migrated"] = True
+            return ""
+
+        with patch.object(POLICY, "_verify_firewall", side_effect=verify), patch.object(POLICY, "_run", side_effect=insert) as mutate:
+            self.assertTrue(POLICY._migrate_input_reply(NETWORK_ID, facts, "nftables"))
+        mutate.assert_called_once()
+
+        marker = f'comment "phi-omni:{NETWORK_ID[:12]}:allowed_host_reply"'
+        with patch.object(POLICY, "_run", return_value=f"{POLICY._nft_input_reply_expression(NETWORK_ID, BRIDGE, SUBNET)} {marker} # handle 27\n"):
+            self.assertEqual(POLICY._nft_input_reply_handle(NETWORK_ID), "27")
+        with patch.object(POLICY, "_run", return_value=f"{marker} # handle 27\n{marker} # handle 28\n"), self.assertRaisesRegex(POLICY.PolicyError, "identity_mismatch"):
+            POLICY._nft_input_reply_handle(NETWORK_ID)
+
+    def test_iptables_input_policy_rollback_deletes_only_the_attested_exception(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        state = {"migrated": True}
+
+        def verify(_network_id, _facts, _backend, *, established_reply=True):
+            if established_reply and not state["migrated"]:
+                raise POLICY.PolicyError("legacy")
+            if not established_reply and state["migrated"]:
+                raise POLICY.PolicyError("current")
+
+        def delete(argv, **_kwargs):
+            self.assertEqual(argv[4], "-D")
+            self.assertEqual(argv[5], POLICY.policy_names(NETWORK_ID)["input"])
+            self.assertIn("--ctstate", argv)
+            self.assertIn("--ctdir", argv)
+            self.assertIn("--dst-type", argv)
+            state["migrated"] = False
+            return ""
+
+        with patch.object(POLICY, "_verify_firewall", side_effect=verify), patch.object(POLICY, "_run", side_effect=delete) as mutate:
+            self.assertTrue(POLICY._rollback_input_reply(NETWORK_ID, facts, "iptables"))
+        mutate.assert_called_once()
+        with patch.object(POLICY, "_verify_firewall", return_value=None), patch.object(POLICY, "_run") as mutate:
+            self.assertFalse(POLICY._rollback_input_reply(NETWORK_ID, facts, "iptables"))
+        mutate.assert_not_called()
 
     def test_iptables_uses_only_separate_user_chains_and_supported_user_hook(self):
         plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
@@ -426,6 +688,18 @@ class EdgeAttestationTests(unittest.TestCase):
         with self.assertRaisesRegex(EDGE.AttestationError, "network_id_mismatch"):
             self.attest(wrong_network, "post-start")
 
+    def test_final_edge_attestation_accepts_docker_capability_name_canonicalization(self):
+        for phase in ("pre-start", "post-start"):
+            with self.subTest(phase=phase):
+                snapshot = self.edge_snapshot(phase=phase)
+                snapshot["HostConfig"]["CapAdd"] = ["CAP_NET_BIND_SERVICE"]
+                self.attest(snapshot, phase)
+
+        widened = self.edge_snapshot(phase="post-start")
+        widened["HostConfig"]["CapAdd"] = ["NET_ADMIN"]
+        with self.assertRaisesRegex(EDGE.AttestationError, "cap_add_mismatch"):
+            self.attest(widened, "post-start")
+
     def test_wrong_or_replaced_container_identity_fails_closed(self):
         replacement = self.edge_snapshot()
         replacement["Id"] = "b" * 64
@@ -479,7 +753,7 @@ class BackendResumeAttestationTests(unittest.TestCase):
             "Mounts": [],
         }
 
-    def attest(self, snapshot, phase="pre-start"):
+    def attest(self, snapshot, phase="pre-start", auth_mode=None, api_key_sha256=None):
         BACKEND.attest_backend(
             snapshot,
             expected_id=self.backend_id,
@@ -490,6 +764,8 @@ class BackendResumeAttestationTests(unittest.TestCase):
             label_key="phi.omniroute.candidate.egress",
             label_value="v1",
             phase=phase,
+            expected_auth_mode=auth_mode,
+            expected_api_key_sha256=api_key_sha256,
         )
 
     def test_stopped_exact_backend_and_poststart_namespace_are_attested(self):
@@ -533,6 +809,124 @@ class BackendResumeAttestationTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(BACKEND.AttestationError):
                 self.attest(snapshot)
 
+    def test_legacy_and_enforced_api_auth_modes_are_attested_without_revealing_key(self):
+        legacy = self.snapshot()
+        legacy["Config"]["Env"] = ["REQUIRE_API_KEY=false"]
+        self.attest(legacy, auth_mode="legacy")
+
+        key = "fixture-only-api-key-" + "a" * 64
+        digest = __import__("hashlib").sha256(key.encode()).hexdigest()
+        enforced = self.snapshot()
+        enforced["Config"]["Env"] = ["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={key}"]
+        self.attest(enforced, auth_mode="enforced", api_key_sha256=digest)
+
+        for env, reason in (
+            (["REQUIRE_API_KEY=false"], "api_key_policy_not_enforced"),
+            (["REQUIRE_API_KEY=true"], "configured_api_key_missing"),
+            (["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={'b' * 64}"], "configured_api_key_digest_mismatch"),
+            (["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={key}", "ROUTER_API_KEY=alternate"], "unexpected_alternate_api_key"),
+        ):
+            snapshot = self.snapshot()
+            snapshot["Config"]["Env"] = env
+            with self.subTest(reason=reason), self.assertRaisesRegex(BACKEND.AttestationError, reason):
+                self.attest(snapshot, auth_mode="enforced", api_key_sha256=digest)
+
+    def test_legacy_mode_rejects_configured_keys_and_malformed_env(self):
+        for env in (["REQUIRE_API_KEY=false", "OMNIROUTE_API_KEY=unexpected"], ["REQUIRE_API_KEY=false", "REQUIRE_API_KEY=false"]):
+            snapshot = self.snapshot()
+            snapshot["Config"]["Env"] = env
+            with self.assertRaises(BACKEND.AttestationError):
+                self.attest(snapshot, auth_mode="legacy")
+
+
+class CandidateGateIntegrationTests(unittest.TestCase):
+    """Compose the candidate's real offline attestors and report gates."""
+
+    def test_authenticated_catalog_completion_composes_probe_counters_attestors_and_tls_catalog(self):
+        edge_factory = EdgeAttestationTests()
+        edge_id = edge_factory.edge_id
+        edge_snapshot = edge_factory.edge_snapshot(phase="post-start")
+        # Docker inspect may canonicalize NET_BIND_SERVICE with a CAP_ prefix.
+        edge_snapshot["HostConfig"]["CapAdd"] = ["CAP_NET_BIND_SERVICE"]
+
+        backend_factory = BackendResumeAttestationTests()
+        backend_id = "c" * 64
+        api_key = "fixture-only-backend-key-" + "a" * 48
+        api_key_digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+        backend_snapshot = backend_factory.snapshot(phase="post-start")
+        backend_snapshot["Id"] = backend_id
+        backend_snapshot["Name"] = "/phi-omniroute-egress-backend-auth-v1"
+        backend_snapshot["Config"]["Labels"]["phi.omniroute.candidate.egress"] = "auth-v1"
+        backend_snapshot["Config"]["Env"] = ["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={api_key}"]
+
+        raw_probe_checks = {name: True for name in REPORT.CHECKS}
+        probe_raw = json.dumps({"probeStatus": "PASS", "phase": "COMPLETE", "checks": raw_probe_checks}).encode()
+        probe = REPORT.classify(probe_raw, 0)
+        self.assertEqual(probe["status"], "PASS")
+        counter_keys = {
+            "blocked_host_original", "blocked_special", "blocked_host_local", "allowed_tcp443",
+            "blocked_udp443", "blocked_tcp_other", "blocked_other", "blocked_host_input",
+        }
+        before = {name: 10 for name in counter_keys}
+        after = {name: value + 1 for name, value in before.items()}
+        counter_gate = REPORT.classify_counter_gate(
+            json.dumps(before), json.dumps(after), 0,
+            json.dumps({"status": probe["status"], "phase": probe["phase"], "checks": probe["checks"]}).encode(),
+        )
+        self.assertEqual(counter_gate, {"status": "PASS", "phase": "COMPLETE"})
+
+        edge_factory.attest(edge_snapshot, "post-start")
+        BACKEND.attest_backend(
+            backend_snapshot,
+            expected_id=backend_id,
+            expected_image_id=backend_factory.image_id,
+            expected_image_ref=backend_factory.image_ref,
+            edge_id=edge_id,
+            container_name="phi-omniroute-egress-backend-auth-v1",
+            label_key="phi.omniroute.candidate.egress",
+            label_value="auth-v1",
+            phase="post-start",
+            expected_auth_mode="enforced",
+            expected_api_key_sha256=api_key_digest,
+        )
+
+        catalog = {"object": "list", "data": [{"id": f"fixture-model-{index}"} for index in range(492)]}
+        with tempfile.TemporaryDirectory() as directory:
+            body = pathlib.Path(directory) / "catalog.json"
+            body.write_text(json.dumps(catalog), encoding="utf-8")
+            receipt, catalog_ok = TLS_REPORT.models_response_report(0, "200|0.01|0.03|0.04|0.05", str(body))
+            self.assertTrue(catalog_ok)
+            self.assertIn("models=PRESENT count=492", receipt)
+
+        # Negative composition checks prove that a changed security predicate,
+        # API key, or unusable catalog cannot be reported as completion.
+        bad_edge = json.loads(json.dumps(edge_snapshot))
+        bad_edge["HostConfig"]["CapAdd"] = ["NET_ADMIN"]
+        with self.assertRaisesRegex(EDGE.AttestationError, "cap_add_mismatch"):
+            edge_factory.attest(bad_edge, "post-start")
+        bad_backend = json.loads(json.dumps(backend_snapshot))
+        bad_backend["Config"]["Env"] = ["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={'d' * 64}"]
+        with self.assertRaisesRegex(BACKEND.AttestationError, "configured_api_key_digest_mismatch"):
+            BACKEND.attest_backend(
+                bad_backend,
+                expected_id=backend_id,
+                expected_image_id=backend_factory.image_id,
+                expected_image_ref=backend_factory.image_ref,
+                edge_id=edge_id,
+                container_name="phi-omniroute-egress-backend-auth-v1",
+                label_key="phi.omniroute.candidate.egress",
+                label_value="auth-v1",
+                phase="post-start",
+                expected_auth_mode="enforced",
+                expected_api_key_sha256=api_key_digest,
+            )
+        with tempfile.TemporaryDirectory() as directory:
+            body = pathlib.Path(directory) / "catalog.json"
+            body.write_text(json.dumps({"object": "list", "data": []}), encoding="utf-8")
+            receipt, catalog_ok = TLS_REPORT.models_response_report(0, "200|0.01|0.03|0.04|0.05", str(body))
+            self.assertFalse(catalog_ok)
+            self.assertIn("models=EMPTY", receipt)
+
 
 class ProbeReportTests(unittest.TestCase):
     def test_safe_success_and_internal_failure_phase_are_classified(self):
@@ -554,15 +948,77 @@ class ProbeReportTests(unittest.TestCase):
         self.assertEqual(result, {"status": "FAIL", "phase": "PROBE_OUTPUT_VALIDATION", "checks": {}})
         self.assertNotIn("secret", __import__("json").dumps(result))
 
+    def test_counter_gate_validates_every_json_input_and_command_status(self):
+        import json
+
+        checks = {name: True for name in REPORT.CHECKS}
+        probe = json.dumps({"status": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
+        nft_before = {"blocked_host_original": 0, "blocked_special": 0, "blocked_host_local": 0, "allowed_tcp443": 0, "blocked_udp443": 0, "blocked_all_other_egress": 0, "blocked_host_input": 0}
+        nft_after = {**nft_before, "blocked_special": 1, "allowed_tcp443": 1, "blocked_udp443": 1, "blocked_all_other_egress": 1, "blocked_host_input": 1}
+        ipt_before = {"blocked_host_original": 0, "blocked_special": 0, "blocked_host_local": 0, "allowed_tcp443": 0, "blocked_udp443": 0, "blocked_tcp_other": 0, "blocked_other": 0, "blocked_host_input": 0}
+        ipt_after = {**ipt_before, "blocked_special": 1, "allowed_tcp443": 1, "blocked_udp443": 1, "blocked_tcp_other": 1, "blocked_other": 1, "blocked_host_input": 1}
+
+        for before, after in ((nft_before, nft_after), (ipt_before, ipt_after)):
+            with self.subTest(backend="nftables" if len(before) == 7 else "iptables"):
+                result = REPORT.classify_counter_gate(json.dumps(before), json.dumps(after), 0, probe)
+                self.assertEqual(result, {"status": "PASS", "phase": "COMPLETE"})
+
+        self.assertEqual(REPORT.classify_counter_gate("", json.dumps(nft_after), 0, probe)["phase"], "COUNTERS_BEFORE_JSON_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate("{", json.dumps(nft_after), 0, probe)["phase"], "COUNTERS_BEFORE_JSON_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(nft_before), "", 1, probe)["phase"], "COUNTERS_AFTER_COMMAND_FAILED")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(nft_before), "", 0, probe)["phase"], "COUNTERS_AFTER_JSON_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(nft_before), "{", 0, probe)["phase"], "COUNTERS_AFTER_JSON_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(nft_before), json.dumps(nft_after), 0, b"")["phase"], "PROBE_REPORT_JSON_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(nft_before), json.dumps(nft_after), 0, b"{" )["phase"], "PROBE_REPORT_JSON_INVALID")
+        self.assertNotIn("secret", json.dumps(REPORT.classify_counter_gate(json.dumps(nft_before), "secret", 1, probe)))
+
+    def test_counter_gate_rejects_wrong_schema_and_missing_deltas(self):
+        import json
+
+        checks = {name: True for name in REPORT.CHECKS}
+        probe = json.dumps({"status": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
+        before = {"blocked_host_original": 0, "blocked_special": 0, "blocked_host_local": 0, "allowed_tcp443": 0, "blocked_udp443": 0, "blocked_all_other_egress": 0, "blocked_host_input": 0}
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(before), json.dumps({**before, "extra": 0}), 0, probe)["phase"], "COUNTER_SCHEMA_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(before), json.dumps({**before, "allowed_tcp443": True}), 0, probe)["phase"], "COUNTER_SCHEMA_INVALID")
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(before), json.dumps(before), 0, probe)["phase"], "COUNTER_DELTAS_INSUFFICIENT")
+        bad_probe = json.dumps({"status": "FAIL", "phase": "POLICY_CHECKS", "checks": checks}).encode()
+        self.assertEqual(REPORT.classify_counter_gate(json.dumps(before), json.dumps(before), 0, bad_probe)["phase"], "PROBE_REPORT_NOT_PASS")
+
+    def test_counter_gate_cli_reports_only_sanitized_phase_for_command_json_and_success(self):
+        import json
+
+        checks = {name: True for name in REPORT.CHECKS}
+        probe = json.dumps({"status": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
+        before = {"blocked_host_original": 0, "blocked_special": 0, "blocked_host_local": 0, "allowed_tcp443": 0, "blocked_udp443": 0, "blocked_tcp_other": 0, "blocked_other": 0, "blocked_host_input": 0}
+        after = {**before, "blocked_special": 1, "allowed_tcp443": 1, "blocked_udp443": 1, "blocked_tcp_other": 1, "blocked_other": 1, "blocked_host_input": 1}
+        command = [sys.executable, str(ROOT / "scripts" / "omniroute-egress-probe-report.py"), "--counter-gate", "--before-json", json.dumps(before), "--after-json", "private-counter-secret", "--after-exit-code", "7"]
+        failed_command = subprocess.run(command, input=probe, capture_output=True, check=False, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(failed_command.returncode, 0)
+        self.assertEqual(failed_command.stdout.decode().strip(), "OMNIROUTE_EGRESS_COUNTERS=FAIL phase=COUNTERS_AFTER_COMMAND_FAILED")
+        self.assertEqual(failed_command.stderr, b"")
+        self.assertNotIn(b"private-counter-secret", failed_command.stdout + failed_command.stderr)
+
+        invalid_json = subprocess.run([*command[:-4], "--after-json", "{", "--after-exit-code", "0"], input=probe, capture_output=True, check=False, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(invalid_json.returncode, 0)
+        self.assertEqual(invalid_json.stdout.decode().strip(), "OMNIROUTE_EGRESS_COUNTERS=FAIL phase=COUNTERS_AFTER_JSON_INVALID")
+        self.assertNotIn(b"private-counter-secret", invalid_json.stdout + invalid_json.stderr)
+
+        valid = subprocess.run([sys.executable, str(ROOT / "scripts" / "omniroute-egress-probe-report.py"), "--counter-gate", "--before-json", json.dumps(before), "--after-json", json.dumps(after), "--after-exit-code", "0"], input=probe, capture_output=True, check=False, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        self.assertEqual(valid.returncode, 0)
+        self.assertEqual(valid.stdout.decode().strip(), "OMNIROUTE_EGRESS_COUNTERS=PASS phase=COMPLETE")
+        self.assertEqual(valid.stderr, b"")
+
     def test_false_policy_check_remains_failure_and_counter_gate_remains_in_candidate(self):
         checks = {name: True for name in REPORT.CHECKS}
         checks["ipv6EgressBlocked"] = False
         raw = __import__("json").dumps({"probeStatus": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
         self.assertEqual(REPORT.classify(raw, 2)["phase"], "POLICY_CHECKS")
         source = (ROOT / "scripts" / "omniroute-docker-candidate.sh").read_text()
+        report = (ROOT / "scripts" / "omniroute-egress-probe-report.py").read_text()
         self.assertIn('counters --network-id "$network_id"', source)
-        self.assertIn('blocked_udp443', source)
-        self.assertIn('blocked_host_input', source)
+        self.assertIn('--counter-gate', source)
+        self.assertIn('blocked_udp443', report)
+        self.assertIn('blocked_host_input', report)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

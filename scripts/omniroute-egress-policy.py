@@ -164,7 +164,7 @@ def _validate_interface(value: str) -> str:
     return value
 
 
-def render_nft_batch(network_id: str, bridge: str, subnet: str, host_addresses: Sequence[str], docker_subnets: Sequence[str] = (), egress_interface: str = "") -> str:
+def render_nft_batch(network_id: str, bridge: str, subnet: str, host_addresses: Sequence[str], docker_subnets: Sequence[str] = (), egress_interface: str = "", *, established_reply: bool = True) -> str:
     names = policy_names(network_id)
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", bridge):
         raise PolicyError("docker_bridge_identity_invalid")
@@ -187,13 +187,32 @@ def render_nft_batch(network_id: str, bridge: str, subnet: str, host_addresses: 
         " }\n"
         " chain input {\n"
         "  type filter hook input priority -10; policy accept;\n"
-        f'  iifname "{bridge}" ip saddr {subnet} fib daddr type local counter drop comment "{marker}blocked_host_input"\n'
-        " }\n"
+        + (
+            f'  iifname "{bridge}" ip saddr {subnet} fib daddr type local meta l4proto tcp ct state established ct direction reply return comment "{marker}allowed_host_reply"\n'
+            if established_reply else ""
+        )
+        + f'  iifname "{bridge}" ip saddr {subnet} fib daddr type local counter drop comment "{marker}blocked_host_input"\n'
+        + " }\n"
         "}\n"
     )
 
 
-def iptables_plan(network_id: str, bridge: str, subnet: str, host_addresses: Sequence[str], docker_subnets: Sequence[str] = (), egress_interface: str = "") -> list[list[str]]:
+def _iptables_input_reply_rule(network_id: str, bridge: str, subnet: str) -> list[str]:
+    # Return only established TCP replies arriving on this network's attested
+    # bridge/source range and destined to a host-local address. RETURN resumes
+    # the host's ordinary INPUT rules; it never ACCEPTs a new candidate flow.
+    names = policy_names(network_id)
+    return [
+        "iptables", "-w", "-t", "filter", "-A", names["input"],
+        "-i", bridge, "-s", subnet, "-p", "tcp",
+        "-m", "conntrack", "--ctstate", "ESTABLISHED", "--ctdir", "REPLY",
+        "-m", "addrtype", "--dst-type", "LOCAL",
+        "-m", "comment", "--comment", f"phi-omni:{network_id[:12]}:allowed_host_reply",
+        "-j", "RETURN",
+    ]
+
+
+def iptables_plan(network_id: str, bridge: str, subnet: str, host_addresses: Sequence[str], docker_subnets: Sequence[str] = (), egress_interface: str = "", *, established_reply: bool = True) -> list[list[str]]:
     names = policy_names(network_id)
     subnet = str(ipaddress.ip_network(subnet, strict=True))
     host_addresses = _normalize_host_addresses(host_addresses)
@@ -219,6 +238,7 @@ def iptables_plan(network_id: str, bridge: str, subnet: str, host_addresses: Seq
         ["iptables", "-w", "-t", "filter", "-A", main, "-p", "udp", "--dport", "443", "-j", names["UDP443"]],
         ["iptables", "-w", "-t", "filter", "-A", main, "-p", "tcp", "-j", names["TCP_OTHER"]],
         ["iptables", "-w", "-t", "filter", "-A", main, "-j", names["OTHER"]],
+        *([_iptables_input_reply_rule(network_id, bridge, subnet)] if established_reply else []),
         ["iptables", "-w", "-t", "filter", "-A", names["input"], "-m", "addrtype", "--dst-type", "LOCAL", "-j", names["HOSTLOCAL"]],
         ["iptables", "-w", "-t", "filter", "-A", names["input"], "-j", "RETURN"],
     ])
@@ -391,8 +411,8 @@ def _nft_apply(facts: NetworkFacts) -> None:
 
 
 _IPTABLES_RULE_OPTIONS = frozenset({
-    "-i", "-o", "-s", "-d", "-p", "-m", "--comment", "--ctorigdst",
-    "--dst-type", "--dport", "-j",
+    "-i", "-o", "-s", "-d", "-p", "-m", "--comment", "--ctorigdst", "--ctorigdstport",
+    "--ctstate", "--ctdir", "--dst-type", "--dport", "-j",
 })
 
 
@@ -422,7 +442,9 @@ def _iptables_rule_semantics(rule: str | Sequence[str], *, expected_chain: str |
         if option not in _IPTABLES_RULE_OPTIONS or not value or value.startswith("-") and option != "--comment":
             raise PolicyError("iptables_rule_option_invalid")
         pairs.append((option, value))
-    if len({option for option, _ in pairs}) != len(pairs):
+    single_value_options = [option for option, _ in pairs if option != "-m"]
+    modules = [value for option, value in pairs if option == "-m"]
+    if len(set(single_value_options)) != len(single_value_options) or len(set(modules)) != len(modules):
         raise PolicyError("iptables_rule_duplicate_option")
     # xtables may serialize the protocol extension explicitly even when the
     # plan's ``-p tcp/udp --dport`` already loads it implicitly. Treat only a
@@ -474,7 +496,7 @@ def _iptables_hook_rules(raw: str, chain: str) -> list[tuple[str, tuple[tuple[st
     return result
 
 
-def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
+def _verify_iptables(network_id: str, facts: NetworkFacts, *, established_reply: bool = True) -> None:
     names = policy_names(network_id)
     docker_user = _iptables_hook_rules(_run(["iptables", "-w", "-t", "filter", "-S", "DOCKER-USER"]), "DOCKER-USER")
     input_rules = _iptables_hook_rules(_run(["iptables", "-w", "-t", "filter", "-S", "INPUT"]), "INPUT")
@@ -498,7 +520,7 @@ def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
     )]
     if not input_rules or input_rules[0] != expected_input or input_owned != [expected_input]:
         raise PolicyError("iptables_host_input_hook_missing")
-    expected = iptables_plan(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface)
+    expected = iptables_plan(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface, established_reply=established_reply)
     # Stable plan order makes the first reported discrepancy reproducible.
     created = [names[key] for key in IPTABLES_TARGETS] + [names["main"], names["input"]]
     for chain in created:
@@ -519,7 +541,7 @@ def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
             raise PolicyError(f"iptables_custom_chain_mismatch:chain={chain}:rules_unknown")
 
 
-def _verify_nft(network_id: str, facts: NetworkFacts) -> None:
+def _verify_nft(network_id: str, facts: NetworkFacts, *, established_reply: bool = True) -> None:
     table = policy_names(network_id)["table"]
     raw = _run(["nft", "--numeric", "list", "table", "inet", table])
     lines = [" ".join(line.strip().split()) for line in raw.splitlines() if line.strip()]
@@ -564,7 +586,7 @@ def _verify_nft(network_id: str, facts: NetworkFacts) -> None:
             raise PolicyError("nft_policy_chain_nesting_invalid")
         return result
 
-    expected_lines = [" ".join(line.strip().split()) for line in render_nft_batch(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface).splitlines() if line.strip()]
+    expected_lines = [" ".join(line.strip().split()) for line in render_nft_batch(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface, established_reply=established_reply).splitlines() if line.strip()]
     actual = parse_table(lines, rendered=False)
     expected = parse_table(expected_lines, rendered=True)
     if set(actual) != {"forward", "input"} or set(expected) != {"forward", "input"}:
@@ -578,6 +600,127 @@ def _verify_nft(network_id: str, facts: NetworkFacts) -> None:
             raise PolicyError("nft_policy_hook_mismatch")
         if actual_rules != expected_rules:
             raise PolicyError("nft_policy_rule_semantics_mismatch")
+
+
+def _verify_firewall(network_id: str, facts: NetworkFacts, backend: str, *, established_reply: bool = True) -> None:
+    if backend == "iptables":
+        _verify_iptables(network_id, facts, established_reply=established_reply)
+    elif backend == "nftables":
+        _verify_nft(network_id, facts, established_reply=established_reply)
+    else:
+        raise PolicyError("docker_firewall_backend_unknown")
+
+
+def _input_migration_preflight(network_id: str, facts: NetworkFacts, backend: str) -> str:
+    try:
+        _verify_firewall(network_id, facts, backend)
+        return "VERIFIED"
+    except PolicyError:
+        pass
+    try:
+        _verify_firewall(network_id, facts, backend, established_reply=False)
+        return "LEGACY_VERIFIED"
+    except PolicyError as error:
+        raise PolicyError("input_policy_migration_preflight_unrecognized") from error
+
+
+def _nft_input_reply_expression(network_id: str, bridge: str, subnet: str) -> str:
+    marker = f"phi-omni:{network_id[:12]}:allowed_host_reply"
+    return (
+        f'iifname "{bridge}" ip saddr {subnet} fib daddr type local meta l4proto tcp '
+        f'ct state established ct direction reply return comment "{marker}"'
+    )
+
+
+def _iptables_input_reply_command(network_id: str, bridge: str, subnet: str, action: str) -> list[str]:
+    rule = _iptables_input_reply_rule(network_id, bridge, subnet)
+    chain = policy_names(network_id)["input"]
+    if action == "insert":
+        return [*rule[:4], "-I", chain, "1", *rule[rule.index("-A") + 2:]]
+    if action == "delete":
+        return [*rule[:4], "-D", chain, *rule[rule.index("-A") + 2:]]
+    raise PolicyError("input_migration_action_invalid")
+
+
+def _migrate_input_reply(network_id: str, facts: NetworkFacts, backend: str) -> bool:
+    """Migrate only an exact legacy policy, or attest an already migrated one.
+
+    The sole mutation inserts one reply-only rule into the network-owned INPUT
+    chain. A failed/ambiguous state is retained for inspection; rerunning this
+    operation is safe only when the complete current or legacy policy verifies.
+    """
+    try:
+        _verify_firewall(network_id, facts, backend)
+        return False
+    except PolicyError:
+        pass
+    try:
+        _verify_firewall(network_id, facts, backend, established_reply=False)
+    except PolicyError as error:
+        raise PolicyError("input_migration_precondition_unrecognized") from error
+
+    names = policy_names(network_id)
+    if backend == "iptables":
+        _run(_iptables_input_reply_command(network_id, facts.bridge, facts.subnet, "insert"))
+    elif backend == "nftables":
+        _run(
+            ["nft", "-f", "-"],
+            input_text=(
+                f"insert rule inet {names['table']} input "
+                f"{_nft_input_reply_expression(network_id, facts.bridge, facts.subnet)}\n"
+            ),
+        )
+    else:
+        raise PolicyError("docker_firewall_backend_unknown")
+    try:
+        _verify_firewall(network_id, facts, backend)
+    except PolicyError as error:
+        raise PolicyError("input_migration_postverify_failed_state_preserved") from error
+    return True
+
+
+def _nft_input_reply_handle(network_id: str) -> str:
+    table = policy_names(network_id)["table"]
+    raw = _run(["nft", "-a", "list", "chain", "inet", table, "input"])
+    marker = f'comment "phi-omni:{network_id[:12]}:allowed_host_reply"'
+    handles = []
+    for line in raw.splitlines():
+        if marker not in line:
+            continue
+        match = re.search(r"# handle ([0-9]+)\s*$", line)
+        if match is None:
+            raise PolicyError("input_migration_rollback_handle_unknown")
+        handles.append(match.group(1))
+    if len(handles) != 1:
+        raise PolicyError("input_migration_rollback_rule_identity_mismatch")
+    return handles[0]
+
+
+def _rollback_input_reply(network_id: str, facts: NetworkFacts, backend: str) -> bool:
+    """Remove only the exact reply exception and verify the exact old policy."""
+    try:
+        _verify_firewall(network_id, facts, backend, established_reply=False)
+        return False
+    except PolicyError:
+        pass
+    try:
+        _verify_firewall(network_id, facts, backend)
+    except PolicyError as error:
+        raise PolicyError("input_migration_rollback_precondition_unrecognized") from error
+
+    names = policy_names(network_id)
+    if backend == "iptables":
+        _run(_iptables_input_reply_command(network_id, facts.bridge, facts.subnet, "delete"))
+    elif backend == "nftables":
+        handle = _nft_input_reply_handle(network_id)
+        _run(["nft", "delete", "rule", "inet", names["table"], "input", "handle", handle])
+    else:
+        raise PolicyError("docker_firewall_backend_unknown")
+    try:
+        _verify_firewall(network_id, facts, backend, established_reply=False)
+    except PolicyError as error:
+        raise PolicyError("input_migration_rollback_postverify_failed_state_preserved") from error
+    return True
 
 
 def _counter_snapshot(network_id: str, facts: NetworkFacts, backend: str) -> dict[str, int]:
@@ -619,7 +762,7 @@ def _counter_snapshot(network_id: str, facts: NetworkFacts, backend: str) -> dic
 
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("preflight", "apply", "verify", "facts", "counters", "rollback"))
+    parser.add_argument("action", choices=("preflight", "apply", "verify", "facts", "counters", "preflight-input", "migrate-input", "rollback-input", "rollback"))
     parser.add_argument("--network-id")
     parser.add_argument("--daemon-id", required=True)
     parser.add_argument("--bridge")
@@ -657,6 +800,25 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return 0
     if not _valid_id(args.network_id):
         raise PolicyError("network_identity_argument_invalid")
+    if args.action in {"preflight-input", "migrate-input", "rollback-input"}:
+        if not args.expect_empty:
+            raise PolicyError("input_migration_requires_empty_candidate_network")
+        facts = _network_facts(args.network_id, require_empty=True)
+        if _run(["docker", "network", "inspect", "--format", "{{.Name}}", args.network_id]).strip() != "phi-omniroute-egress-candidate-v1":
+            raise PolicyError("docker_network_name_mismatch")
+        _, _, backend = _docker_facts(args.daemon_id)
+        if args.action == "preflight-input":
+            state = _input_migration_preflight(args.network_id, facts, backend)
+            print(f"OMNIROUTE_EGRESS_POLICY={state} backend={backend} network={args.network_id[:12]} input_migration=ready")
+        elif args.action == "migrate-input":
+            changed = _migrate_input_reply(args.network_id, facts, backend)
+            state = "MIGRATED" if changed else "ALREADY_VERIFIED"
+            print(f"OMNIROUTE_EGRESS_POLICY={state} backend={backend} network={args.network_id[:12]} rule=host_reply_only")
+        else:
+            changed = _rollback_input_reply(args.network_id, facts, backend)
+            state = "ROLLED_BACK" if changed else "ALREADY_LEGACY"
+            print(f"OMNIROUTE_EGRESS_POLICY={state} backend={backend} network={args.network_id[:12]} rule=host_reply_only")
+        return 0
     if args.action == "apply":
         facts = _network_facts(args.network_id, require_empty=True)
         if _run(["docker", "network", "inspect", "--format", "{{.Name}}", args.network_id]).strip() != "phi-omniroute-egress-candidate-v1":

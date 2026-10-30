@@ -39,6 +39,18 @@ PHASES = {
     "PROBE_OUTPUT_VALIDATION",
     "POLICY_CHECKS",
 }
+COUNTER_KEYSETS = (
+    frozenset({
+        "blocked_host_original", "blocked_special", "blocked_host_local",
+        "allowed_tcp443", "blocked_udp443", "blocked_all_other_egress",
+        "blocked_host_input",
+    }),
+    frozenset({
+        "blocked_host_original", "blocked_special", "blocked_host_local",
+        "allowed_tcp443", "blocked_udp443", "blocked_tcp_other",
+        "blocked_other", "blocked_host_input",
+    }),
+)
 
 
 def classify(raw: bytes, exit_code: int) -> dict[str, object]:
@@ -77,12 +89,79 @@ def classify(raw: bytes, exit_code: int) -> dict[str, object]:
     return {"status": "FAIL", "phase": phase, "checks": normalized}
 
 
+def classify_counter_gate(before_raw: str, after_raw: str, after_exit_code: int, probe_raw: bytes) -> dict[str, str]:
+    """Compare only bounded counter/probe JSON and return fixed safe diagnostics."""
+    try:
+        before = json.loads(before_raw)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        return {"status": "FAIL", "phase": "COUNTERS_BEFORE_JSON_INVALID"}
+    if not isinstance(before, dict):
+        return {"status": "FAIL", "phase": "COUNTERS_BEFORE_JSON_INVALID"}
+    if type(after_exit_code) is not int or after_exit_code != 0:
+        return {"status": "FAIL", "phase": "COUNTERS_AFTER_COMMAND_FAILED"}
+    try:
+        after = json.loads(after_raw)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        return {"status": "FAIL", "phase": "COUNTERS_AFTER_JSON_INVALID"}
+    if not isinstance(after, dict):
+        return {"status": "FAIL", "phase": "COUNTERS_AFTER_JSON_INVALID"}
+    try:
+        probe = json.loads(probe_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {"status": "FAIL", "phase": "PROBE_REPORT_JSON_INVALID"}
+    if not isinstance(probe, dict):
+        return {"status": "FAIL", "phase": "PROBE_REPORT_INVALID"}
+    if set(probe) != {"status", "phase", "checks"} or probe.get("status") != "PASS" or probe.get("phase") != "COMPLETE":
+        return {"status": "FAIL", "phase": "PROBE_REPORT_NOT_PASS"}
+    checks = probe.get("checks")
+    if not isinstance(checks, dict) or set(checks) != set(CHECKS) or any(type(checks.get(key)) is not bool for key in CHECKS) or not all(checks.values()):
+        return {"status": "FAIL", "phase": "PROBE_CHECKS_INVALID"}
+
+    before_keys = frozenset(before)
+    after_keys = frozenset(after)
+    if before_keys not in COUNTER_KEYSETS or after_keys != before_keys:
+        return {"status": "FAIL", "phase": "COUNTER_SCHEMA_INVALID"}
+    if any(type(value) is not int or value < 0 for value in before.values()) or any(type(value) is not int or value < 0 for value in after.values()):
+        return {"status": "FAIL", "phase": "COUNTER_SCHEMA_INVALID"}
+
+    def increased(name: str) -> bool:
+        return name in before and after[name] > before[name]
+
+    required_deltas = (
+        increased("allowed_tcp443"),
+        increased("blocked_tcp_other") or increased("blocked_all_other_egress"),
+        increased("blocked_udp443"),
+        increased("blocked_other") or increased("blocked_all_other_egress"),
+        increased("blocked_special"),
+        increased("blocked_host_input") or increased("blocked_host_local") or increased("blocked_host_original"),
+    )
+    if not all(required_deltas):
+        return {"status": "FAIL", "phase": "COUNTER_DELTAS_INSUFFICIENT"}
+    return {"status": "PASS", "phase": "COMPLETE"}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exit-code", type=int, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--exit-code", type=int)
+    mode.add_argument("--counter-gate", action="store_true")
+    parser.add_argument("--before-json")
+    parser.add_argument("--after-json")
+    parser.add_argument("--after-exit-code", type=int)
     args = parser.parse_args(argv)
-    result = classify(sys.stdin.buffer.read(65536), args.exit_code)
-    print(json.dumps(result, separators=(",", ":"), sort_keys=True))
+    if args.counter_gate:
+        if args.before_json is None or args.after_json is None or args.after_exit_code is None:
+            result = {"status": "FAIL", "phase": "COUNTER_VALIDATOR_ARGUMENTS_INVALID"}
+        else:
+            probe_raw = sys.stdin.buffer.read(65537)
+            if len(probe_raw) > 65536:
+                result = {"status": "FAIL", "phase": "PROBE_REPORT_TOO_LARGE"}
+            else:
+                result = classify_counter_gate(args.before_json, args.after_json, args.after_exit_code, probe_raw)
+        print(f"OMNIROUTE_EGRESS_COUNTERS={result['status']} phase={result['phase']}")
+    else:
+        result = classify(sys.stdin.buffer.read(65536), args.exit_code)
+        print(json.dumps(result, separators=(",", ":"), sort_keys=True))
     return 0
 
 

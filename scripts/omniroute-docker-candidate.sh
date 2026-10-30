@@ -16,26 +16,57 @@ readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
 readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
 readonly EGRESS_REPORT_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe-report.py"
+readonly TLS_HEALTH_REPORT_SCRIPT="$SCRIPT_DIR/omniroute-tls-health-report.py"
 readonly EDGE_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-edge-attest.py"
 readonly BACKEND_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-backend-attest.py"
-readonly POLICY_SCRIPT_SHA256='58ac39dd9cc0b6f4997e2618c4492b7acf6d61ab0ae75de18161ff9da85bef6f'
-readonly EGRESS_PROBE_SHA256='887ded845f880729a1745b62352f737de0109da14ac3c54c3690b0074ef0b1f8'
-readonly EGRESS_REPORT_SHA256='6ecb0adb8b1dc2ea5a74dc36fe3d8772f54859108abf07b0401cb4ebde919272'
+readonly BACKEND_AUTH_CONFIG_SCRIPT="$SCRIPT_DIR/omniroute-backend-auth-config.py"
+readonly POLICY_SCRIPT_SHA256='ff2ef7a40bb672e8d0f251e83b9b3130a8497fc1e0e10b79d2c80b44132abe0b'
+readonly EGRESS_PROBE_SHA256='85a4ec7cfc0396c65a93ce0d95722c6340b2e1c32eab326876170999012a779d'
+readonly EGRESS_REPORT_SHA256='c7dc6ad7b39814a193297f5abc1e487d60b50e5babb29bea19216f2b9d9a2e9c'
+readonly TLS_HEALTH_REPORT_SHA256='b87d6fe56e7856c6d55a50f376f1aaac99ee7a1e09aaee74df0fd33630396cb5'
 readonly EDGE_ATTEST_SHA256='cd5801cb7a05895639b4f8d305f0bc1814dc8c13b1010b97382e0c9336904df2'
-readonly BACKEND_ATTEST_SHA256='fce908101041ee12faa7202854a30588ea82a6fd6fc2295062719c850ff47b3a'
+readonly BACKEND_ATTEST_SHA256='a6e92e046bd76fe8235286c9de161f586be18aec3c9e5229f20c00e4140e9aef'
+readonly BACKEND_AUTH_CONFIG_SHA256='d5bee35fb391f9995122e4250ab39328fc6b084d835ca0b057fe44145a8402fb'
 
 edge_id=''
 backend_id=''
+legacy_backend_id=''
+backend_container_name=''
+backend_env_file=''
+backend_auth_mode='unknown'
+backend_api_key_sha256=''
+edge_ip=''
 edge_started=0
 backend_started=0
 completed=0
 caddy_log=''
 egress_probe_report=''
 models_file=''
-inspect_file=''
+models_curl_exit=0
+models_writeout=''
+models_status='000'
+models_report=''
+models_report_exit=0
 
 fail() { printf 'OMNIROUTE_CANDIDATE=FAIL reason=%s\n' "$1" >&2; exit 1; }
 log() { printf 'OMNIROUTE_CANDIDATE=%s\n' "$1"; }
+
+attest_edge_address() {
+	local edge_runtime_networks network_runtime_ipam
+	local -a edge_subnet_args=()
+	edge_ip=''
+	edge_runtime_networks=$(docker inspect --format '{{.Id}}|{{json .NetworkSettings.Networks}}' "$edge_id") || return 1
+	network_runtime_ipam=$(docker network inspect --format '{{.Id}}|{{json .IPAM.Config}}' "$network_id") || return 1
+	if (( egress_candidate == 1 )); then
+		[[ -n "${policy_subnet:-}" ]] || return 1
+		edge_subnet_args=(--expected-subnet "$policy_subnet")
+	fi
+	edge_ip=$(python3 "$TLS_HEALTH_REPORT_SCRIPT" edge-ip \
+		--edge-snapshot "$edge_runtime_networks" --network-snapshot "$network_runtime_ipam" \
+		--expected-edge-id "$edge_id" --expected-network-id "$network_id" --network-name "$NETWORK" \
+		"${edge_subnet_args[@]}" 2>/dev/null) || { edge_ip=''; return 1; }
+	[[ "$edge_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { edge_ip=''; return 1; }
+}
 
 render_caddyfile() {
 	local port=$1
@@ -54,6 +85,8 @@ egress_candidate=0
 resume_egress_network_id=''
 resume_edge_container_id=''
 resume_backend_container_id=''
+resume_auth_backend_container_id=''
+backend_api_key_upgrade=0
 while (($#)); do
 	case "$1" in
 		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
@@ -78,6 +111,17 @@ while (($#)); do
 			resume_backend_container_id=$2
 			shift
 			;;
+		--resume-auth-backend-container-id)
+			(($# >= 2)) || fail 'resume_auth_backend_container_id_missing'
+			[[ -z "$resume_auth_backend_container_id" ]] || fail 'duplicate_resume_auth_backend_container_id'
+			[[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_auth_backend_container_id_invalid'
+			resume_auth_backend_container_id=$2
+			shift
+			;;
+		--backend-api-key-upgrade)
+			(( backend_api_key_upgrade == 0 )) || fail 'duplicate_backend_api_key_upgrade_flag'
+			backend_api_key_upgrade=1
+			;;
 		*) fail 'unsupported_arguments' ;;
 	esac
 	shift
@@ -86,12 +130,18 @@ if (( egress_candidate == 1 )); then
 	readonly NETWORK='phi-omniroute-egress-candidate-v1'
 	readonly EDGE_NAME='phi-omniroute-egress-edge-v1'
 	readonly BACKEND_NAME='phi-omniroute-egress-backend-v1'
+	readonly BACKEND_AUTH_NAME='phi-omniroute-egress-backend-auth-v1'
 	readonly NETWORK_LABEL='phi.omniroute.candidate.egress=v1'
 else
 	readonly NETWORK='phi-omniroute-candidate-3_8_50'
 	readonly EDGE_NAME='phi-omniroute-candidate-edge-3_8_50'
 	readonly BACKEND_NAME='phi-omniroute-candidate-backend-3_8_50'
+	readonly BACKEND_AUTH_NAME='phi-omniroute-candidate-backend-auth-3_8_50'
 	readonly NETWORK_LABEL='phi.omniroute.candidate=true'
+fi
+if (( backend_api_key_upgrade == 1 )); then
+	(( egress_candidate == 1 && resume_existing == 1 )) || fail 'backend_api_key_upgrade_requires_egress_resume'
+	[[ -n "$resume_egress_network_id" && -n "$resume_edge_container_id" && -n "$resume_backend_container_id" ]] || fail 'backend_api_key_upgrade_requires_exact_existing_ids'
 fi
 if (( egress_candidate == 1 && resume_existing == 1 )); then
 	[[ "$resume_egress_network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_egress_network_id_required'
@@ -107,13 +157,17 @@ if [[ -n "$resume_backend_container_id" ]]; then
 	[[ -n "$resume_edge_container_id" ]] || fail 'resume_backend_requires_exact_edge_id'
 	[[ "$resume_backend_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_backend_container_id_invalid'
 fi
+if [[ -n "$resume_auth_backend_container_id" ]]; then
+	(( egress_candidate == 1 && resume_existing == 1 && backend_api_key_upgrade == 0 )) || fail 'resume_auth_backend_requires_egress_resume_without_upgrade'
+	[[ -n "$resume_egress_network_id" && -n "$resume_edge_container_id" && -n "$resume_backend_container_id" ]] || fail 'resume_auth_backend_requires_exact_network_edge_and_legacy_backend_ids'
+	[[ "$resume_auth_backend_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_auth_backend_container_id_invalid'
+fi
 
 on_exit() {
 	local status=$?
 	if [[ -n "$caddy_log" && -f "$caddy_log" && ! -L "$caddy_log" ]]; then rm -f -- "$caddy_log"; fi
 	if [[ -n "$egress_probe_report" && -f "$egress_probe_report" && ! -L "$egress_probe_report" ]]; then rm -f -- "$egress_probe_report"; fi
 	if [[ -n "$models_file" && -f "$models_file" && ! -L "$models_file" ]]; then rm -f -- "$models_file"; fi
-	if [[ -n "$inspect_file" && -f "$inspect_file" && ! -L "$inspect_file" ]]; then rm -f -- "$inspect_file"; fi
 	if (( status != 0 && completed == 0 )); then
 		if [[ -e "$ROOT" || -L "$ROOT" ]]; then printf 'OMNIROUTE_CANDIDATE=PROTECTED_HOST_CONFIG_PRESERVED path=%s\n' "$ROOT" >&2; fi
 		# Stop only exact IDs created by this invocation. Never remove anything.
@@ -126,6 +180,7 @@ trap on_exit EXIT
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail 'run_from_authorized_host_terminal_with_sudo'
 for command in docker openssl curl ss sha256sum install python3 ip; do command -v "$command" >/dev/null 2>&1 || fail "missing_host_command_${command}"; done
+printf '%s  %s\n' "$TLS_HEALTH_REPORT_SHA256" "$TLS_HEALTH_REPORT_SCRIPT" | sha256sum --check --status || fail 'tls_health_report_script_digest_mismatch'
 if (( egress_candidate == 1 )); then
 	[[ "$POLICY_SCRIPT_SHA256" != TO_BE_PINNED ]] || fail 'egress_policy_script_digest_not_pinned'
 	printf '%s  %s\n' "$POLICY_SCRIPT_SHA256" "$POLICY_SCRIPT" | sha256sum --check --status || fail 'egress_policy_script_digest_mismatch'
@@ -137,6 +192,8 @@ if (( egress_candidate == 1 )); then
 	printf '%s  %s\n' "$EDGE_ATTEST_SHA256" "$EDGE_ATTEST_SCRIPT" | sha256sum --check --status || fail 'edge_attestation_script_digest_mismatch'
 	[[ "$BACKEND_ATTEST_SHA256" != TO_BE_PINNED ]] || fail 'backend_attestation_script_digest_not_pinned'
 	printf '%s  %s\n' "$BACKEND_ATTEST_SHA256" "$BACKEND_ATTEST_SCRIPT" | sha256sum --check --status || fail 'backend_attestation_script_digest_mismatch'
+	[[ "$BACKEND_AUTH_CONFIG_SHA256" != TO_BE_PINNED ]] || fail 'backend_auth_config_script_digest_not_pinned'
+	printf '%s  %s\n' "$BACKEND_AUTH_CONFIG_SHA256" "$BACKEND_AUTH_CONFIG_SCRIPT" | sha256sum --check --status || fail 'backend_auth_config_script_digest_mismatch'
 fi
 
 # Pin the local Docker context/daemon to the system Docker socket. Do not fall
@@ -164,9 +221,22 @@ fi
 if [[ -n "$resume_backend_container_id" ]]; then
 	existing_backend_id=$(docker container inspect --format '{{.Id}}' "$BACKEND_NAME" 2>/dev/null) || fail 'resume_backend_container_name_missing_preserved'
 	[[ "$existing_backend_id" == "$resume_backend_container_id" ]] || fail 'resume_backend_container_name_identity_mismatch_preserved'
-	backend_id=$resume_backend_container_id
+	legacy_backend_id=$resume_backend_container_id
+	if (( backend_api_key_upgrade == 1 )); then
+		docker container inspect "$BACKEND_AUTH_NAME" >/dev/null 2>&1 && fail 'auth_upgrade_backend_name_already_exists_preserved'
+	elif [[ -n "$resume_auth_backend_container_id" ]]; then
+		existing_auth_backend_id=$(docker container inspect --format '{{.Id}}' "$BACKEND_AUTH_NAME" 2>/dev/null) || fail 'resume_auth_backend_name_missing_preserved'
+		[[ "$existing_auth_backend_id" == "$resume_auth_backend_container_id" ]] || fail 'resume_auth_backend_name_identity_mismatch_preserved'
+		backend_id=$resume_auth_backend_container_id
+	else
+		docker container inspect "$BACKEND_AUTH_NAME" >/dev/null 2>&1 && fail 'auth_backend_exists_requires_exact_resume_id_preserved'
+		backend_id=$resume_backend_container_id
+	fi
+elif [[ -n "$resume_auth_backend_container_id" ]]; then
+	fail 'resume_auth_backend_requires_exact_legacy_backend_id'
 else
 	docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
+	docker container inspect "$BACKEND_AUTH_NAME" >/dev/null 2>&1 && fail 'auth_backend_name_already_exists_preserved'
 fi
 if [[ -n "$resume_egress_network_id" ]]; then
 	network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_missing_preserved'
@@ -189,8 +259,8 @@ if (( egress_candidate == 1 )); then
 	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=READY\ backend=*\ host_ipv4_count=*\ egress=* ]] || fail 'egress_policy_host_preflight_receipt_invalid'
 	log "$policy_result"
 	if [[ -n "$resume_egress_network_id" ]]; then
-		policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_or_network_not_attested_preserved'
-		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_or_network_not_attested_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
 		log "$policy_result"
 	fi
 fi
@@ -211,16 +281,19 @@ prepare_protected_config() {
 		# A prior run can reach the Caddy validation gate after creating these
 		# files. Reuse them only when the full expected object set, ownership,
 		# modes, and secret schema match; never ask for replacement secrets.
-		python3 - "$ROOT" <<'PY' || fail 'existing_protected_config_untrusted_preserved'
+		local existing_config_receipt
+		existing_config_receipt=$(python3 - "$ROOT" <<'PY'
 import os, re, stat, sys
 root = sys.argv[1]
-expected_names = {"Caddyfile", "backend.env", "ca.crt", "caddy.env", "tls.key"}
+base_names = {"Caddyfile", "backend.env", "ca.crt", "caddy.env", "tls.key"}
 try:
     root_stat = os.lstat(root)
     if not stat.S_ISDIR(root_stat.st_mode) or stat.S_ISLNK(root_stat.st_mode) or (root_stat.st_uid, root_stat.st_gid, stat.S_IMODE(root_stat.st_mode)) != (0, 0, 0o755): raise ValueError
-    if set(os.listdir(root)) != expected_names: raise ValueError
+    names = set(os.listdir(root))
+    if names not in (base_names, base_names | {"backend-auth.env"}): raise ValueError
     files = {}
     modes = {"Caddyfile": 0o644, "backend.env": 0o600, "ca.crt": 0o644, "caddy.env": 0o600, "tls.key": 0o600}
+    if "backend-auth.env" in names: modes["backend-auth.env"] = 0o600
     for name, mode in modes.items():
         path = os.path.join(root, name)
         before = os.lstat(path)
@@ -250,17 +323,34 @@ try:
     proxy = parse_env(files["caddy.env"])
     if set(proxy) != {"OMNIROUTE_PROXY_TOKEN"} or not re.fullmatch(r"[A-Fa-f0-9]{64,4096}", proxy["OMNIROUTE_PROXY_TOKEN"]): raise ValueError
     backend = parse_env(files["backend.env"])
-    expected = {"JWT_SECRET", "API_KEY_SECRET", "INITIAL_PASSWORD", "FORCE_OWNERSHIP", "REQUIRE_API_KEY", "HOSTNAME", "PORT", "BASE_URL", "NEXT_PUBLIC_BASE_URL", "AUTH_COOKIE_SECURE"}
-    if set(backend) != expected: raise ValueError
+    base_expected = {"JWT_SECRET", "API_KEY_SECRET", "INITIAL_PASSWORD", "FORCE_OWNERSHIP", "REQUIRE_API_KEY", "HOSTNAME", "PORT", "BASE_URL", "NEXT_PUBLIC_BASE_URL", "AUTH_COOKIE_SECURE"}
+    if set(backend) not in (base_expected, base_expected | {"OMNIROUTE_API_KEY"}): raise ValueError
     if not re.fullmatch(r"[a-f0-9]{64}", backend["JWT_SECRET"]) or not re.fullmatch(r"[a-f0-9]{64}", backend["API_KEY_SECRET"]): raise ValueError
     if not re.fullmatch(r"[A-Za-z0-9._~!@#%+=-]{24,}", backend["INITIAL_PASSWORD"]): raise ValueError
-    for key, value in {"FORCE_OWNERSHIP":"false", "REQUIRE_API_KEY":"false", "HOSTNAME":"127.0.0.1", "PORT":"20128", "BASE_URL":"http://127.0.0.1:20128", "NEXT_PUBLIC_BASE_URL":"https://127.0.0.1:20129", "AUTH_COOKIE_SECURE":"true"}.items():
+    for key, value in {"FORCE_OWNERSHIP":"false", "HOSTNAME":"127.0.0.1", "PORT":"20128", "BASE_URL":"http://127.0.0.1:20128", "NEXT_PUBLIC_BASE_URL":"https://127.0.0.1:20129", "AUTH_COOKIE_SECURE":"true"}.items():
         if backend[key] != value: raise ValueError
+    if set(backend) == base_expected:
+        if backend["REQUIRE_API_KEY"] != "false": raise ValueError
+        auth_mode = "legacy"
+    else:
+        if backend["REQUIRE_API_KEY"] != "true" or backend["OMNIROUTE_API_KEY"] != proxy["OMNIROUTE_PROXY_TOKEN"]: raise ValueError
+        auth_mode = "enforced"
+    if "backend-auth.env" in names:
+        if auth_mode != "legacy": raise ValueError
+        auth = parse_env(files["backend-auth.env"])
+        expected_auth = dict(backend, REQUIRE_API_KEY="true", OMNIROUTE_API_KEY=proxy["OMNIROUTE_PROXY_TOKEN"])
+        if auth != expected_auth: raise ValueError
 except Exception:
     print("OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=FAIL_CLOSED", file=sys.stderr)
     raise SystemExit(1)
-print("OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=PASS")
+print(f"OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=PASS auth_mode={auth_mode}")
 PY
+		) || fail 'existing_protected_config_untrusted_preserved'
+		case "$existing_config_receipt" in
+			OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=PASS\ auth_mode=legacy) backend_auth_mode='legacy' ;;
+			OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=PASS\ auth_mode=enforced) backend_auth_mode='enforced' ;;
+			*) fail 'existing_protected_config_receipt_invalid_preserved' ;;
+		esac
 		local expected_caddy known_bad_caddy old_identity temp_caddy
 		expected_caddy=$(render_caddyfile "$BACKEND_PORT")
 		known_bad_caddy=${expected_caddy/@unauthorized/\\@unauthorized}
@@ -314,16 +404,17 @@ PY
 		key_pub=$(openssl pkey -in "$ROOT/tls.key" -pubout 2>/dev/null | sha256sum | awk '{print $1}')
 		[[ -n "$cert_pub" && "$cert_pub" == "$key_pub" ]] || fail 'tls_key_certificate_mismatch'
 
-		# Token is enforced by Caddy at the only host-facing endpoint. The OmniRoute
-		# backend has no published port; API auth inside it is disabled only because
-		# the isolated Caddy edge performs the bearer check before proxying.
+		# The random bearer is also configured as OmniRoute's dedicated API key.
+		# Caddy enforces it at the host edge and the backend enforces it again for
+		# catalog and inference routes, including any same-namespace path.
 		printf 'OMNIROUTE_PROXY_TOKEN=%s\n' "$proxy_token" > "$ROOT/caddy.env"
-		printf 'JWT_SECRET=%s\nAPI_KEY_SECRET=%s\nINITIAL_PASSWORD=%s\nFORCE_OWNERSHIP=false\nREQUIRE_API_KEY=false\nHOSTNAME=127.0.0.1\nPORT=%s\nBASE_URL=http://127.0.0.1:%s\nNEXT_PUBLIC_BASE_URL=https://127.0.0.1:%s\nAUTH_COOKIE_SECURE=true\n' \
-			"$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$initial_password" "$BACKEND_PORT" "$BACKEND_PORT" "$HOST_PORT" > "$ROOT/backend.env"
+		printf 'JWT_SECRET=%s\nAPI_KEY_SECRET=%s\nINITIAL_PASSWORD=%s\nFORCE_OWNERSHIP=false\nREQUIRE_API_KEY=true\nOMNIROUTE_API_KEY=%s\nHOSTNAME=127.0.0.1\nPORT=%s\nBASE_URL=http://127.0.0.1:%s\nNEXT_PUBLIC_BASE_URL=https://127.0.0.1:%s\nAUTH_COOKIE_SECURE=true\n' \
+			"$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$initial_password" "$proxy_token" "$BACKEND_PORT" "$BACKEND_PORT" "$HOST_PORT" > "$ROOT/backend.env"
 		render_caddyfile "$BACKEND_PORT" > "$ROOT/Caddyfile"
 		chown root:root "$ROOT" "$ROOT/ca.crt" "$ROOT/tls.key" "$ROOT/caddy.env" "$ROOT/backend.env" "$ROOT/Caddyfile"
 		chmod 0600 "$ROOT/caddy.env" "$ROOT/backend.env"
 		chmod 0644 "$ROOT/Caddyfile"
+		backend_auth_mode='enforced'
 	fi
 
 	# Validate the reused/generated credentials and certificate without exposing
@@ -332,6 +423,9 @@ PY
 	for entry in ca.crt tls.key caddy.env backend.env Caddyfile; do
 		[[ ! -L "$ROOT/$entry" && -f "$ROOT/$entry" ]] || fail 'protected_config_entry_not_regular'
 	done
+	if [[ -e "$ROOT/backend-auth.env" || -L "$ROOT/backend-auth.env" ]]; then
+		[[ ! -L "$ROOT/backend-auth.env" && -f "$ROOT/backend-auth.env" && $(stat -c '%u:%g:%a' "$ROOT/backend-auth.env") == '0:0:600' ]] || fail 'backend_auth_config_metadata_mismatch_preserved'
+	fi
 	[[ $(stat -c '%u:%g:%a' "$ROOT/tls.key") == '0:0:600' ]] || fail 'tls_private_key_permissions_mismatch'
 	[[ $(stat -c '%u:%g:%a' "$ROOT/caddy.env") == '0:0:600' && $(stat -c '%u:%g:%a' "$ROOT/backend.env") == '0:0:600' ]] || fail 'secret_file_permissions_mismatch'
 	[[ $(stat -c '%u:%g:%a' "$ROOT/ca.crt") == '0:0:644' ]] || fail 'client_ca_permissions_mismatch'
@@ -342,6 +436,48 @@ PY
 }
 
 prepare_protected_config
+
+backend_container_name=$BACKEND_NAME
+backend_env_file="$ROOT/backend.env"
+if (( egress_candidate == 1 )); then
+	if [[ "$backend_auth_mode" == legacy ]]; then
+		(( backend_api_key_upgrade == 1 )) || fail 'catalog_and_inference_api_key_enforcement_required'
+		[[ -n "$legacy_backend_id" ]] || fail 'auth_upgrade_requires_exact_legacy_backend_id'
+		# Confirm the existing backend is the exact stopped, unauthenticated object
+		# whose immutable env needs replacement. No secret values are emitted.
+		docker inspect --format '{{json .}}' "$legacy_backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+			--expected-id "$legacy_backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+			--edge-id "$resume_edge_container_id" --container-name "$BACKEND_NAME" \
+			--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start --expected-auth-mode legacy \
+			|| fail 'legacy_backend_identity_or_auth_state_mismatch_preserved'
+		python3 "$BACKEND_AUTH_CONFIG_SCRIPT" prepare --root "$ROOT" || fail 'backend_auth_config_prepare_failed_preserved'
+		backend_api_key_sha256=$(python3 "$BACKEND_AUTH_CONFIG_SCRIPT" key-digest --root "$ROOT") || fail 'backend_auth_config_digest_unavailable_preserved'
+		backend_container_name=$BACKEND_AUTH_NAME
+		backend_env_file="$ROOT/backend-auth.env"
+	elif [[ "$backend_auth_mode" == enforced ]]; then
+		(( backend_api_key_upgrade == 0 )) || fail 'backend_auth_upgrade_not_needed_or_config_mismatch_preserved'
+		backend_api_key_sha256=$(python3 "$BACKEND_AUTH_CONFIG_SCRIPT" key-digest --root "$ROOT") || fail 'backend_auth_config_digest_unavailable_preserved'
+		if [[ -n "$resume_auth_backend_container_id" ]]; then
+			[[ -n "$legacy_backend_id" ]] || fail 'resume_auth_backend_legacy_id_missing_preserved'
+			backend_container_name=$BACKEND_AUTH_NAME
+			backend_env_file="$ROOT/backend-auth.env"
+			backend_id=$resume_auth_backend_container_id
+			# Re-attest the original stopped legacy backend before resuming its
+			# authenticated replacement. Neither object is adopted by name alone.
+			docker inspect --format '{{json .}}' "$legacy_backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+				--expected-id "$legacy_backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+				--edge-id "$resume_edge_container_id" --container-name "$BACKEND_NAME" \
+				--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start --expected-auth-mode legacy \
+				|| fail 'legacy_backend_preservation_attestation_failed_preserved'
+		fi
+	else
+		fail 'backend_auth_state_unknown_preserved'
+	fi
+elif (( backend_api_key_upgrade == 1 )); then
+	fail 'backend_api_key_upgrade_requires_egress_candidate'
+elif [[ "$backend_auth_mode" == legacy ]]; then
+	fail 'catalog_and_inference_api_key_enforcement_required'
+fi
 
 # Validate Caddy's actual Caddyfile with the pinned image, no network and only
 # disposable tmpfs state. This creates and auto-removes one short-lived validator.
@@ -397,8 +533,8 @@ if (( egress_candidate == 1 )); then
 		actual_network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_disappeared_preserved'
 		[[ "$actual_network_id" == "$resume_egress_network_id" ]] || fail 'resume_candidate_network_replaced_preserved'
 		network_id=$actual_network_id
-		policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_changed_preserved'
-		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_changed_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
 		log "$policy_result"
 	else
 		# A new bridge has no endpoint while its candidate-specific deny policy is
@@ -432,8 +568,12 @@ PY
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_reverification_failed'
 	log "$policy_result"
 elif (( egress_candidate == 1 )); then
-	# Existing networks are only verified here; never reapply their rules.
-	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_reverification_failed'
+	# A resumed network may have the exact legacy INPUT policy. Classify only
+	# the complete current/legacy policy here; migration is deliberately later,
+	# after the exact edge has passed pre-start attestation. A full current-policy
+	# verify here would reject LEGACY_VERIFIED before that authorized migration.
+	policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_reverification_failed_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_reverification_receipt_invalid_preserved'
 	log "$policy_result"
 else
 	network_facts=$(docker network inspect --format '{{.Id}}|{{.Driver}}|{{.Internal}}|{{.Attachable}}' "$NETWORK") || fail 'candidate_network_inspect_failed'
@@ -442,11 +582,17 @@ fi
 
 edge_label='phi.omniroute.candidate=true'
 backend_label='phi.omniroute.candidate=true'
+backend_label_value='true'
 network_sysctl=()
 if (( egress_candidate == 1 )); then
 	edge_label='phi.omniroute.candidate.egress=v1'
 	backend_label='phi.omniroute.candidate.egress=v1'
+	backend_label_value='v1'
 	network_sysctl+=(--sysctl net.ipv6.conf.all.disable_ipv6=1 --sysctl net.ipv6.conf.default.disable_ipv6=1)
+fi
+if (( backend_api_key_upgrade == 1 )) || [[ -n "$resume_auth_backend_container_id" ]]; then
+	backend_label='phi.omniroute.candidate.egress=auth-v1'
+	backend_label_value='auth-v1'
 fi
 
 if [[ -n "$resume_edge_container_id" ]]; then
@@ -475,6 +621,9 @@ if (( egress_candidate == 1 )); then
 		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
 		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase pre-start \
 		|| fail 'edge_prestart_identity_or_configuration_attestation_failed_preserved'
+	policy_result=$(python3 "$POLICY_SCRIPT" migrate-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_input_migration_failed_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=MIGRATED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only || "$policy_result" == OMNIROUTE_EGRESS_POLICY=ALREADY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only ]] || fail 'egress_policy_input_migration_receipt_invalid_preserved'
+	log "$policy_result"
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_prestart_or_empty_endpoint_verification_failed_preserved'
 	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_prestart_receipt_invalid_preserved'
 	log "$policy_result"
@@ -512,22 +661,37 @@ PY
 	log "$policy_result"
 fi
 
-if [[ -n "$resume_backend_container_id" ]]; then
+attest_edge_address || fail 'edge_attested_ipv4_unavailable'
+
+if (( backend_api_key_upgrade == 1 )); then
+	# The legacy container was attested stopped before any new object is created.
+	# Keep it intact under its old name for operator-controlled rollback.
+	backend_id=$(docker create --name "$backend_container_name" --label "$backend_label" \
+		--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
+		--env-file "$backend_env_file" "$OMNI_IMAGE") || fail 'auth_backend_create_failed_legacy_backend_preserved'
+	[[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'auth_backend_create_returned_invalid_id_preserved'
+	log "AUTH_BACKEND_CREATED_EXACT_ID_${backend_id:0:12}_LEGACY_ID_${legacy_backend_id:0:12}_PRESERVED"
+	elif [[ -n "$resume_auth_backend_container_id" ]]; then
+	# Resume the exact already-created authenticated replacement. Never create a
+	# duplicate and never change or remove the preserved legacy backend.
+	log "RESUMING_EXACT_AUTH_BACKEND_ID_${backend_id:0:12}_LEGACY_ID_${legacy_backend_id:0:12}_PRESERVED"
+elif [[ -n "$resume_backend_container_id" ]]; then
 	# Validate the named object by its supplied immutable ID and exact image,
 	# stopped state, hardening, and namespace target before any start operation.
 	log "RESUMING_EXACT_BACKEND_ID_${backend_id:0:12}"
 else
-	backend_id=$(docker create --name "$BACKEND_NAME" --label "$backend_label" \
+	backend_id=$(docker create --name "$backend_container_name" --label "$backend_label" \
 		--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
-		--env-file "$ROOT/backend.env" "$OMNI_IMAGE") || fail 'backend_create_failed'
+		--env-file "$backend_env_file" "$OMNI_IMAGE") || fail 'backend_create_failed'
 	[[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'backend_create_returned_invalid_id'
 fi
 
 if (( egress_candidate == 1 )); then
 	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
 		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
-		--edge-id "$edge_id" --container-name "$BACKEND_NAME" \
-		--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start \
+		--edge-id "$edge_id" --container-name "$backend_container_name" \
+		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase pre-start \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
 		|| fail 'backend_prestart_identity_or_configuration_attestation_failed_preserved'
 fi
 
@@ -537,15 +701,22 @@ docker start "$backend_id" >/dev/null || fail 'backend_start_failed'
 if (( egress_candidate == 1 )); then
 	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
 		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
-		--edge-id "$edge_id" --container-name "$BACKEND_NAME" \
-		--label-key phi.omniroute.candidate.egress --label-value v1 --phase post-start \
+		--edge-id "$edge_id" --container-name "$backend_container_name" \
+		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase post-start \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
 		|| fail 'backend_poststart_identity_or_namespace_attestation_failed_preserved'
 fi
 
 if (( egress_candidate == 1 )); then
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_post_start_verification_failed'
 	log "$policy_result"
-	probe_counters_before=$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_counter_snapshot_failed'
+	probe_counters_before=''
+	if probe_counters_before=$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id" 2>/dev/null); then
+		:
+	else
+		printf 'OMNIROUTE_EGRESS_RUNTIME_COUNTERS=FAIL phase=COUNTERS_BEFORE_COMMAND\n' >&2
+		fail 'egress_policy_counter_snapshot_failed'
+	fi
 	host_ips_json=$(ip -j -4 address show | python3 -c 'import ipaddress,json,sys; data=json.load(sys.stdin); vals=sorted({str(ipaddress.IPv4Address(x["local"])) for d in data for x in d.get("addr_info",[]) if x.get("family")=="inet"}); assert 0<len(vals)<=64; print(json.dumps(vals,separators=(",",":")))') || fail 'host_ipv4_snapshot_failed'
 	probe_code=$(<"$EGRESS_PROBE_SCRIPT")
 	egress_probe_report=$(mktemp /run/phi-omniroute-egress-probe.XXXXXX) || fail 'egress_probe_report_create_failed'
@@ -564,56 +735,171 @@ if (( egress_candidate == 1 )); then
 		printf 'OMNIROUTE_EGRESS_RUNTIME_PROBE=FAIL phase=%s diagnostic=%s\n' "$probe_phase" "$probe_diagnostic" >&2
 		fail 'egress_runtime_probe_failed'
 	fi
-	python3 - "$probe_counters_before" "$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id")" "$egress_probe_report" <<'PY' || fail 'egress_runtime_counters_not_proven'
-import json,sys
-before,after,probe=(json.loads(x) for x in sys.argv[1:])
-if probe.get("status") != "PASS" or probe.get("phase") != "COMPLETE": raise SystemExit(1)
-report=probe.get("checks")
-if not isinstance(report,dict) or not report or any(value is not True for value in report.values()): raise SystemExit(1)
-def increased(name): return after.get(name,0)>before.get(name,0)
-if not increased("allowed_tcp443"): raise SystemExit(1)
-if not increased("blocked_tcp_other") and not increased("blocked_all_other_egress"): raise SystemExit(1)
-if not increased("blocked_udp443"): raise SystemExit(1)
-if not increased("blocked_other") and not increased("blocked_all_other_egress"): raise SystemExit(1)
-if not increased("blocked_special"): raise SystemExit(1)
-if not increased("blocked_host_input") and not increased("blocked_host_local") and not increased("blocked_host_original"): raise SystemExit(1)
-print("OMNIROUTE_EGRESS_RUNTIME_PROBES=PASS")
-PY
+	probe_counters_after=''
+	probe_counters_after_exit=0
+	if probe_counters_after=$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id" 2>/dev/null); then
+		probe_counters_after_exit=0
+	else
+		probe_counters_after_exit=$?
+	fi
+	counter_diagnostic=''
+	if counter_diagnostic=$(python3 "$EGRESS_REPORT_SCRIPT" --counter-gate \
+		--before-json "$probe_counters_before" --after-json "$probe_counters_after" \
+		--after-exit-code "$probe_counters_after_exit" < "$egress_probe_report" 2>/dev/null); then
+		:
+	else
+		printf 'OMNIROUTE_EGRESS_RUNTIME_COUNTERS=FAIL phase=COUNTER_VALIDATOR\n' >&2
+		fail 'egress_runtime_counters_not_proven'
+	fi
+	if [[ "$counter_diagnostic" != 'OMNIROUTE_EGRESS_COUNTERS=PASS phase=COMPLETE' ]]; then
+		if [[ "$counter_diagnostic" =~ ^OMNIROUTE_EGRESS_COUNTERS=FAIL\ phase=([A-Z_]+)$ ]]; then
+			printf 'OMNIROUTE_EGRESS_RUNTIME_COUNTERS=FAIL phase=%s\n' "${BASH_REMATCH[1]}" >&2
+		else
+			printf 'OMNIROUTE_EGRESS_RUNTIME_COUNTERS=FAIL phase=COUNTER_RESULT_INVALID\n' >&2
+		fi
+		fail 'egress_runtime_counters_not_proven'
+	fi
+	printf '%s\n' "$counter_diagnostic"
 	log 'EGRESS_POLICY_RUNTIME_PROBES_PASS'
 fi
 
+tls_last_exit=0
+tls_last_writeout='000|0.000000|0.000000|0.000000|0.000000'
 wait_status() {
 	local code=$1
 	local deadline=$((SECONDS + 75))
+	local writeout curl_exit http_status
 	while (( SECONDS < deadline )); do
-		local status
-		status=$(curl --noproxy '*' --silent --show-error --output /dev/null --write-out '%{http_code}' \
+		if writeout=$(curl --noproxy '*' --silent --output /dev/null \
+			--write-out '%{http_code}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \
 			--connect-timeout 1 --max-time 3 --cacert "$ROOT/ca.crt" \
-			-H "Authorization: Bearer $proxy_token" "https://127.0.0.1:${HOST_PORT}/healthz" 2>/dev/null || true)
-		[[ "$status" == "$code" ]] && return 0
+			-H "Authorization: Bearer $proxy_token" "https://127.0.0.1:${HOST_PORT}/healthz" 2>/dev/null); then
+			curl_exit=0
+		else
+			curl_exit=$?
+		fi
+		http_status=${writeout%%|*}
+		[[ "$curl_exit" == 0 && "$http_status" == "$code" ]] && return 0
+		tls_last_exit=$curl_exit
+		tls_last_writeout=$writeout
 		sleep 1
 	done
 	return 1
 }
 
-wait_status 200 || fail 'authenticated_tls_health_timeout'
+diagnose_tls_health_failure() {
+	local port_snapshot counter_after='' counter_after_exit=1
+	local backend_output='' backend_exit=1 edge_output='' edge_exit=1 auth_edge_output='' auth_edge_exit=1 report
+	if ! attest_edge_address; then
+		printf 'OMNIROUTE_TLS_EDGE_ENDPOINT=UNKNOWN phase=ATTESTATION_FAILED\n' >&2
+	fi
+	port_snapshot=$(docker inspect --format '{{json .HostConfig.PortBindings}}|{{json .NetworkSettings.Ports}}' "$edge_id" 2>/dev/null) || port_snapshot='{}|{}'
+	# Readiness is requested inside the existing shared edge namespace; the
+	# backend remains unpublished to the host and no response body is retained.
+	if backend_output=$(docker exec "$backend_id" node -e '
+const http=require("node:http");let done=false,connected=false;const start=process.hrtime.bigint();let connect=0,timer;
+const emit=(phase,status,errorCode)=>{if(done)return;done=true;clearTimeout(timer);const total=Number(process.hrtime.bigint()-start)/1e9;process.stdout.write(JSON.stringify({phase,status,errorCode,timeConnect:connect,timeAppconnect:0,timeTotal:total}));};
+const req=http.get({hostname:"127.0.0.1",port:20128,path:"/healthz",timeout:2500},res=>{res.resume();emit("http",res.statusCode,null);});
+req.on("socket",s=>s.on("connect",()=>{connected=true;connect=Number(process.hrtime.bigint()-start)/1e9;}));
+timer=setTimeout(()=>{req.destroy();emit("timeout",null,"ETIMEDOUT");},2500);
+req.on("timeout",()=>{req.destroy();emit("timeout",null,"ETIMEDOUT");});
+req.on("error",e=>emit(connected?"http":"connect",null,/^[A-Z0-9_]{1,48}$/.test(e.code||"")?e.code:"OTHER"));
+' 2>/dev/null); then
+		backend_exit=0
+	else
+		backend_exit=$?
+	fi
+	# Probe Caddy directly from the backend's shared namespace. Node's HTTPS
+	# verifier is explicitly enabled and uses only the candidate CA and logical
+	# IP identity. It intentionally sends no bearer token to the backend container.
+	local edge_tls_probe_code='const https=require("node:https");let raw="";process.stdin.setEncoding("utf8");process.stdin.on("data",c=>raw+=c);process.stdin.on("end",()=>{let input;try{input=JSON.parse(raw);if(typeof input.ca!=="string")throw Error();}catch{process.stdout.write(JSON.stringify({phase:"input",status:null,errorCode:"INVALID_INPUT",timeConnect:0,timeAppconnect:0,timeTotal:0}));return;}let done=false,connected=false,secured=false,connect=0,appconnect=0,timer;const start=process.hrtime.bigint();const emit=(phase,status,errorCode)=>{if(done)return;done=true;clearTimeout(timer);const total=Number(process.hrtime.bigint()-start)/1e9;process.stdout.write(JSON.stringify({phase,status,errorCode,timeConnect:connect,timeAppconnect:appconnect,timeTotal:total}));};const req=https.get({hostname:"127.0.0.1",port:8443,path:"/healthz",method:"GET",ca:input.ca,rejectUnauthorized:true,timeout:2500},res=>{res.resume();emit("http",res.statusCode,null);});req.on("socket",s=>{s.on("connect",()=>{connected=true;connect=Number(process.hrtime.bigint()-start)/1e9;});s.on("secureConnect",()=>{secured=true;appconnect=Number(process.hrtime.bigint()-start)/1e9;});});timer=setTimeout(()=>{req.destroy();emit("timeout",null,"ETIMEDOUT");},2500);req.on("timeout",()=>{req.destroy();emit("timeout",null,"ETIMEDOUT");});req.on("error",e=>emit(!connected?"connect":!secured?"tls":"http",null,/^[A-Z0-9_]{1,48}$/.test(e.code||"")?e.code:"OTHER"));});'
+	if edge_output=$(
+		python3 - "$ROOT/ca.crt" 2>/dev/null <<'PY' |
+import json,sys
+ca=open(sys.argv[1],"r",encoding="ascii").read()
+if len(ca)>65536 or "-----BEGIN CERTIFICATE-----" not in ca or "-----END CERTIFICATE-----" not in ca: raise SystemExit(1)
+print(json.dumps({"ca":ca},separators=(",",":")))
+PY
+		docker exec -i "$backend_id" node -e "$edge_tls_probe_code" 2>/dev/null
+	); then
+		edge_exit=0
+	else
+		edge_exit=$?
+	fi
+	# Send the authenticated direct-edge diagnostic to curl over stdin config.
+	# connect-to changes only the TCP target; the URL hostname remains 127.0.0.1
+	# so CA and IP-SAN verification are unchanged. The token is never argv/log.
+	if [[ -n "$edge_ip" ]]; then
+		if auth_edge_output=$(
+			python3 "$TLS_HEALTH_REPORT_SCRIPT" curl-config --ca-file "$ROOT/ca.crt" --env-file "$ROOT/caddy.env" --edge-address "$edge_ip" 2>/dev/null |
+			curl --disable --config - 2>/dev/null
+		); then
+			auth_edge_exit=0
+		else
+			auth_edge_exit=$?
+		fi
+	fi
+	if (( egress_candidate == 1 )); then
+		if counter_after=$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id" 2>/dev/null); then
+			counter_after_exit=0
+		else
+			counter_after_exit=$?
+		fi
+	fi
+	if report=$(python3 "$TLS_HEALTH_REPORT_SCRIPT" failure \
+		--port-snapshot "$port_snapshot" --curl-exit "$tls_last_exit" --curl-output "$tls_last_writeout" \
+		--backend-exit "$backend_exit" --backend-output "$backend_output" \
+		--edge-exit "$edge_exit" --edge-output "$edge_output" \
+		--auth-edge-curl-exit "$auth_edge_exit" --auth-edge-curl-output "$auth_edge_output" \
+		--counter-before "${probe_counters_after:-}" --counter-after "$counter_after" \
+		--counter-after-exit "$counter_after_exit" 2>/dev/null); then
+		printf '%s\n' "$report" >&2
+	else
+		printf 'OMNIROUTE_TLS_DIAGNOSTIC=FAIL phase=SAFE_REPORT_GENERATION_FAILED\n' >&2
+	fi
+}
+
+# Compare Docker's configured and active port views while the exact edge ID is
+# still running. A post-cleanup inspect is never used to infer this state.
+tls_runtime_port_snapshot=$(docker inspect --format '{{json .HostConfig.PortBindings}}|{{json .NetworkSettings.Ports}}' "$edge_id") || fail 'edge_runtime_port_snapshot_unavailable'
+if tls_port_receipt=$(python3 "$TLS_HEALTH_REPORT_SCRIPT" ports --snapshot "$tls_runtime_port_snapshot"); then
+	printf '%s\n' "$tls_port_receipt"
+else
+	printf '%s\n' "$tls_port_receipt" >&2
+	fail 'edge_runtime_port_publication_mismatch'
+fi
+if ! wait_status 200; then
+	diagnose_tls_health_failure
+	fail 'authenticated_tls_health_timeout'
+fi
 unauth_status=$(curl --noproxy '*' --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 1 --max-time 3 --cacert "$ROOT/ca.crt" "https://127.0.0.1:${HOST_PORT}/v1/models" 2>/dev/null || true)
 [[ "$unauth_status" == 401 ]] || fail 'unauthenticated_request_not_rejected'
 wrong_status=$(curl --noproxy '*' --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 1 --max-time 3 --cacert "$ROOT/ca.crt" -H 'Authorization: Bearer invalid-candidate-token' "https://127.0.0.1:${HOST_PORT}/v1/models" 2>/dev/null || true)
 [[ "$wrong_status" == 401 ]] || fail 'invalid_bearer_not_rejected'
 
 models_file=$(mktemp)
-models_status=$(curl --noproxy '*' --silent --show-error --output "$models_file" --write-out '%{http_code}' \
+if models_writeout=$(curl --noproxy '*' --silent --show-error --max-filesize 4194304 --output "$models_file" \
+	--write-out '%{http_code}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \
 	--connect-timeout 1 --max-time 10 --cacert "$ROOT/ca.crt" -H "Authorization: Bearer $proxy_token" \
-	"https://127.0.0.1:${HOST_PORT}/v1/models" 2>/dev/null || true)
-[[ "$models_status" == 200 ]] || fail 'authenticated_models_endpoint_failed'
-python3 - "$models_file" <<'PY' || fail 'models_response_not_valid_json'
-import json,sys
-with open(sys.argv[1], 'rb') as stream:
-    value=json.load(stream)
-if not isinstance(value, dict) or not isinstance(value.get('data'), list):
-    raise SystemExit(1)
-PY
+	"https://127.0.0.1:${HOST_PORT}/v1/models" 2>/dev/null); then
+	models_curl_exit=0
+else
+	models_curl_exit=$?
+fi
+models_status=${models_writeout%%|*}
+if models_report=$(python3 "$TLS_HEALTH_REPORT_SCRIPT" models \
+	--curl-exit "$models_curl_exit" --curl-output "$models_writeout" --body-file "$models_file" 2>/dev/null); then
+	models_report_exit=0
+else
+	models_report_exit=$?
+fi
+if [[ -n "$models_report" ]]; then
+	printf '%s\n' "$models_report"
+else
+	printf 'OMNIROUTE_MODELS=UNKNOWN phase=VALIDATOR_UNAVAILABLE curl_exit=%s http_status=%s json=UNKNOWN schema=UNKNOWN models=UNKNOWN count=UNKNOWN\n' \
+		"$models_curl_exit" "${models_status:-000}" >&2
+fi
+[[ "$models_report_exit" -eq 0 ]] || fail 'authenticated_models_endpoint_failed'
 rm -f -- "$models_file"
 models_file=''
 
@@ -635,43 +921,25 @@ if list(json.loads(edge_networks)) != [network]: raise SystemExit(1)
 PY
 
 if (( egress_candidate == 1 )); then
-	inspect_file=$(mktemp)
-	docker inspect "$edge_id" "$backend_id" > "$inspect_file" || fail 'egress_candidate_security_inspect_failed'
-	python3 - "$inspect_file" "$edge_id" "$backend_id" "$NETWORK" "$ROOT" "$edge_label" "$backend_label" <<'PY' || fail 'egress_candidate_security_mismatch'
-import json,sys
-path,edge_id,backend_id,network,root,edge_label,backend_label=sys.argv[1:]
-with open(path,"rb") as stream: rows=json.load(stream)
-if len(rows)!=2 or rows[0].get("Id")!=edge_id or rows[1].get("Id")!=backend_id: raise SystemExit(1)
-edge,backend=rows
-e=edge["HostConfig"]; b=backend["HostConfig"]
-if e.get("Privileged") or e.get("CapDrop")!=["ALL"] or e.get("CapAdd")!=["NET_BIND_SERVICE"] or not e.get("ReadonlyRootfs") or e.get("RestartPolicy",{}).get("Name")!="no": raise SystemExit(1)
-if not any(x in {"no-new-privileges:true","no-new-privileges"} for x in (e.get("SecurityOpt") or [])): raise SystemExit(1)
-if e.get("NetworkMode")!=network or e.get("PortBindings")!={"8443/tcp":[{"HostIp":"127.0.0.1","HostPort":"20129"}]}: raise SystemExit(1)
-if (edge.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
-if (backend.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
-sysctls=e.get("Sysctls") or {}
-if sysctls.get("net.ipv6.conf.all.disable_ipv6")!="1" or sysctls.get("net.ipv6.conf.default.disable_ipv6")!="1": raise SystemExit(1)
-mounts={(x.get("Source"),x.get("Destination"),x.get("RW")) for x in (edge.get("Mounts") or [])}
-expected={(root+"/Caddyfile","/etc/caddy/Caddyfile",False),(root+"/ca.crt","/etc/caddy/tls.crt",False),(root+"/tls.key","/etc/caddy/tls.key",False)}
-if mounts!=expected: raise SystemExit(1)
-if b.get("Privileged") or b.get("CapDrop")!=["ALL"] or b.get("CapAdd") not in (None,[]): raise SystemExit(1)
-if not any(x in {"no-new-privileges:true","no-new-privileges"} for x in (b.get("SecurityOpt") or [])): raise SystemExit(1)
-if b.get("NetworkMode")!="container:"+edge_id or b.get("RestartPolicy",{}).get("Name")!="no" or b.get("PortBindings") not in (None,{}): raise SystemExit(1)
-if (backend.get("Mounts") or []) or (backend.get("Config",{}).get("Labels") or {}).get("phi.omniroute.candidate.egress")!="v1": raise SystemExit(1)
-print("OMNIROUTE_CANDIDATE_SECURITY_ATTESTATION=PASS")
-PY
-	rm -f -- "$inspect_file"
-	inspect_file=''
+	# Reuse the same canonical attestators that accepted the exact-ID pre/post
+	# start snapshots. A second hand-written inspect predicate drifted from the
+	# edge capability canonicalization and collapsed distinct failures into a
+	# generic security mismatch. Fresh single-object snapshots bind this final
+	# gate to the immutable IDs and keep the checks fail-closed.
+	docker inspect --format '{{json .}}' "$edge_id" | python3 "$EDGE_ATTEST_SCRIPT" \
+		--expected-id "$edge_id" --expected-image-id "$caddy_id" --expected-image-ref "$CADDY_IMAGE" \
+		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase post-start \
+		|| fail 'egress_candidate_final_edge_attestation_failed'
+	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+		--edge-id "$edge_id" --container-name "$backend_container_name" \
+		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase post-start \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+		|| fail 'egress_candidate_final_backend_attestation_failed'
+	log 'SECURITY_ATTESTATION=PASS'
 fi
 
-network_facts=$(docker inspect --format '{{json .NetworkSettings.Networks}}' "$edge_id") || fail 'edge_ip_unavailable'
-edge_ip=$(python3 - "$network_facts" "$NETWORK" <<'PY'
-import json,sys
-data=json.loads(sys.argv[1]); row=data.get(sys.argv[2],{})
-print(row.get('IPAddress',''))
-PY
-) || fail 'edge_ip_unavailable'
-[[ "$edge_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'edge_ip_invalid'
 if curl --noproxy '*' --silent --output /dev/null --connect-timeout 1 --max-time 2 "http://${edge_ip}:${BACKEND_PORT}/healthz" >/dev/null 2>&1; then
 	fail 'backend_reachable_directly_from_host'
 fi
@@ -698,7 +966,7 @@ if (( egress_candidate == 1 )); then
 	route_json=$(docker exec "$backend_id" node -e '
 const fs=require("node:fs");let ipv4Default=false,ipv6Default=false;
 try { for(const row of fs.readFileSync("/proc/net/route","utf8").trim().split("\n").slice(1)) { const c=row.trim().split(/\s+/); if(c[1]==="00000000"&&c[7]==="00000000"&&(parseInt(c[3],16)&1)!==0) ipv4Default=true; } } catch {}
-try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").trim().split("\n")) { const c=row.trim().split(/\s+/); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00") ipv6Default=true; } } catch {}
+try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").split("\n")) { if(!row.trim())continue; const c=row.trim().split(/\s+/); if(c.length!==10||!/^[0-9a-fA-F]{32}$/.test(c[0])||!/^[0-9a-fA-F]{2}$/.test(c[1])||!/^[0-9a-fA-F]{8}$/.test(c[8]))process.exit(2); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00"&&(parseInt(c[8],16)&0x200)===0)ipv6Default=true; } } catch {process.exit(2)}
 process.stdout.write(JSON.stringify({ipv4Default,ipv6Default}));if(!ipv4Default||ipv6Default)process.exitCode=2;
 ') || fail 'egress_candidate_route_state_invalid'
 	[[ "$route_json" == '{"ipv4Default":true,"ipv6Default":false}' ]] || fail 'egress_candidate_route_state_invalid'
@@ -708,7 +976,7 @@ else
 	route_json=$(docker exec "$backend_id" node -e '
 const fs=require("node:fs");let ipv4Default=false,ipv6Default=false;
 try { for(const row of fs.readFileSync("/proc/net/route","utf8").trim().split("\n").slice(1)) { const c=row.trim().split(/\s+/); if(c[1]==="00000000"&&c[7]==="00000000"&&(parseInt(c[3],16)&1)!==0) ipv4Default=true; } } catch {}
-try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").trim().split("\n")) { const c=row.trim().split(/\s+/); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00") ipv6Default=true; } } catch {}
+try { for(const row of fs.readFileSync("/proc/net/ipv6_route","utf8").split("\n")) { if(!row.trim())continue; const c=row.trim().split(/\s+/); if(c.length!==10||!/^[0-9a-fA-F]{32}$/.test(c[0])||!/^[0-9a-fA-F]{2}$/.test(c[1])||!/^[0-9a-fA-F]{8}$/.test(c[8]))process.exit(2); if(c[0]==="00000000000000000000000000000000"&&c[1]==="00"&&(parseInt(c[8],16)&0x200)===0)ipv6Default=true; } } catch {process.exit(2)}
 process.stdout.write(JSON.stringify({ipv4Default,ipv6Default}));if(ipv4Default||ipv6Default)process.exitCode=2;
 ') || fail 'backend_default_route_present_or_unreadable'
 	[[ "$route_json" == '{"ipv4Default":false,"ipv6Default":false}' ]] || fail 'unexpected_default_route'

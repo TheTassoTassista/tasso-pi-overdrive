@@ -9,6 +9,34 @@ const net = require("node:net");
 const dgram = require("node:dgram");
 
 let phase = "INPUT_VALIDATION";
+// Keep the absolute deadline referenced while async DNS/network work is
+// pending; clear it on normal settlement so successful probes exit promptly.
+const probeTimeout = setTimeout(() => {
+	process.stdout.write(`${JSON.stringify({ probeStatus: "FAIL", phase })}\n`, () => process.exit(2));
+}, 15000);
+
+function ipv6DefaultRoutePresent(contents) {
+	const zero = "0".repeat(32);
+	let present = false;
+	for (const line of contents.split(/\n/)) {
+		if (!line.trim()) continue;
+		const fields = line.trim().split(/\s+/);
+		// /proc/net/ipv6_route: destination, prefix length, source,
+		// source prefix length, next hop, metric, refcnt, use, flags, device.
+		if (fields.length !== 10 || !/^[0-9a-fA-F]{32}$/.test(fields[0]) ||
+			!/^[0-9a-fA-F]{2}$/.test(fields[1]) || !/^[0-9a-fA-F]{32}$/.test(fields[2]) ||
+			!/^[0-9a-fA-F]{2}$/.test(fields[3]) || !/^[0-9a-fA-F]{32}$/.test(fields[4]) ||
+			fields.slice(5, 9).some((field) => !/^[0-9a-fA-F]{8}$/.test(field)) ||
+			parseInt(fields[1], 16) > 128 || parseInt(fields[3], 16) > 128) {
+			throw new Error("malformed_ipv6_route");
+		}
+		// Linux RTF_REJECT (0x200) includes the kernel's ::/0 lo
+		// unreachable sentinel; it cannot provide outbound routing.
+		const rejected = (parseInt(fields[8], 16) & 0x200) !== 0;
+		if (fields[0] === zero && fields[1].toLowerCase() === "00" && !rejected) present = true;
+	}
+	return present;
+}
 
 function tcp(host, port, timeoutMs = 1400) {
 	return new Promise((resolve) => {
@@ -100,8 +128,7 @@ async function main() {
 
 	phase = "IPV6_PROBES";
 	const ipv6AddressesPresent = fs.readFileSync("/proc/net/if_inet6", "utf8").trim().length > 0;
-	const ipv6DefaultRoutePresent = fs.readFileSync("/proc/net/ipv6_route", "utf8").trim().split(/\n/)
-		.some((row) => row.trim().split(/\s+/)[0] === "00000000000000000000000000000000");
+	const defaultRoutePresent = ipv6DefaultRoutePresent(fs.readFileSync("/proc/net/ipv6_route", "utf8"));
 	const ipv6Reachable = await tcp("2606:4700:4700::1111", 443);
 	const report = {
 		dnsViaDockerResolver: true,
@@ -116,7 +143,7 @@ async function main() {
 		hostIpv4Blocked: !hostReachable,
 		ipv6Disabled,
 		ipv6Unassigned: !ipv6AddressesPresent,
-		ipv6NoDefaultRoute: !ipv6DefaultRoutePresent,
+		ipv6NoDefaultRoute: !defaultRoutePresent,
 		ipv6EgressBlocked: !ipv6Reachable,
 	};
 	phase = "REPORT_SERIALIZATION";
@@ -125,7 +152,8 @@ async function main() {
 	if (!allPassed) process.exitCode = 2;
 }
 
-main().catch(() => {
+main().then(() => clearTimeout(probeTimeout)).catch(() => {
+	clearTimeout(probeTimeout);
 	console.log(JSON.stringify({ probeStatus: "FAIL", phase }));
 	process.exitCode = 2;
 });
