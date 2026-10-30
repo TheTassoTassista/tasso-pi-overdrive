@@ -201,6 +201,48 @@ class RulePlanTests(unittest.TestCase):
         with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
             POLICY._verify_iptables(NETWORK_ID, facts)
 
+    def test_iptables_verifier_normalizes_xtables_protocol_modules_but_reports_real_rule_diff(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        names = POLICY.policy_names(NETWORK_ID)
+        outputs = {
+            "DOCKER-USER": ["-N DOCKER-USER", f'-A DOCKER-USER -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:candidate_egress" -j {names["main"]}'],
+            "INPUT": ["-P INPUT ACCEPT", f'-A INPUT -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:blocked_host_input" -j {names["input"]}'],
+        }
+        created = [names[key] for key in POLICY.IPTABLES_TARGETS] + [names["main"], names["input"]]
+        for chain in created:
+            outputs[chain] = ["-N " + chain]
+            for command in plan:
+                if "-A" not in command or command[command.index("-A") + 1] != chain:
+                    continue
+                tokens = command[command.index("-A"):]
+                if "-p" in tokens and "--dport" in tokens:
+                    protocol_index = tokens.index("-p")
+                    protocol = tokens[protocol_index + 1]
+                    if protocol in {"tcp", "udp"}:
+                        tokens[protocol_index + 2:protocol_index + 2] = ["-m", protocol]
+                outputs[chain].append(shlex.join(tokens))
+
+        def fake_run(argv, **_kwargs):
+            if "-S" in argv and argv[-1] in outputs:
+                return "\n".join(outputs[argv[-1]])
+            raise AssertionError("unexpected command")
+
+        with patch.object(POLICY, "_run", side_effect=fake_run):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+
+        main = names["main"]
+        tcp_rule = next(index for index, row in enumerate(outputs[main]) if "--dport 443" in row and "-p tcp" in row)
+        outputs[main][tcp_rule] = outputs[main][tcp_rule].replace("--dport 443", "--dport 8443")
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaises(POLICY.PolicyError) as raised:
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        message = str(raised.exception)
+        self.assertIn(f"chain={main}:rule={tcp_rule - 1}", message)
+        self.assertIn("actual=", message)
+        self.assertIn("wanted=", message)
+        self.assertIn("8443", message)
+        self.assertIn("443", message)
+
     def test_iptables_hook_verifier_rejects_missing_duplicate_and_mispositioned_rules(self):
         facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
         plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)

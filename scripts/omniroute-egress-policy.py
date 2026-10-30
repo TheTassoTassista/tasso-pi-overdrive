@@ -424,6 +424,15 @@ def _iptables_rule_semantics(rule: str | Sequence[str], *, expected_chain: str |
         pairs.append((option, value))
     if len({option for option, _ in pairs}) != len(pairs):
         raise PolicyError("iptables_rule_duplicate_option")
+    # xtables may serialize the protocol extension explicitly even when the
+    # plan's ``-p tcp/udp --dport`` already loads it implicitly. Treat only a
+    # matching explicit module as redundant; a mismatched or extra module
+    # remains in the semantic tuple and therefore fails exact comparison.
+    pair_set = set(pairs)
+    protocol = next((value for option, value in pairs if option == "-p"), None)
+    for module in ("tcp", "udp"):
+        if ("-m", module) in pair_set and protocol == module and any(option == "--dport" for option, _ in pairs):
+            pairs.remove(("-m", module))
     return chain, tuple(sorted(pairs))
 
 
@@ -490,7 +499,8 @@ def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
     if not input_rules or input_rules[0] != expected_input or input_owned != [expected_input]:
         raise PolicyError("iptables_host_input_hook_missing")
     expected = iptables_plan(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface)
-    created = {names[key] for key in IPTABLES_TARGETS} | {names["main"], names["input"]}
+    # Stable plan order makes the first reported discrepancy reproducible.
+    created = [names[key] for key in IPTABLES_TARGETS] + [names["main"], names["input"]]
     for chain in created:
         actual = _iptables_chain_rules(_run(["iptables", "-w", "-t", "filter", "-S", chain]), chain)
         wanted = [
@@ -498,7 +508,15 @@ def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
             for args in expected if "-A" in args and args[args.index("-A") + 1] == chain
         ]
         if actual != wanted:
-            raise PolicyError("iptables_custom_chain_mismatch")
+            for index in range(max(len(actual), len(wanted))):
+                actual_rule = actual[index] if index < len(actual) else "<missing>"
+                wanted_rule = wanted[index] if index < len(wanted) else "<missing>"
+                if actual_rule != wanted_rule:
+                    raise PolicyError(
+                        f"iptables_custom_chain_mismatch:chain={chain}:rule={index}:"
+                        f"actual={actual_rule!r}:wanted={wanted_rule!r}"
+                    )
+            raise PolicyError(f"iptables_custom_chain_mismatch:chain={chain}:rules_unknown")
 
 
 def _verify_nft(network_id: str, facts: NetworkFacts) -> None:

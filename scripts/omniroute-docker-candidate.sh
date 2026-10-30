@@ -15,7 +15,7 @@ readonly BACKEND_PORT='20128'
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
 readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
-readonly POLICY_SCRIPT_SHA256='cf2054010c220dcb699a50a04a509527311af320054880b1c7748dcb27240b42'
+readonly POLICY_SCRIPT_SHA256='833962c7b35c508841fff531a547b977dcef12745eb3615721ce4b90a6be0078'
 readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
 
 edge_id=''

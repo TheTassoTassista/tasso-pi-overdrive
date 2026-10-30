@@ -1,5 +1,15 @@
 # Phi implementation ledger
 
+## CURRENT — xtables implicit TCP/UDP module normalization (2026-10-30)
+
+Starting branch/HEAD: `feature/phi-optional-services-startup` / `7d184dc4acf9253b9dec236b2094eed9b174beca`. The egress verifier now treats only an explicit `-m tcp`/`-m udp` paired with the same `-p` protocol and a destination-port match as the implicit module already represented by the plan. All other options and values remain exact; order of custom-chain rules remains enforced. The failing chain walk is deterministic and a true mismatch reports chain, zero-based rule index, normalized `actual`, and `wanted` rather than a generic error.
+
+Offline reproduction with the candidate network's generated MAIN chain showed the canonical xtables TCP form `-p tcp -m tcp --dport 443`; normalization yields the same tuple as the planned `-p tcp --dport 443` rule. The operator's complete `iptables-save` dump was not present in the repository/logs accessible during this turn, so the exact live host rule index is not independently proven. The reported hook and five host-destination entries are consistent with, but do not by themselves prove, this specific normalization mismatch. The verifier is deliberately not made permissive: if any actual rule is missing or differs, resume fails before creating candidate endpoints, and the new diagnostic identifies it.
+
+Focused evidence: Python policy tests **14/14 PASS**; Node egress, TLS/provider and Pi-runtime tests **15/15 PASS**; Bash/Python/Node syntax and `git diff --check` PASS. No privileged command, Docker, firewall query/mutation, provider call, stable Phi, SearXNG or Second Brain operation occurred. The candidate shell's helper pin was updated to the verified helper bytes. Host resume still requires separate operator authorization and an exact live verification; no rule is auto-added or repaired.
+
+Helper SHA-256: `833962c7b35c508841fff531a547b977dcef12745eb3615721ce4b90a6be0078`; candidate script SHA-256: `6f717e370dc8e50ddabed29b1ab6246bd306a5cb7b38a6d42f04685ab43994e9`. Do not claim host egress/runtime PASS from these offline tests.
+
 ## CURRENT — OmniRoute iptables semantic verifier and exact-network resume (2026-10-30)
 
 The host-reported false negative was caused by `_verify_iptables()` comparing `iptables -S` output as raw strings: the observed hook reordered `-s`/`-i` and quoted its comment. The verifier now parses with `shlex.split`, compares the exact normalized option/value set, still requires the candidate hook to be first and unique, and compares every owned chain's rule sequence exactly. Regressions cover reordered hook options, quoted comments, wrong destinations, missing/duplicate/mispositioned hooks, altered chain order and altered chain rules.
