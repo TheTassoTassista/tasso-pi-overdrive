@@ -14,6 +14,7 @@ import ipaddress
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -389,24 +390,113 @@ def _nft_apply(facts: NetworkFacts) -> None:
     _run(["nft", "-f", "-"], input_text=render_nft_batch(facts.network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface))
 
 
+_IPTABLES_RULE_OPTIONS = frozenset({
+    "-i", "-o", "-s", "-d", "-p", "-m", "--comment", "--ctorigdst",
+    "--dst-type", "--dport", "-j",
+})
+
+
+def _iptables_rule_semantics(rule: str | Sequence[str], *, expected_chain: str | None = None) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Parse one iptables-save/-S rule and normalize option order only.
+
+    The parser intentionally accepts only the option vocabulary emitted by
+    ``iptables_plan``. It strips shell quoting (notably around comments),
+    preserves all values and duplicates, and rejects unknown or valueless
+    arguments instead of treating a different rule as equivalent.
+    """
+    try:
+        tokens = shlex.split(rule, posix=True) if isinstance(rule, str) else list(rule)
+    except ValueError as error:
+        raise PolicyError("iptables_rule_quoting_invalid") from error
+    if len(tokens) < 4 or tokens[0] != "-A" or not re.fullmatch(r"[A-Za-z0-9_.-]{1,28}", tokens[1]):
+        raise PolicyError("iptables_rule_shape_invalid")
+    chain = tokens[1]
+    if expected_chain is not None and chain != expected_chain:
+        raise PolicyError("iptables_rule_chain_mismatch")
+    arguments = tokens[2:]
+    if len(arguments) % 2:
+        raise PolicyError("iptables_rule_arity_invalid")
+    pairs = []
+    for index in range(0, len(arguments), 2):
+        option, value = arguments[index:index + 2]
+        if option not in _IPTABLES_RULE_OPTIONS or not value or value.startswith("-") and option != "--comment":
+            raise PolicyError("iptables_rule_option_invalid")
+        pairs.append((option, value))
+    if len({option for option, _ in pairs}) != len(pairs):
+        raise PolicyError("iptables_rule_duplicate_option")
+    return chain, tuple(sorted(pairs))
+
+
+def _iptables_chain_rules(raw: str, chain: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
+    """Validate an ``iptables -S CHAIN`` dump and return ordered rules."""
+    lines = [line for line in raw.splitlines() if line.strip()]
+    if not lines:
+        raise PolicyError("iptables_chain_dump_empty")
+    try:
+        first = shlex.split(lines[0], posix=True)
+    except ValueError as error:
+        raise PolicyError("iptables_chain_dump_invalid") from error
+    if first != ["-N", chain]:
+        raise PolicyError("iptables_chain_declaration_mismatch")
+    rules = []
+    for line in lines[1:]:
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError as error:
+            raise PolicyError("iptables_chain_dump_invalid") from error
+        if len(tokens) < 2 or tokens[0] != "-A" or tokens[1] != chain:
+            raise PolicyError("iptables_chain_unexpected_statement")
+        rules.append(_iptables_rule_semantics(tokens, expected_chain=chain))
+    return rules
+
+
+def _iptables_hook_rules(raw: str, chain: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
+    """Select ordered append rules from a built-in chain, ignoring its policy."""
+    result = []
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError as error:
+            raise PolicyError("iptables_builtin_chain_dump_invalid") from error
+        if tokens[:2] == ["-A", chain]:
+            result.append(_iptables_rule_semantics(tokens, expected_chain=chain))
+    return result
+
+
 def _verify_iptables(network_id: str, facts: NetworkFacts) -> None:
     names = policy_names(network_id)
-    docker_user = _run(["iptables", "-w", "-t", "filter", "-S", "DOCKER-USER"]).splitlines()
-    input_rules = _run(["iptables", "-w", "-t", "filter", "-S", "INPUT"]).splitlines()
-    forward_hooks = [line for line in docker_user if line.startswith("-A ")]
-    expected_forward = f"-A DOCKER-USER -i {facts.bridge} -s {facts.subnet} -m comment --comment phi-omni:{network_id[:12]}:candidate_egress -j {names['main']}"
-    if not forward_hooks or forward_hooks[0] != expected_forward:
+    docker_user = _iptables_hook_rules(_run(["iptables", "-w", "-t", "filter", "-S", "DOCKER-USER"]), "DOCKER-USER")
+    input_rules = _iptables_hook_rules(_run(["iptables", "-w", "-t", "filter", "-S", "INPUT"]), "INPUT")
+    expected_forward = _iptables_rule_semantics([
+        "-A", "DOCKER-USER", "-i", facts.bridge, "-s", facts.subnet,
+        "-m", "comment", "--comment", f"phi-omni:{network_id[:12]}:candidate_egress", "-j", names["main"],
+    ], expected_chain="DOCKER-USER")
+    forward_owned = [rule for rule in docker_user if any(
+        option == "-j" and value == names["main"] or option == "--comment" and value.startswith(f"phi-omni:{network_id[:12]}:")
+        for option, value in rule[1]
+    )]
+    if not docker_user or docker_user[0] != expected_forward or forward_owned != [expected_forward]:
         raise PolicyError("iptables_forward_hook_missing")
-    expected_input = f"-A INPUT -i {facts.bridge} -s {facts.subnet} -m comment --comment phi-omni:{network_id[:12]}:blocked_host_input -j {names['input']}"
-    input_hooks = [line for line in input_rules if line.startswith("-A INPUT ")]
-    if not input_hooks or input_hooks[0] != expected_input:
+    expected_input = _iptables_rule_semantics([
+        "-A", "INPUT", "-i", facts.bridge, "-s", facts.subnet,
+        "-m", "comment", "--comment", f"phi-omni:{network_id[:12]}:blocked_host_input", "-j", names["input"],
+    ], expected_chain="INPUT")
+    input_owned = [rule for rule in input_rules if any(
+        option == "-j" and value == names["input"] or option == "--comment" and value.startswith(f"phi-omni:{network_id[:12]}:")
+        for option, value in rule[1]
+    )]
+    if not input_rules or input_rules[0] != expected_input or input_owned != [expected_input]:
         raise PolicyError("iptables_host_input_hook_missing")
     expected = iptables_plan(network_id, facts.bridge, facts.subnet, facts.host_addresses, facts.docker_subnets, facts.egress_interface)
     created = {names[key] for key in IPTABLES_TARGETS} | {names["main"], names["input"]}
     for chain in created:
-        actual = _run(["iptables", "-w", "-t", "filter", "-S", chain]).splitlines()
-        wanted = ["-N " + chain]
-        wanted.extend("-A " + " ".join(args[args.index("-A") + 1:]) for args in expected if "-A" in args and args[args.index("-A") + 1] == chain)
+        actual = _iptables_chain_rules(_run(["iptables", "-w", "-t", "filter", "-S", chain]), chain)
+        wanted = [
+            _iptables_rule_semantics(args[args.index("-A"):], expected_chain=chain)
+            for args in expected if "-A" in args and args[args.index("-A") + 1] == chain
+        ]
         if actual != wanted:
             raise PolicyError("iptables_custom_chain_mismatch")
 

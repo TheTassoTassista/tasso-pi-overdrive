@@ -1,5 +1,15 @@
 # Phi implementation ledger
 
+## CURRENT — OmniRoute iptables semantic verifier and exact-network resume (2026-10-30)
+
+The host-reported false negative was caused by `_verify_iptables()` comparing `iptables -S` output as raw strings: the observed hook reordered `-s`/`-i` and quoted its comment. The verifier now parses with `shlex.split`, compares the exact normalized option/value set, still requires the candidate hook to be first and unique, and compares every owned chain's rule sequence exactly. Regressions cover reordered hook options, quoted comments, wrong destinations, missing/duplicate/mispositioned hooks, altered chain order and altered chain rules.
+
+The candidate script accepts `--resume-egress-network-id <full-id>` only together with `--egress-candidate --resume-existing`. For the operator-reported network `a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f`, it first confirms the name resolves to that exact ID, confirms the policy and empty endpoint set, then repeats both attestations after the temporary Caddy validator and immediately before creating an endpoint. Resume mode never calls network creation or policy apply; absent, replaced, partial, extra, or reordered firewall state fails closed before candidate mutation. This host ID/state is **operator-reported and not independently inspected in this session**.
+
+Local validation on the changed files: Python policy tests **13/13 PASS**; Node egress plus existing TLS/provider/Pi-runtime tests **15/15 PASS**; `bash -n`, Python compile-only syntax, Node syntax, and `git diff --check` PASS. No Docker, sudo, firewall, candidate container, stable Phi, provider, SearXNG, or Second Brain operation was performed. Runtime verification remains pending.
+
+Current helper pin: `scripts/omniroute-egress-policy.py` SHA-256 `cf2054010c220dcb699a50a04a509527311af320054880b1c7748dcb27240b42`; probe SHA-256 remains `a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712`. One operator command, pending separate authorization: `sudo bash /home/tasso/Documents/Codex/tasso-pi-overdrive-optional-services/scripts/omniroute-docker-candidate.sh --egress-candidate --resume-existing --resume-egress-network-id a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f`. It will not recreate or reapply the reported network policy; it attests first and refuses any mismatch.
+
 ## CURRENT — OmniRoute candidate-scoped egress implementation prepared (2026-10-30)
 
 Starting branch/HEAD: `feature/phi-optional-services-startup` / `0ab1687b843759d9ec73f315ffecd75db5b4aadd`. This implementation adds a separate Docker-29.8.1-gated policy helper and a new candidate-only non-internal bridge path; the prior AppImage/containers, SearXNG, Second Brain, stable Phi, provider defaults and `omniroute=deferred` were not changed. Existing untracked `logs/` and `scripts/__pycache__/` were preserved and excluded.

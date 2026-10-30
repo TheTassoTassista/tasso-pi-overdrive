@@ -15,7 +15,7 @@ readonly BACKEND_PORT='20128'
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
 readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
-readonly POLICY_SCRIPT_SHA256='26c3ef95b5bc32f7d39333c0504dca8d3abaa3c1356f4b2ff43e48a367c61fb2'
+readonly POLICY_SCRIPT_SHA256='cf2054010c220dcb699a50a04a509527311af320054880b1c7748dcb27240b42'
 readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
 
 edge_id=''
@@ -45,10 +45,17 @@ if [[ ${1:-} == '--render-caddyfile' ]]; then
 fi
 resume_existing=0
 egress_candidate=0
+resume_egress_network_id=''
 while (($#)); do
 	case "$1" in
 		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
 		--egress-candidate) (( egress_candidate == 0 )) || fail 'duplicate_egress_flag'; egress_candidate=1 ;;
+		--resume-egress-network-id)
+			(($# >= 2)) || fail 'resume_egress_network_id_missing'
+			[[ -z "$resume_egress_network_id" ]] || fail 'duplicate_resume_egress_network_id'
+			resume_egress_network_id=$2
+			shift
+			;;
 		*) fail 'unsupported_arguments' ;;
 	esac
 	shift
@@ -63,6 +70,11 @@ else
 	readonly EDGE_NAME='phi-omniroute-candidate-edge-3_8_50'
 	readonly BACKEND_NAME='phi-omniroute-candidate-backend-3_8_50'
 	readonly NETWORK_LABEL='phi.omniroute.candidate=true'
+fi
+if (( egress_candidate == 1 && resume_existing == 1 )); then
+	[[ "$resume_egress_network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_egress_network_id_required'
+elif [[ -n "$resume_egress_network_id" ]]; then
+	fail 'resume_egress_network_id_requires_egress_resume_mode'
 fi
 
 on_exit() {
@@ -108,12 +120,32 @@ resolved_omni_id=$(docker image inspect "$OMNI_IMAGE" --format '{{.Id}}' 2>/dev/
 
 docker container inspect "$EDGE_NAME" >/dev/null 2>&1 && fail 'edge_name_already_exists'
 docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
-docker network inspect "$NETWORK" >/dev/null 2>&1 && fail 'network_already_exists'
+if [[ -n "$resume_egress_network_id" ]]; then
+	network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_missing_preserved'
+	[[ "$network_id" == "$resume_egress_network_id" ]] || fail 'resume_candidate_network_identity_mismatch_preserved'
+else
+	docker network inspect "$NETWORK" >/dev/null 2>&1 && fail 'network_already_exists'
+fi
 root_exists=0
 if [[ -e "$ROOT" || -L "$ROOT" ]]; then root_exists=1; fi
 if (( resume_existing == 1 && root_exists == 0 )); then fail 'resume_protected_host_config_missing_no_new_credentials_requested'; fi
 if (( root_exists == 1 )) && { [[ ! -d "$ROOT" ]] || [[ -L "$ROOT" ]]; }; then fail 'existing_protected_path_not_a_directory_preserved'; fi
 [[ -z "$(ss -Hln 'sport = :20129' 2>/dev/null)" ]] || fail 'loopback_tls_port_already_in_use'
+
+# Pre-attest an existing candidate network and its complete policy before the
+# validator container, Caddy config repair, or any other new Docker mutation.
+# A mismatch or partial policy is preserved for manual inspection; this resume
+# path never reapplies, duplicates, repairs, or removes existing firewall rules.
+if (( egress_candidate == 1 )); then
+	policy_result=$(python3 "$POLICY_SCRIPT" preflight --daemon-id "$daemon_id") || fail 'egress_policy_host_preflight_failed'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=READY\ backend=*\ host_ipv4_count=*\ egress=* ]] || fail 'egress_policy_host_preflight_receipt_invalid'
+	log "$policy_result"
+	if [[ -n "$resume_egress_network_id" ]]; then
+		policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_or_network_not_attested_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		log "$policy_result"
+	fi
+fi
 
 # Reuse only the already-present edge image for this egress experiment. This
 # operation never pulls or changes any image; the legacy mode retains its
@@ -309,21 +341,27 @@ PY
 
 validate_caddyfile
 
-if (( egress_candidate == 1 )); then
-	policy_result=$(python3 "$POLICY_SCRIPT" preflight --daemon-id "$daemon_id") || fail 'egress_policy_host_preflight_failed'
-	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=READY\ backend=*\ host_ipv4_count=*\ egress=* ]] || fail 'egress_policy_host_preflight_receipt_invalid'
-	log "$policy_result"
-fi
 
 if (( egress_candidate == 1 )); then
-	# The new bridge has no endpoint while the candidate-specific deny policy is
-	# installed. It is never made externally usable before the policy verifies.
-	network_id=$(docker network create --driver bridge --ipv6=false --label "$NETWORK_LABEL" --opt com.docker.network.bridge.enable_ip_masquerade=true "$NETWORK") || fail 'egress_candidate_network_create_failed'
+	if [[ -n "$resume_egress_network_id" ]]; then
+		# Reconfirm exact Docker identity and full policy after the temporary
+		# validator, immediately before creating the first endpoint.
+		actual_network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_disappeared_preserved'
+		[[ "$actual_network_id" == "$resume_egress_network_id" ]] || fail 'resume_candidate_network_replaced_preserved'
+		network_id=$actual_network_id
+		policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_changed_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		log "$policy_result"
+	else
+		# A new bridge has no endpoint while its candidate-specific deny policy is
+		# installed and verified.
+		network_id=$(docker network create --driver bridge --ipv6=false --label "$NETWORK_LABEL" --opt com.docker.network.bridge.enable_ip_masquerade=true "$NETWORK") || fail 'egress_candidate_network_create_failed'
+	fi
 else
 	network_id=$(docker network create --driver bridge --internal --label "$NETWORK_LABEL" "$NETWORK") || fail 'candidate_network_create_failed'
 fi
 [[ "$network_id" =~ ^[a-f0-9]{64}$ ]] || fail 'candidate_network_create_returned_invalid_id'
-if (( egress_candidate == 1 )); then
+if (( egress_candidate == 1 )) && [[ -z "$resume_egress_network_id" ]]; then
 	policy_result=$(python3 "$POLICY_SCRIPT" apply --network-id "$network_id" --daemon-id "$daemon_id") || fail 'egress_policy_application_or_verification_failed'
 	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=APPLIED\ backend=*\ network="${network_id:0:12}"\ bridge=*\ subnet=*\ gateway=*\ egress=* ]] || fail 'egress_policy_apply_receipt_invalid'
 	log "$policy_result"
@@ -343,6 +381,10 @@ if not re.fullmatch(r"[a-f0-9]{64}", network) or not re.fullmatch(r"[A-Za-z0-9_.
 parsed = ipaddress.ip_network(subnet, strict=True)
 if parsed.version != 4 or ipaddress.ip_address(gateway) not in parsed: raise SystemExit(1)
 PY
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_reverification_failed'
+	log "$policy_result"
+elif (( egress_candidate == 1 )); then
+	# Existing networks are only verified here; never reapply their rules.
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_reverification_failed'
 	log "$policy_result"
 else

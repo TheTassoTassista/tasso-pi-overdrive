@@ -26,12 +26,13 @@ test("candidate installs its network policy before endpoint creation and restric
 	assert.ok(probeDigest);
 	assert.equal(createHash("sha256").update(readFileSync(policyScript)).digest("hex"), helperDigest);
 	assert.equal(createHash("sha256").update(readFileSync(probeScript)).digest("hex"), probeDigest);
-	const networkStart = source.indexOf("if (( egress_candidate == 1 )); then\n\t# The new bridge");
+	const networkStart = source.indexOf("network_id=$(docker network create --driver bridge --ipv6=false");
 	const networkEnd = source.indexOf("edge_label='phi.omniroute.candidate=true'", networkStart);
 	assert.ok(networkStart >= 0 && networkEnd > networkStart);
 	const egressNetwork = source.slice(networkStart, networkEnd);
 	assert.ok(egressNetwork.includes("docker network create --driver bridge --ipv6=false"));
-	assert.ok(egressNetwork.indexOf("network create --driver bridge --ipv6=false") < egressNetwork.indexOf("network create --driver bridge --internal"));
+	assert.ok(source.includes('network_id=$(docker network create --driver bridge --internal'));
+	assert.ok(egressNetwork.indexOf("network create --driver bridge --ipv6=false") < egressNetwork.indexOf('POLICY_SCRIPT" apply'));
 	assert.ok(egressNetwork.includes('python3 "$POLICY_SCRIPT" apply'));
 	assert.ok(egressNetwork.includes('python3 "$POLICY_SCRIPT" verify'));
 	assert.ok(egressNetwork.indexOf('POLICY_SCRIPT" apply') < egressNetwork.indexOf('POLICY_SCRIPT" verify'));
@@ -45,6 +46,29 @@ test("candidate installs its network policy before endpoint creation and restric
 	for (const check of ["publicIpv4Tcp443", "publicIpv4Tcp80Blocked", "udp443Blocked", "directTcpDnsBlocked", "directUdpDnsBlocked", "privateIpv4Blocked", "metadataIpv4Blocked", "dockerGatewayBlocked", "hostIpv4Blocked", "ipv6Disabled", "ipv6Unassigned", "ipv6NoDefaultRoute", "ipv6EgressBlocked"]) {
 		assert.ok(probe.includes(check), "missing probe " + check);
 	}
+});
+
+test("resume mode attests the exact existing candidate network and policy before any new Docker mutation", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	assert.ok(source.includes("--resume-egress-network-id"));
+	assert.ok(source.includes("resume_egress_network_id_required"));
+	assert.ok(source.includes("network_id=$(docker network inspect --format '{{.Id}}' \"$NETWORK\" 2>/dev/null)"));
+	assert.ok(source.includes('[[ "$network_id" == "$resume_egress_network_id" ]]'));
+	assert.ok(source.includes("existing_candidate_policy_or_network_not_attested_preserved"));
+	assert.ok(source.includes("existing_candidate_policy_changed_preserved"));
+	const preflightStart = source.indexOf("# Pre-attest an existing candidate network");
+	const preflightEnd = source.indexOf("# Reuse only the already-present edge image", preflightStart);
+	assert.ok(preflightStart >= 0 && preflightEnd > preflightStart);
+	const preflight = source.slice(preflightStart, preflightEnd);
+	assert.ok(preflight.includes('POLICY_SCRIPT" verify --network-id "$network_id"'));
+	assert.ok(source.indexOf("# Pre-attest an existing candidate network") < source.indexOf("validate_caddyfile\n"));
+	const resumeBranchStart = source.indexOf('if [[ -n "$resume_egress_network_id" ]]; then', source.indexOf("validate_caddyfile\n"));
+	const resumeBranchEnd = source.indexOf("else\n\t\t# A new bridge", resumeBranchStart);
+	assert.ok(resumeBranchStart >= 0 && resumeBranchEnd > resumeBranchStart);
+	const resumeBranch = source.slice(resumeBranchStart, resumeBranchEnd);
+	assert.ok(resumeBranch.includes('POLICY_SCRIPT" verify'));
+	assert.ok(!resumeBranch.includes("docker network create"));
+	assert.ok(!resumeBranch.includes('POLICY_SCRIPT" apply'));
 });
 
 test("firewall/runtime script preserves TLS, bearer, backend isolation, and manual recovery boundaries", () => {
@@ -73,5 +97,6 @@ test("firewall/runtime script preserves TLS, bearer, backend isolation, and manu
 	assert.ok(!backendCreate.includes("--cap-add"));
 	assert.ok(!backendCreate.includes("--publish"));
 	assert.ok(!/docker (?:rm|network rm)\b/u.test(source));
-	assert.ok(!/systemctl|iptables-save|nft -f \/etc/u.test(policy));
+	assert.ok(!/["'](?:systemctl|iptables-save)["']/u.test(policy));
+	assert.ok(!/["']nft["']\s*,\s*["']-f["']\s*,\s*["']\/etc/u.test(policy));
 });

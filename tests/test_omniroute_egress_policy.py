@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import shlex
 import sys
 import unittest
 from unittest.mock import patch
@@ -145,11 +146,11 @@ class RulePlanTests(unittest.TestCase):
         plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
         created = {POLICY.policy_names(NETWORK_ID)[key] for key in POLICY.IPTABLES_TARGETS} | {POLICY.policy_names(NETWORK_ID)["main"], POLICY.policy_names(NETWORK_ID)["input"]}
         outputs = {"DOCKER-USER": ["-N DOCKER-USER"], "INPUT": ["-P INPUT ACCEPT"]}
-        outputs["DOCKER-USER"].append("-A DOCKER-USER -i " + BRIDGE + " -s " + SUBNET + " -m comment --comment phi-omni:" + NETWORK_ID[:12] + ":candidate_egress -j " + POLICY.policy_names(NETWORK_ID)["main"])
-        outputs["INPUT"].append("-A INPUT -i " + BRIDGE + " -s " + SUBNET + " -m comment --comment phi-omni:" + NETWORK_ID[:12] + ":blocked_host_input -j " + POLICY.policy_names(NETWORK_ID)["input"])
+        outputs["DOCKER-USER"].append(f'-A DOCKER-USER -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:candidate_egress" -j {POLICY.policy_names(NETWORK_ID)["main"]}')
+        outputs["INPUT"].append(f'-A INPUT -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:blocked_host_input" -j {POLICY.policy_names(NETWORK_ID)["input"]}')
         for chain in created:
             outputs[chain] = ["-N " + chain]
-            outputs[chain].extend("-A " + " ".join(command[command.index("-A") + 1:]) for command in plan if "-A" in command and command[command.index("-A") + 1] == chain)
+            outputs[chain].extend(shlex.join(command[command.index("-A"):]) for command in plan if "-A" in command and command[command.index("-A") + 1] == chain)
 
         def fake_run(argv, **_kwargs):
             if "-S" in argv and argv[-1] in outputs:
@@ -160,6 +161,72 @@ class RulePlanTests(unittest.TestCase):
             POLICY._verify_iptables(NETWORK_ID, facts)
         outputs["DOCKER-USER"][1] = outputs["DOCKER-USER"][1].replace(SUBNET, "172.30.0.0/24")
         with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "forward_hook"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+
+    def test_iptables_semantic_verification_rejects_missing_wrong_destination_and_reordered_rules(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        names = POLICY.policy_names(NETWORK_ID)
+        outputs = {
+            "DOCKER-USER": ["-N DOCKER-USER", f'-A DOCKER-USER -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:candidate_egress" -j {names["main"]}'],
+            "INPUT": ["-P INPUT ACCEPT", f'-A INPUT -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:blocked_host_input" -j {names["input"]}'],
+        }
+        created = {names[key] for key in POLICY.IPTABLES_TARGETS} | {names["main"], names["input"]}
+        for chain in created:
+            outputs[chain] = ["-N " + chain]
+            outputs[chain].extend(shlex.join(command[command.index("-A"):]) for command in plan if "-A" in command and command[command.index("-A") + 1] == chain)
+
+        def fake_run(argv, **_kwargs):
+            if "-S" in argv and argv[-1] in outputs:
+                return "\n".join(outputs[argv[-1]])
+            raise AssertionError("unexpected command")
+
+        with patch.object(POLICY, "_run", side_effect=fake_run):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+
+        main = names["main"]
+        original = list(outputs[main])
+        outputs[main].pop()
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        outputs[main] = list(original)
+
+        destination_rule = next(index for index, row in enumerate(outputs[main]) if "-d 10.0.0.0/8" in row)
+        outputs[main][destination_rule] = outputs[main][destination_rule].replace("10.0.0.0/8", "10.1.0.0/16")
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        outputs[main] = list(original)
+
+        outputs[main][1], outputs[main][2] = outputs[main][2], outputs[main][1]
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "custom_chain_mismatch"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+
+    def test_iptables_hook_verifier_rejects_missing_duplicate_and_mispositioned_rules(self):
+        facts = POLICY.NetworkFacts(NETWORK_ID, BRIDGE, SUBNET, "172.29.88.1", (), HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        plan = POLICY.iptables_plan(NETWORK_ID, BRIDGE, SUBNET, HOST_ADDRESSES, DOCKER_SUBNETS, EGRESS_INTERFACE)
+        names = POLICY.policy_names(NETWORK_ID)
+        docker_rule = f'-A DOCKER-USER -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:candidate_egress" -j {names["main"]}'
+        input_rule = f'-A INPUT -s {SUBNET} -i {BRIDGE} -m comment --comment "phi-omni:{NETWORK_ID[:12]}:blocked_host_input" -j {names["input"]}'
+        outputs = {"DOCKER-USER": ["-N DOCKER-USER", docker_rule], "INPUT": ["-P INPUT ACCEPT", input_rule]}
+        created = {names[key] for key in POLICY.IPTABLES_TARGETS} | {names["main"], names["input"]}
+        for chain in created:
+            outputs[chain] = ["-N " + chain]
+            outputs[chain].extend(shlex.join(command[command.index("-A"):]) for command in plan if "-A" in command and command[command.index("-A") + 1] == chain)
+
+        def fake_run(argv, **_kwargs):
+            if "-S" in argv and argv[-1] in outputs:
+                return "\n".join(outputs[argv[-1]])
+            raise AssertionError("unexpected command")
+
+        outputs["DOCKER-USER"].insert(1, "-A DOCKER-USER -j RETURN")
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "forward_hook"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        outputs["DOCKER-USER"] = ["-N DOCKER-USER", docker_rule, docker_rule]
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "forward_hook"):
+            POLICY._verify_iptables(NETWORK_ID, facts)
+        outputs["DOCKER-USER"] = ["-N DOCKER-USER", docker_rule]
+        outputs["INPUT"] = ["-P INPUT ACCEPT", input_rule.replace(SUBNET, "172.30.0.0/24")]
+        with patch.object(POLICY, "_run", side_effect=fake_run), self.assertRaisesRegex(POLICY.PolicyError, "host_input_hook"):
             POLICY._verify_iptables(NETWORK_ID, facts)
 
     def test_docker_inventory_captures_public_cidr_bridges_and_rejects_replaced_ids(self):
