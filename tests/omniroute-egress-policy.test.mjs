@@ -11,6 +11,8 @@ const policyScript = path.join(root, "scripts", "omniroute-egress-policy.py");
 const edgeAttestScript = path.join(root, "scripts", "omniroute-edge-attest.py");
 const candidateScript = path.join(root, "scripts", "omniroute-docker-candidate.sh");
 const probeScript = path.join(root, "scripts", "omniroute-egress-probe.cjs");
+const probeReportScript = path.join(root, "scripts", "omniroute-egress-probe-report.py");
+const backendAttestScript = path.join(root, "scripts", "omniroute-backend-attest.py");
 
 test("OmniRoute egress policy planners reject unsafe metadata and generate focused deny-by-default rules", () => {
 	const result = spawnSync("python3", [path.join(root, "tests", "test_omniroute_egress_policy.py")], { encoding: "utf8", timeout: 10000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
@@ -23,13 +25,19 @@ test("candidate installs its network policy before endpoint creation and restric
 	const probe = readFileSync(probeScript, "utf8");
 	const helperDigest = source.match(/POLICY_SCRIPT_SHA256='([a-f0-9]{64})'/u)?.[1];
 	const probeDigest = source.match(/EGRESS_PROBE_SHA256='([a-f0-9]{64})'/u)?.[1];
+	const probeReportDigest = source.match(/EGRESS_REPORT_SHA256='([a-f0-9]{64})'/u)?.[1];
 	const edgeAttestDigest = source.match(/EDGE_ATTEST_SHA256='([a-f0-9]{64})'/u)?.[1];
+	const backendAttestDigest = source.match(/BACKEND_ATTEST_SHA256='([a-f0-9]{64})'/u)?.[1];
 	assert.ok(helperDigest);
 	assert.ok(probeDigest);
+	assert.ok(probeReportDigest);
 	assert.ok(edgeAttestDigest);
+	assert.ok(backendAttestDigest);
 	assert.equal(createHash("sha256").update(readFileSync(policyScript)).digest("hex"), helperDigest);
 	assert.equal(createHash("sha256").update(readFileSync(probeScript)).digest("hex"), probeDigest);
+	assert.equal(createHash("sha256").update(readFileSync(probeReportScript)).digest("hex"), probeReportDigest);
 	assert.equal(createHash("sha256").update(readFileSync(edgeAttestScript)).digest("hex"), edgeAttestDigest);
+	assert.equal(createHash("sha256").update(readFileSync(backendAttestScript)).digest("hex"), backendAttestDigest);
 	const networkStart = source.indexOf("network_id=$(docker network create --driver bridge --ipv6=false");
 	const networkEnd = source.indexOf("edge_label='phi.omniroute.candidate=true'", networkStart);
 	assert.ok(networkStart >= 0 && networkEnd > networkStart);
@@ -47,9 +55,54 @@ test("candidate installs its network policy before endpoint creation and restric
 	assert.ok(source.includes("--restart no"));
 	assert.ok(probe.includes("127.0.0.11"));
 	assert.ok(probe.includes('dns.resolve4("example.com")'));
+	assert.ok(probe.includes('phase = "RESOLVER_CONFIG_READ"'));
+	assert.ok(probe.includes('phase = "DNS_RESOLUTION"'));
+	assert.ok(probe.includes('phase = "SYSCTL_READ"'));
+	assert.ok(probe.includes('{ probeStatus: "FAIL", phase }'));
 	for (const check of ["publicIpv4Tcp443", "publicIpv4Tcp80Blocked", "udp443Blocked", "directTcpDnsBlocked", "directUdpDnsBlocked", "privateIpv4Blocked", "metadataIpv4Blocked", "dockerGatewayBlocked", "hostIpv4Blocked", "ipv6Disabled", "ipv6Unassigned", "ipv6NoDefaultRoute", "ipv6EgressBlocked"]) {
 		assert.ok(probe.includes(check), "missing probe " + check);
 	}
+});
+
+test("failed egress probe prints only a sanitized phase/check receipt before failure cleanup", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	const report = readFileSync(probeReportScript, "utf8");
+	assert.ok(source.includes('docker exec "$backend_id" node -e "$probe_code" "$policy_gateway" "$host_ips_json" > "$egress_probe_report" 2>/dev/null'));
+	const diagnosticAt = source.indexOf("probe_diagnostic=$(python3 \"$EGRESS_REPORT_SCRIPT\"");
+	const failureAt = source.indexOf("printf 'OMNIROUTE_EGRESS_RUNTIME_PROBE=FAIL phase=%s diagnostic=%s\\n'", diagnosticAt);
+	const failAt = source.indexOf("fail 'egress_runtime_probe_failed'", failureAt);
+	assert.ok(diagnosticAt >= 0 && failureAt > diagnosticAt && failAt > failureAt);
+	assert.ok(report.includes('"DOCKER_EXEC"'));
+	assert.ok(report.includes('"NODE_LAUNCH"'));
+	assert.ok(report.includes('"NODE_EXECUTION"'));
+	assert.ok(!source.includes('cat "$egress_probe_report"'));
+	assert.ok(!source.includes('docker exec "$backend_id" node -e "$probe_code" "$policy_gateway" "$host_ips_json" > "$egress_probe_report" ||'));
+});
+
+test("backend resume is exact-ID-only and pre-attests immutable image, hardening and edge namespace before start", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	const helper = readFileSync(backendAttestScript, "utf8");
+	assert.ok(source.includes("--resume-backend-container-id"));
+	assert.ok(source.includes("resume_backend_container_id_required") === false);
+	assert.ok(source.includes('[[ "$existing_backend_id" == "$resume_backend_container_id" ]]'));
+	assert.ok(source.includes('backend_id=$resume_backend_container_id'));
+	assert.ok(helper.includes('row.get("Id") == expected_id'));
+	assert.ok(helper.includes('row.get("Image") == expected_image_id'));
+	assert.ok(helper.includes('host.get("NetworkMode") == f"container:{edge_id}"'));
+	assert.ok(helper.includes('host.get("CapDrop") == ["ALL"]'));
+	assert.ok(helper.includes('host.get("CapAdd") in (None, [])'));
+	const backendStart = source.indexOf('docker start "$backend_id"');
+	const backendPreAttest = source.lastIndexOf('"$BACKEND_ATTEST_SCRIPT"', backendStart);
+	assert.ok(backendPreAttest >= 0 && backendPreAttest < backendStart);
+	assert.ok(source.slice(backendPreAttest, backendStart).includes('--phase pre-start'));
+	const resumeBranchStart = source.lastIndexOf('if [[ -n "$resume_backend_container_id" ]]; then');
+	const resumeBranchEnd = source.indexOf("else\n\tbackend_id=$(docker create", resumeBranchStart);
+	assert.ok(resumeBranchStart >= 0 && resumeBranchEnd > resumeBranchStart);
+	assert.ok(!source.slice(resumeBranchStart, resumeBranchEnd).includes("docker create"));
+	const backendPath = source.slice(resumeBranchStart, source.indexOf("if (( egress_candidate == 1 )); then\n\tdocker inspect --format '{{json .}}' \"$backend_id\"", resumeBranchStart));
+	assert.equal((backendPath.match(/docker create --name "\$BACKEND_NAME"/gu) || []).length, 1, "fresh path has one create site and resume path has none");
+	assert.equal((source.match(/docker start "\$backend_id"/gu) || []).length, 1, "backend is started once by exact ID");
+	assert.ok(!/docker (?:rm|container\s+rm)\b/u.test(source));
 });
 
 test("egress edge startup attests the exact created ID before start and the assigned endpoint immediately after", () => {

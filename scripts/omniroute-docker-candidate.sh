@@ -15,10 +15,14 @@ readonly BACKEND_PORT='20128'
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly POLICY_SCRIPT="$SCRIPT_DIR/omniroute-egress-policy.py"
 readonly EGRESS_PROBE_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe.cjs"
+readonly EGRESS_REPORT_SCRIPT="$SCRIPT_DIR/omniroute-egress-probe-report.py"
 readonly EDGE_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-edge-attest.py"
+readonly BACKEND_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-backend-attest.py"
 readonly POLICY_SCRIPT_SHA256='58ac39dd9cc0b6f4997e2618c4492b7acf6d61ab0ae75de18161ff9da85bef6f'
-readonly EGRESS_PROBE_SHA256='a129135a3731e38fc4fc7f1bb2920319ce14e7cda4042947b48cb4b3a3fba712'
-readonly EDGE_ATTEST_SHA256='30e2ce6b83bd896930cb9d15c2779006dd01d0073d2c3271176b3f770d7904b8'
+readonly EGRESS_PROBE_SHA256='887ded845f880729a1745b62352f737de0109da14ac3c54c3690b0074ef0b1f8'
+readonly EGRESS_REPORT_SHA256='6ecb0adb8b1dc2ea5a74dc36fe3d8772f54859108abf07b0401cb4ebde919272'
+readonly EDGE_ATTEST_SHA256='cd5801cb7a05895639b4f8d305f0bc1814dc8c13b1010b97382e0c9336904df2'
+readonly BACKEND_ATTEST_SHA256='fce908101041ee12faa7202854a30588ea82a6fd6fc2295062719c850ff47b3a'
 
 edge_id=''
 backend_id=''
@@ -49,6 +53,7 @@ resume_existing=0
 egress_candidate=0
 resume_egress_network_id=''
 resume_edge_container_id=''
+resume_backend_container_id=''
 while (($#)); do
 	case "$1" in
 		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
@@ -64,6 +69,13 @@ while (($#)); do
 			[[ -z "$resume_edge_container_id" ]] || fail 'duplicate_resume_edge_container_id'
 			[[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_edge_container_id_invalid'
 			resume_edge_container_id=$2
+			shift
+			;;
+		--resume-backend-container-id)
+			(($# >= 2)) || fail 'resume_backend_container_id_missing'
+			[[ -z "$resume_backend_container_id" ]] || fail 'duplicate_resume_backend_container_id'
+			[[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_backend_container_id_invalid'
+			resume_backend_container_id=$2
 			shift
 			;;
 		*) fail 'unsupported_arguments' ;;
@@ -90,6 +102,11 @@ if [[ -n "$resume_edge_container_id" ]]; then
 	(( egress_candidate == 1 && resume_existing == 1 )) || fail 'resume_edge_id_requires_egress_resume_mode'
 	[[ "$resume_edge_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_edge_container_id_invalid'
 fi
+if [[ -n "$resume_backend_container_id" ]]; then
+	(( egress_candidate == 1 && resume_existing == 1 )) || fail 'resume_backend_id_requires_egress_resume_mode'
+	[[ -n "$resume_edge_container_id" ]] || fail 'resume_backend_requires_exact_edge_id'
+	[[ "$resume_backend_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_backend_container_id_invalid'
+fi
 
 on_exit() {
 	local status=$?
@@ -114,8 +131,12 @@ if (( egress_candidate == 1 )); then
 	printf '%s  %s\n' "$POLICY_SCRIPT_SHA256" "$POLICY_SCRIPT" | sha256sum --check --status || fail 'egress_policy_script_digest_mismatch'
 	[[ "$EGRESS_PROBE_SHA256" != TO_BE_PINNED ]] || fail 'egress_probe_script_digest_not_pinned'
 	printf '%s  %s\n' "$EGRESS_PROBE_SHA256" "$EGRESS_PROBE_SCRIPT" | sha256sum --check --status || fail 'egress_probe_script_digest_mismatch'
+	[[ "$EGRESS_REPORT_SHA256" != TO_BE_PINNED ]] || fail 'egress_probe_report_script_digest_not_pinned'
+	printf '%s  %s\n' "$EGRESS_REPORT_SHA256" "$EGRESS_REPORT_SCRIPT" | sha256sum --check --status || fail 'egress_probe_report_script_digest_mismatch'
 	[[ "$EDGE_ATTEST_SHA256" != TO_BE_PINNED ]] || fail 'edge_attestation_script_digest_not_pinned'
 	printf '%s  %s\n' "$EDGE_ATTEST_SHA256" "$EDGE_ATTEST_SCRIPT" | sha256sum --check --status || fail 'edge_attestation_script_digest_mismatch'
+	[[ "$BACKEND_ATTEST_SHA256" != TO_BE_PINNED ]] || fail 'backend_attestation_script_digest_not_pinned'
+	printf '%s  %s\n' "$BACKEND_ATTEST_SHA256" "$BACKEND_ATTEST_SCRIPT" | sha256sum --check --status || fail 'backend_attestation_script_digest_mismatch'
 fi
 
 # Pin the local Docker context/daemon to the system Docker socket. Do not fall
@@ -140,7 +161,13 @@ if [[ -n "$resume_edge_container_id" ]]; then
 else
 	docker container inspect "$EDGE_NAME" >/dev/null 2>&1 && fail 'edge_name_already_exists'
 fi
-docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
+if [[ -n "$resume_backend_container_id" ]]; then
+	existing_backend_id=$(docker container inspect --format '{{.Id}}' "$BACKEND_NAME" 2>/dev/null) || fail 'resume_backend_container_name_missing_preserved'
+	[[ "$existing_backend_id" == "$resume_backend_container_id" ]] || fail 'resume_backend_container_name_identity_mismatch_preserved'
+	backend_id=$resume_backend_container_id
+else
+	docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
+fi
 if [[ -n "$resume_egress_network_id" ]]; then
 	network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_missing_preserved'
 	[[ "$network_id" == "$resume_egress_network_id" ]] || fail 'resume_candidate_network_identity_mismatch_preserved'
@@ -485,14 +512,35 @@ PY
 	log "$policy_result"
 fi
 
-backend_id=$(docker create --name "$BACKEND_NAME" --label "$backend_label" \
-	--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
-	--env-file "$ROOT/backend.env" "$OMNI_IMAGE") || fail 'backend_create_failed'
-[[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'backend_create_returned_invalid_id'
+if [[ -n "$resume_backend_container_id" ]]; then
+	# Validate the named object by its supplied immutable ID and exact image,
+	# stopped state, hardening, and namespace target before any start operation.
+	log "RESUMING_EXACT_BACKEND_ID_${backend_id:0:12}"
+else
+	backend_id=$(docker create --name "$BACKEND_NAME" --label "$backend_label" \
+		--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
+		--env-file "$ROOT/backend.env" "$OMNI_IMAGE") || fail 'backend_create_failed'
+	[[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'backend_create_returned_invalid_id'
+fi
 
-# Start the backend by exact ID. Do not retry or remove either container.
+if (( egress_candidate == 1 )); then
+	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+		--edge-id "$edge_id" --container-name "$BACKEND_NAME" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start \
+		|| fail 'backend_prestart_identity_or_configuration_attestation_failed_preserved'
+fi
+
+# Start only the exact, pre-attested backend ID. Do not retry or remove either container.
 backend_started=1
 docker start "$backend_id" >/dev/null || fail 'backend_start_failed'
+if (( egress_candidate == 1 )); then
+	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+		--edge-id "$edge_id" --container-name "$BACKEND_NAME" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --phase post-start \
+		|| fail 'backend_poststart_identity_or_namespace_attestation_failed_preserved'
+fi
 
 if (( egress_candidate == 1 )); then
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id") || fail 'egress_policy_post_start_verification_failed'
@@ -502,11 +550,26 @@ if (( egress_candidate == 1 )); then
 	probe_code=$(<"$EGRESS_PROBE_SCRIPT")
 	egress_probe_report=$(mktemp /run/phi-omniroute-egress-probe.XXXXXX) || fail 'egress_probe_report_create_failed'
 	chmod 0600 "$egress_probe_report" || fail 'egress_probe_report_permissions_failed'
-	docker exec "$backend_id" node -e "$probe_code" "$policy_gateway" "$host_ips_json" > "$egress_probe_report" || fail 'egress_runtime_probe_failed'
+	probe_exit=0
+	if docker exec "$backend_id" node -e "$probe_code" "$policy_gateway" "$host_ips_json" > "$egress_probe_report" 2>/dev/null; then
+		probe_exit=0
+	else
+		probe_exit=$?
+	fi
+	probe_diagnostic=$(python3 "$EGRESS_REPORT_SCRIPT" --exit-code "$probe_exit" < "$egress_probe_report") || fail 'egress_probe_diagnostic_sanitization_failed'
+	printf '%s\n' "$probe_diagnostic" > "$egress_probe_report"
+	probe_status=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$probe_diagnostic") || fail 'egress_probe_diagnostic_shape_invalid'
+	if [[ "$probe_status" != PASS || "$probe_exit" -ne 0 ]]; then
+		probe_phase=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["phase"])' <<<"$probe_diagnostic") || probe_phase=PROBE_OUTPUT_VALIDATION
+		printf 'OMNIROUTE_EGRESS_RUNTIME_PROBE=FAIL phase=%s diagnostic=%s\n' "$probe_phase" "$probe_diagnostic" >&2
+		fail 'egress_runtime_probe_failed'
+	fi
 	python3 - "$probe_counters_before" "$(python3 "$POLICY_SCRIPT" counters --network-id "$network_id" --daemon-id "$daemon_id" --expected-endpoint-id "$edge_id")" "$egress_probe_report" <<'PY' || fail 'egress_runtime_counters_not_proven'
 import json,sys
-before,after,report=(json.loads(x) for x in sys.argv[1:])
-if not all(report.values()): raise SystemExit(1)
+before,after,probe=(json.loads(x) for x in sys.argv[1:])
+if probe.get("status") != "PASS" or probe.get("phase") != "COMPLETE": raise SystemExit(1)
+report=probe.get("checks")
+if not isinstance(report,dict) or not report or any(value is not True for value in report.values()): raise SystemExit(1)
 def increased(name): return after.get(name,0)>before.get(name,0)
 if not increased("allowed_tcp443"): raise SystemExit(1)
 if not increased("blocked_tcp_other") and not increased("blocked_all_other_egress"): raise SystemExit(1)

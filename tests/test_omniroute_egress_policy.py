@@ -16,6 +16,14 @@ EDGE_SPEC = importlib.util.spec_from_file_location("omniroute_edge_attest", ROOT
 EDGE = importlib.util.module_from_spec(EDGE_SPEC)
 sys.modules[EDGE_SPEC.name] = EDGE
 EDGE_SPEC.loader.exec_module(EDGE)
+BACKEND_SPEC = importlib.util.spec_from_file_location("omniroute_backend_attest", ROOT / "scripts" / "omniroute-backend-attest.py")
+BACKEND = importlib.util.module_from_spec(BACKEND_SPEC)
+sys.modules[BACKEND_SPEC.name] = BACKEND
+BACKEND_SPEC.loader.exec_module(BACKEND)
+REPORT_SPEC = importlib.util.spec_from_file_location("omniroute_egress_probe_report", ROOT / "scripts" / "omniroute-egress-probe-report.py")
+REPORT = importlib.util.module_from_spec(REPORT_SPEC)
+sys.modules[REPORT_SPEC.name] = REPORT
+REPORT_SPEC.loader.exec_module(REPORT)
 
 NETWORK_ID = "a" * 64
 DAEMON_ID = "01234567-89ab-cdef-0123-456789abcdef"
@@ -399,6 +407,14 @@ class EdgeAttestationTests(unittest.TestCase):
         with self.assertRaisesRegex(EDGE.AttestationError, "endpoint_exists_before_start"):
             self.attest(snapshot, "pre-start")
 
+    def test_stopped_existing_edge_can_resume_only_with_zero_pid(self):
+        snapshot = self.edge_snapshot()
+        snapshot["State"] = {"Status": "exited", "Running": False, "Pid": 0}
+        self.attest(snapshot, "pre-start")
+        snapshot["State"]["Pid"] = 71
+        with self.assertRaisesRegex(EDGE.AttestationError, "stopped_state_invalid"):
+            self.attest(snapshot, "pre-start")
+
     def test_started_edge_requires_endpoint_assigned_to_exact_network(self):
         self.attest(self.edge_snapshot(phase="post-start"), "post-start")
         missing = self.edge_snapshot(phase="post-start")
@@ -419,7 +435,7 @@ class EdgeAttestationTests(unittest.TestCase):
             self.attest(None, "pre-start")
         disappeared = self.edge_snapshot()
         disappeared["State"] = {"Status": "removing", "Running": False, "Pid": 0}
-        with self.assertRaisesRegex(EDGE.AttestationError, "not_created"):
+        with self.assertRaisesRegex(EDGE.AttestationError, "not_stopped_for_resume"):
             self.attest(disappeared, "pre-start")
 
     def test_partial_resume_accepts_only_exact_created_edge_and_config(self):
@@ -433,6 +449,120 @@ class EdgeAttestationTests(unittest.TestCase):
         with self.assertRaisesRegex(EDGE.AttestationError, "label_mismatch"):
             self.attest(snapshot, "pre-start")
 
+
+class BackendResumeAttestationTests(unittest.TestCase):
+    backend_id = "b" * 64
+    edge_id = "f" * 64
+    image_id = "sha256:" + "d" * 64
+    image_ref = "diegosouzapw/omniroute@sha256:" + "8" * 64
+    backend_name = "phi-omniroute-egress-backend-v1"
+
+    def snapshot(self, *, phase="pre-start"):
+        running = phase == "post-start"
+        return {
+            "Id": self.backend_id,
+            "Name": "/" + self.backend_name,
+            "Image": self.image_id,
+            "Config": {"Image": self.image_ref, "Labels": {"phi.omniroute.candidate.egress": "v1"}},
+            "State": {"Status": "running", "Running": True, "Pid": 234} if running else {"Status": "exited", "Running": False, "Pid": 0},
+            "HostConfig": {
+                "NetworkMode": "container:" + self.edge_id,
+                "Privileged": False,
+                "CapDrop": ["ALL"],
+                "CapAdd": None,
+                "RestartPolicy": {"Name": "no"},
+                "SecurityOpt": ["no-new-privileges:true"],
+                "PidsLimit": 256,
+                "PortBindings": {},
+                "Binds": None,
+            },
+            "Mounts": [],
+        }
+
+    def attest(self, snapshot, phase="pre-start"):
+        BACKEND.attest_backend(
+            snapshot,
+            expected_id=self.backend_id,
+            expected_image_id=self.image_id,
+            expected_image_ref=self.image_ref,
+            edge_id=self.edge_id,
+            container_name=self.backend_name,
+            label_key="phi.omniroute.candidate.egress",
+            label_value="v1",
+            phase=phase,
+        )
+
+    def test_stopped_exact_backend_and_poststart_namespace_are_attested(self):
+        self.attest(self.snapshot())
+        self.attest(self.snapshot(phase="post-start"), "post-start")
+        created = self.snapshot()
+        created["State"] = {"Status": "created", "Running": False, "Pid": 0}
+        self.attest(created)
+
+    def test_replacement_between_id_lookup_and_final_attestation_fails_closed(self):
+        name_lookup_id = self.backend_id
+        self.assertEqual(name_lookup_id, self.backend_id)
+        replacement = self.snapshot()
+        replacement["Id"] = "c" * 64
+        with self.assertRaisesRegex(BACKEND.AttestationError, "identity_mismatch"):
+            self.attest(replacement)
+        self.assertEqual(name_lookup_id, self.backend_id)
+
+    def test_missing_original_id_and_security_or_namespace_mismatches_fail_closed(self):
+        with self.assertRaisesRegex(BACKEND.AttestationError, "inspect_shape_invalid"):
+            self.attest(None)
+        for field, value, reason in (
+            ("Image", "sha256:" + "e" * 64, "image_id_mismatch"),
+            ("HostConfig", {"NetworkMode": "container:" + "a" * 64, "Privileged": False, "CapDrop": ["ALL"], "CapAdd": [], "RestartPolicy": {"Name": "no"}, "SecurityOpt": ["no-new-privileges"], "PidsLimit": 256, "PortBindings": {}, "Binds": []}, "namespace_target_mismatch"),
+        ):
+            snapshot = self.snapshot()
+            snapshot[field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(BACKEND.AttestationError, reason):
+                self.attest(snapshot)
+        for path, value, reason in (
+            (("HostConfig", "Privileged"), True, "container_privileged"),
+            (("HostConfig", "CapAdd"), ["NET_ADMIN"], "cap_add_mismatch"),
+            (("HostConfig", "PidsLimit"), 0, "pids_limit_mismatch"),
+            (("HostConfig", "PortBindings"), {"20128/tcp": []}, "port_binding_present"),
+            (("HostConfig", "RestartPolicy"), {"Name": "always"}, "restart_policy_mismatch"),
+            (("HostConfig", "SecurityOpt"), [], "no_new_privileges_missing"),
+            (("HostConfig", "SecurityOpt"), [{}], "security_options_shape_invalid"),
+        ):
+            snapshot = self.snapshot()
+            snapshot[path[0]][path[1]] = value
+            with self.subTest(path=path), self.assertRaises(BACKEND.AttestationError):
+                self.attest(snapshot)
+
+
+class ProbeReportTests(unittest.TestCase):
+    def test_safe_success_and_internal_failure_phase_are_classified(self):
+        checks = {name: True for name in REPORT.CHECKS}
+        raw = __import__("json").dumps({"probeStatus": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
+        self.assertEqual(REPORT.classify(raw, 0), {"status": "PASS", "phase": "COMPLETE", "checks": checks})
+        for phase in ("DNS_RESOLUTION", "SYSCTL_READ", "IPV6_PROBES"):
+            raw = __import__("json").dumps({"probeStatus": "FAIL", "phase": phase}).encode()
+            self.assertEqual(REPORT.classify(raw, 2), {"status": "FAIL", "phase": phase, "checks": {}})
+
+    def test_missing_or_untrusted_json_reports_only_a_safe_failure_phase(self):
+        for code, phase in ((125, "DOCKER_EXEC"), (126, "NODE_LAUNCH"), (127, "NODE_LAUNCH"), (1, "NODE_EXECUTION")):
+            result = REPORT.classify(b"token=do-not-print 192.0.2.44", code)
+            self.assertEqual(result, {"status": "FAIL", "phase": phase, "checks": {}})
+            self.assertNotIn("do-not-print", __import__("json").dumps(result))
+            self.assertNotIn("192.0.2.44", __import__("json").dumps(result))
+        malicious = __import__("json").dumps({"probeStatus": "FAIL", "phase": "DNS_RESOLUTION", "hostIp": "192.0.2.44", "token": "secret"}).encode()
+        result = REPORT.classify(malicious, 2)
+        self.assertEqual(result, {"status": "FAIL", "phase": "PROBE_OUTPUT_VALIDATION", "checks": {}})
+        self.assertNotIn("secret", __import__("json").dumps(result))
+
+    def test_false_policy_check_remains_failure_and_counter_gate_remains_in_candidate(self):
+        checks = {name: True for name in REPORT.CHECKS}
+        checks["ipv6EgressBlocked"] = False
+        raw = __import__("json").dumps({"probeStatus": "PASS", "phase": "COMPLETE", "checks": checks}).encode()
+        self.assertEqual(REPORT.classify(raw, 2)["phase"], "POLICY_CHECKS")
+        source = (ROOT / "scripts" / "omniroute-docker-candidate.sh").read_text()
+        self.assertIn('counters --network-id "$network_id"', source)
+        self.assertIn('blocked_udp443', source)
+        self.assertIn('blocked_host_input', source)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

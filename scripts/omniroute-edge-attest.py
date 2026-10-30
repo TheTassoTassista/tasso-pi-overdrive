@@ -69,8 +69,8 @@ def attest_edge(
     state = row.get("State") or {}
     _require(isinstance(state, dict), "container_state_shape_invalid")
     if phase == "pre-start":
-        _require(state.get("Status") == "created", "container_not_created")
-        _require(state.get("Running") is False and state.get("Pid") == 0, "container_created_state_invalid")
+        _require(state.get("Status") in {"created", "exited"}, "container_not_stopped_for_resume")
+        _require(state.get("Running") is False and state.get("Pid") == 0, "container_stopped_state_invalid")
     else:
         _require(state.get("Status") == "running", "container_not_running_after_start")
         _require(state.get("Running") is True and type(state.get("Pid")) is int and state["Pid"] > 0, "container_running_state_invalid")

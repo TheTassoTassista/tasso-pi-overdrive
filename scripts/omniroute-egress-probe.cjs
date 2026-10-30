@@ -8,8 +8,7 @@ const dns = require("node:dns/promises");
 const net = require("node:net");
 const dgram = require("node:dgram");
 
-const gateway = process.argv[1];
-const hosts = JSON.parse(process.argv[2]);
+let phase = "INPUT_VALIDATION";
 
 function tcp(host, port, timeoutMs = 1400) {
 	return new Promise((resolve) => {
@@ -60,14 +59,29 @@ function udpNoReply(host, port) {
 }
 
 async function main() {
+	const gateway = process.argv[1];
+	let hosts;
+	try {
+		hosts = JSON.parse(process.argv[2]);
+	} catch {
+		throw new Error("input");
+	}
+	if (!net.isIPv4(gateway) || !Array.isArray(hosts) || hosts.length === 0 || hosts.length > 64 || hosts.some((host) => !net.isIPv4(host))) {
+		throw new Error("input");
+	}
+
+	phase = "RESOLVER_CONFIG_READ";
 	const resolvers = fs.readFileSync("/etc/resolv.conf", "utf8")
 		.split(/\n/)
 		.filter((line) => /^\s*nameserver\s/.test(line))
 		.map((line) => line.trim().split(/\s+/)[1]);
 	if (resolvers.length !== 1 || resolvers[0] !== "127.0.0.11") throw new Error();
+
+	phase = "DNS_RESOLUTION";
 	const dnsAnswers = await dns.resolve4("example.com");
 	if (!dnsAnswers.length) throw new Error();
 
+	phase = "PUBLIC_NETWORK_PROBES";
 	const [public443, public80, udp443, directTcp53, directUdp53, private443, metadata80, gateway443] = await Promise.all([
 		tcp("1.1.1.1", 443),
 		tcp("1.1.1.1", 80),
@@ -79,8 +93,12 @@ async function main() {
 		tcp(gateway, 443),
 	]);
 	const hostReachable = (await Promise.all(hosts.map((address) => tcp(address, 443)))).some(Boolean);
+
+	phase = "SYSCTL_READ";
 	const ipv6Disabled = fs.readFileSync("/proc/sys/net/ipv6/conf/all/disable_ipv6", "utf8").trim() === "1"
 		&& fs.readFileSync("/proc/sys/net/ipv6/conf/default/disable_ipv6", "utf8").trim() === "1";
+
+	phase = "IPV6_PROBES";
 	const ipv6AddressesPresent = fs.readFileSync("/proc/net/if_inet6", "utf8").trim().length > 0;
 	const ipv6DefaultRoutePresent = fs.readFileSync("/proc/net/ipv6_route", "utf8").trim().split(/\n/)
 		.some((row) => row.trim().split(/\s+/)[0] === "00000000000000000000000000000000");
@@ -101,11 +119,13 @@ async function main() {
 		ipv6NoDefaultRoute: !ipv6DefaultRoutePresent,
 		ipv6EgressBlocked: !ipv6Reachable,
 	};
-	console.log(JSON.stringify(report));
-	if (Object.values(report).some((value) => value !== true)) process.exitCode = 2;
+	phase = "REPORT_SERIALIZATION";
+	const allPassed = Object.values(report).every((value) => value === true);
+	console.log(JSON.stringify({ probeStatus: allPassed ? "PASS" : "FAIL", phase: allPassed ? "COMPLETE" : "POLICY_CHECKS", checks: report }));
+	if (!allPassed) process.exitCode = 2;
 }
 
 main().catch(() => {
-	console.log('{"probe":"FAIL"}');
+	console.log(JSON.stringify({ probeStatus: "FAIL", phase }));
 	process.exitCode = 2;
 });
