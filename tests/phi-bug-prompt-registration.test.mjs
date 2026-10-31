@@ -29,6 +29,9 @@ test('Pi registers the Phi bug prompt without shadowing its /bug command', async
   assert.ok(phiPrompt);
   assert.equal(phiPrompt.filePath, path.join(project, 'prompts', 'phi-bug-report.md'));
   const expanded = expandPromptTemplate('/phi-bug-report deterministic-fixture', loaded.templates);
-  assert.match(expanded, /Goal: deterministic-fixture\./u);
-  assert.match(fs.readFileSync(phiPrompt.filePath, 'utf8'), /Add or update a regression test/u);
+  assert.match(expanded, /Observed issue: deterministic-fixture\./u);
+  assert.match(expanded, /Produce a diagnostic report, not a fix/u);
+  assert.match(expanded, /confirmed facts \(`KNOWN`\)/u);
+  assert.match(expanded, /Do not dump complete logs, environment variables, credentials/u);
+  assert.match(expandPromptTemplate('/phi-bug-report', loaded.templates), /ask for a concise symptom/u);
 });

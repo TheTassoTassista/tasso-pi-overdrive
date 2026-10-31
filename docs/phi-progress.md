@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## CURRENT — `/phi-bug-report` report-first CLI gate (2026-10-31)
+
+The existing Pi prompt template was reachable but instructed the agent to implement a fix; that conflicted with a safe diagnostic-report command. It now asks for bounded read-only evidence, explicit KNOWN/LIKELY/POSSIBLE/UNKNOWN and NOT TESTED labels, redacted excerpts, and no external submission or elevation. Pi's built-in `/bug` remains distinct. A real offline Pi CLI invocation with a deterministic local provider expanded `/phi-bug-report controlled-fixture-failure` and returned a report with symptom, KNOWN, UNKNOWN and next step; no host diagnosis or external provider call was performed. Focused registration test and package validation PASS. This validates the CLI/template path, not the quality of a future model's investigation.
+
 ## CURRENT — OmniRoute optional Phi/Pi RPC selection (2026-10-31)
 
 Operator host receipt: Docker candidate healthy, security/egress/TLS PASS, authenticated `/v1/models` HTTP 200 with 482 models, no inference. Work's isolated real stable `phi` → Pi RPC test **PASS** for registered catalog, explicit OmniRoute selection, restore of a distinct preceding model, and zero inference events. Direct worktree Pi RPC also PASS; verified-CA unauthenticated health request returned expected HTTP 401. The Pi RPC catalog is package-configured and does not itself fetch the live OmniRoute catalog; no real model completion was attempted. Stable Phi/default `openai-codex/gpt-6-sol:medium` remains unchanged. OmniRoute is available for explicit selection but live inference remains **NOT TESTED / separate authorization**. See `harness/CONTINUATION.md` for scope and limits.
