@@ -290,6 +290,18 @@ validate_resume_policy_preflight() {
 	fi
 }
 
+# The recovery preflight attests the exact edge image before any firewall
+# mutation. Resolve its pinned local identity before invoking that preflight.
+# In egress mode an absent image fails closed; the legacy mode alone retains
+# its existing pinned-image pull fallback.
+if ! docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1; then
+	if (( egress_candidate == 1 )); then fail 'pinned_caddy_image_not_local_no_pull_attempted'; fi
+	log 'PULLING_PINNED_CADDY_EDGE_IMAGE'
+	docker pull "$CADDY_IMAGE" >/dev/null || fail 'pinned_caddy_image_pull_failed'
+fi
+caddy_id=$(docker image inspect "$CADDY_IMAGE" --format '{{.Id}}' 2>/dev/null) || fail 'pinned_caddy_image_unavailable'
+[[ "$caddy_id" =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'caddy_image_identity_invalid'
+
 # Pre-attest an existing candidate network and its complete policy before the
 # validator container, Caddy config repair, or any other new Docker mutation.
 # A mismatch or partial policy is preserved for manual inspection; this resume
@@ -304,17 +316,6 @@ if (( egress_candidate == 1 )); then
 		log "$policy_result"
 	fi
 fi
-
-# Reuse only the already-present edge image for this egress experiment. This
-# operation never pulls or changes any image; the legacy mode retains its
-# previously documented pinned-Caddy pull fallback.
-if ! docker image inspect "$CADDY_IMAGE" >/dev/null 2>&1; then
-	if (( egress_candidate == 1 )); then fail 'pinned_caddy_image_not_local_no_pull_attempted'; fi
-	log 'PULLING_PINNED_CADDY_EDGE_IMAGE'
-	docker pull "$CADDY_IMAGE" >/dev/null || fail 'pinned_caddy_image_pull_failed'
-fi
-caddy_id=$(docker image inspect "$CADDY_IMAGE" --format '{{.Id}}' 2>/dev/null) || fail 'pinned_caddy_image_unavailable'
-[[ "$caddy_id" =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'caddy_image_identity_invalid'
 
 prepare_protected_config() {
 	if (( root_exists == 1 )); then

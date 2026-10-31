@@ -281,10 +281,12 @@ test("resume mode attests the exact existing candidate network and policy before
 	assert.ok(source.includes("existing_candidate_policy_or_network_not_attested_preserved"));
 	assert.ok(source.includes("existing_candidate_policy_changed_preserved"));
 	const preflightStart = source.indexOf("# Pre-attest an existing candidate network");
-	const preflightEnd = source.indexOf("# Reuse only the already-present edge image", preflightStart);
+	const preflightEnd = source.indexOf("prepare_protected_config() {", preflightStart);
 	assert.ok(preflightStart >= 0 && preflightEnd > preflightStart);
 	const preflight = source.slice(preflightStart, preflightEnd);
 	assert.ok(preflight.includes("policy_result=$(run_resume_policy_preflight)"));
+	assert.ok(source.indexOf('caddy_id=$(docker image inspect "$CADDY_IMAGE"') < preflightStart,
+		"the exact pinned Caddy image ID must exist before recovery preflight consumes it");
 	const resumePolicyHelperStart = source.indexOf("run_resume_policy_preflight() {");
 	const resumePolicyHelperEnd = source.indexOf("validate_resume_policy_preflight() {", resumePolicyHelperStart);
 	const resumePolicyHelper = source.slice(resumePolicyHelperStart, resumePolicyHelperEnd);
