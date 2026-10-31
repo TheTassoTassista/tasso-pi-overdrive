@@ -97,6 +97,44 @@ class RuntimeInstallTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.InstallError, "recovery_required"):
             MODULE.transact(self.prefix, "rollback")
 
+    def test_actual_process_interruption_before_switch_and_fresh_diagnosis(self):
+        self.install(self.a)
+        b = self.b_commit()
+        snippet = f'''import importlib.util, os, signal
+spec = importlib.util.spec_from_file_location("runtime", {str(SCRIPT)!r})
+module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+def interrupted(*args): os.kill(os.getpid(), signal.SIGKILL)
+module.os.replace = interrupted
+module.transact({str(self.prefix)!r}, "install", {str(self.repo)!r}, {b!r})
+'''
+        child = subprocess.run(["python3", "-c", snippet], capture_output=True)
+        self.assertEqual(child.returncode, -9)
+        snapshot = subprocess.run(["python3", str(SCRIPT), "inspect", "--prefix", str(self.prefix)],
+                                  capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(snapshot.stdout)["state"], "INTENT_BEFORE_SWITCH")
+        self.assertEqual(MODULE.active_id(self.prefix), self.a)
+
+    def test_post_switch_receipt_io_failure_remains_unconfirmed(self):
+        self.install(self.a)
+        b = self.b_commit()
+        original = MODULE.write_json_atomic
+        writes = 0
+
+        def interrupted(parent, name, value):
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                raise OSError(28, "No space left on device")
+            return original(parent, name, value)
+
+        with patch.object(MODULE, "write_json_atomic", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.install(b)
+        self.assertEqual(MODULE.active_id(self.prefix), b)
+        self.assertEqual(MODULE.diagnose(self.prefix)["state"], "SWITCHED_UNCONFIRMED")
+        with self.assertRaisesRegex(MODULE.InstallError, "recovery_required"):
+            MODULE.transact(self.prefix, "rollback")
+
     def test_staging_interruption_and_symlink_source_fail_closed(self):
         with self.assertRaisesRegex(MODULE.InstallError, "injected_staging"):
             self.install(self.a, fault="staging")
@@ -153,6 +191,17 @@ class RuntimeInstallTests(unittest.TestCase):
             self.install(b)
         self.assertEqual(MODULE.active_id(self.prefix), self.a)
 
+    def test_staging_file_sync_failure_preserves_unpublished_stage(self):
+        with patch.object(MODULE, "sync_file", side_effect=OSError(5, "I/O error")):
+            with self.assertRaises(OSError):
+                self.install(self.a)
+        snapshot = MODULE.diagnose(self.prefix)
+        self.assertIsNone(snapshot["active"])
+        self.assertEqual(snapshot["stagingCount"], 1)
+        self.assertEqual(snapshot["releases"], {})
+        with self.assertRaisesRegex(MODULE.InstallError, "recovery_required"):
+            self.install(self.a)
+
     def test_actual_process_interruption_after_switch(self):
         self.install(self.a)
         b = self.b_commit()
@@ -183,6 +232,41 @@ module.transact({str(self.prefix)!r}, "install", {str(self.repo)!r}, {b!r})
         self.prefix.chmod(0o777)
         with self.assertRaisesRegex(MODULE.InstallError, "directory_untrusted"):
             MODULE.diagnose(self.prefix)
+
+    def test_writable_nonsticky_ancestor_rejected(self):
+        unsafe = self.root / "unsafe-parent"
+        unsafe.mkdir(mode=0o777)
+        unsafe.chmod(0o777)
+        with self.assertRaisesRegex(MODULE.InstallError, "ancestor_untrusted"):
+            MODULE.transact(unsafe / "prefix", "install", str(self.repo), self.a)
+        self.assertFalse((unsafe / "prefix").exists())
+
+    def test_corrupt_manifest_and_unrelated_release_block_all_mutation(self):
+        self.install(self.a)
+        b = self.b_commit()
+        second = self.prefix / "releases" / b
+        second.mkdir()
+        (second / ".phi-release.json").write_text("not json")
+        second.chmod(0o555)
+        with self.assertRaisesRegex(MODULE.InstallError, "existing_release_invalid"):
+            self.install(self.a)
+        self.assertEqual(MODULE.active_id(self.prefix), self.a)
+
+    def test_malformed_receipt_identity_fails_closed_before_mutation(self):
+        self.install(self.a)
+        file = self.prefix / "transition.json"
+        original = file.read_text()
+        for replacement in ({"to": [self.a]}, {"toDigest": "bad"}, {"from": "../other"}, []):
+            value = json.loads(original)
+            if isinstance(replacement, dict):
+                value.update(replacement)
+            else:
+                value = replacement
+            file.write_text(json.dumps(value))
+            with self.assertRaisesRegex(MODULE.InstallError, "receipt_invalid"):
+                self.install(self.a)
+            self.assertEqual(MODULE.active_id(self.prefix), self.a)
+        file.write_text(original)
 
 
 if __name__ == "__main__":

@@ -11,13 +11,19 @@ const source = path.resolve(import.meta.dirname, '..');
 test('isolated Linux Phi runtime launches without the source checkout mounted', { skip: process.platform !== 'linux' }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-runtime-isolated-'));
   const prefix = path.join(root, 'managed');
-  const release = path.join(prefix, 'releases', 'a'.repeat(40));
   const home = path.join(root, 'home');
   const nodeRoot = path.resolve(path.dirname(process.execPath), '..');
   try {
-    fs.mkdirSync(release, { recursive: true, mode: 0o700 });
     fs.mkdirSync(home, { mode: 0o700 });
-    fs.symlinkSync(`releases/${'a'.repeat(40)}`, path.join(prefix, 'active'));
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' });
+    assert.equal(head.status, 0, head.stderr);
+    const releaseId = head.stdout.trim();
+    const installed = spawnSync('python3', [path.join(source, 'bootstrap', 'versioned-runtime.py'), 'install',
+      '--prefix', prefix, '--repository', source, '--release-id', releaseId], {
+      encoding: 'utf8', timeout: 90_000, env: { ...process.env, npm_config_offline: 'true' },
+    });
+    assert.equal(installed.status, 0, installed.stderr + installed.stdout);
+    assert.equal(JSON.parse(installed.stdout).active, releaseId);
     const launcher = path.join(home, 'phi');
     const unsafe = path.join(root, 'unsafe');
     fs.symlinkSync('outside', unsafe);
@@ -25,15 +31,6 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     fs.writeFileSync(launcher, versionedWrapperContent('linux', process.execPath, prefix)
       .replaceAll(prefix, '/managed'), { mode: 0o700 });
     fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true, mode: 0o700 });
-    const archive = spawnSync('git', ['archive', '--format=tar', 'HEAD'], { cwd: source, maxBuffer: 32 * 1024 * 1024 });
-    assert.equal(archive.status, 0, archive.stderr?.toString());
-    const extracted = spawnSync('tar', ['-xf', '-', '-C', release], { input: archive.stdout, encoding: 'utf8' });
-    assert.equal(extracted.status, 0, extracted.stderr);
-    const pinnedMcp = spawnSync('npm', ['ls', '--prefix', path.join(source, 'runtime', 'mcp'), '--depth=0',
-      'pi-mcp-adapter@2.32.1', '@modelcontextprotocol/sdk@1.30.0'], { encoding: 'utf8' });
-    assert.equal(pinnedMcp.status, 0, pinnedMcp.stderr);
-    fs.cpSync(path.join(source, 'runtime', 'mcp', 'node_modules'), path.join(release, 'runtime', 'mcp', 'node_modules'),
-      { recursive: true, dereference: false });
     fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), JSON.stringify({ packages: ['/managed/active'],
       defaultProvider: 'openai-codex', defaultModel: 'gpt-6-sol', defaultThinkingLevel: 'medium' }), { mode: 0o600 });
     const isolation = ['--ro-bind', '/usr', '/usr', '--symlink', 'usr/bin', '/bin', '--symlink', 'usr/lib', '/lib',
@@ -56,7 +53,7 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     const checks = JSON.parse(doctor.stdout).checks;
     assert.equal(checks.find((row) => row.capability === 'Package configuration')?.status, 'PASS');
     assert.equal(checks.find((row) => row.capability === 'Pi runtime')?.status, 'PASS');
-    assert.equal(checks.find((row) => row.capability === 'Phi source')?.detail, '/managed/releases/' + 'a'.repeat(40));
+    assert.equal(checks.find((row) => row.capability === 'Phi source')?.detail, '/managed/releases/' + releaseId);
     const rpc = run(['--offline', '--no-session', '--no-context-files', '--no-tools', '--mode', 'rpc'],
       `${JSON.stringify({ id: 'models', type: 'get_available_models' })}\n`);
     assert.equal(rpc.status, 0, rpc.stderr);
@@ -70,5 +67,9 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     assert.match(result.stdout, /Symptom: controlled fixture failure\./u);
     assert.doesNotMatch(result.stdout + result.stderr, /fixture-only/u);
     assert.equal(fs.existsSync(source), true, 'host checkout must remain untouched');
-  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    const cleanup = 'import os,shutil,sys;root=sys.argv[1];[(os.chmod(base,0o700),[os.chmod(os.path.join(base,d),0o700) for d in dirs if not os.path.islink(os.path.join(base,d))]) for base,dirs,_ in os.walk(root)];shutil.rmtree(root)';
+    const removed = spawnSync('python3', ['-c', cleanup, root], { encoding: 'utf8' });
+    assert.equal(removed.status, 0, removed.stderr);
+  }
 });

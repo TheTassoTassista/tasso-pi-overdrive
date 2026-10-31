@@ -49,9 +49,19 @@ def sync_file(file):
         os.close(fd)
 
 
+def trusted_ancestors(value):
+    for ancestor in reversed(value.parents):
+        ancestor_info = os.lstat(ancestor)
+        require(stat.S_ISDIR(ancestor_info.st_mode) and ancestor_info.st_uid in (0, os.getuid()) and
+                (ancestor_info.st_mode & 0o022 == 0 or
+                 ancestor_info.st_uid == 0 and ancestor_info.st_mode & stat.S_ISVTX),
+                "ancestor_untrusted")
+
+
 def plain_private_dir(directory):
     value = Path(directory)
     require(value.is_absolute() and os.path.realpath(value) == str(value), "path_not_canonical")
+    trusted_ancestors(value)
     info = os.lstat(value)
     require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and info.st_mode & 0o077 == 0,
             "directory_untrusted")
@@ -61,6 +71,7 @@ def plain_private_dir(directory):
 def ensure_prefix(prefix):
     prefix = Path(prefix).absolute()
     require(os.path.realpath(prefix) == str(prefix), "prefix_symlink_rejected")
+    trusted_ancestors(prefix)
     if not prefix.exists():
         prefix.mkdir(mode=0o700)
     plain_private_dir(prefix)
@@ -198,8 +209,16 @@ def receipt(prefix):
         raw = stream.read(64 * 1024 + 1)
     require(len(raw) <= 64 * 1024, "receipt_oversize")
     value = json.loads(raw)
+    require(isinstance(value, dict), "receipt_invalid")
     require(set(value) == {"version", "state", "from", "to", "fromDigest", "toDigest"} and
-            value["version"] == 1 and value["state"] in ("INTENT", "OBSERVED"), "receipt_invalid")
+            value["version"] == 1 and value["state"] in ("INTENT", "OBSERVED") and
+            isinstance(value["to"], str) and RELEASE_ID.fullmatch(value["to"]), "receipt_invalid")
+    require((value["from"] is None and value["fromDigest"] is None) or
+            (isinstance(value["from"], str) and RELEASE_ID.fullmatch(value["from"]) and
+             isinstance(value["fromDigest"], str) and re.fullmatch(r"[0-9a-f]{64}", value["fromDigest"])),
+            "receipt_invalid")
+    require(isinstance(value["toDigest"], str) and re.fullmatch(r"[0-9a-f]{64}", value["toDigest"]),
+            "receipt_invalid")
     return value
 
 
@@ -320,6 +339,8 @@ def transact(prefix, action, repository=None, release_id=None, fault=None):
         require(before["state"] == "STABLE" and before["stagingCount"] == 0 and
                 before["temporaryCount"] == 0,
                 "recovery_required")
+        require(all(item["status"] == "PASS" for item in before["releases"].values()),
+                "existing_release_invalid")
         previous = before["active"]
         if action == "install":
             require(repository is not None and release_id is not None, "install_arguments_missing")
