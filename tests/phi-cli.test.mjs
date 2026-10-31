@@ -27,6 +27,8 @@ test('Doctor prints whitelisted state, never credentials/config values or model-
     assert.equal(report.checks.find((row) => row.capability === 'GPT default').detail, 'openai-codex/gpt-6-sol:medium');
     assert.equal(report.checks.find((row) => row.capability === 'Runtime callability').status, 'WARN');
     assert.equal(report.checks.find((row) => row.capability === 'Authentication').status, 'PASS');
+    assert.equal(report.checks.find((row) => row.capability === 'OmniRoute').status, 'WARN');
+    assert.match(report.checks.find((row) => row.capability === 'OmniRoute').detail, /authenticated HTTPS runtime not probed/u);
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 test('runtime discovery refuses unreviewed Pi versions and package traversal', () => {
@@ -38,4 +40,15 @@ test('runtime discovery refuses unreviewed Pi versions and package traversal', (
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '0.87.1', bin: { pi: '../escape.mjs' } }));
     assert.equal(discoverPiRuntime({ PHI_PI_ROOT: root }), null);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('Doctor never probes the obsolete unauthenticated OmniRoute backend port', async () => {
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url) => { calls.push(String(url)); return { ok: false, body: { cancel: async () => {} } }; };
+  try {
+    const report = await phiDoctor({ probeServices: true });
+    assert.equal(report.checks.find((row) => row.capability === 'OmniRoute').status, 'WARN');
+    assert.ok(calls.every((url) => !url.includes(':20128') && !url.includes(':20129')));
+  } finally { globalThis.fetch = original; }
 });

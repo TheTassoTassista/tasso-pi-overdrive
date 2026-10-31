@@ -8,10 +8,12 @@ const docFile = path.join(root, 'docs', 'PHI_ENCYCLOPEDIA.md');
 
 test('encyclopedia links resolve and statically registered Phi commands are catalogued', () => {
   const document = fs.readFileSync(docFile, 'utf8');
-  for (const [, link] of document.matchAll(/\]\(([^)]+)\)/gu)) {
-    if (link.startsWith('#')) continue;
-    const target = path.resolve(path.dirname(docFile), decodeURIComponent(link.split('#')[0]));
-    assert.ok(fs.existsSync(target), `missing documentation target: ${link}`);
+  for (const file of [docFile, path.join(root, 'docs', 'phi-optional-services-usage.md')]) {
+    for (const [, link] of fs.readFileSync(file, 'utf8').matchAll(/\]\(([^)]+)\)/gu)) {
+      if (link.startsWith('#')) continue;
+      const target = path.resolve(path.dirname(file), decodeURIComponent(link.split('#')[0]));
+      assert.ok(fs.existsSync(target), `missing documentation target: ${link}`);
+    }
   }
   for (const file of fs.readdirSync(path.join(root, 'extensions')).filter((name) => name.endsWith('.ts'))) {
     const source = fs.readFileSync(path.join(root, 'extensions', file), 'utf8');

@@ -49,6 +49,8 @@ Il tool pubblico è `web_research`; `safe_web_fetch` è distinto. [Web routing](
 
 ## Servizi opzionali
 
+Per i comandi Fish/REPL effettivi e la distinzione candidato/stabile: [guida operativa servizi opzionali](phi-optional-services-usage.md).
+
 | Servizio | Stato distinto | Avvio/limite |
 |---|---|
 | SearXNG | Route esplicita testata; disponibilità del container live dipende dall'host | Il launcher **non** avvia Docker; `DEFERRED_SECURITY_BOUNDARY` è intenzionale finché non esiste un avvio attestato senza privilegio generalizzato |
