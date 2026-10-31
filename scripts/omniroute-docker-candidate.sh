@@ -340,6 +340,11 @@ try:
         auth = parse_env(files["backend-auth.env"])
         expected_auth = dict(backend, REQUIRE_API_KEY="true", OMNIROUTE_API_KEY=proxy["OMNIROUTE_PROXY_TOKEN"])
         if auth != expected_auth: raise ValueError
+        # backend.env intentionally remains the preserved legacy source file;
+        # the separate, exact sidecar is what the authenticated replacement
+        # consumes. Report the effective candidate mode, not the base file's
+        # mode, so an exact-ID resume reaches the enforced-backend branch.
+        auth_mode = "enforced"
 except Exception:
     print("OMNIROUTE_CANDIDATE=EXISTING_CONFIG_CHECK=FAIL_CLOSED", file=sys.stderr)
     raise SystemExit(1)

@@ -143,6 +143,10 @@ test("authenticated backend resume uses exact existing IDs and preserves the leg
 	assert.ok(source.includes("resume_auth_backend_requires_exact_network_edge_and_legacy_backend_ids"));
 	assert.ok(source.includes('[[ "$existing_auth_backend_id" == "$resume_auth_backend_container_id" ]]'));
 	assert.ok(source.includes('backend_id=$resume_auth_backend_container_id'));
+	assert.match(source, /if auth != expected_auth: raise ValueError\n\s*# backend\.env intentionally remains the preserved legacy source file;[\s\S]*?auth_mode = "enforced"/u,
+		"the validated sidecar changes the effective auth mode consumed by resume");
+	assert.match(source, /EXISTING_CONFIG_CHECK=PASS\\ auth_mode=enforced\) backend_auth_mode='enforced'/u,
+		"the effective enforced receipt must reach the existing resume branch without the upgrade flag");
 	assert.ok(source.includes("--expected-auth-mode legacy"), "the old backend is re-attested as legacy and preserved");
 	assert.ok(source.includes('--label-value "$backend_label_value" --phase pre-start'));
 	const resumeBranchAt = source.indexOf('elif [[ -n "$resume_auth_backend_container_id" ]]; then', source.indexOf('if (( backend_api_key_upgrade == 1 )); then\n\t# The legacy container'));
@@ -151,6 +155,35 @@ test("authenticated backend resume uses exact existing IDs and preserves the leg
 	assert.ok(resumeBranchAt >= 0 && resumeBranchEnd > resumeBranchAt && startAt > resumeBranchEnd);
 	assert.doesNotMatch(source.slice(resumeBranchAt, resumeBranchEnd), /docker create/u, "resuming the auth backend must never create a duplicate");
 	assert.doesNotMatch(source, /docker (?:rm|container\s+rm)\b/u, "preserved Docker objects are never removed automatically");
+	const existingBackendIdentityAt = source.indexOf('existing_backend_id=$(docker container inspect');
+	const upgradeGuardAt = source.indexOf('if (( backend_api_key_upgrade == 1 )); then', existingBackendIdentityAt);
+	const upgradeNameCheckAt = source.indexOf("auth_upgrade_backend_name_already_exists_preserved", upgradeGuardAt);
+	const authCreateAt = source.indexOf('backend_id=$(docker create --name "$backend_container_name"', upgradeGuardAt);
+	assert.ok(existingBackendIdentityAt >= 0 && upgradeGuardAt > existingBackendIdentityAt && upgradeNameCheckAt > upgradeGuardAt && authCreateAt > upgradeNameCheckAt,
+		"repeating the one-time upgrade refuses an existing auth backend instead of duplicating it");
+});
+
+test("authenticated candidate completion keeps all runtime gates after backend resume", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	const resumed = source.indexOf('elif [[ -n "$resume_auth_backend_container_id" ]]; then', source.indexOf('if (( backend_api_key_upgrade == 1 )); then\n\t# The legacy container'));
+	const prestart = source.indexOf("--phase pre-start", resumed);
+	const backendStart = source.indexOf('docker start "$backend_id"', prestart);
+	const poststart = source.indexOf("--phase post-start", backendStart);
+	const egress = source.indexOf("egress_runtime_counters_not_proven", poststart);
+	const health = source.indexOf("wait_status 200", poststart);
+	const unauthorized = source.indexOf('[[ "$unauth_status" == 401 ]]', health);
+	const wrongBearer = source.indexOf('[[ "$wrong_status" == 401 ]]', unauthorized);
+	const models = source.indexOf("authenticated_models_endpoint_failed", wrongBearer);
+	const finalBackend = source.indexOf("egress_candidate_final_backend_attestation_failed", models);
+	const complete = source.indexOf("completed=1", finalBackend);
+	assert.ok(resumed >= 0 && prestart > resumed && backendStart > prestart && poststart > backendStart);
+	assert.ok(egress > poststart && health > poststart && unauthorized > health && wrongBearer > unauthorized);
+	assert.ok(models > wrongBearer && finalBackend > models && complete > finalBackend,
+		"a successful resume still requires egress, TLS health, auth rejection, real catalog, final identity/auth attestations and completion");
+	assert.ok(source.includes('backend_id=$resume_auth_backend_container_id'));
+	const resumeBranchEnd = source.indexOf('\nelif [[ -n "$resume_backend_container_id" ]]; then', resumed);
+	assert.ok(resumeBranchEnd > resumed);
+	assert.doesNotMatch(source.slice(resumed, resumeBranchEnd), /docker create/u);
 });
 
 test("final candidate security gate reuses immutable-ID attestators after authenticated catalog validation", () => {

@@ -265,7 +265,11 @@ test("candidate Caddyfile generation emits a valid unescaped matcher and recover
 	assert.match(script, /phi-omniroute-egress-backend-auth-v1/u);
 	assert.match(script, /--expected-auth-mode enforced --expected-api-key-sha256/u);
 	assert.match(script, /legacy_backend_id.*PRESERVED/u);
-	assert.match(script, /elif \[\[ "\$backend_auth_mode" == legacy \]\]; then\n\s*fail 'catalog_and_inference_api_key_enforcement_required'/u);
+	assert.match(script, /elif \[\[ "\$backend_auth_mode" == legacy \]\]; then\n\s*fail 'catalog_and_inference_api_key_enforcement_required'/u,
+		"legacy backend config remains blocked unless the explicit one-time upgrade is requested");
+	assert.match(script, /if auth != expected_auth: raise ValueError\n\s*# backend\.env intentionally remains the preserved legacy source file;[\s\S]*?auth_mode = "enforced"/u,
+		"a verified API-key-enforced sidecar must be reported as the effective enforced mode");
+	assert.match(script, /EXISTING_CONFIG_CHECK=PASS\\ auth_mode=enforced\) backend_auth_mode='enforced'/u);
 	assert.doesNotMatch(script, /docker (?:rm|container rm)\b/u);
 });
 
