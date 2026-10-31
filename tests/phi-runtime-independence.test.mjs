@@ -66,6 +66,47 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Symptom: controlled fixture failure\./u);
     assert.doesNotMatch(result.stdout + result.stderr, /fixture-only/u);
+    const nextRepository = path.join(root, 'next-repository');
+    const cloned = spawnSync('git', ['clone', '--quiet', '--shared', source, nextRepository], { encoding: 'utf8' });
+    assert.equal(cloned.status, 0, cloned.stderr);
+    const productFile = path.join(nextRepository, 'config', 'phi-product.json');
+    const product = JSON.parse(fs.readFileSync(productFile, 'utf8'));
+    product.version = '1.0.1-fixture';
+    fs.writeFileSync(productFile, `${JSON.stringify(product, null, 2)}\n`);
+    const committed = spawnSync('git', ['-C', nextRepository, 'add', 'config/phi-product.json'], { encoding: 'utf8' });
+    assert.equal(committed.status, 0, committed.stderr);
+    const fixtureGit = { ...process.env, GIT_AUTHOR_NAME: 'Phi Fixture', GIT_COMMITTER_NAME: 'Phi Fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.test', GIT_COMMITTER_EMAIL: 'fixture@example.test' };
+    const nextCommit = spawnSync('git', ['-C', nextRepository, 'commit', '--quiet', '-m', 'fixture runtime B'],
+      { encoding: 'utf8', env: fixtureGit });
+    assert.equal(nextCommit.status, 0, nextCommit.stderr);
+    const nextId = spawnSync('git', ['-C', nextRepository, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+    const updated = spawnSync('python3', [path.join(source, 'bootstrap', 'versioned-runtime.py'), 'install',
+      '--prefix', prefix, '--repository', nextRepository, '--release-id', nextId], {
+      encoding: 'utf8', timeout: 90_000, env: { ...process.env, npm_config_offline: 'true' },
+    });
+    assert.equal(updated.status, 0, updated.stderr + updated.stdout);
+    assert.equal(JSON.parse(updated.stdout).previous, releaseId);
+    const inspect = () => spawnSync('python3', [path.join(source, 'bootstrap', 'versioned-runtime.py'),
+      'inspect', '--prefix', prefix], { encoding: 'utf8' });
+    const updatedSnapshot = inspect();
+    assert.equal(updatedSnapshot.status, 0, updatedSnapshot.stderr);
+    assert.equal(JSON.parse(updatedSnapshot.stdout).state, 'STABLE');
+    assert.equal(JSON.parse(updatedSnapshot.stdout).active, nextId);
+    const updatedVersion = run(['--version']);
+    assert.equal(updatedVersion.status, 0, updatedVersion.stderr);
+    assert.match(updatedVersion.stdout, /Phi 1\.0\.1-fixture/u);
+    const rolledBack = spawnSync('python3', [path.join(source, 'bootstrap', 'versioned-runtime.py'), 'rollback',
+      '--prefix', prefix], { encoding: 'utf8' });
+    assert.equal(rolledBack.status, 0, rolledBack.stderr + rolledBack.stdout);
+    assert.equal(JSON.parse(rolledBack.stdout).active, releaseId);
+    const restoredSnapshot = inspect();
+    assert.equal(restoredSnapshot.status, 0, restoredSnapshot.stderr);
+    assert.equal(JSON.parse(restoredSnapshot.stdout).state, 'STABLE');
+    const restoredVersion = run(['--version']);
+    assert.equal(restoredVersion.status, 0, restoredVersion.stderr);
+    assert.match(restoredVersion.stdout, /Phi 1\.0\.0/u);
+    assert.equal(fs.existsSync(path.join(prefix, 'releases', nextId)), true, 'B must remain available');
     assert.equal(fs.existsSync(source), true, 'host checkout must remain untouched');
   } finally {
     const cleanup = 'import os,shutil,sys;root=sys.argv[1];[(os.chmod(base,0o700),[os.chmod(os.path.join(base,d),0o700) for d in dirs if not os.path.islink(os.path.join(base,d))]) for base,dirs,_ in os.walk(root)];shutil.rmtree(root)';
