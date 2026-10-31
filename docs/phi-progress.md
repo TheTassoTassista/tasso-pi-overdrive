@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## CURRENT — OmniRoute host execution requires operator terminal (2026-10-31)
+
+Follow-up capability check on committed HEAD `f0c7383549b1186797061e69607b231b93511995`, branch `feature/phi-optional-services-startup`: the current Work process is uid/gid `1000:1000`; read-only `docker info` was denied on `/var/run/docker.sock`, and `sudo -n docker info` returned `a password is required`. No password was requested or entered; no privileged command, Docker mutation, firewall action, container action, or provider call was performed. Candidate and policy helper hashes still match the committed recovery checkpoint (`63e8b551…` and `96a360bd…`). Therefore host recovery, service startup and runtime verification remain pending in the operator's local terminal. The already-prepared single `sudo bash -c` recovery command in `harness/CONTINUATION.md` is the required launcher: it asks for sudo once, checks both exact digests, then runs the complete bounded recovery/resume/verification workflow. No additional wrapper or code change is justified. No changed-code tests were rerun because source bytes are unchanged; previous focused results remain applicable.
+
 ## CURRENT — OmniRoute missing-policy recovery prepared (2026-10-31)
 
 Start: branch `feature/phi-optional-services-startup`, HEAD `680e5b5bb52dd548b69adea65547bdd4623827bc`; index was clean. Preserved pre-existing untracked `logs/`, `scripts/__pycache__/`, and `tests/__pycache__/`. The operator reports that the candidate firewall rules disappeared from iptables-nft, iptables-legacy, and dedicated nftables state while the exact candidate network had zero endpoints and all three known containers were stopped. **Why the rules disappeared is UNKNOWN**; a Docker/firewall restart is only a possibility, not an established cause.

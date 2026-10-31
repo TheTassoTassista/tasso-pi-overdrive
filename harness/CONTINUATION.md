@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## CURRENT — Operator terminal needed for OmniRoute host recovery (2026-10-31)
+
+Capability probe on committed HEAD `f0c7383549b1186797061e69607b231b93511995`: Work runs as uid/gid `1000:1000`; unprivileged `docker info` is denied by `/var/run/docker.sock`, and `sudo -n docker info` reports that a password is required. No interactive password prompt was attempted and no host mutation occurred. The candidate and policy helper remain at the expected committed hashes `63e8b551ac8f777f59242e5f3eb41a4e83dba01203588e8672f6776349ae85ef` and `96a360bd1020bb10f0085355c7f1acdc50e44bdd59072a5ee58fdbd20bb0ae9c`. Do not repeat local tests for unchanged bytes. The single operator-run `sudo bash -c` command in the next continuation section is reusable and performs one sudo authorization followed by exact hash checks and the bounded recovery/resume/verification; run it only in the operator's local terminal. Runtime status remains **NOT VERIFIED** until that receipt is returned.
+
 ## CURRENT — OmniRoute missing-policy recovery prepared; host run pending (2026-10-31)
 
 Starting branch `feature/phi-optional-services-startup`, HEAD `680e5b5bb52dd548b69adea65547bdd4623827bc`; tracked tree/index were clean before this unit. Existing untracked `logs/`, `scripts/__pycache__/`, and `tests/__pycache__/` were preserved. The operator reports that the exact candidate network has zero endpoints, the known edge plus legacy/auth backends are stopped, and the candidate-owned firewall rules are absent from iptables-nft, iptables-legacy, and dedicated nft tables. The historical disappearance cause remains **UNKNOWN**; do not attribute it to a restart without new evidence.
