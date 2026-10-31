@@ -14,6 +14,7 @@ readonly RECOVERY_NETWORK_ID='a2428c56b520dabc38140474ff2559bcfc50a84587ab495346
 readonly RECOVERY_EDGE_ID='f31a9d41602d7321cf080974bf00ca550551528d620453346ee0186d8f18f83e'
 readonly RECOVERY_LEGACY_BACKEND_ID='b5c5de6334a53acb5f4a127f5d60734ca61890b6a684271d0df288444294b74d'
 readonly RECOVERY_AUTH_BACKEND_ID='b225f9f2456449c7f6287713baa67f1de203f63ec864fd165f468468851c0f02'
+readonly LOOPBACK_BACKEND_NAME='phi-omniroute-egress-backend-loopback-v1'
 readonly ROOT='/etc/phi-omniroute-candidate'
 readonly HOST_PORT='20129'
 readonly BACKEND_PORT='20128'
@@ -30,7 +31,7 @@ readonly EGRESS_PROBE_SHA256='85a4ec7cfc0396c65a93ce0d95722c6340b2e1c32eab326876
 readonly EGRESS_REPORT_SHA256='c7dc6ad7b39814a193297f5abc1e487d60b50e5babb29bea19216f2b9d9a2e9c'
 readonly TLS_HEALTH_REPORT_SHA256='b87d6fe56e7856c6d55a50f376f1aaac99ee7a1e09aaee74df0fd33630396cb5'
 readonly EDGE_ATTEST_SHA256='cd5801cb7a05895639b4f8d305f0bc1814dc8c13b1010b97382e0c9336904df2'
-readonly BACKEND_ATTEST_SHA256='a6e92e046bd76fe8235286c9de161f586be18aec3c9e5229f20c00e4140e9aef'
+readonly BACKEND_ATTEST_SHA256='e0215d7218aaaacdfb7f813142427c7cc5d96772884330555eb2bea37054455e'
 readonly BACKEND_AUTH_CONFIG_SHA256='d5bee35fb391f9995122e4250ab39328fc6b084d835ca0b057fe44145a8402fb'
 
 edge_id=''
@@ -40,6 +41,7 @@ backend_container_name=''
 backend_env_file=''
 backend_auth_mode='unknown'
 backend_api_key_sha256=''
+loopback_bind_args=()
 edge_ip=''
 edge_started=0
 backend_started=0
@@ -91,7 +93,9 @@ resume_egress_network_id=''
 resume_edge_container_id=''
 resume_backend_container_id=''
 resume_auth_backend_container_id=''
+resume_loopback_backend_container_id=''
 backend_api_key_upgrade=0
+loopback_backend_upgrade=0
 recover_missing_egress_policy=0
 while (($#)); do
 	case "$1" in
@@ -123,6 +127,16 @@ while (($#)); do
 			[[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_auth_backend_container_id_invalid'
 			resume_auth_backend_container_id=$2
 			shift
+			;;
+		--resume-loopback-backend-container-id)
+			(($# >= 2)) || fail 'resume_loopback_backend_container_id_missing'
+			[[ -z "$resume_loopback_backend_container_id" && "$2" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_loopback_backend_container_id_invalid'
+			resume_loopback_backend_container_id=$2
+			shift
+			;;
+		--loopback-backend-upgrade)
+			(( loopback_backend_upgrade == 0 )) || fail 'duplicate_loopback_backend_upgrade_flag'
+			loopback_backend_upgrade=1
 			;;
 		--backend-api-key-upgrade)
 			(( backend_api_key_upgrade == 0 )) || fail 'duplicate_backend_api_key_upgrade_flag'
@@ -172,6 +186,12 @@ if [[ -n "$resume_auth_backend_container_id" ]]; then
 	[[ -n "$resume_egress_network_id" && -n "$resume_edge_container_id" && -n "$resume_backend_container_id" ]] || fail 'resume_auth_backend_requires_exact_network_edge_and_legacy_backend_ids'
 	[[ "$resume_auth_backend_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_auth_backend_container_id_invalid'
 fi
+if (( loopback_backend_upgrade == 1 )) || [[ -n "$resume_loopback_backend_container_id" ]]; then
+	(( egress_candidate == 1 && resume_existing == 1 && backend_api_key_upgrade == 0 && recover_missing_egress_policy == 0 )) || fail 'loopback_upgrade_requires_existing_verified_policy'
+	[[ -n "$resume_auth_backend_container_id" && -n "$resume_backend_container_id" && -n "$resume_edge_container_id" ]] || fail 'loopback_upgrade_requires_exact_existing_ids'
+	[[ "$resume_egress_network_id" == "$RECOVERY_NETWORK_ID" && "$resume_edge_container_id" == "$RECOVERY_EDGE_ID" && "$resume_backend_container_id" == "$RECOVERY_LEGACY_BACKEND_ID" && "$resume_auth_backend_container_id" == "$RECOVERY_AUTH_BACKEND_ID" ]] || fail 'loopback_upgrade_scope_identity_mismatch'
+	(( loopback_backend_upgrade == 0 )) || [[ -z "$resume_loopback_backend_container_id" ]] || fail 'loopback_upgrade_and_resume_are_exclusive'
+fi
 if (( recover_missing_egress_policy == 1 )); then
 	(( egress_candidate == 1 && resume_existing == 1 && backend_api_key_upgrade == 0 )) || fail 'egress_policy_recovery_requires_exact_candidate_resume'
 	[[ "$resume_egress_network_id" == "$RECOVERY_NETWORK_ID" && "$resume_edge_container_id" == "$RECOVERY_EDGE_ID" && "$resume_backend_container_id" == "$RECOVERY_LEGACY_BACKEND_ID" && "$resume_auth_backend_container_id" == "$RECOVERY_AUTH_BACKEND_ID" ]] || fail 'egress_policy_recovery_scope_identity_mismatch'
@@ -184,9 +204,14 @@ on_exit() {
 	if [[ -n "$models_file" && -f "$models_file" && ! -L "$models_file" ]]; then rm -f -- "$models_file"; fi
 	if (( status != 0 && completed == 0 )); then
 		if [[ -e "$ROOT" || -L "$ROOT" ]]; then printf 'OMNIROUTE_CANDIDATE=PROTECTED_HOST_CONFIG_PRESERVED path=%s\n' "$ROOT" >&2; fi
-		# Stop only exact IDs created by this invocation. Never remove anything.
-		if (( backend_started == 1 )) && [[ -n "$backend_id" ]]; then docker stop --time 5 "$backend_id" >/dev/null 2>&1 || true; fi
-		if (( edge_started == 1 )) && [[ -n "$edge_id" ]]; then docker stop --time 5 "$edge_id" >/dev/null 2>&1 || true; fi
+		# Contain only exact candidate IDs started by this invocation. Never
+		# remove objects; an unsuccessful stop remains explicitly unproven.
+		if (( backend_started == 1 )) && [[ -n "$backend_id" ]]; then
+			docker stop --time 5 "$backend_id" >/dev/null 2>&1 || printf 'OMNIROUTE_CANDIDATE=CONTAINMENT_UNKNOWN component=backend\n' >&2
+		fi
+		if (( edge_started == 1 )) && [[ -n "$edge_id" ]]; then
+			docker stop --time 5 "$edge_id" >/dev/null 2>&1 || printf 'OMNIROUTE_CANDIDATE=CONTAINMENT_UNKNOWN component=edge\n' >&2
+		fi
 		printf 'OMNIROUTE_CANDIDATE=PARTIAL_STATE_PRESERVED network_id=%s edge_id=%s backend_id=%s egress_policy=retained\n' "${network_id:-none}" "${edge_id:-none}" "${backend_id:-none}" >&2
 	fi
 }
@@ -218,7 +243,7 @@ socket=$(docker context inspect default --format '{{(index .Endpoints "docker").
 [[ "$socket" == unix:///var/run/docker.sock ]] || fail 'docker_endpoint_not_system_socket'
 daemon_id=$(docker info --format '{{.ID}}' 2>/dev/null) || fail 'docker_daemon_unavailable'
 [[ "$daemon_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] || fail 'docker_daemon_identity_invalid'
-if (( recover_missing_egress_policy == 1 )); then
+if (( recover_missing_egress_policy == 1 || loopback_backend_upgrade == 1 )) || [[ -n "$resume_loopback_backend_container_id" ]]; then
 	[[ "$daemon_id" == "$RECOVERY_DAEMON_ID" ]] || fail 'egress_policy_recovery_daemon_identity_mismatch'
 fi
 
@@ -254,6 +279,12 @@ elif [[ -n "$resume_auth_backend_container_id" ]]; then
 else
 	docker container inspect "$BACKEND_NAME" >/dev/null 2>&1 && fail 'backend_name_already_exists'
 	docker container inspect "$BACKEND_AUTH_NAME" >/dev/null 2>&1 && fail 'auth_backend_name_already_exists_preserved'
+fi
+if (( loopback_backend_upgrade == 1 )); then
+	docker container inspect "$LOOPBACK_BACKEND_NAME" >/dev/null 2>&1 && fail 'loopback_backend_name_already_exists_preserved'
+elif [[ -n "$resume_loopback_backend_container_id" ]]; then
+	existing_loopback_id=$(docker container inspect --format '{{.Id}}' "$LOOPBACK_BACKEND_NAME" 2>/dev/null) || fail 'resume_loopback_backend_name_missing_preserved'
+	[[ "$existing_loopback_id" == "$resume_loopback_backend_container_id" ]] || fail 'resume_loopback_backend_identity_mismatch_preserved'
 fi
 if [[ -n "$resume_egress_network_id" ]]; then
 	network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_missing_preserved'
@@ -515,6 +546,21 @@ if (( egress_candidate == 1 )); then
 				--edge-id "$resume_edge_container_id" --container-name "$BACKEND_NAME" \
 				--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start --expected-auth-mode legacy \
 				|| fail 'legacy_backend_preservation_attestation_failed_preserved'
+			if (( loopback_backend_upgrade == 1 )) || [[ -n "$resume_loopback_backend_container_id" ]]; then
+				# The old authenticated container is immutable: its HOSTNAME setting
+				# cannot be repaired. Keep it stopped and attest it by exact ID before
+				# creating or resuming a distinct loopback-bound replacement.
+				docker inspect --format '{{json .}}' "$resume_auth_backend_container_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+					--expected-id "$resume_auth_backend_container_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+					--edge-id "$resume_edge_container_id" --container-name "$BACKEND_AUTH_NAME" \
+					--label-key phi.omniroute.candidate.egress --label-value auth-v1 --phase pre-start \
+					--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+					|| fail 'old_auth_backend_preservation_attestation_failed_preserved'
+				backend_container_name=$LOOPBACK_BACKEND_NAME
+				backend_label_value=auth-loopback-v1
+				loopback_bind_args=(--expected-loopback-bind)
+				if [[ -n "$resume_loopback_backend_container_id" ]]; then backend_id=$resume_loopback_backend_container_id; fi
+			fi
 		fi
 	else
 		fail 'backend_auth_state_unknown_preserved'
@@ -674,6 +720,10 @@ if (( backend_api_key_upgrade == 1 )) || [[ -n "$resume_auth_backend_container_i
 	backend_label='phi.omniroute.candidate.egress=auth-v1'
 	backend_label_value='auth-v1'
 fi
+if (( loopback_backend_upgrade == 1 )) || [[ -n "$resume_loopback_backend_container_id" ]]; then
+	backend_label='phi.omniroute.candidate.egress=auth-loopback-v1'
+	backend_label_value='auth-loopback-v1'
+fi
 
 if [[ -n "$resume_edge_container_id" ]]; then
 	# Resume only the operator-specified immutable ID. The name lookup above is
@@ -752,7 +802,16 @@ fi
 
 attest_edge_address || fail 'edge_attested_ipv4_unavailable'
 
-if (( backend_api_key_upgrade == 1 )); then
+if (( loopback_backend_upgrade == 1 )); then
+	backend_id=$(docker create --name "$backend_container_name" --label "$backend_label" \
+		--network "container:${edge_id}" --restart no --cap-drop ALL --security-opt no-new-privileges --pids-limit 256 \
+		--env-file "$backend_env_file" --env OMNIROUTE_HOSTNAME=127.0.0.1 "$OMNI_IMAGE") || fail 'loopback_backend_create_failed_old_backends_preserved'
+	[[ "$backend_id" =~ ^[a-f0-9]{64}$ ]] || fail 'loopback_backend_create_returned_invalid_id_preserved'
+	log "LOOPBACK_BACKEND_CREATED_EXACT_ID_${backend_id:0:12}_OLD_AUTH_ID_${resume_auth_backend_container_id:0:12}_PRESERVED"
+elif [[ -n "$resume_loopback_backend_container_id" ]]; then
+	backend_id=$resume_loopback_backend_container_id
+	log "RESUMING_EXACT_LOOPBACK_BACKEND_ID_${backend_id:0:12}_OLD_AUTH_ID_${resume_auth_backend_container_id:0:12}_PRESERVED"
+elif (( backend_api_key_upgrade == 1 )); then
 	# The legacy container was attested stopped before any new object is created.
 	# Keep it intact under its old name for operator-controlled rollback.
 	backend_id=$(docker create --name "$backend_container_name" --label "$backend_label" \
@@ -780,7 +839,7 @@ if (( egress_candidate == 1 )); then
 		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
 		--edge-id "$edge_id" --container-name "$backend_container_name" \
 		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase pre-start \
-		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" "${loopback_bind_args[@]}" \
 		|| fail 'backend_prestart_identity_or_configuration_attestation_failed_preserved'
 fi
 
@@ -792,8 +851,17 @@ if (( egress_candidate == 1 )); then
 		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
 		--edge-id "$edge_id" --container-name "$backend_container_name" \
 		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase post-start \
-		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" "${loopback_bind_args[@]}" \
 		|| fail 'backend_poststart_identity_or_namespace_attestation_failed_preserved'
+fi
+
+# Refuse an ordinary host-to-container HTTP path as soon as the exact backend
+# starts. Caddy uses the shared namespace's loopback, not the edge bridge IP;
+# an HTTP response of *any* status here is direct reachability, including 401.
+# The exact-IP edge was attested immediately before backend creation. A failure
+# triggers the exact-ID stop trap, preserving every Docker object for inspection.
+if curl --noproxy '*' --silent --output /dev/null --connect-timeout 1 --max-time 2 "http://${edge_ip}:${BACKEND_PORT}/healthz" >/dev/null 2>&1; then
+	fail 'backend_reachable_directly_from_host'
 fi
 
 if (( egress_candidate == 1 )); then
@@ -1024,13 +1092,9 @@ if (( egress_candidate == 1 )); then
 		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
 		--edge-id "$edge_id" --container-name "$backend_container_name" \
 		--label-key phi.omniroute.candidate.egress --label-value "$backend_label_value" --phase post-start \
-		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" "${loopback_bind_args[@]}" \
 		|| fail 'egress_candidate_final_backend_attestation_failed'
 	log 'SECURITY_ATTESTATION=PASS'
-fi
-
-if curl --noproxy '*' --silent --output /dev/null --connect-timeout 1 --max-time 2 "http://${edge_ip}:${BACKEND_PORT}/healthz" >/dev/null 2>&1; then
-	fail 'backend_reachable_directly_from_host'
 fi
 
 # Attest the socket inside the shared namespace: exact loopback bind, not

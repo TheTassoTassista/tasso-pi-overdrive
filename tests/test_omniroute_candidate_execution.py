@@ -19,6 +19,7 @@ NETWORK = "a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f"
 EDGE = "f31a9d41602d7321cf080974bf00ca550551528d620453346ee0186d8f18f83e"
 LEGACY = "b5c5de6334a53acb5f4a127f5d60734ca61890b6a684271d0df288444294b74d"
 AUTH = "b225f9f2456449c7f6287713baa67f1de203f63ec864fd165f468468851c0f02"
+LOOPBACK = "d" * 64
 ARGS = ["--resume-existing", "--egress-candidate", "--recover-missing-egress-policy",
         "--resume-egress-network-id", NETWORK, "--resume-edge-container-id", EDGE,
         "--resume-backend-container-id", LEGACY,
@@ -28,7 +29,7 @@ FAKE = r'''#!/usr/bin/python3
 import json, os, sys
 from pathlib import Path
 a=sys.argv[1:]; cmd=Path(sys.argv[0]).name
-state=Path(os.environ['PHI_FAKE_STATE']); network=os.environ['PHI_NETWORK']; edge=os.environ['PHI_EDGE']; legacy=os.environ['PHI_LEGACY']; auth=os.environ['PHI_AUTH']
+state=Path(os.environ['PHI_FAKE_STATE']); network=os.environ['PHI_NETWORK']; edge=os.environ['PHI_EDGE']; legacy=os.environ['PHI_LEGACY']; auth=os.environ['PHI_AUTH']; loopback=os.environ['PHI_LOOPBACK']
 def record(s):
     with (state/'calls').open('a') as f: f.write(s+'\n')
 def fail(): sys.exit(1)
@@ -36,8 +37,10 @@ def present(name): return (state/name).exists()
 if cmd=='ss': sys.exit(0)
 if cmd=='ip': print('[{"addr_info":[{"family":"inet","local":"198.51.100.8"}]}]'); sys.exit(0)
 if cmd=='curl':
-    record('curl')
-    if any(x.startswith('http://172.19.0.2:20128/') for x in a): fail()
+    record('curl '+('direct-backend' if any(x.startswith('http://172.19.0.2:20128/') for x in a) else 'edge-https'))
+    if any(x.startswith('http://172.19.0.2:20128/') for x in a):
+        if present('direct_reachable'): sys.exit(0)
+        fail()
     if '--output' in a:
         out=a[a.index('--output')+1]
         if out!='/dev/null': Path(out).write_text('{"data":[{"id":"fixture"}]}')
@@ -59,6 +62,9 @@ if cmd=='docker':
     if a[:2]==['container','inspect']:
         target=a[-1]
         if 'edge' in target: print(edge)
+        elif 'backend-loopback' in target:
+            if not present('created'): fail()
+            print(loopback)
         elif 'backend-auth' in target: print(auth)
         elif 'backend' in target: print(legacy)
         else: fail()
@@ -76,10 +82,13 @@ if cmd=='docker':
         elif 'NetworkSettings.Networks' in fmt: print('{"phi-omniroute-egress-candidate-v1":{}}')
         elif 'HostConfig.NetworkMode' in fmt:
             if target==edge: print(edge+'|sha256:'+ 'c'*64 +'|running|phi-omniroute-egress-candidate-v1|{"8443/tcp":[{"HostIp":"127.0.0.1","HostPort":"20129"}]}|no')
-            else: print(auth+'|sha256:'+ 'a'*64 +'|running|container:'+edge+'|{}|no')
+            else: print((loopback if target==loopback else auth)+'|sha256:'+ 'a'*64 +'|running|container:'+edge+'|{}|no')
         else: print('{}')
         sys.exit(0)
     if a[0]=='run': sys.exit(0)
+    if a[0]=='create':
+        if a[a.index('--name')+1]!='phi-omniroute-egress-backend-loopback-v1' or a[a.index('--env')+1]!='OMNIROUTE_HOSTNAME=127.0.0.1': fail()
+        (state/'created').touch(); record('create '+loopback); print(loopback); sys.exit(0)
     if a[0]=='start': record('start '+a[1]); print(a[1]); sys.exit(0)
     if a[0]=='stop': record('stop '+a[-1]); print(a[-1]); sys.exit(0)
     if a[0]=='exec':
@@ -97,6 +106,8 @@ if cmd=='python3':
         action=a[1]; record('policy '+action)
         if action=='preflight': print('OMNIROUTE_EGRESS_POLICY=READY backend=iptables host_ipv4_count=1 egress=eth0')
         elif action=='recovery-preflight': print('OMNIROUTE_EGRESS_POLICY='+('RECOVERY_VERIFIED' if present('recovered') else 'RECOVERY_ABSENT')+' backend=iptables network='+network[:12])
+        elif action=='preflight-input': print('OMNIROUTE_EGRESS_POLICY=VERIFIED backend=iptables network='+network[:12]+' input_migration=ready')
+        elif action=='migrate-input': print('OMNIROUTE_EGRESS_POLICY=ALREADY_VERIFIED backend=iptables network='+network[:12]+' rule=host_reply_only')
         elif action=='recover':
             if present('force_fail'): fail()
             (state/'recovered').touch(); print('OMNIROUTE_EGRESS_POLICY=RECOVERY_RECOVERED backend=iptables network='+network[:12])
@@ -107,6 +118,7 @@ if cmd=='python3':
     elif name=='omniroute-backend-auth-config.py': print('a'*64)
     elif name in ('omniroute-edge-attest.py','omniroute-backend-attest.py'):
         sys.stdin.read()
+        if name=='omniroute-backend-attest.py' and 'phi-omniroute-egress-backend-loopback-v1' in a and '--expected-loopback-bind' not in a: fail()
         record('attest '+name+' '+(a[a.index('--phase')+1] if '--phase' in a else 'none'))
     elif name=='omniroute-egress-probe-report.py':
         if '--counter-gate' in a: print('OMNIROUTE_EGRESS_COUNTERS=PASS phase=COMPLETE')
@@ -131,7 +143,7 @@ fail()
 
 
 class CandidateExecution(unittest.TestCase):
-    def run_candidate(self, fail_recovery=False, already_recovered=False, args=ARGS):
+    def run_candidate(self, fail_recovery=False, already_recovered=False, direct_reachable=False, already_created=False, args=ARGS):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
             (base / "state").mkdir()
@@ -141,6 +153,10 @@ class CandidateExecution(unittest.TestCase):
                 (base / "state/force_fail").touch()
             if already_recovered:
                 (base / "state/recovered").touch()
+            if direct_reachable:
+                (base / "state/direct_reachable").touch()
+            if already_created:
+                (base / "state/created").touch()
             fake = base / "fake.py"
             fake.write_text(FAKE)
             fake.chmod(0o755)
@@ -164,7 +180,7 @@ class CandidateExecution(unittest.TestCase):
                 (base / helper).symlink_to(ROOT / "scripts" / helper)
             env = dict(os.environ, PATH=f"{base / 'bin'}:{os.environ['PATH']}",
                        PHI_FAKE_STATE=str(base / "state"), PHI_NETWORK=NETWORK,
-                       PHI_EDGE=EDGE, PHI_LEGACY=LEGACY, PHI_AUTH=AUTH)
+                       PHI_EDGE=EDGE, PHI_LEGACY=LEGACY, PHI_AUTH=AUTH, PHI_LOOPBACK=LOOPBACK)
             result = subprocess.run(["bash", str(script), *args], capture_output=True,
                                     text=True, timeout=20, env=env)
             calls = (base / "state/calls").read_text() if (base / "state/calls").exists() else ""
@@ -200,6 +216,45 @@ class CandidateExecution(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("egress_policy_recovery_scope_identity_mismatch", result.stderr)
         self.assertNotIn("policy recover", calls)
+        self.assertNotIn("start ", calls)
+
+    def test_loopback_replacement_completes_without_starting_old_backends(self):
+        args = [item for item in ARGS if item != "--recover-missing-egress-policy"] + ["--loopback-backend-upgrade"]
+        result, calls = self.run_candidate(already_recovered=True, args=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("OMNIROUTE_CANDIDATE=CREATED_RUNNING_HEALTHY", result.stdout)
+        self.assertEqual(calls.count("create " + LOOPBACK), 1)
+        self.assertIn("start " + LOOPBACK, calls)
+        self.assertNotIn("start " + AUTH, calls)
+        self.assertNotIn("start " + LEGACY, calls)
+        self.assertIn("attest omniroute-backend-attest.py post-start", calls)
+        self.assertLess(calls.index('curl direct-backend'), calls.index('policy counters'))
+        self.assertIn('curl edge-https', calls)
+
+    def test_direct_backend_reachability_fails_and_stops_exact_candidates(self):
+        args = [item for item in ARGS if item != "--recover-missing-egress-policy"] + ["--loopback-backend-upgrade"]
+        result, calls = self.run_candidate(already_recovered=True, direct_reachable=True, args=args)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("backend_reachable_directly_from_host", result.stderr)
+        self.assertIn("stop " + LOOPBACK, calls)
+        self.assertIn("stop " + EDGE, calls)
+        self.assertNotIn("stop " + AUTH, calls)
+        self.assertNotIn("stop " + LEGACY, calls)
+        self.assertNotIn('policy counters', calls)
+        self.assertNotIn('curl edge-https', calls)
+
+    def test_exact_loopback_resume_creates_nothing_and_still_completes(self):
+        args = [item for item in ARGS if item != "--recover-missing-egress-policy"] + ["--resume-loopback-backend-container-id", LOOPBACK]
+        result, calls = self.run_candidate(already_recovered=True, already_created=True, args=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("OMNIROUTE_CANDIDATE=CREATED_RUNNING_HEALTHY", result.stdout)
+        self.assertNotIn("create ", calls)
+        self.assertIn("start " + LOOPBACK, calls)
+        wrong = [*args]
+        wrong[-1] = "e" * 64
+        result, calls = self.run_candidate(already_recovered=True, already_created=True, args=wrong)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("resume_loopback_backend_identity_mismatch_preserved", result.stderr)
         self.assertNotIn("start ", calls)
 
 

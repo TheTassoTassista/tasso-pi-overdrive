@@ -1105,6 +1105,27 @@ class BackendResumeAttestationTests(unittest.TestCase):
             with self.assertRaises(BACKEND.AttestationError):
                 self.attest(snapshot, auth_mode="legacy")
 
+    def test_loopback_replacement_requires_runtime_bind_override_and_enforced_key(self):
+        key = "fixture-only-api-key-" + "a" * 64
+        digest = hashlib.sha256(key.encode()).hexdigest()
+        snapshot = self.snapshot(phase="post-start")
+        snapshot["Config"]["Env"] = ["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={key}", "HOSTNAME=127.0.0.1"]
+        options = dict(expected_id=self.backend_id, expected_image_id=self.image_id,
+                       expected_image_ref=self.image_ref, edge_id=self.edge_id,
+                       container_name=self.backend_name, label_key="phi.omniroute.candidate.egress",
+                       label_value="v1", phase="post-start", expected_auth_mode="enforced",
+                       expected_api_key_sha256=digest, expected_loopback_bind=True)
+        with self.assertRaisesRegex(BACKEND.AttestationError, "runtime_loopback_bind_not_configured"):
+            BACKEND.attest_backend(snapshot, **options)
+        snapshot["Config"]["Env"].append("OMNIROUTE_HOSTNAME=0.0.0.0")
+        with self.assertRaisesRegex(BACKEND.AttestationError, "runtime_loopback_bind_not_configured"):
+            BACKEND.attest_backend(snapshot, **options)
+        snapshot["Config"]["Env"][-1] = "OMNIROUTE_HOSTNAME=127.0.0.1"
+        BACKEND.attest_backend(snapshot, **options)
+        snapshot["Config"]["Env"][1] = "OMNIROUTE_API_KEY=wrong"
+        with self.assertRaisesRegex(BACKEND.AttestationError, "configured_api_key_digest_mismatch"):
+            BACKEND.attest_backend(snapshot, **options)
+
 
 class CandidateGateIntegrationTests(unittest.TestCase):
     """Compose the candidate's real offline attestors and report gates."""

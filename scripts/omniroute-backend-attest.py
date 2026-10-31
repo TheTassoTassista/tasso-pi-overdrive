@@ -32,6 +32,7 @@ def attest_backend(
     phase: str,
     expected_auth_mode: str | None = None,
     expected_api_key_sha256: str | None = None,
+    expected_loopback_bind: bool = False,
 ) -> None:
     _require(phase in {"pre-start", "post-start"}, "phase_invalid")
     _require(isinstance(expected_id, str) and re.fullmatch(r"[a-f0-9]{64}", expected_id) is not None, "expected_container_id_invalid")
@@ -45,6 +46,7 @@ def attest_backend(
         _require(isinstance(expected_api_key_sha256, str) and re.fullmatch(r"[a-f0-9]{64}", expected_api_key_sha256) is not None, "expected_api_key_digest_invalid")
     else:
         _require(expected_api_key_sha256 is None, "unexpected_api_key_digest")
+    _require(not expected_loopback_bind or expected_auth_mode == "enforced", "loopback_requires_enforced_auth")
 
     row = payload
     _require(row.get("Id") == expected_id, "container_identity_mismatch")
@@ -73,6 +75,8 @@ def attest_backend(
             _require(bool(actual_api_key), "configured_api_key_missing")
             _require(hashlib.sha256(actual_api_key.encode("utf-8")).hexdigest() == expected_api_key_sha256, "configured_api_key_digest_mismatch")
             _require(not env.get("ROUTER_API_KEY"), "unexpected_alternate_api_key")
+        if expected_loopback_bind:
+            _require(env.get("OMNIROUTE_HOSTNAME") == "127.0.0.1", "runtime_loopback_bind_not_configured")
 
     state = row.get("State") or {}
     _require(isinstance(state, dict), "container_state_shape_invalid")
@@ -113,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--phase", choices=("pre-start", "post-start"), required=True)
     parser.add_argument("--expected-auth-mode", choices=("legacy", "enforced"))
     parser.add_argument("--expected-api-key-sha256")
+    parser.add_argument("--expected-loopback-bind", action="store_true")
     args = parser.parse_args(argv)
     try:
         attest_backend(
@@ -127,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
             phase=args.phase,
             expected_auth_mode=args.expected_auth_mode,
             expected_api_key_sha256=args.expected_api_key_sha256,
+            expected_loopback_bind=args.expected_loopback_bind,
         )
     except (AttestationError, json.JSONDecodeError, OSError):
         print("OMNIROUTE_BACKEND_ATTESTATION=FAIL_CLOSED", file=sys.stderr)
