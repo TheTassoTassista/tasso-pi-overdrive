@@ -1,0 +1,19 @@
+# Versioned runtime installer — isolated Linux development contract
+
+Decision `PHI-INSTALLER-RECOVERABLE-RUNTIME-001-R2` permits only an installer-specific release selector. `bootstrap/versioned-runtime.py` is not a stable installer and must not be pointed at the active Phi installation without a separate decision. It owns a private prefix containing `releases/<commit>`, transient `.stage-*`, one `active` symlink, `install.lock` and `transition.json`. It does not own Pi registration, credentials, preferences, memory, service state or database migrations. The existing `wrapperContent()` can target `<prefix>/active/bin/phi.mjs`; Pi and Node are explicit external bootstrap dependencies. The isolated Linux test mounts the checkout out of view and uses this wrapper.
+
+The installer archives an exact Git commit, installs only the locked MCP production dependencies if present, hashes every release entry, rejects special files, escaping/broken links and hardlinks, writes a manifest, synchronizes files and directories, then publishes the release without replacing any existing release. Activation writes an INTENT receipt, atomically replaces the one `active` reference, then records OBSERVED. The lock serializes cooperating installers. Previous releases are retained. Explicit rollback changes only the reference to the previously verified release. Inspection is read-only; incomplete staging, temporary artifacts, corrupt releases and uncertain transitions block a new mutation rather than being cleaned automatically.
+
+Recovery matrix:
+
+| Physical/receipt state | Disposition |
+| --- | --- |
+| No receipt, valid active release | Stable; new install may proceed |
+| INTENT, active still previous | `INTENT_BEFORE_SWITCH`; manual review, no automatic mutation |
+| INTENT, active now target | `SWITCHED_UNCONFIRMED`; manual review, no automatic mutation |
+| OBSERVED, active target, both receipt digests valid | Stable |
+| Staging, temporary reference/receipt, changed reference, invalid manifest or release, unexpected object | Fail closed; preserve artifacts |
+
+Linux evidence is limited to disposable filesystem tests, including a real process kill after the reference switch and a simulated ENOSPC receipt write. `fsync` is ordered for stage content, published release, parent, intent, reference and observed receipt, but power-loss durability has **not** been natively verified. A user-owned release is logically immutable through permissions and verified hashes, not protected against a hostile process with the same UID. No stable promotion, release garbage collection or cross-product state rollback is in scope.
+
+Windows equivalent requires a private ACL-protected same-volume staging/release root, native no-replace directory publication, an atomic replace of one validated activation reference compatible with Windows reparse-point and sharing rules, an exclusive OS lock, flushed files/directories where supported, and a receipt revalidated against physical state. A Windows launcher must reject untrusted reparse points and use the selected release without a mutable checkout. None of those Windows operations or crash behaviors has been implemented or natively certified; POSIX symlink, `renameat2`, `flock`, mode bits and `fsync` are not Windows substitutes.

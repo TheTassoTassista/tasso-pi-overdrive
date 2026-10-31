@@ -23,6 +23,18 @@ export function wrapperContent(platform, node, entry) {
   throw new Error('PHI_PLATFORM_UNSUPPORTED');
 }
 
+// Keep the launcher bound to one managed selector, never a mutable checkout path.
+// The installer verifies the release and receipt before this content is installed.
+export function versionedWrapperContent(platform, node, prefix) {
+  if (!path.isAbsolute(prefix) || fs.realpathSync(prefix) !== prefix) throw new Error('PHI_VERSIONED_PREFIX_UNTRUSTED');
+  const active = path.join(prefix, 'active');
+  const info = fs.lstatSync(active);
+  if (!info.isSymbolicLink() || !/^releases\/[0-9a-f]{40}$/u.test(fs.readlinkSync(active))) {
+    throw new Error('PHI_VERSIONED_REFERENCE_UNTRUSTED');
+  }
+  return wrapperContent(platform, node, path.join(active, 'bin', 'phi.mjs'));
+}
+
 export async function bootstrapFoundation({ plan = false, root = source, dirs = localDirectories(), env = process.env } = {}) {
   const adapter = platformAdapter();
   const target = path.join(dirs.bin, adapter.id === 'win32' ? 'phi.cmd' : 'phi');
