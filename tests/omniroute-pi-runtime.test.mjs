@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,6 +9,7 @@ import { loadPiOpenAiCompletionsStreamSimple } from "../lib/omniroute-tls.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pi = process.env.PI_BIN || path.join(path.dirname(process.execPath), "pi");
+const phi = process.env.PHI_BIN;
 const extension = path.join(packageRoot, "extensions", "omniroute.ts");
 const policy = JSON.parse(readFileSync(path.join(packageRoot, "config", "routing-policy.json"), "utf8"));
 const selected = Object.values(policy.models).find((model) => model.source === "OmniRoute" && model.catalogId);
@@ -26,16 +27,23 @@ test("loads Pi's exported OpenAI-completions stream adapter from the installed r
 	assert.equal(typeof loadPiOpenAiCompletionsStreamSimple(), "function");
 });
 
-test("Pi RPC loads the worktree extension, registers OmniRoute, and selects its local fixture model", { skip: !piRuntimeAvailable }, async (t) => {
+test("Pi RPC registers OmniRoute, selects it, and restores the preceding model without inference", { skip: !piRuntimeAvailable }, async (t) => {
 	assert.ok(selected?.catalogId, "routing policy must provide a deterministic OmniRoute model fixture");
 	const root = mkdtempSync(path.join(os.tmpdir(), "phi-omniroute-pi-rpc-"));
 	const agentDir = path.join(root, "agent");
 	mkdirSync(agentDir, { recursive: true, mode: 0o700 });
 	t.after(() => rmSync(root, { recursive: true, force: true }));
+	if (phi) {
+		const target = process.env.PHI_TARGET_ROOT;
+		assert.ok(target && path.isAbsolute(target) && existsSync(path.join(target, "package.json")), "stable Phi target must be identified explicitly");
+		writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({
+			packages: [target], defaultProvider: "openai-codex", defaultModel: "gpt-6-sol", defaultThinkingLevel: "medium",
+		}), { mode: 0o600 });
+	}
 
-	const child = spawn(pi, [
+	const child = spawn(phi || pi, [
 		"--offline", "--no-session", "--no-context-files", "--no-tools", "--mode", "rpc",
-		"--extension", extension, "--provider", "omniroute", "--model", selected.catalogId,
+		...(!phi ? ["--extension", extension] : []),
 	], {
 		cwd: root,
 		env: {
@@ -58,14 +66,10 @@ test("Pi RPC loads the worktree extension, registers OmniRoute, and selects its 
 	const responses = new Map();
 	let sendNext;
 	const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, 20_000);
-	const requests = [
-		{ id: "models", type: "get_available_models" },
-		{ id: "select", type: "set_model", provider: "omniroute", modelId: selected.catalogId },
-		{ id: "state", type: "get_state" },
-	];
+	const requests = [{ id: "models", type: "get_available_models" }];
 	let nextRequest = 0;
 	const send = () => {
-		if (nextRequest >= requests.length) { child.stdin.end(); return; }
+		if (nextRequest >= requests.length) return;
 		child.stdin.write(`${JSON.stringify(requests[nextRequest++])}\n`);
 	};
 	child.stdout.setEncoding("utf8");
@@ -82,8 +86,19 @@ test("Pi RPC loads the worktree extension, registers OmniRoute, and selects its 
 				events.push(event);
 				if (event.type === "response" && event.id === requests[nextRequest - 1]?.id) {
 					responses.set(event.id, event);
-					if (event.id !== "state") sendNext?.();
-					else child.stdin.end();
+					if (event.id === "models" && event.success) {
+						const models = event.data?.models ?? [];
+						const preceding = models.find((model) => model.provider && model.id && (model.provider !== "omniroute" || model.id !== selected.catalogId));
+						if (preceding) requests.push(
+							{ id: "preceding", type: "set_model", provider: preceding.provider, modelId: preceding.id },
+							{ id: "select", type: "set_model", provider: "omniroute", modelId: selected.catalogId },
+							{ id: "selected_state", type: "get_state" },
+							{ id: "restore", type: "set_model", provider: preceding.provider, modelId: preceding.id },
+							{ id: "restored_state", type: "get_state" },
+						);
+					}
+					if (event.id === "restored_state" || (event.id === "models" && requests.length === 1)) child.stdin.end();
+					else sendNext?.();
 				}
 			} catch {}
 		}
@@ -106,8 +121,14 @@ test("Pi RPC loads the worktree extension, registers OmniRoute, and selects its 
 	assert.equal(responses.get("models")?.success, true, `model catalog request failed: ${stderr.slice(-3000)}`);
 	const models = responses.get("models")?.data?.models ?? [];
 	assert.ok(models.some((model) => model.provider === "omniroute" && model.id === selected.catalogId), "Pi RPC catalog must contain the extension-registered fixture model");
+	const preceding = models.find((model) => model.provider && model.id && (model.provider !== "omniroute" || model.id !== selected.catalogId));
+	assert.ok(preceding, "Pi RPC must expose a distinct model to restore");
+	assert.equal(responses.get("preceding")?.success, true, "the isolated session must select its preceding model");
 	assert.equal(responses.get("select")?.success, true, "Pi RPC must accept explicit selection of the OmniRoute model");
-	assert.equal(responses.get("state")?.data?.model?.provider, "omniroute");
-	assert.equal(responses.get("state")?.data?.model?.id, selected.catalogId);
+	assert.equal(responses.get("selected_state")?.data?.model?.provider, "omniroute");
+	assert.equal(responses.get("selected_state")?.data?.model?.id, selected.catalogId);
+	assert.equal(responses.get("restore")?.success, true, "Pi RPC must restore the preceding model");
+	assert.equal(responses.get("restored_state")?.data?.model?.provider, preceding.provider);
+	assert.equal(responses.get("restored_state")?.data?.model?.id, preceding.id);
 	assert.equal(events.filter((event) => ["agent_start", "message_start", "message_update", "message_end"].includes(event.type)).length, 0, "RPC selection must not invoke a model");
 });

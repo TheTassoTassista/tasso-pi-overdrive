@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## CURRENT — OmniRoute optional Phi/Pi RPC selection (2026-10-31)
+
+Operator host receipt: Docker candidate healthy, security/egress/TLS PASS, authenticated `/v1/models` HTTP 200 with 482 models, no inference. Work's isolated real stable `phi` → Pi RPC test **PASS** for registered catalog, explicit OmniRoute selection, restore of a distinct preceding model, and zero inference events. Direct worktree Pi RPC also PASS; verified-CA unauthenticated health request returned expected HTTP 401. The Pi RPC catalog is package-configured and does not itself fetch the live OmniRoute catalog; no real model completion was attempted. Stable Phi/default `openai-codex/gpt-6-sol:medium` remains unchanged. OmniRoute is available for explicit selection but live inference remains **NOT TESTED / separate authorization**. See `harness/CONTINUATION.md` for scope and limits.
+
 ## CURRENT — OmniRoute direct-backend isolation (2026-10-31)
 
 Gate **PARTIAL / host proof pending**. Operator reports firewall recovery/verification, egress, TLS, authenticated catalog (477 models), and security attestation PASS, followed by `backend_reachable_directly_from_host`. Local installed 3.8.50 launcher was read-only tested: `HOSTNAME=127.0.0.1` is replaced by wildcard unless `OMNIROUTE_HOSTNAME=127.0.0.1` is set. The candidate now prepares a distinct exact-ID loopback-bound authenticated backend, preserves the old backends, and probes direct host access before later gates. Focused local checks PASS; no new Docker run, provider inference, stable Phi activation or host security claim was made. See `harness/CONTINUATION.md` for hashes, limits and exact next action. OmniRoute is still opt-in/deferred in the stable CLI.
