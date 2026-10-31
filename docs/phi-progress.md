@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## CURRENT — Phi encyclopedia candidate inventory (2026-10-31)
+
+Created [`PHI_ENCYCLOPEDIA.md`](PHI_ENCYCLOPEDIA.md) as a navigable document, not a new CLI subsystem. Its static inventory covers 33 extension files, all 42 registered slash-command names and 12 prompt templates; a focused regression verifies every listed local link and every static command/prompt name against the source (1/1 PASS). It separates package configuration, live service status, and native verification, with a personal checklist. This is not a claim that every handler, model or host service has been exercised: those remain individually testable/UNKNOWN as marked in the document.
+
 ## CURRENT — `/phi-bug-report` report-first CLI gate (2026-10-31)
 
 The existing Pi prompt template was reachable but instructed the agent to implement a fix; that conflicted with a safe diagnostic-report command. It now asks for bounded read-only evidence, explicit KNOWN/LIKELY/POSSIBLE/UNKNOWN and NOT TESTED labels, redacted excerpts, and no external submission or elevation. Pi's built-in `/bug` remains distinct. A real offline Pi CLI invocation with a deterministic local provider expanded `/phi-bug-report controlled-fixture-failure` and returned a report with symptom, KNOWN, UNKNOWN and next step; no host diagnosis or external provider call was performed. Focused registration test and package validation PASS. This validates the CLI/template path, not the quality of a future model's investigation.
