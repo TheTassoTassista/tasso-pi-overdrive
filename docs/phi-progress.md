@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## CURRENT — Optional launcher fail-soft hardening (2026-10-31)
+
+The Linux interactive Phi optional coordinator still leaves SearXNG startup deferred and OmniRoute `deferred` by policy; neither Docker nor the stable target was changed. A demonstrated local failure mode was that a thrown OmniRoute launcher error could skip Second Brain preparation, while an indeterminate/timeout memory `status` could lead to `start`. Calls are now independently fail-soft and `start` is only attempted for numeric inactive/unhealthy status 1 or 3. Focused optional/launcher tests **18/18 PASS**, typecheck, package validation, Node/Bash syntax and diff check PASS. Read-only user-systemd inspection at this checkpoint found embeddings, OpenViking and Hindsight `loaded/inactive`; no service was started/stopped for this test. This is local code/fixture verification, not a new end-to-end health or Docker attestation.
+
 ## CURRENT — Phi encyclopedia candidate inventory (2026-10-31)
 
 Created [`PHI_ENCYCLOPEDIA.md`](PHI_ENCYCLOPEDIA.md) as a navigable document, not a new CLI subsystem. Its static inventory covers 33 extension files, all 42 registered slash-command names and 12 prompt templates; a focused regression verifies every listed local link and every static command/prompt name against the source (1/1 PASS). It separates package configuration, live service status, and native verification, with a personal checklist. This is not a claim that every handler, model or host service has been exercised: those remain individually testable/UNKNOWN as marked in the document.

@@ -144,6 +144,29 @@ linuxTest('missing memory units and bounded manager timeout remain optional', ()
   } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
 });
 
+linuxTest('launcher errors do not suppress memory and indeterminate status does not start units', () => {
+  const setup = fixture();
+  try {
+    const actions = [];
+    const result = prepareOptionalServices({ root: setup.root, environment: setup.env, run: (_command, args) => {
+      actions.push(args[0]);
+      if (args[0] === '--phi-prepare-omniroute') throw new Error('fixture failure');
+      return { status: 0 };
+    } });
+    assert.equal(result.omniroute, 'UNAVAILABLE');
+    assert.equal(result.secondBrain, 'READY');
+    assert.deepEqual(actions, ['--phi-prepare-omniroute', 'status']);
+
+    actions.length = 0;
+    const timedOut = prepareOptionalServices({ root: setup.root, environment: setup.env, run: (_command, args) => {
+      actions.push(args[0]);
+      return args[0] === 'status' ? { status: null, error: { code: 'ETIMEDOUT' } } : { status: 0 };
+    } });
+    assert.equal(timedOut.secondBrain, 'TIMEOUT');
+    assert.deepEqual(actions, ['--phi-prepare-omniroute', 'status']);
+  } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
+});
+
 linuxTest('disabled, unconfigured and absent memory manager never start units', () => {
   const setup = fixture();
   try {
