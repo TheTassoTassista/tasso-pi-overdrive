@@ -41,6 +41,10 @@ SUBNET = "172.29.88.0/24"
 DOCKER_SUBNETS = ("172.29.88.0/24", "10.90.0.0/16", "203.0.113.0/24")
 HOST_ADDRESSES = ("127.0.0.1", "172.29.88.1", "198.51.100.27")
 EGRESS_INTERFACE = "enp5s0"
+RECOVERY_IMAGE_ID = "sha256:" + "1" * 64
+RECOVERY_OMNI_IMAGE_ID = "sha256:" + "2" * 64
+RECOVERY_API_KEY = "e" * 64
+RECOVERY_API_KEY_SHA256 = hashlib.sha256(RECOVERY_API_KEY.encode()).hexdigest()
 
 
 def payload(**changes):
@@ -58,6 +62,269 @@ def payload(**changes):
     }
     value.update(changes)
     return value
+
+
+def recovery_facts(containers=()):
+    return POLICY.NetworkFacts(
+        POLICY.RECOVERY_NETWORK_ID, "br-a2428c56b520", "172.19.0.0/16", "172.19.0.1",
+        tuple(containers), ("127.0.0.1", "172.19.0.1"), ("172.19.0.0/16", "10.0.0.0/8"), "enp5s0",
+    )
+
+
+def recovery_container_snapshots(*, running_id=None):
+    ids = (POLICY.RECOVERY_EDGE_ID, POLICY.RECOVERY_LEGACY_BACKEND_ID, POLICY.RECOVERY_AUTH_BACKEND_ID)
+    specs = (
+        (POLICY.RECOVERY_EDGE_NAME, RECOVERY_IMAGE_ID, POLICY.RECOVERY_CADDY_IMAGE, "v1", POLICY.RECOVERY_NETWORK_NAME),
+        (POLICY.RECOVERY_LEGACY_BACKEND_NAME, RECOVERY_OMNI_IMAGE_ID, POLICY.RECOVERY_OMNI_IMAGE, "v1", f"container:{POLICY.RECOVERY_EDGE_ID}"),
+        (POLICY.RECOVERY_AUTH_BACKEND_NAME, RECOVERY_OMNI_IMAGE_ID, POLICY.RECOVERY_OMNI_IMAGE, "auth-v1", f"container:{POLICY.RECOVERY_EDGE_ID}"),
+    )
+    snapshots = {}
+    for identifier, (name, image_id, image_ref, label_value, network_mode) in zip(ids, specs, strict=True):
+        active = identifier == running_id
+        is_edge = identifier == POLICY.RECOVERY_EDGE_ID
+        env = [] if is_edge else (["REQUIRE_API_KEY=false"] if identifier == POLICY.RECOVERY_LEGACY_BACKEND_ID else ["REQUIRE_API_KEY=true", f"OMNIROUTE_API_KEY={RECOVERY_API_KEY}"])
+        host = {
+            "NetworkMode": network_mode, "RestartPolicy": {"Name": "no"}, "Privileged": False,
+            "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges:true"],
+            "PidsLimit": 128 if is_edge else 256,
+            "PortBindings": {"8443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "20129"}]} if is_edge else {},
+        }
+        config = {"Image": image_ref, "Labels": {POLICY.NETWORK_LABEL: label_value}, "Env": env}
+        mounts = []
+        networks = {}
+        if is_edge:
+            config.update({
+                "User": "0:0", "Entrypoint": ["caddy"],
+                "Cmd": ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"],
+            })
+            host.update({
+                "ReadonlyRootfs": True, "CapAdd": ["NET_BIND_SERVICE"],
+                "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "1", "net.ipv6.conf.default.disable_ipv6": "1"},
+                "Tmpfs": {path: "rw,noexec,nosuid,size=16m" for path in ("/data", "/config", "/tmp")},
+            })
+            mounts = [
+                {"Source": "/etc/phi-omniroute-candidate/Caddyfile", "Destination": "/etc/caddy/Caddyfile", "Type": "bind", "RW": False, "Mode": "ro"},
+                {"Source": "/etc/phi-omniroute-candidate/ca.crt", "Destination": "/etc/caddy/tls.crt", "Type": "bind", "RW": False, "Mode": "ro"},
+                {"Source": "/etc/phi-omniroute-candidate/tls.key", "Destination": "/etc/caddy/tls.key", "Type": "bind", "RW": False, "Mode": "ro"},
+            ]
+            networks = {POLICY.RECOVERY_NETWORK_NAME: {"NetworkID": "", "EndpointID": "", "IPAddress": "", "GlobalIPv6Address": ""}}
+        snapshots[identifier] = {
+            "Id": identifier, "Name": f"/{name}", "Image": image_id,
+            "Config": config,
+            "State": {"Status": "running" if active else "created", "Running": active, "Pid": 123 if active else 0},
+            "HostConfig": host, "Mounts": mounts, "NetworkSettings": {"Networks": networks},
+        }
+    return list(ids), snapshots
+
+
+RECOVERY_PRESENT_KEYS = {"iptables-nft": False, "iptables-legacy": False, "nftables": False}
+
+
+class FirewallRecoveryTests(unittest.TestCase):
+    def test_recovery_network_configuration_is_exact_and_endpoints_must_be_empty(self):
+        facts = POLICY.validate_network_payload(
+            {
+                **payload(Id=POLICY.RECOVERY_NETWORK_ID, Name=POLICY.RECOVERY_NETWORK_NAME,
+                          Options={"com.docker.network.bridge.name": "br-a2428c56b520"},
+                          IPAM={"Config": [{"Subnet": "172.19.0.0/16", "Gateway": "172.19.0.1"}]}),
+            },
+            POLICY.RECOVERY_NETWORK_ID,
+            require_empty=True,
+        )
+        self.assertEqual((facts.bridge, facts.subnet, facts.gateway), ("br-a2428c56b520", "172.19.0.0/16", "172.19.0.1"))
+        with self.assertRaisesRegex(POLICY.PolicyError, "endpoints"):
+            POLICY.validate_network_payload(
+                {**payload(Id=POLICY.RECOVERY_NETWORK_ID), "Containers": {"e" * 64: {}}},
+                POLICY.RECOVERY_NETWORK_ID, require_empty=True,
+            )
+        with self.assertRaisesRegex(POLICY.PolicyError, "ipv4_subnet_unknown"):
+            POLICY.validate_network_payload(
+                {**payload(Id=POLICY.RECOVERY_NETWORK_ID), "IPAM": {"Config": [
+                    {"Subnet": "172.19.0.0/16", "Gateway": "172.19.0.1"},
+                    {"Subnet": "2001:db8::/64", "Gateway": "2001:db8::1"},
+                ]}},
+                POLICY.RECOVERY_NETWORK_ID, require_empty=True,
+            )
+
+    def test_recovery_requires_exact_full_stopped_container_inventory(self):
+        ids, rows = recovery_container_snapshots()
+        POLICY.validate_recovery_container_snapshots(ids, rows, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+        with self.assertRaisesRegex(POLICY.PolicyError, "configured_api_key_digest_mismatch"):
+            POLICY.validate_recovery_container_snapshots(ids, rows, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256="0" * 64)
+        invalid_auth = dict(rows)
+        auth_id = POLICY.RECOVERY_AUTH_BACKEND_ID
+        auth_row = dict(rows[auth_id])
+        auth_config = dict(auth_row["Config"])
+        auth_config["Env"] = ["REQUIRE_API_KEY=false"]
+        auth_row["Config"] = auth_config
+        invalid_auth[auth_id] = auth_row
+        with self.assertRaisesRegex(POLICY.PolicyError, "api_key_policy_mismatch"):
+            POLICY.validate_recovery_container_snapshots(ids, invalid_auth, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+        with self.assertRaisesRegex(POLICY.PolicyError, "inventory_mismatch"):
+            POLICY.validate_recovery_container_snapshots(ids + ["c" * 64], rows, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+        running_ids, running_rows = recovery_container_snapshots(running_id=POLICY.RECOVERY_AUTH_BACKEND_ID)
+        with self.assertRaisesRegex(POLICY.PolicyError, "active_or_unknown"):
+            POLICY.validate_recovery_container_snapshots(running_ids, running_rows, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+        wrong_image = dict(rows)
+        wrong_image[POLICY.RECOVERY_EDGE_ID] = {**rows[POLICY.RECOVERY_EDGE_ID], "Image": "sha256:" + "3" * 64}
+        with self.assertRaisesRegex(POLICY.PolicyError, "container_image_id_mismatch"):
+            POLICY.validate_recovery_container_snapshots(ids, wrong_image, edge_image_id=RECOVERY_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+        with self.assertRaisesRegex(POLICY.PolicyError, "image_id_mismatch"):
+            POLICY.validate_recovery_container_snapshots(ids, rows, edge_image_id=RECOVERY_OMNI_IMAGE_ID, backend_image_id=RECOVERY_OMNI_IMAGE_ID, expected_api_key_sha256=RECOVERY_API_KEY_SHA256)
+
+    def test_recovery_classifies_total_absence_and_exact_current_policy_only(self):
+        facts = recovery_facts()
+        empty = dict(RECOVERY_PRESENT_KEYS)
+        with patch.object(POLICY, "_verify_firewall", side_effect=POLICY.PolicyError("not installed")):
+            self.assertEqual(POLICY.classify_recovery_policy_state(empty, network_id=POLICY.RECOVERY_NETWORK_ID, facts=facts, backend="iptables", active_iptables="iptables-nft"), "ABSENT")
+        present = {**empty, "iptables-nft": True}
+        with patch.object(POLICY, "_verify_firewall", return_value=None):
+            self.assertEqual(POLICY.classify_recovery_policy_state(present, network_id=POLICY.RECOVERY_NETWORK_ID, facts=facts, backend="iptables", active_iptables="iptables-nft"), "VERIFIED")
+        with patch.object(POLICY, "_verify_firewall", side_effect=[POLICY.PolicyError("current differs"), None]), self.assertRaisesRegex(POLICY.PolicyError, "explicit_migration"):
+            POLICY.classify_recovery_policy_state(present, network_id=POLICY.RECOVERY_NETWORK_ID, facts=facts, backend="iptables", active_iptables="iptables-nft")
+        with patch.object(POLICY, "_verify_firewall", side_effect=[POLICY.PolicyError("modified"), POLICY.PolicyError("modified")]), self.assertRaisesRegex(POLICY.PolicyError, "partial_or_modified"):
+            POLICY.classify_recovery_policy_state(present, network_id=POLICY.RECOVERY_NETWORK_ID, facts=facts, backend="iptables", active_iptables="iptables-nft")
+        duplicate = {**present, "nftables": True}
+        with patch.object(POLICY, "_verify_firewall", return_value=None), self.assertRaisesRegex(POLICY.PolicyError, "duplicate_or_backend"):
+            POLICY.classify_recovery_policy_state(duplicate, network_id=POLICY.RECOVERY_NETWORK_ID, facts=facts, backend="iptables", active_iptables="iptables-nft")
+        modified_nft = json.dumps({"nftables": [{"table": {"family": "inet", "name": POLICY.policy_names(POLICY.RECOVERY_NETWORK_ID)["table"]}}]})
+        self.assertTrue(POLICY._nft_ruleset_has_owned_state(modified_nft, POLICY.RECOVERY_NETWORK_ID))
+        self.assertFalse(POLICY._nft_ruleset_has_owned_state('{"nftables": []}', POLICY.RECOVERY_NETWORK_ID))
+        marker = f"phi-omni:{POLICY.RECOVERY_NETWORK_ID[:12]}:candidate_egress"
+        iptables_nft_compat = json.dumps({"nftables": [
+            {"table": {"family": "ip", "name": "filter"}},
+            {"chain": {"family": "ip", "table": "filter", "name": POLICY.policy_names(POLICY.RECOVERY_NETWORK_ID)["main"]}},
+            {"rule": {"family": "ip", "table": "filter", "comment": marker}},
+        ]})
+        self.assertFalse(POLICY._nft_ruleset_has_owned_state(iptables_nft_compat, POLICY.RECOVERY_NETWORK_ID))
+        partial_inet = json.dumps({"nftables": [
+            {"table": {"family": "inet", "name": "unexpected_table"}},
+            {"rule": {"family": "inet", "table": "unexpected_table", "comment": marker}},
+        ]})
+        self.assertTrue(POLICY._nft_ruleset_has_owned_state(partial_inet, POLICY.RECOVERY_NETWORK_ID))
+        wrong_family_dedicated = json.dumps({"nftables": [
+            {"table": {"family": "ip", "name": POLICY.policy_names(POLICY.RECOVERY_NETWORK_ID)["table"]}},
+        ]})
+        self.assertTrue(POLICY._nft_ruleset_has_owned_state(wrong_family_dedicated, POLICY.RECOVERY_NETWORK_ID))
+        with self.assertRaisesRegex(POLICY.PolicyError, "snapshot_invalid"):
+            POLICY._nft_ruleset_has_owned_state("not-json", POLICY.RECOVERY_NETWORK_ID)
+
+    def test_iptables_recovery_inventory_parses_markers_and_chain_names(self):
+        owned = POLICY.policy_names(POLICY.RECOVERY_NETWORK_ID)["main"]
+        marker = f"phi-omni:{POLICY.RECOVERY_NETWORK_ID[:12]}:candidate_egress"
+        self.assertTrue(POLICY._iptables_save_has_owned_state(f":{owned} - [0:0]\n", POLICY.RECOVERY_NETWORK_ID))
+        self.assertTrue(POLICY._iptables_save_has_owned_state(f'-A DOCKER-USER -s 172.19.0.0/16 -m comment --comment "{marker}" -j {owned}\n', POLICY.RECOVERY_NETWORK_ID))
+        self.assertFalse(POLICY._iptables_save_has_owned_state(":DOCKER-USER - [0:0]\n-A DOCKER-USER -j RETURN\n", POLICY.RECOVERY_NETWORK_ID))
+        with self.assertRaisesRegex(POLICY.PolicyError, "unparseable"):
+            POLICY._iptables_save_has_owned_state('-A FILTER "unterminated\n', POLICY.RECOVERY_NETWORK_ID)
+
+    def test_firewall_inventory_requires_both_iptables_sources_and_nft_json(self):
+        available = {"iptables-nft-save", "iptables-legacy-save", "nft"}
+        with patch.object(POLICY.shutil, "which", side_effect=lambda name: "/sbin/" + name if name in available else None), \
+             patch.object(POLICY, "_run", side_effect=["", "", '{"nftables": []}']) as run:
+            self.assertEqual(POLICY._firewall_owned_presence(POLICY.RECOVERY_NETWORK_ID), {
+                "iptables-nft": False, "iptables-legacy": False, "nftables": False,
+            })
+        self.assertEqual(run.call_count, 3)
+        with patch.object(POLICY.shutil, "which", return_value=None), self.assertRaisesRegex(POLICY.PolicyError, "inventory_unavailable:iptables-nft"):
+            POLICY._firewall_owned_presence(POLICY.RECOVERY_NETWORK_ID)
+        with patch.object(POLICY.shutil, "which", side_effect=lambda name: "/sbin/" + name if name == "iptables-nft-save" else None), \
+             patch.object(POLICY, "_run", return_value=""), self.assertRaisesRegex(POLICY.PolicyError, "inventory_unavailable:iptables-legacy"):
+            POLICY._firewall_owned_presence(POLICY.RECOVERY_NETWORK_ID)
+
+    def test_recovery_preflight_fails_for_wrong_daemon_before_any_firewall_work(self):
+        with patch.object(POLICY, "_docker_network_name") as network_name, patch.object(POLICY, "_firewall_owned_presence") as firewall:
+            with self.assertRaisesRegex(POLICY.PolicyError, "scope_identity"):
+                POLICY._recovery_preconditions(POLICY.RECOVERY_NETWORK_ID, DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID)
+        network_name.assert_not_called()
+        firewall.assert_not_called()
+
+    def test_recovery_cli_binds_preflight_and_mutation_to_expected_api_key_digest(self):
+        common = ["--network-id", POLICY.RECOVERY_NETWORK_ID, "--daemon-id", POLICY.RECOVERY_DAEMON_ID,
+                  "--expect-empty", "--edge-container-id", POLICY.RECOVERY_EDGE_ID,
+                  "--legacy-backend-container-id", POLICY.RECOVERY_LEGACY_BACKEND_ID,
+                  "--auth-backend-container-id", POLICY.RECOVERY_AUTH_BACKEND_ID,
+                  "--expected-edge-image-id", RECOVERY_IMAGE_ID, "--expected-backend-image-id", RECOVERY_OMNI_IMAGE_ID,
+                  "--expected-api-key-sha256", RECOVERY_API_KEY_SHA256]
+        output = io.StringIO()
+        with patch.object(POLICY.os, "geteuid", return_value=0), \
+             patch.object(POLICY, "_docker_facts", return_value=(POLICY.RECOVERY_DAEMON_ID, "29.8.1", "iptables")), \
+             patch.object(POLICY, "_validate_recovery_cli"), \
+             patch.object(POLICY, "_recovery_preconditions", return_value=(recovery_facts(), "iptables", "VERIFIED")) as preconditions, \
+             contextlib.redirect_stdout(output):
+            self.assertEqual(POLICY._main(["recovery-preflight", *common]), 0)
+        self.assertEqual(preconditions.call_args.args, (
+            POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID,
+            RECOVERY_API_KEY_SHA256,
+        ))
+        self.assertIn("RECOVERY_VERIFIED", output.getvalue())
+
+        with patch.object(POLICY.os, "geteuid", return_value=0), \
+             patch.object(POLICY, "_docker_facts", return_value=(POLICY.RECOVERY_DAEMON_ID, "29.8.1", "iptables")), \
+             patch.object(POLICY, "_validate_recovery_cli"), \
+             patch.object(POLICY, "_recover_missing_policy", return_value=("RECOVERED", recovery_facts(), "iptables")) as recover, \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(POLICY._main(["recover", *common]), 0)
+        self.assertEqual(recover.call_args.args, (
+            POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID,
+            RECOVERY_API_KEY_SHA256,
+        ))
+
+    def test_recovery_preflight_requires_network_endpoints_and_stopped_containers(self):
+        with patch.object(POLICY, "_docker_network_name", return_value=POLICY.RECOVERY_NETWORK_NAME), \
+             patch.object(POLICY, "_recovery_container_snapshot"), \
+             patch.object(POLICY, "_network_facts", side_effect=POLICY.PolicyError("docker_network_has_endpoints_before_policy")), \
+             patch.object(POLICY, "_docker_facts", return_value=(POLICY.RECOVERY_DAEMON_ID, "29.8.1", "iptables")) as docker_facts, patch.object(POLICY, "_firewall_owned_presence") as firewall:
+            with self.assertRaisesRegex(POLICY.PolicyError, "endpoints"):
+                POLICY._recovery_preconditions(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID)
+        docker_facts.assert_called_once_with(POLICY.RECOVERY_DAEMON_ID)
+        firewall.assert_not_called()
+        with patch.object(POLICY, "_docker_network_name", return_value=POLICY.RECOVERY_NETWORK_NAME), \
+             patch.object(POLICY, "_recovery_container_snapshot", side_effect=POLICY.PolicyError("recovery_candidate_container_active_or_unknown")), \
+             patch.object(POLICY, "_docker_facts", return_value=(POLICY.RECOVERY_DAEMON_ID, "29.8.1", "iptables")), \
+             patch.object(POLICY, "_network_facts") as network_facts:
+            with self.assertRaisesRegex(POLICY.PolicyError, "active_or_unknown"):
+                POLICY._recovery_preconditions(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID)
+        network_facts.assert_not_called()
+
+    def test_recovery_apply_failure_preserves_partial_state_without_retry_or_cleanup(self):
+        facts = recovery_facts()
+        absent = (facts, "iptables", "ABSENT")
+        with patch.object(POLICY, "_recovery_preconditions", side_effect=[absent, absent]) as preconditions, \
+             patch.object(POLICY, "_iptables_apply", side_effect=POLICY.PolicyError("command_failed:iptables:1")) as apply, \
+             patch.object(POLICY, "_nft_apply") as nft_apply:
+            with self.assertRaisesRegex(POLICY.PolicyError, "apply_failed_state_preserved"):
+                POLICY._recover_missing_policy(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID, RECOVERY_API_KEY_SHA256)
+        self.assertEqual(preconditions.call_count, 2)
+        apply.assert_called_once_with(facts)
+        nft_apply.assert_not_called()
+
+    def test_recovery_success_is_verified_before_return_and_second_call_is_idempotent(self):
+        facts = recovery_facts()
+        absent = (facts, "iptables", "ABSENT")
+        verified = (facts, "iptables", "VERIFIED")
+        with patch.object(POLICY, "_recovery_preconditions", side_effect=[absent, absent, verified]), \
+             patch.object(POLICY, "_iptables_apply") as apply:
+            self.assertEqual(POLICY._recover_missing_policy(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID, RECOVERY_API_KEY_SHA256), ("RECOVERED", facts, "iptables"))
+        apply.assert_called_once_with(facts)
+        with patch.object(POLICY, "_recovery_preconditions", return_value=verified) as preconditions, \
+             patch.object(POLICY, "_iptables_apply", side_effect=AssertionError("must not duplicate")) as apply_again:
+            self.assertEqual(POLICY._recover_missing_policy(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID, RECOVERY_API_KEY_SHA256), ("ALREADY_VERIFIED", facts, "iptables"))
+        preconditions.assert_called_once()
+        apply_again.assert_not_called()
+
+    def test_recovery_refuses_changed_policy_before_apply_and_preserves_postverify_failure(self):
+        facts = recovery_facts()
+        absent = (facts, "iptables", "ABSENT")
+        verified = (facts, "iptables", "VERIFIED")
+        with patch.object(POLICY, "_recovery_preconditions", side_effect=[absent, verified]), patch.object(POLICY, "_iptables_apply") as apply:
+            with self.assertRaisesRegex(POLICY.PolicyError, "precondition_changed"):
+                POLICY._recover_missing_policy(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID, RECOVERY_API_KEY_SHA256)
+        apply.assert_not_called()
+        with patch.object(POLICY, "_recovery_preconditions", side_effect=[absent, absent, (facts, "iptables", "ABSENT")]), patch.object(POLICY, "_iptables_apply") as apply:
+            with self.assertRaisesRegex(POLICY.PolicyError, "postverify_failed_state_preserved"):
+                POLICY._recover_missing_policy(POLICY.RECOVERY_NETWORK_ID, POLICY.RECOVERY_DAEMON_ID, RECOVERY_IMAGE_ID, RECOVERY_OMNI_IMAGE_ID, RECOVERY_API_KEY_SHA256)
+        apply.assert_called_once_with(facts)
 
 
 class RuntimeFactTests(unittest.TestCase):

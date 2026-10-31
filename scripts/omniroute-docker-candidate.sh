@@ -9,6 +9,11 @@ readonly OMNI_TAG='diegosouzapw/omniroute:3.8.50'
 readonly OMNI_DIGEST='sha256:085c57adf499a8aaa9f35ccde95c0df9c11bd9ecd18d6c9edbf3b68b8079ba9d'
 readonly OMNI_IMAGE="diegosouzapw/omniroute@${OMNI_DIGEST}"
 readonly CADDY_IMAGE='docker.io/library/caddy@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f'
+readonly RECOVERY_DAEMON_ID='b64b0d52-95ab-4b1a-a971-5f09a4d6e36d'
+readonly RECOVERY_NETWORK_ID='a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f'
+readonly RECOVERY_EDGE_ID='f31a9d41602d7321cf080974bf00ca550551528d620453346ee0186d8f18f83e'
+readonly RECOVERY_LEGACY_BACKEND_ID='b5c5de6334a53acb5f4a127f5d60734ca61890b6a684271d0df288444294b74d'
+readonly RECOVERY_AUTH_BACKEND_ID='b225f9f2456449c7f6287713baa67f1de203f63ec864fd165f468468851c0f02'
 readonly ROOT='/etc/phi-omniroute-candidate'
 readonly HOST_PORT='20129'
 readonly BACKEND_PORT='20128'
@@ -20,7 +25,7 @@ readonly TLS_HEALTH_REPORT_SCRIPT="$SCRIPT_DIR/omniroute-tls-health-report.py"
 readonly EDGE_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-edge-attest.py"
 readonly BACKEND_ATTEST_SCRIPT="$SCRIPT_DIR/omniroute-backend-attest.py"
 readonly BACKEND_AUTH_CONFIG_SCRIPT="$SCRIPT_DIR/omniroute-backend-auth-config.py"
-readonly POLICY_SCRIPT_SHA256='ff2ef7a40bb672e8d0f251e83b9b3130a8497fc1e0e10b79d2c80b44132abe0b'
+readonly POLICY_SCRIPT_SHA256='96a360bd1020bb10f0085355c7f1acdc50e44bdd59072a5ee58fdbd20bb0ae9c'
 readonly EGRESS_PROBE_SHA256='85a4ec7cfc0396c65a93ce0d95722c6340b2e1c32eab326876170999012a779d'
 readonly EGRESS_REPORT_SHA256='c7dc6ad7b39814a193297f5abc1e487d60b50e5babb29bea19216f2b9d9a2e9c'
 readonly TLS_HEALTH_REPORT_SHA256='b87d6fe56e7856c6d55a50f376f1aaac99ee7a1e09aaee74df0fd33630396cb5'
@@ -87,6 +92,7 @@ resume_edge_container_id=''
 resume_backend_container_id=''
 resume_auth_backend_container_id=''
 backend_api_key_upgrade=0
+recover_missing_egress_policy=0
 while (($#)); do
 	case "$1" in
 		--resume-existing) (( resume_existing == 0 )) || fail 'duplicate_resume_flag'; resume_existing=1 ;;
@@ -121,6 +127,10 @@ while (($#)); do
 		--backend-api-key-upgrade)
 			(( backend_api_key_upgrade == 0 )) || fail 'duplicate_backend_api_key_upgrade_flag'
 			backend_api_key_upgrade=1
+			;;
+		--recover-missing-egress-policy)
+			(( recover_missing_egress_policy == 0 )) || fail 'duplicate_egress_policy_recovery_flag'
+			recover_missing_egress_policy=1
 			;;
 		*) fail 'unsupported_arguments' ;;
 	esac
@@ -161,6 +171,10 @@ if [[ -n "$resume_auth_backend_container_id" ]]; then
 	(( egress_candidate == 1 && resume_existing == 1 && backend_api_key_upgrade == 0 )) || fail 'resume_auth_backend_requires_egress_resume_without_upgrade'
 	[[ -n "$resume_egress_network_id" && -n "$resume_edge_container_id" && -n "$resume_backend_container_id" ]] || fail 'resume_auth_backend_requires_exact_network_edge_and_legacy_backend_ids'
 	[[ "$resume_auth_backend_container_id" =~ ^[a-f0-9]{64}$ ]] || fail 'resume_auth_backend_container_id_invalid'
+fi
+if (( recover_missing_egress_policy == 1 )); then
+	(( egress_candidate == 1 && resume_existing == 1 && backend_api_key_upgrade == 0 )) || fail 'egress_policy_recovery_requires_exact_candidate_resume'
+	[[ "$resume_egress_network_id" == "$RECOVERY_NETWORK_ID" && "$resume_edge_container_id" == "$RECOVERY_EDGE_ID" && "$resume_backend_container_id" == "$RECOVERY_LEGACY_BACKEND_ID" && "$resume_auth_backend_container_id" == "$RECOVERY_AUTH_BACKEND_ID" ]] || fail 'egress_policy_recovery_scope_identity_mismatch'
 fi
 
 on_exit() {
@@ -204,6 +218,9 @@ socket=$(docker context inspect default --format '{{(index .Endpoints "docker").
 [[ "$socket" == unix:///var/run/docker.sock ]] || fail 'docker_endpoint_not_system_socket'
 daemon_id=$(docker info --format '{{.ID}}' 2>/dev/null) || fail 'docker_daemon_unavailable'
 [[ "$daemon_id" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]] || fail 'docker_daemon_identity_invalid'
+if (( recover_missing_egress_policy == 1 )); then
+	[[ "$daemon_id" == "$RECOVERY_DAEMON_ID" ]] || fail 'egress_policy_recovery_daemon_identity_mismatch'
+fi
 
 # OmniRoute must already be local under the exact operator-supplied digest.
 omni_id=$(docker image inspect "$OMNI_TAG" --format '{{.Id}}' 2>/dev/null) || fail 'approved_omniroute_image_not_local'
@@ -250,6 +267,29 @@ if (( resume_existing == 1 && root_exists == 0 )); then fail 'resume_protected_h
 if (( root_exists == 1 )) && { [[ ! -d "$ROOT" ]] || [[ -L "$ROOT" ]]; }; then fail 'existing_protected_path_not_a_directory_preserved'; fi
 [[ -z "$(ss -Hln 'sport = :20129' 2>/dev/null)" ]] || fail 'loopback_tls_port_already_in_use'
 
+run_resume_policy_preflight() {
+	if (( recover_missing_egress_policy == 1 )); then
+		local -a recovery_key_args=()
+		if [[ -n "$backend_api_key_sha256" ]]; then
+			recovery_key_args=(--expected-api-key-sha256 "$backend_api_key_sha256")
+		fi
+		python3 "$POLICY_SCRIPT" recovery-preflight --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty \
+			--edge-container-id "$resume_edge_container_id" --legacy-backend-container-id "$resume_backend_container_id" \
+			--auth-backend-container-id "$resume_auth_backend_container_id" --expected-edge-image-id "$caddy_id" --expected-backend-image-id "$omni_id" \
+			"${recovery_key_args[@]}"
+	else
+		python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty
+	fi
+}
+
+validate_resume_policy_preflight() {
+	if (( recover_missing_egress_policy == 1 )); then
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=RECOVERY_ABSENT\ backend=*\ network="${network_id:0:12}" || "$policy_result" == OMNIROUTE_EGRESS_POLICY=RECOVERY_VERIFIED\ backend=*\ network="${network_id:0:12}" ]]
+	else
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]]
+	fi
+}
+
 # Pre-attest an existing candidate network and its complete policy before the
 # validator container, Caddy config repair, or any other new Docker mutation.
 # A mismatch or partial policy is preserved for manual inspection; this resume
@@ -259,8 +299,8 @@ if (( egress_candidate == 1 )); then
 	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=READY\ backend=*\ host_ipv4_count=*\ egress=* ]] || fail 'egress_policy_host_preflight_receipt_invalid'
 	log "$policy_result"
 	if [[ -n "$resume_egress_network_id" ]]; then
-		policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_or_network_not_attested_preserved'
-		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		policy_result=$(run_resume_policy_preflight) || fail 'existing_candidate_policy_or_network_not_attested_preserved'
+		validate_resume_policy_preflight || fail 'existing_candidate_policy_receipt_invalid_preserved'
 		log "$policy_result"
 	fi
 fi
@@ -484,6 +524,40 @@ elif [[ "$backend_auth_mode" == legacy ]]; then
 	fail 'catalog_and_inference_api_key_enforcement_required'
 fi
 
+# Recovery is deliberately completed and fully re-attested before even the
+# isolated Caddy validator container is started. This explicit mode only
+# resumes the exact already-stopped edge/legacy/auth-backend objects.
+if (( recover_missing_egress_policy == 1 )); then
+	edge_id=$resume_edge_container_id
+	backend_id=$resume_auth_backend_container_id
+	docker inspect --format '{{json .}}' "$edge_id" | python3 "$EDGE_ATTEST_SCRIPT" \
+		--expected-id "$edge_id" --expected-image-id "$caddy_id" --expected-image-ref "$CADDY_IMAGE" \
+		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase pre-start \
+		|| fail 'edge_prestart_identity_or_configuration_attestation_failed_preserved'
+	docker inspect --format '{{json .}}' "$legacy_backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+		--expected-id "$legacy_backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+		--edge-id "$edge_id" --container-name "$BACKEND_NAME" \
+		--label-key phi.omniroute.candidate.egress --label-value v1 --phase pre-start --expected-auth-mode legacy \
+		|| fail 'legacy_backend_preservation_attestation_failed_preserved'
+	docker inspect --format '{{json .}}' "$backend_id" | python3 "$BACKEND_ATTEST_SCRIPT" \
+		--expected-id "$backend_id" --expected-image-id "$omni_id" --expected-image-ref "$OMNI_IMAGE" \
+		--edge-id "$edge_id" --container-name "$BACKEND_AUTH_NAME" \
+		--label-key phi.omniroute.candidate.egress --label-value auth-v1 --phase pre-start \
+		--expected-auth-mode enforced --expected-api-key-sha256 "$backend_api_key_sha256" \
+		|| fail 'backend_prestart_identity_or_configuration_attestation_failed_preserved'
+	policy_result=$(python3 "$POLICY_SCRIPT" recover --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty \
+		--edge-container-id "$edge_id" --legacy-backend-container-id "$legacy_backend_id" \
+		--auth-backend-container-id "$backend_id" --expected-edge-image-id "$caddy_id" --expected-backend-image-id "$omni_id" \
+		--expected-api-key-sha256 "$backend_api_key_sha256") \
+		|| fail 'egress_policy_recovery_failed_state_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=RECOVERY_RECOVERED\ backend=*\ network="${network_id:0:12}" || "$policy_result" == OMNIROUTE_EGRESS_POLICY=RECOVERY_ALREADY_VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_recovery_receipt_invalid_preserved'
+	log "$policy_result"
+	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_recovery_reverification_failed_preserved'
+	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_recovery_reverification_receipt_invalid_preserved'
+	log "$policy_result"
+fi
+
 # Validate Caddy's actual Caddyfile with the pinned image, no network and only
 # disposable tmpfs state. This creates and auto-removes one short-lived validator.
 validate_caddyfile() {
@@ -538,8 +612,8 @@ if (( egress_candidate == 1 )); then
 		actual_network_id=$(docker network inspect --format '{{.Id}}' "$NETWORK" 2>/dev/null) || fail 'resume_candidate_network_disappeared_preserved'
 		[[ "$actual_network_id" == "$resume_egress_network_id" ]] || fail 'resume_candidate_network_replaced_preserved'
 		network_id=$actual_network_id
-		policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_changed_preserved'
-		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_receipt_invalid_preserved'
+		policy_result=$(run_resume_policy_preflight) || fail 'existing_candidate_policy_changed_preserved'
+		validate_resume_policy_preflight || fail 'existing_candidate_policy_receipt_invalid_preserved'
 		log "$policy_result"
 	else
 		# A new bridge has no endpoint while its candidate-specific deny policy is
@@ -577,8 +651,8 @@ elif (( egress_candidate == 1 )); then
 	# the complete current/legacy policy here; migration is deliberately later,
 	# after the exact edge has passed pre-start attestation. A full current-policy
 	# verify here would reject LEGACY_VERIFIED before that authorized migration.
-	policy_result=$(python3 "$POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'existing_candidate_policy_reverification_failed_preserved'
-	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready || "$policy_result" == OMNIROUTE_EGRESS_POLICY=LEGACY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ input_migration=ready ]] || fail 'existing_candidate_policy_reverification_receipt_invalid_preserved'
+	policy_result=$(run_resume_policy_preflight) || fail 'existing_candidate_policy_reverification_failed_preserved'
+	validate_resume_policy_preflight || fail 'existing_candidate_policy_reverification_receipt_invalid_preserved'
 	log "$policy_result"
 else
 	network_facts=$(docker network inspect --format '{{.Id}}|{{.Driver}}|{{.Internal}}|{{.Attachable}}' "$NETWORK") || fail 'candidate_network_inspect_failed'
@@ -626,8 +700,17 @@ if (( egress_candidate == 1 )); then
 		--network-id "$network_id" --network-name "$NETWORK" --container-name "$EDGE_NAME" --root "$ROOT" \
 		--label-key phi.omniroute.candidate.egress --label-value v1 --host-port "$HOST_PORT" --phase pre-start \
 		|| fail 'edge_prestart_identity_or_configuration_attestation_failed_preserved'
-	policy_result=$(python3 "$POLICY_SCRIPT" migrate-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_input_migration_failed_preserved'
-	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=MIGRATED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only || "$policy_result" == OMNIROUTE_EGRESS_POLICY=ALREADY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only ]] || fail 'egress_policy_input_migration_receipt_invalid_preserved'
+	if (( recover_missing_egress_policy == 1 )); then
+		policy_result=$(python3 "$POLICY_SCRIPT" recovery-preflight --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty \
+			--edge-container-id "$edge_id" --legacy-backend-container-id "$legacy_backend_id" \
+			--auth-backend-container-id "$backend_id" --expected-edge-image-id "$caddy_id" --expected-backend-image-id "$omni_id" \
+			--expected-api-key-sha256 "$backend_api_key_sha256") \
+			|| fail 'egress_policy_recovery_changed_before_start_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=RECOVERY_VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_recovery_missing_before_start_preserved'
+	else
+		policy_result=$(python3 "$POLICY_SCRIPT" migrate-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_input_migration_failed_preserved'
+		[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=MIGRATED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only || "$policy_result" == OMNIROUTE_EGRESS_POLICY=ALREADY_VERIFIED\ backend=*\ network="${network_id:0:12}"\ rule=host_reply_only ]] || fail 'egress_policy_input_migration_receipt_invalid_preserved'
+	fi
 	log "$policy_result"
 	policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty) || fail 'egress_policy_prestart_or_empty_endpoint_verification_failed_preserved'
 	[[ "$policy_result" == OMNIROUTE_EGRESS_POLICY=VERIFIED\ backend=*\ network="${network_id:0:12}" ]] || fail 'egress_policy_prestart_receipt_invalid_preserved'

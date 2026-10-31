@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import os
@@ -24,6 +25,19 @@ from typing import Sequence
 EXPECTED_DOCKER_SERVER = "29.8.1"
 NETWORK_LABEL = "phi.omniroute.candidate.egress"
 NETWORK_LABEL_VALUE = "v1"
+RECOVERY_DAEMON_ID = "b64b0d52-95ab-4b1a-a971-5f09a4d6e36d"
+RECOVERY_NETWORK_ID = "a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f"
+RECOVERY_EDGE_ID = "f31a9d41602d7321cf080974bf00ca550551528d620453346ee0186d8f18f83e"
+RECOVERY_LEGACY_BACKEND_ID = "b5c5de6334a53acb5f4a127f5d60734ca61890b6a684271d0df288444294b74d"
+RECOVERY_AUTH_BACKEND_ID = "b225f9f2456449c7f6287713baa67f1de203f63ec864fd165f468468851c0f02"
+RECOVERY_NETWORK_NAME = "phi-omniroute-egress-candidate-v1"
+RECOVERY_BRIDGE = "br-a2428c56b520"
+RECOVERY_SUBNET = "172.19.0.0/16"
+RECOVERY_EDGE_NAME = "phi-omniroute-egress-edge-v1"
+RECOVERY_LEGACY_BACKEND_NAME = "phi-omniroute-egress-backend-v1"
+RECOVERY_AUTH_BACKEND_NAME = "phi-omniroute-egress-backend-auth-v1"
+RECOVERY_OMNI_IMAGE = "diegosouzapw/omniroute@sha256:085c57adf499a8aaa9f35ccde95c0df9c11bd9ecd18d6c9edbf3b68b8079ba9d"
+RECOVERY_CADDY_IMAGE = "docker.io/library/caddy@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f"
 SPECIAL_V4 = (
     "0.0.0.0/8",
     "10.0.0.0/8",
@@ -107,12 +121,11 @@ def validate_network_payload(payload: dict, expected_network_id: str, *, require
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", bridge):
         raise PolicyError("docker_bridge_identity_invalid")
     configs = (payload.get("IPAM") or {}).get("Config") or []
-    v4 = [entry for entry in configs if isinstance(entry, dict) and "." in str(entry.get("Subnet", ""))]
-    if len(v4) != 1:
+    if len(configs) != 1 or not isinstance(configs[0], dict) or "." not in str(configs[0].get("Subnet", "")):
         raise PolicyError("docker_network_ipv4_subnet_unknown")
     try:
-        subnet = ipaddress.ip_network(v4[0]["Subnet"], strict=True)
-        gateway = ipaddress.ip_address(v4[0]["Gateway"])
+        subnet = ipaddress.ip_network(configs[0]["Subnet"], strict=True)
+        gateway = ipaddress.ip_address(configs[0]["Gateway"])
     except (KeyError, ValueError, TypeError) as error:
         raise PolicyError("docker_network_ipam_invalid") from error
     if subnet.version != 4 or gateway not in subnet:
@@ -611,6 +624,376 @@ def _verify_firewall(network_id: str, facts: NetworkFacts, backend: str, *, esta
         raise PolicyError("docker_firewall_backend_unknown")
 
 
+def _iptables_save_has_owned_state(raw: str, network_id: str) -> bool:
+    """Detect this network's rules/chains in a complete iptables-save dump."""
+    names = set(policy_names(network_id).values())
+    marker = f"phi-omni:{network_id[:12]}:"
+    for line in raw.splitlines():
+        if marker in line:
+            return True
+        if line.startswith(":"):
+            chain = line[1:].split(None, 1)[0]
+            if chain in names:
+                return True
+        elif line.startswith("-A "):
+            try:
+                tokens = shlex.split(line, posix=True)
+            except ValueError as error:
+                raise PolicyError("firewall_iptables_snapshot_unparseable") from error
+            if len(tokens) < 3 or tokens[0] != "-A":
+                raise PolicyError("firewall_iptables_snapshot_unparseable")
+            if tokens[1] in names or any(
+                tokens[index] == "-j" and tokens[index + 1] in names
+                for index in range(2, len(tokens) - 1)
+            ):
+                return True
+    return False
+
+
+def _walk_nft_values(value: object):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield key, child
+            yield from _walk_nft_values(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_nft_values(child)
+
+
+def _nft_ruleset_has_owned_state(raw: str, network_id: str) -> bool:
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise PolicyError("firewall_nft_snapshot_invalid") from error
+    if not isinstance(document, dict) or not isinstance(document.get("nftables"), list):
+        raise PolicyError("firewall_nft_snapshot_invalid")
+    names = set(policy_names(network_id).values())
+    marker = f"phi-omni:{network_id[:12]}:"
+    table = policy_names(network_id)["table"]
+    # `nft list ruleset` also renders iptables-nft compatibility rules from
+    # `ip filter`. Those are inventoried separately through iptables-nft-save;
+    # counting their generated chains/comments here would make a correct
+    # iptables policy look like both nftables and iptables. The dedicated nft
+    # implementation uses an `inet` table, but still treat its exact table
+    # name as owned if it appears under the wrong family. Also detect renamed
+    # or partial objects carrying our stable names/comments outside the
+    # iptables compatibility table.
+    for entry in document["nftables"]:
+        if not isinstance(entry, dict):
+            continue
+        owned_objects = [entry[key] for key in ("table", "chain", "rule") if isinstance(entry.get(key), dict)]
+        if any(row.get("name") == table or row.get("table") == table for row in owned_objects):
+            return True
+        is_iptables_compat = any(
+            row.get("family") == "ip" and row.get("table") == "filter"
+            for row in owned_objects
+        )
+        if is_iptables_compat:
+            continue
+        for key, value in _walk_nft_values(entry):
+            if isinstance(value, str) and (marker in value or value in names or key == "name" and value == table):
+                return True
+    return False
+
+
+def _firewall_owned_presence(network_id: str) -> dict[str, bool]:
+    """Inventory every supported v4 firewall backend plus dedicated nft rules.
+
+    Missing tools or unreadable/malformed snapshots are UNKNOWN, never absence.
+    IPv6 firewall variants are included when installed; the candidate policy
+    itself has no IPv6 rules because its network and namespace disable IPv6.
+    """
+    result: dict[str, bool] = {}
+    for command, key in (("iptables-nft-save", "iptables-nft"), ("iptables-legacy-save", "iptables-legacy")):
+        if shutil.which(command) is None:
+            raise PolicyError(f"firewall_backend_inventory_unavailable:{key}")
+        result[key] = _iptables_save_has_owned_state(_run([command]), network_id)
+    for command, key in (("ip6tables-nft-save", "ip6tables-nft"), ("ip6tables-legacy-save", "ip6tables-legacy")):
+        if shutil.which(command) is not None:
+            result[key] = _iptables_save_has_owned_state(_run([command]), network_id)
+    if shutil.which("nft") is None:
+        raise PolicyError("firewall_backend_inventory_unavailable:nftables")
+    result["nftables"] = _nft_ruleset_has_owned_state(_run(["nft", "--json", "list", "ruleset"]), network_id)
+    return result
+
+
+def _iptables_active_variant() -> str:
+    version = _run(["iptables", "--version"])
+    if "(nf_tables)" in version:
+        return "iptables-nft"
+    if "(legacy)" in version:
+        return "iptables-legacy"
+    raise PolicyError("iptables_active_variant_unknown")
+
+
+def classify_recovery_policy_state(
+    presence: dict[str, bool],
+    *,
+    network_id: str,
+    facts: NetworkFacts,
+    backend: str,
+    active_iptables: str | None = None,
+) -> str:
+    """Classify only complete current policy or total absence as recoverable."""
+    expected_keys = {"iptables-nft", "iptables-legacy", "nftables"}
+    if not expected_keys.issubset(presence) or not set(presence).issubset(expected_keys | {"ip6tables-nft", "ip6tables-legacy"}) or any(type(value) is not bool for value in presence.values()):
+        raise PolicyError("firewall_backend_inventory_incomplete")
+    present = {key for key, value in presence.items() if value}
+    expected_backend = "nftables" if backend == "nftables" else active_iptables
+    if backend == "iptables" and expected_backend not in {"iptables-nft", "iptables-legacy"}:
+        raise PolicyError("iptables_active_variant_unknown")
+    try:
+        _verify_firewall(network_id, facts, backend)
+        current_verified = True
+    except PolicyError:
+        current_verified = False
+    if current_verified:
+        if present != {expected_backend}:
+            raise PolicyError("recovery_policy_duplicate_or_backend_mismatch")
+        return "VERIFIED"
+    try:
+        _verify_firewall(network_id, facts, backend, established_reply=False)
+    except PolicyError:
+        legacy_verified = False
+    else:
+        legacy_verified = True
+    if legacy_verified:
+        raise PolicyError("recovery_legacy_policy_requires_explicit_migration")
+    if not present:
+        return "ABSENT"
+    raise PolicyError("recovery_policy_partial_or_modified")
+
+
+def validate_recovery_container_snapshots(
+    listed_ids: Sequence[str],
+    snapshots: dict[str, object],
+    *,
+    edge_image_id: str,
+    backend_image_id: str,
+    expected_api_key_sha256: str | None = None,
+) -> None:
+    """Require the exact three stopped, labelled candidate objects by full ID."""
+    expected_ids = {RECOVERY_EDGE_ID, RECOVERY_LEGACY_BACKEND_ID, RECOVERY_AUTH_BACKEND_ID}
+    if len(listed_ids) != len(set(listed_ids)) or set(listed_ids) != expected_ids or set(snapshots) != expected_ids:
+        raise PolicyError("recovery_candidate_container_inventory_mismatch")
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", edge_image_id) or not re.fullmatch(r"sha256:[a-f0-9]{64}", backend_image_id):
+        raise PolicyError("recovery_image_identity_invalid")
+    expected = {
+        RECOVERY_EDGE_ID: (RECOVERY_EDGE_NAME, edge_image_id, RECOVERY_CADDY_IMAGE, "v1", RECOVERY_NETWORK_NAME),
+        RECOVERY_LEGACY_BACKEND_ID: (RECOVERY_LEGACY_BACKEND_NAME, backend_image_id, RECOVERY_OMNI_IMAGE, "v1", f"container:{RECOVERY_EDGE_ID}"),
+        RECOVERY_AUTH_BACKEND_ID: (RECOVERY_AUTH_BACKEND_NAME, backend_image_id, RECOVERY_OMNI_IMAGE, "auth-v1", f"container:{RECOVERY_EDGE_ID}"),
+    }
+    for identifier, (name, image_id, image_ref, label_value, network_mode) in expected.items():
+        row = snapshots[identifier]
+        if not isinstance(row, dict) or row.get("Id") != identifier:
+            raise PolicyError("recovery_candidate_container_identity_mismatch")
+        if row.get("Name") != f"/{name}":
+            raise PolicyError("recovery_candidate_container_name_mismatch")
+        if row.get("Image") != image_id:
+            raise PolicyError("recovery_candidate_container_image_id_mismatch")
+        config = row.get("Config")
+        if not isinstance(config, dict) or config.get("Image") != image_ref:
+            raise PolicyError("recovery_candidate_container_image_mismatch")
+        labels = config.get("Labels") or {}
+        if not isinstance(labels, dict) or labels.get(NETWORK_LABEL) != label_value:
+            raise PolicyError("recovery_candidate_container_ownership_mismatch")
+        state = row.get("State")
+        if not isinstance(state, dict) or state.get("Status") not in {"created", "exited"} or state.get("Running") is not False or state.get("Pid") != 0:
+            raise PolicyError("recovery_candidate_container_active_or_unknown")
+        host = row.get("HostConfig")
+        if not isinstance(host, dict) or host.get("NetworkMode") != network_mode:
+            raise PolicyError("recovery_candidate_container_network_mode_mismatch")
+        restart = host.get("RestartPolicy")
+        if not isinstance(restart, dict) or restart.get("Name") != "no" or host.get("Privileged") is not False:
+            raise PolicyError("recovery_candidate_container_security_mismatch")
+    auth_env_rows = snapshots[RECOVERY_AUTH_BACKEND_ID]["Config"].get("Env")
+    if not isinstance(auth_env_rows, list):
+        raise PolicyError("recovery_auth_backend_environment_unknown")
+    auth_env = {}
+    for value in auth_env_rows:
+        if not isinstance(value, str):
+            raise PolicyError("recovery_auth_backend_environment_unknown")
+        key, separator, item = value.partition("=")
+        if not separator or not key or key in auth_env:
+            raise PolicyError("recovery_auth_backend_environment_unknown")
+        auth_env[key] = item
+    if auth_env.get("REQUIRE_API_KEY") != "true" or not auth_env.get("OMNIROUTE_API_KEY") or auth_env.get("ROUTER_API_KEY"):
+        raise PolicyError("recovery_auth_backend_api_key_policy_mismatch")
+    if expected_api_key_sha256 is not None and not re.fullmatch(r"[a-f0-9]{64}", expected_api_key_sha256):
+        raise PolicyError("recovery_expected_api_key_digest_invalid")
+    _attest_recovery_container_payloads(snapshots, edge_image_id, backend_image_id, expected_api_key_sha256)
+
+
+def _load_attestor(script_name: str, module_name: str):
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    if spec is None or spec.loader is None:
+        raise PolicyError("recovery_attestor_unavailable")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, AttributeError) as error:
+        raise PolicyError("recovery_attestor_unavailable") from error
+    return module
+
+
+def _attest_recovery_container_payloads(
+    snapshots: dict[str, object],
+    edge_image_id: str,
+    backend_image_id: str,
+    expected_api_key_sha256: str | None,
+) -> None:
+    edge_attestor = _load_attestor("omniroute-edge-attest.py", "phi_recovery_edge_attestor")
+    backend_attestor = _load_attestor("omniroute-backend-attest.py", "phi_recovery_backend_attestor")
+    try:
+        edge_attestor.attest_edge(
+            snapshots[RECOVERY_EDGE_ID], expected_id=RECOVERY_EDGE_ID, expected_image_id=edge_image_id,
+            expected_image_ref=RECOVERY_CADDY_IMAGE, network_id=RECOVERY_NETWORK_ID,
+            network_name=RECOVERY_NETWORK_NAME, container_name=RECOVERY_EDGE_NAME,
+            root="/etc/phi-omniroute-candidate", label_key=NETWORK_LABEL, label_value="v1",
+            host_port="20129", phase="pre-start",
+        )
+        backend_attestor.attest_backend(
+            snapshots[RECOVERY_LEGACY_BACKEND_ID], expected_id=RECOVERY_LEGACY_BACKEND_ID,
+            expected_image_id=backend_image_id, expected_image_ref=RECOVERY_OMNI_IMAGE,
+            edge_id=RECOVERY_EDGE_ID, container_name=RECOVERY_LEGACY_BACKEND_NAME,
+            label_key=NETWORK_LABEL, label_value="v1", phase="pre-start", expected_auth_mode="legacy",
+        )
+        backend_attestor.attest_backend(
+            snapshots[RECOVERY_AUTH_BACKEND_ID], expected_id=RECOVERY_AUTH_BACKEND_ID,
+            expected_image_id=backend_image_id, expected_image_ref=RECOVERY_OMNI_IMAGE,
+            edge_id=RECOVERY_EDGE_ID, container_name=RECOVERY_AUTH_BACKEND_NAME,
+            label_key=NETWORK_LABEL, label_value="auth-v1", phase="pre-start",
+            expected_auth_mode="enforced" if expected_api_key_sha256 is not None else None,
+            expected_api_key_sha256=expected_api_key_sha256,
+        )
+    except (AttributeError, KeyError, ValueError) as error:
+        # Canonical attestors emit stable reason codes (not snapshot values).
+        # Preserve only that bounded vocabulary so a host operator can tell
+        # which invariant failed without exposing environment/config contents.
+        reason = str(error)
+        if not re.fullmatch(r"[a-z0-9_]{1,80}", reason):
+            reason = "unknown"
+        raise PolicyError(f"recovery_candidate_security_attestation_failed:{reason}") from error
+
+
+def _recovery_container_snapshot(
+    edge_image_id: str,
+    backend_image_id: str,
+    expected_api_key_sha256: str | None = None,
+) -> None:
+    raw_ids = _run([
+        "docker", "container", "ls", "--all", "--no-trunc", "--filter",
+        f"label={NETWORK_LABEL}", "--format", "{{.ID}}",
+    ])
+    listed_ids = [row.strip() for row in raw_ids.splitlines() if row.strip()]
+    snapshots: dict[str, object] = {}
+    for identifier in (RECOVERY_EDGE_ID, RECOVERY_LEGACY_BACKEND_ID, RECOVERY_AUTH_BACKEND_ID):
+        raw = _run(["docker", "container", "inspect", "--format", "{{json .}}", identifier])
+        try:
+            snapshots[identifier] = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise PolicyError("recovery_candidate_container_inspect_invalid") from error
+    validate_recovery_container_snapshots(
+        listed_ids, snapshots, edge_image_id=edge_image_id, backend_image_id=backend_image_id,
+        expected_api_key_sha256=expected_api_key_sha256,
+    )
+
+
+def _recovery_preconditions(
+    network_id: str,
+    daemon_id: str,
+    edge_image_id: str,
+    backend_image_id: str,
+    expected_api_key_sha256: str | None = None,
+) -> tuple[NetworkFacts, str, str]:
+    if daemon_id != RECOVERY_DAEMON_ID or network_id != RECOVERY_NETWORK_ID:
+        raise PolicyError("recovery_scope_identity_mismatch")
+    _, _, backend = _docker_facts(daemon_id)
+    if _docker_network_name(network_id) != RECOVERY_NETWORK_NAME:
+        raise PolicyError("docker_network_name_mismatch")
+    _recovery_container_snapshot(edge_image_id, backend_image_id, expected_api_key_sha256)
+    facts = _network_facts(network_id, require_empty=True)
+    if facts.bridge != RECOVERY_BRIDGE or facts.subnet != RECOVERY_SUBNET or ipaddress.ip_address(facts.gateway) not in ipaddress.ip_network(RECOVERY_SUBNET):
+        raise PolicyError("recovery_network_configuration_mismatch")
+    presence = _firewall_owned_presence(network_id)
+    active = _iptables_active_variant() if backend == "iptables" else None
+    state = classify_recovery_policy_state(
+        presence, network_id=network_id, facts=facts, backend=backend, active_iptables=active,
+    )
+    return facts, backend, state
+
+
+def _docker_network_name(network_id: str) -> str:
+    return _run(["docker", "network", "inspect", "--format", "{{.Name}}", network_id]).strip()
+
+
+def _recover_missing_policy(
+    network_id: str,
+    daemon_id: str,
+    edge_image_id: str,
+    backend_image_id: str,
+    expected_api_key_sha256: str,
+) -> tuple[str, NetworkFacts, str]:
+    """Recover only total absence for the exact empty, stopped candidate.
+
+    If an iptables multi-command apply fails halfway, no automatic cleanup is
+    attempted: the partial owned state is retained and every subsequent run
+    fails closed for manual inspection. A complete existing policy is a no-op.
+    """
+    initial, backend, state = _recovery_preconditions(network_id, daemon_id, edge_image_id, backend_image_id, expected_api_key_sha256)
+    if state == "VERIFIED":
+        return "ALREADY_VERIFIED", initial, backend
+    # Take an immediately-pre-mutation snapshot and refuse drift. This does
+    # not claim to serialize unrelated privileged Docker/firewall operators.
+    current, current_backend, current_state = _recovery_preconditions(network_id, daemon_id, edge_image_id, backend_image_id, expected_api_key_sha256)
+    if current_backend != backend or current_state != "ABSENT":
+        raise PolicyError("recovery_precondition_changed_before_apply")
+    if (current.network_id, current.bridge, current.subnet, current.gateway, current.containers) != (
+        initial.network_id, initial.bridge, initial.subnet, initial.gateway, initial.containers,
+    ):
+        raise PolicyError("recovery_network_identity_changed_before_apply")
+    try:
+        if backend == "nftables":
+            _nft_apply(current)
+        elif backend == "iptables":
+            _iptables_apply(current)
+        else:
+            raise PolicyError("docker_firewall_backend_unknown")
+    except (PolicyError, OSError) as error:
+        raise PolicyError("recovery_apply_failed_state_preserved") from error
+    try:
+        final_facts, final_backend, final_state = _recovery_preconditions(network_id, daemon_id, edge_image_id, backend_image_id, expected_api_key_sha256)
+        if final_backend != backend or final_state != "VERIFIED":
+            raise PolicyError("recovery_policy_postverify_mismatch")
+        if (final_facts.network_id, final_facts.bridge, final_facts.subnet, final_facts.gateway, final_facts.containers) != (
+            current.network_id, current.bridge, current.subnet, current.gateway, (),
+        ):
+            raise PolicyError("recovery_network_postverify_mismatch")
+    except PolicyError as error:
+        raise PolicyError("recovery_postverify_failed_state_preserved") from error
+    return "RECOVERED", final_facts, final_backend
+
+
+def _validate_recovery_cli(args: argparse.Namespace) -> None:
+    if (
+        args.edge_container_id != RECOVERY_EDGE_ID
+        or args.legacy_backend_container_id != RECOVERY_LEGACY_BACKEND_ID
+        or args.auth_backend_container_id != RECOVERY_AUTH_BACKEND_ID
+    ):
+        raise PolicyError("recovery_candidate_identity_mismatch")
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", args.expected_edge_image_id or "") or not re.fullmatch(r"sha256:[a-f0-9]{64}", args.expected_backend_image_id or ""):
+        raise PolicyError("recovery_image_identity_invalid")
+    if args.expected_api_key_sha256 is not None and not re.fullmatch(r"[a-f0-9]{64}", args.expected_api_key_sha256):
+        raise PolicyError("recovery_expected_api_key_digest_invalid")
+    if args.action == "recover" and args.expected_api_key_sha256 is None:
+        raise PolicyError("recovery_expected_api_key_digest_required")
+    edge_actual = _run(["docker", "image", "inspect", RECOVERY_CADDY_IMAGE, "--format", "{{.Id}}"] ).strip()
+    backend_actual = _run(["docker", "image", "inspect", RECOVERY_OMNI_IMAGE, "--format", "{{.Id}}"] ).strip()
+    if edge_actual != args.expected_edge_image_id or backend_actual != args.expected_backend_image_id:
+        raise PolicyError("recovery_local_image_identity_mismatch_no_pull")
+
+
 def _input_migration_preflight(network_id: str, facts: NetworkFacts, backend: str) -> str:
     try:
         _verify_firewall(network_id, facts, backend)
@@ -762,7 +1145,7 @@ def _counter_snapshot(network_id: str, facts: NetworkFacts, backend: str) -> dic
 
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("preflight", "apply", "verify", "facts", "counters", "preflight-input", "migrate-input", "rollback-input", "rollback"))
+    parser.add_argument("action", choices=("preflight", "apply", "verify", "facts", "counters", "preflight-input", "migrate-input", "rollback-input", "recovery-preflight", "recover", "rollback"))
     parser.add_argument("--network-id")
     parser.add_argument("--daemon-id", required=True)
     parser.add_argument("--bridge")
@@ -770,6 +1153,12 @@ def _main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--egress-interface")
     parser.add_argument("--expect-empty", action="store_true")
     parser.add_argument("--expected-endpoint-id")
+    parser.add_argument("--edge-container-id")
+    parser.add_argument("--legacy-backend-container-id")
+    parser.add_argument("--auth-backend-container-id")
+    parser.add_argument("--expected-edge-image-id")
+    parser.add_argument("--expected-backend-image-id")
+    parser.add_argument("--expected-api-key-sha256")
     args = parser.parse_args(argv)
     if not _valid_daemon_id(args.daemon_id):
         raise PolicyError("identity_argument_invalid")
@@ -800,6 +1189,24 @@ def _main(argv: Sequence[str] | None = None) -> int:
         return 0
     if not _valid_id(args.network_id):
         raise PolicyError("network_identity_argument_invalid")
+    if args.action in {"recovery-preflight", "recover"}:
+        if not args.expect_empty:
+            raise PolicyError("recovery_requires_empty_candidate_network")
+        _validate_recovery_cli(args)
+        if args.action == "recovery-preflight":
+            _, backend, state = _recovery_preconditions(
+                args.network_id, args.daemon_id, args.expected_edge_image_id, args.expected_backend_image_id,
+                args.expected_api_key_sha256,
+            )
+            status = "RECOVERY_ABSENT" if state == "ABSENT" else "RECOVERY_VERIFIED"
+        else:
+            status, _, backend = _recover_missing_policy(
+                args.network_id, args.daemon_id, args.expected_edge_image_id, args.expected_backend_image_id,
+                args.expected_api_key_sha256,
+            )
+            status = f"RECOVERY_{status}"
+        print(f"OMNIROUTE_EGRESS_POLICY={status} backend={backend} network={args.network_id[:12]}")
+        return 0
     if args.action in {"preflight-input", "migrate-input", "rollback-input"}:
         if not args.expect_empty:
             raise PolicyError("input_migration_requires_empty_candidate_network")

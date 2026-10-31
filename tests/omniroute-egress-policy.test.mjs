@@ -186,6 +186,48 @@ test("authenticated candidate completion keeps all runtime gates after backend r
 	assert.doesNotMatch(source.slice(resumed, resumeBranchEnd), /docker create/u);
 });
 
+test("missing-policy recovery is explicit, exact-ID scoped, fully attested before any candidate start", () => {
+	const source = readFileSync(candidateScript, "utf8");
+	const policy = readFileSync(policyScript, "utf8");
+	assert.ok(source.includes("--recover-missing-egress-policy"));
+	assert.ok(source.includes("egress_policy_recovery_scope_identity_mismatch"));
+	assert.ok(source.includes('--expected-api-key-sha256 "$backend_api_key_sha256"'),
+		"recovery mutation and post-config revalidation must use the protected backend-key digest");
+	assert.ok(source.includes("RECOVERY_DAEMON_ID='b64b0d52-95ab-4b1a-a971-5f09a4d6e36d'"));
+	assert.ok(source.includes("resume_auth_backend_container_id=$2"));
+	assert.ok(policy.includes('choices=("preflight", "apply", "verify", "facts", "counters", "preflight-input", "migrate-input", "rollback-input", "recovery-preflight", "recover", "rollback")'));
+	assert.ok(policy.includes("RECOVERY_NETWORK_ID = \"a2428c56b520dabc38140474ff2559bcfc50a84587ab4953460b1fd80445ae0f\""));
+	assert.ok(policy.includes("firewall_backend_inventory_unavailable"));
+	assert.ok(policy.includes("recovery_policy_partial_or_modified"));
+	assert.ok(policy.includes("recovery_legacy_policy_requires_explicit_migration"));
+	assert.ok(policy.includes("_iptables_apply(current)"));
+	assert.ok(policy.includes("_nft_apply(current)"));
+	assert.ok(policy.includes('parser.add_argument("--expected-api-key-sha256")'));
+	assert.ok(policy.includes("established_reply"), "the canonical full policy including the conntrack reply rule is applied");
+
+	const recoveryPreflight = source.indexOf("policy_result=$(run_resume_policy_preflight)");
+	const recoveryApply = source.indexOf('policy_result=$(python3 "$POLICY_SCRIPT" recover');
+	const recoveryVerify = source.indexOf('policy_result=$(python3 "$POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty)', recoveryApply);
+	const caddyValidatorRun = source.indexOf('if docker run --rm --pull=never --network none');
+	const edgeStart = source.indexOf('docker start "$edge_id"');
+	const edgePreAttest = source.indexOf("edge_prestart_identity_or_configuration_attestation_failed_preserved", recoveryPreflight);
+	const authBackendPreAttest = source.indexOf("backend_prestart_identity_or_configuration_attestation_failed_preserved", edgePreAttest);
+	assert.ok(recoveryPreflight >= 0 && edgePreAttest > recoveryPreflight && authBackendPreAttest > edgePreAttest);
+	assert.ok(authBackendPreAttest < recoveryApply, "edge, legacy backend and authenticated backend attest before policy mutation");
+	assert.ok(recoveryApply > authBackendPreAttest && recoveryVerify > recoveryApply && caddyValidatorRun > recoveryVerify && edgeStart > caddyValidatorRun,
+		"the full policy is restored and reverified before Caddy validator, edge or backend starts");
+	assert.ok(source.indexOf('backend_api_key_sha256=$(python3 "$BACKEND_AUTH_CONFIG_SCRIPT" key-digest') < recoveryApply,
+		"recovery is bound to the exact protected auth key before firewall mutation");
+	const policyRecoveryBlock = source.slice(recoveryApply, recoveryVerify);
+	assert.ok(policyRecoveryBlock.includes("RECOVERY_RECOVERED"));
+	assert.ok(policyRecoveryBlock.includes("RECOVERY_ALREADY_VERIFIED"));
+	assert.doesNotMatch(policyRecoveryBlock, /docker (?:create|start|stop|rm)\b/u);
+	assert.ok(source.includes("egress_policy_recovery_missing_before_start_preserved"));
+	assert.ok(source.includes("docker start \"$edge_id\""));
+	assert.ok(source.includes("docker start \"$backend_id\""));
+	assert.doesNotMatch(source, /docker (?:rm|container\s+rm)\b/u);
+});
+
 test("final candidate security gate reuses immutable-ID attestators after authenticated catalog validation", () => {
 	const source = readFileSync(candidateScript, "utf8");
 	const models = source.indexOf('[[ "$models_report_exit" -eq 0 ]] || fail \'authenticated_models_endpoint_failed\'');
@@ -242,24 +284,29 @@ test("resume mode attests the exact existing candidate network and policy before
 	const preflightEnd = source.indexOf("# Reuse only the already-present edge image", preflightStart);
 	assert.ok(preflightStart >= 0 && preflightEnd > preflightStart);
 	const preflight = source.slice(preflightStart, preflightEnd);
-	assert.ok(preflight.includes('POLICY_SCRIPT" preflight-input --network-id "$network_id"'));
-	assert.ok(preflight.includes("LEGACY_VERIFIED"));
+	assert.ok(preflight.includes("policy_result=$(run_resume_policy_preflight)"));
+	const resumePolicyHelperStart = source.indexOf("run_resume_policy_preflight() {");
+	const resumePolicyHelperEnd = source.indexOf("validate_resume_policy_preflight() {", resumePolicyHelperStart);
+	const resumePolicyHelper = source.slice(resumePolicyHelperStart, resumePolicyHelperEnd);
+	assert.ok(resumePolicyHelper.includes('POLICY_SCRIPT" preflight-input --network-id "$network_id"'));
+	assert.ok(resumePolicyHelper.includes('POLICY_SCRIPT" recovery-preflight --network-id "$network_id"'));
+	const validatePolicyHelperEnd = source.indexOf("\non_exit() {", resumePolicyHelperEnd);
+	assert.ok(source.slice(resumePolicyHelperEnd, validatePolicyHelperEnd).includes("LEGACY_VERIFIED"));
 	assert.ok(source.indexOf("# Pre-attest an existing candidate network") < source.indexOf("validate_caddyfile\n"));
 	const resumeBranchStart = source.indexOf('if [[ -n "$resume_egress_network_id" ]]; then', source.indexOf("validate_caddyfile\n"));
 	const resumeBranchEnd = source.indexOf("else\n\t\t# A new bridge", resumeBranchStart);
 	assert.ok(resumeBranchStart >= 0 && resumeBranchEnd > resumeBranchStart);
 	const resumeBranch = source.slice(resumeBranchStart, resumeBranchEnd);
-	assert.ok(resumeBranch.includes('POLICY_SCRIPT" preflight-input'));
+	assert.ok(resumeBranch.includes("policy_result=$(run_resume_policy_preflight)"));
 	assert.ok(!resumeBranch.includes("docker network create"));
 	assert.ok(!resumeBranch.includes('POLICY_SCRIPT" apply'));
 	const resumePolicyStart = source.indexOf('elif (( egress_candidate == 1 )); then\n\t# A resumed network may have the exact legacy INPUT policy.', resumeBranchEnd);
 	const resumePolicyEnd = source.indexOf("\nelse\n\tnetwork_facts=", resumePolicyStart);
 	assert.ok(resumePolicyStart >= 0 && resumePolicyEnd > resumePolicyStart);
 	const resumePolicy = source.slice(resumePolicyStart, resumePolicyEnd);
-	assert.ok(resumePolicy.includes('POLICY_SCRIPT" preflight-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty'));
+	assert.ok(resumePolicy.includes("policy_result=$(run_resume_policy_preflight)"));
 	assert.ok(resumePolicy.includes("LEGACY_VERIFIED"), "a fully attested legacy policy must reach the explicit migration gate");
-	assert.ok(!resumePolicy.includes('POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty'), "do not require the migrated policy before migration runs");
-	assert.ok(!resumePolicy.includes('POLICY_SCRIPT" apply'), "resume must never reapply/duplicate firewall policy");
+	assert.ok(!resumePolicy.includes('POLICY_SCRIPT" apply'), "resume preflight must never reapply/duplicate firewall policy");
 	const preStartAttest = source.indexOf("--phase pre-start", source.indexOf('docker inspect --format \'{{json .}}\' "$edge_id"'));
 	const migrateAt = source.indexOf('POLICY_SCRIPT" migrate-input --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty', preStartAttest);
 	const verifyAt = source.indexOf('POLICY_SCRIPT" verify --network-id "$network_id" --daemon-id "$daemon_id" --expect-empty', migrateAt);
