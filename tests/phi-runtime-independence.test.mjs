@@ -31,8 +31,12 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     fs.writeFileSync(launcher, versionedWrapperContent('linux', process.execPath, prefix)
       .replaceAll(prefix, '/managed'), { mode: 0o700 });
     fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), JSON.stringify({ packages: ['/managed/active'],
-      defaultProvider: 'openai-codex', defaultModel: 'gpt-6-sol', defaultThinkingLevel: 'medium' }), { mode: 0o600 });
+    const settingsFile = path.join(home, '.pi', 'agent', 'settings.json');
+    const settingsBytes = JSON.stringify({ packages: ['/managed/active'],
+      defaultProvider: 'openai-codex', defaultModel: 'gpt-6-sol', defaultThinkingLevel: 'medium' });
+    fs.writeFileSync(settingsFile, settingsBytes, { mode: 0o600 });
+    const userStateFile = path.join(home, 'user-state-sentinel');
+    fs.writeFileSync(userStateFile, 'preserve-user-state', { mode: 0o600 });
     const isolation = ['--ro-bind', '/usr', '/usr', '--symlink', 'usr/bin', '/bin', '--symlink', 'usr/lib', '/lib',
       '--symlink', 'usr/lib64', '/lib64', '--dir', '/home', '--dir', '/home/tasso', '--dir', '/home/tasso/.local',
       '--dir', '/home/tasso/.local/share', '--dir', '/home/tasso/.local/share/pi-node',
@@ -107,6 +111,8 @@ test('isolated Linux Phi runtime launches without the source checkout mounted', 
     assert.equal(restoredVersion.status, 0, restoredVersion.stderr);
     assert.match(restoredVersion.stdout, /Phi 1\.0\.0/u);
     assert.equal(fs.existsSync(path.join(prefix, 'releases', nextId)), true, 'B must remain available');
+    assert.equal(fs.readFileSync(settingsFile, 'utf8'), settingsBytes, 'Pi preferences must survive A to B to A');
+    assert.equal(fs.readFileSync(userStateFile, 'utf8'), 'preserve-user-state', 'user state must survive A to B to A');
     assert.equal(fs.existsSync(source), true, 'host checkout must remain untouched');
   } finally {
     const cleanup = 'import os,shutil,sys;root=sys.argv[1];[(os.chmod(base,0o700),[os.chmod(os.path.join(base,d),0o700) for d in dirs if not os.path.islink(os.path.join(base,d))]) for base,dirs,_ in os.walk(root)];shutil.rmtree(root)';
