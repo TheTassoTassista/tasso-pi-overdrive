@@ -60,7 +60,7 @@ async function main(args) {
   const report = await phiDoctor({ probeServices: false });
   // Existing proven Linux engine and settings are reused, not rewritten. No
   // optional service/browser start and no paid call happens before Pi itself.
-  for (const name of ['Pi runtime', 'Package configuration', 'GPT default', 'Sandbox']) {
+  for (const name of ['Pi runtime', 'Package configuration', 'Model default', 'Sandbox']) {
     if (!report.checks.some((row) => row.capability === name && row.status === 'PASS')) throw new Error(`PHI_STARTUP_BLOCKED: ${name}; run phi doctor`);
   }
   const runtime = discoverPiRuntime();

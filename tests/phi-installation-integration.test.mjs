@@ -34,7 +34,7 @@ test('isolated Phi foundation installs a working wrapper and reads a pinned Pi p
     const doctor = launch(['doctor', '--json']);
     assert.equal(doctor.status, 0, doctor.stderr);
     const report = JSON.parse(doctor.stdout);
-    for (const capability of ['Pi runtime', 'Package configuration', 'GPT default', 'Sandbox']) {
+    for (const capability of ['Pi runtime', 'Package configuration', 'Model default', 'Sandbox']) {
       assert.equal(report.checks.find((item) => item.capability === capability)?.status, 'PASS', capability);
     }
     assert.equal(fs.readFileSync(path.join(agent, 'auth.json'), 'utf8'), 'AUTH_SENTINEL');

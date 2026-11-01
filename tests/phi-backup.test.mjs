@@ -49,3 +49,54 @@ test('restore requires local callability and preserves unrelated settings/auth',
     assert.equal(fs.readFileSync(path.join(setup.dirs.agent, 'auth.json'), 'utf8'), 'DO_NOT_OPEN_AUTH');
   } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
 });
+
+test('bundled Anthropic default and explicit roles back up and restore reversibly without credentials', { skip: process.platform !== 'linux' }, () => {
+  const setup = fixture();
+  try {
+    const original = createPhiBackup(setup.dirs);
+    const settingsFile = path.join(setup.dirs.agent, 'settings.json');
+    const policyFile = path.join(setup.dirs.legacyConfig, 'model-policy.json');
+    writeLocalJson(settingsFile, { ...readLocalJson(settingsFile), defaultProvider: 'anthropic', defaultModel: 'claude-opus-5' });
+    const roles = ['scout', 'planner', 'oracle', 'worker', 'tester', 'correctness', 'security', 'simplicity', 'council-1', 'council-2', 'council-3', 'council-judge'];
+    writeLocalJson(policyFile, { version: 2, preset: 'custom', basePreset: 'normal', overrides: Object.fromEntries(roles.map((role) => [role, { model: 'anthropic/claude-opus-5', thinking: ['security', 'council-judge'].includes(role) ? 'high' : 'medium' }])) });
+    const alternative = createPhiBackup(setup.dirs);
+    assert.doesNotMatch(fs.readFileSync(alternative.file, 'utf8'), /DO_NOT_EXPORT|DO_NOT_OPEN_AUTH/u);
+    writeLocalJson(settingsFile, { ...readLocalJson(settingsFile), defaultProvider: 'openai-codex', defaultModel: 'gpt-6-sol' });
+    writeLocalJson(policyFile, { version: 2, preset: 'normal', basePreset: 'normal', overrides: {} });
+    writeLocalJson(path.join(setup.dirs.legacyConfig, 'model-callability.json'), { version: 1, entries: {
+      'openai-codex/gpt-6-sol': { runtimeStatus: 'RUNTIME_CALLABLE', reasonCode: 'LOCAL_FIXTURE' },
+      'anthropic/claude-opus-5': { runtimeStatus: 'RUNTIME_CALLABLE', reasonCode: 'LOCAL_FIXTURE' },
+    } });
+    assert.equal(restorePhiBackup(alternative.file, { dirs: setup.dirs }).status, 'PLAN');
+    assert.equal(restorePhiBackup(alternative.file, { dirs: setup.dirs, apply: true }).status, 'PASS');
+    assert.equal(readLocalJson(settingsFile).defaultProvider, 'anthropic');
+    assert.equal(readLocalJson(policyFile).overrides.worker.model, 'anthropic/claude-opus-5');
+    assert.equal(restorePhiBackup(original.file, { dirs: setup.dirs, apply: true }).status, 'PASS');
+    assert.equal(readLocalJson(settingsFile).defaultProvider, 'openai-codex');
+    assert.equal(fs.readFileSync(path.join(setup.dirs.agent, 'auth.json'), 'utf8'), 'DO_NOT_OPEN_AUTH');
+    assert.throws(() => validatePhiBackup({ ...readLocalJson(alternative.file), default: { provider: 'anthropic', model: 'not-a-model', thinking: 'medium' } }), /DEFAULT_INVALID/u);
+  } finally { fs.rmSync(setup.root, { recursive: true, force: true }); }
+});
+
+test('restore failure preserves newer settings instead of overwriting them during rollback', { skip: process.platform !== 'linux' }, () => {
+  const setup = fixture();
+  const originalRename = fs.renameSync;
+  try {
+    const backup = createPhiBackup(setup.dirs);
+    const settingsFile = path.join(setup.dirs.agent, 'settings.json');
+    const policyFile = path.join(setup.dirs.legacyConfig, 'model-policy.json');
+    writeLocalJson(settingsFile, { ...readLocalJson(settingsFile), defaultModel: 'gpt-5.5' });
+    writeLocalJson(path.join(setup.dirs.legacyConfig, 'model-callability.json'), { version: 1, entries: { 'openai-codex/gpt-6-sol': { runtimeStatus: 'RUNTIME_CALLABLE', reasonCode: 'LOCAL_FIXTURE' } } });
+    fs.renameSync = (from, to) => {
+      if (to === policyFile) {
+        fs.renameSync = originalRename;
+        writeLocalJson(settingsFile, { ...readLocalJson(settingsFile), defaultModel: 'gpt-6-astra' });
+        throw new Error('fixture_write_failure');
+      }
+      return originalRename(from, to);
+    };
+    assert.throws(() => restorePhiBackup(backup.file, { dirs: setup.dirs, apply: true }), /ROLLBACK_INCOMPLETE/u);
+    assert.equal(readLocalJson(settingsFile).defaultModel, 'gpt-6-astra');
+    assert.equal(fs.readFileSync(path.join(setup.dirs.agent, 'auth.json'), 'utf8'), 'DO_NOT_OPEN_AUTH');
+  } finally { fs.renameSync = originalRename; fs.rmSync(setup.root, { recursive: true, force: true }); }
+});

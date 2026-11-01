@@ -325,19 +325,22 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
     },
   });
   pi.registerCommand("model-role", {
-    description: "List roles or set one persistent route: /model-role ROLE PROVIDER/MODEL[:THINKING]",
+    description: "List roles or set one/all persistent routes: /model-role ROLE|all PROVIDER/MODEL[:THINKING]",
     handler: async (args, ctx) => {
       try {
         const [role, ...selectionParts] = args.trim().split(/\s+/u);
         if (!role || role === "list") { ctx.ui.notify(MODEL_ROLES.join("\n"), "info"); return; }
-        if (!MODEL_ROLES.includes(role as any) || selectionParts.length !== 1) throw new Error("usage: /model-role ROLE PROVIDER/MODEL[:THINKING]");
+        if (!(MODEL_ROLES.includes(role as any) || role === "all") || selectionParts.length !== 1) throw new Error("usage: /model-role ROLE|all PROVIDER/MODEL[:THINKING]");
         const models = ctx.modelRegistry.getAvailable();
         const options = { registeredModels: ctx.modelRegistry.getAll() };
-        const stored = policyWithRole(readModelPolicy(), role, parseModelSelection(selectionParts[0], models, options));
-        writeModelPolicy(modelPolicyPath(), stored);
+        const selection = parseModelSelection(selectionParts[0], models, options);
+        const mandatoryHigh = new Set(["security", "oracle", "council-1", "council-2", "council-3", "council-judge"]);
+        const stored = (role === "all" ? MODEL_ROLES : [role]).reduce((policy, item) => policyWithRole(policy, item, role === "all" && mandatoryHigh.has(item) ? { ...selection, thinking: "high" } : selection), readModelPolicy());
         const resolved: any = resolveModelPolicy(models, stored, { ...options, qualityRequested: "auto", effectiveQuality: "medium" });
+        writeModelPolicy(modelPolicyPath(), stored);
         syncUserSubagentSettings(resolved);
-        ctx.ui.notify(`${role} -> ${resolved.roles[role].model}:${resolved.roles[role].thinking}\nPersistent policy updated.`, "info");
+        const route = resolved.roles[role === "all" ? "scout" : role];
+        ctx.ui.notify(`${role} -> ${route.model}:${route.thinking}\nPersistent policy updated.`, "info");
       } catch (error) { notifyError(ctx, error); }
     },
   });

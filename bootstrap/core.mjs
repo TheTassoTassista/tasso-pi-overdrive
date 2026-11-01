@@ -63,7 +63,7 @@ export async function bootstrapFoundation({ plan = false, root = source, dirs = 
   if (!fs.existsSync(path.join(dirs.config, 'preferences.json'))) writeLocalJson(path.join(dirs.config, 'preferences.json'), preferences);
   writeLocalJson(manifestFile, { version: 1, product: PRODUCT.name, source: fs.realpathSync(root), target, node: process.execPath, sha256: hash(content) });
   const report = await phiDoctor({ source: root, dirs, env, probeServices: false });
-  return { version: 1, status: 'FOUNDATION_INSTALLED', platform: adapter.id, launcher: target, source: fs.realpathSync(root), modelCalls: 0, doctorStatus: report.status, engineReady: adapter.sandbox.autonomousReady && !report.checks.some((row) => ['Pi runtime', 'Package configuration', 'GPT default', 'Sandbox'].includes(row.capability) && row.status === 'FAIL'), notes: ['Existing pi command, auth, routing and memory state untouched', 'Put the user-local launcher directory on PATH if necessary', 'No Pi runtime, package or optional service installed by foundation mode'] };
+  return { version: 1, status: 'FOUNDATION_INSTALLED', platform: adapter.id, launcher: target, source: fs.realpathSync(root), modelCalls: 0, doctorStatus: report.status, engineReady: adapter.sandbox.autonomousReady && !report.checks.some((row) => ['Pi runtime', 'Package configuration', 'Model default', 'Sandbox'].includes(row.capability) && row.status === 'FAIL'), notes: ['Existing pi command, auth, routing and memory state untouched', 'Put the user-local launcher directory on PATH if necessary', 'No Pi runtime, package or optional service installed by foundation mode'] };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

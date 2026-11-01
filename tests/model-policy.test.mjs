@@ -115,6 +115,22 @@ test("complete route unavailability fails closed", () => {
   assert.throws(() => resolveModelPolicy(fullCatalog, policy(), options(fullCatalog, rejected)), /BLOCKED_BY_MODEL/u);
 });
 
+test("explicit authenticated provider can own every role without silently falling back to Codex", () => {
+  const anthropic = { provider: "anthropic", id: "claude-opus-5", reasoning: true, contextWindow: 1_000_000, maxTokens: 128_000, input: ["text"], cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 } };
+  const overrides = Object.fromEntries(MODEL_ROLES.map((role) => [role, { model: "anthropic/claude-opus-5", thinking: ["security", "council-judge"].includes(role) ? "high" : "medium" }]));
+  const custom = { version: 2, preset: "custom", basePreset: "normal", overrides };
+  assert.throws(() => resolveModelPolicy([anthropic], policy(), options([anthropic])), /BLOCKED_BY_MODEL/u);
+  const resolved = resolveModelPolicy([anthropic], custom, options([anthropic]));
+  assert.ok(MODEL_ROLES.every((role) => resolved.roles[role].model === "anthropic/claude-opus-5" && resolved.roles[role].override === true));
+  assert.equal(resolved.roles.security.thinking, "high");
+  assert.equal(resolved.roles["council-judge"].thinking, "high");
+  assert.equal(settingsAgentOverrides(resolved).worker.model, "anthropic/claude-opus-5");
+  assert.deepEqual(validateResolvedModelPolicy([anthropic], resolved, options([anthropic])).roles, resolved.roles);
+  assert.throws(() => resolveModelPolicy([], custom, options([])), /no_authenticated_models_available/u);
+  assert.throws(() => resolveModelPolicy([anthropic], custom, options([anthropic], { "anthropic/claude-opus-5": "RUNTIME_REJECTED" })), /BLOCKED_BY_MODEL/u);
+  assert.throws(() => resolveModelPolicy([anthropic], { ...custom, overrides: { ...overrides, worker: { model: "anthropic/does-not-exist", thinking: "medium" } } }, options([anthropic])), /BLOCKED_BY_MODEL/u);
+});
+
 test("nested OmniRoute IDs parse and runtime route attestation is exact", () => {
   const model = omniCatalog.find((entry) => entry.id === "openrouter/qwen/qwen3-coder-next");
   const selected = parseModelSelection("omniroute/openrouter/qwen/qwen3-coder-next:off", [model], options([model]));
@@ -166,6 +182,25 @@ test("custom route remains user-owned, persists privately, and symlink writes ar
     const link = path.join(root, "linked.json");
     fs.symlinkSync(outside, link);
     assert.throws(() => writeModelPolicy(link, policy()), /target_unsafe/u);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("all-role migration can be validated before one persistent write and preserves mandatory high effort", () => {
+  const anthropic = { provider: "anthropic", id: "claude-opus-5", reasoning: true, contextWindow: 1_000_000, maxTokens: 128_000, input: ["text"], cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 } };
+  const mandatoryHigh = new Set(["security", "oracle", "council-1", "council-2", "council-3", "council-judge"]);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "phi-model-migration-"));
+  try {
+    const file = path.join(root, "model-policy.json");
+    writeModelPolicy(file, policy());
+    const original = fs.readFileSync(file, "utf8");
+    const candidate = MODEL_ROLES.reduce((current, role) => policyWithRole(current, role, { model: "anthropic/claude-opus-5", thinking: mandatoryHigh.has(role) ? "high" : "medium" }), readModelPolicy(file));
+    assert.throws(() => resolveModelPolicy([], candidate, options([])), /no_authenticated_models_available/u);
+    assert.equal(fs.readFileSync(file, "utf8"), original);
+    const resolved = resolveModelPolicy([anthropic], candidate, options([anthropic]));
+    assert.ok(MODEL_ROLES.every((role) => resolved.roles[role].provider === "anthropic"));
+    assert.ok([...mandatoryHigh].every((role) => resolved.roles[role].thinking === "high"));
+    writeModelPolicy(file, candidate);
+    assert.deepEqual(readModelPolicy(file), candidate);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
