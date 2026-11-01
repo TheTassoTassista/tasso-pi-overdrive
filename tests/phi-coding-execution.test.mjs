@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { requireBoundedWindowsPublication, requireCodingBackend, sandboxInvocation } from '../platform/shared/coding-execution.mjs';
@@ -126,6 +128,38 @@ test('actual production safe_exec, LSP, DAP, eval and mutation entry points are 
     ['scripts/verify-project.mjs', /sandboxInvocation\("verification"/u],
     ['scripts/typecheck.mjs', /'themes', 'platform'/u],
   ]) assert.match(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'), pattern);
+});
+
+test('native verification never reports PASS for malformed, invalid-shape or checkless package manifests', { skip: !linux }, () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), 'phi-verification-manifest-'));
+  const script = fileURLToPath(new URL('../scripts/verify-project.mjs', import.meta.url));
+  try {
+    assert.equal(spawnSync('git', ['init', '-q', cwd]).status, 0);
+    for (const contents of ['{"scripts":', '{"scripts":[]}', '{"scripts":null}']) {
+      writeFileSync(path.join(cwd, 'package.json'), contents);
+      for (const args of [[], ['--list']]) {
+        const result = spawnSync(process.execPath, [script, '--json', '--cwd', cwd, ...args], { encoding: 'utf8', timeout: 10000 });
+        assert.equal(result.status, 1);
+        assert.equal(result.stderr, '');
+        const summary = JSON.parse(result.stdout);
+        assert.equal(summary.status, 'FAIL');
+        assert.equal(summary.error, 'PACKAGE_JSON_INVALID');
+        assert.deepEqual(summary.results, []);
+      }
+    }
+    writeFileSync(path.join(cwd, 'package.json'), '{"scripts":{"test":"node --test"}}');
+    const valid = spawnSync(process.execPath, [script, '--json', '--cwd', cwd, '--list'], { encoding: 'utf8', timeout: 10000 });
+    assert.equal(valid.status, 0);
+    assert.ok(JSON.parse(valid.stdout).checks.some((item) => item.name === 'test'));
+    writeFileSync(path.join(cwd, 'package.json'), '{"name":"git-only"}');
+    const gitOnly = spawnSync(process.execPath, [script, '--json', '--cwd', cwd], { encoding: 'utf8', timeout: 10000 });
+    assert.equal(gitOnly.status, 2);
+    const gitOnlySummary = JSON.parse(gitOnly.stdout);
+    assert.equal(gitOnlySummary.status, 'NO_CHECKS');
+    assert.deepEqual(gitOnlySummary.results.map((item) => [item.name, item.status]), [['git-diff-check', 'PASS']]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('native Windows production constructors and removal deny before reading caller paths or spawn overrides', { skip: process.platform !== 'win32' }, () => {

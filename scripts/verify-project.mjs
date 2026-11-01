@@ -38,13 +38,16 @@ function commandExists(command) {
   return spawnSync("which", [command], { cwd, stdio: "ignore" }).status === 0;
 }
 
-function loadJson(file) {
-  try { return JSON.parse(readFileSync(path.join(cwd, file), "utf8")); } catch { return undefined; }
-}
-
 if (existsSync(path.join(cwd, "package.json"))) {
-  const pkg = loadJson("package.json") ?? {};
-  const scripts = pkg.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {};
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(path.join(cwd, "package.json"), "utf8")); } catch {}
+  if (!pkg || typeof pkg !== "object" || Array.isArray(pkg) || (Object.hasOwn(pkg, "scripts") && (!pkg.scripts || typeof pkg.scripts !== "object" || Array.isArray(pkg.scripts)))) {
+    const summary = { cwd, mode, sandboxed: true, allocationId: allocation?.allocationId ?? null,
+      status: "FAIL", error: "PACKAGE_JSON_INVALID", results: [] };
+    process.stdout.write(asJson ? `${JSON.stringify(summary)}\n` : "Verification: FAIL (package manifest invalid)\n");
+    process.exit(1);
+  }
+  const scripts = pkg.scripts ?? {};
   const manager = existsSync(path.join(cwd, "pnpm-lock.yaml")) && commandExists("pnpm") ? "pnpm"
     : existsSync(path.join(cwd, "bun.lock")) && commandExists("bun") ? "bun"
       : existsSync(path.join(cwd, "yarn.lock")) && commandExists("yarn") ? "yarn" : "npm";
@@ -115,7 +118,8 @@ const summary = {
   mode,
   sandboxed: true,
   allocationId: allocation?.allocationId ?? null,
-  status: results.length === 0 ? "NO_CHECKS" : results.every((item) => item.status === "PASS") ? "PASS" : "FAIL",
+  status: results.some((item) => item.status !== "PASS") ? "FAIL"
+    : results.some((item) => item.name !== "git-diff-check") ? "PASS" : "NO_CHECKS",
   results,
 };
 if (asJson) process.stdout.write(`${JSON.stringify(summary)}\n`);
