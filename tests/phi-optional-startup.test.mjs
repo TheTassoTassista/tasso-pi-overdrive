@@ -3,10 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { entersInteractiveLinuxRepl, prepareOptionalServices } from '../lib/phi-optional-startup.mjs';
+import { entersInteractiveLinuxRepl, prepareOptionalServices, optionalStartupWarnings } from '../lib/phi-optional-startup.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const linuxTest = process.platform === 'linux' ? test : test.skip;
+
+test('ordinary deferred OmniRoute is quiet while real optional-service faults remain visible', () => {
+  assert.deepEqual(optionalStartupWarnings({ omniroute: 'DEFERRED_FAIL_CLOSED', searxng: 'DEFERRED_SECURITY_BOUNDARY', secondBrain: 'READY', elapsedMs: 12 }), []);
+  for (const status of ['SECURITY_MISMATCH', 'TIMEOUT', 'UNAVAILABLE']) {
+    assert.deepEqual(optionalStartupWarnings({ omniroute: status, secondBrain: 'READY' }), [`Phi optional omniroute: ${status}`]);
+  }
+});
 
 test('only Pi-parsed interactive Linux REPL reaches optional preparation', () => {
   const tty = { platform: 'linux', stdinTTY: true, stdoutTTY: true };

@@ -8,7 +8,7 @@ import { readPhiConfig, setPhiTheme } from '../lib/phi-config.mjs';
 import { phiDoctor } from '../lib/phi-doctor.mjs';
 import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
 import { runWindowsStartupRecovery } from '../platform/windows/startup-recovery.mjs';
-import { entersInteractiveLinuxRepl, prepareOptionalServices } from '../lib/phi-optional-startup.mjs';
+import { entersInteractiveLinuxRepl, prepareOptionalServices, optionalStartupWarnings } from '../lib/phi-optional-startup.mjs';
 
 async function main(args) {
   if (args[0] === '--version') { console.log(`Phi ${PRODUCT.version} (Pi ${PRODUCT.piVersion})`); return; }
@@ -69,11 +69,7 @@ async function main(args) {
       const { parseArgs } = await import(pathToFileURL(path.join(runtime.root, 'dist', 'cli', 'args.js')).href);
       if (entersInteractiveLinuxRepl(args, parseArgs(args))) {
         const optional = prepareOptionalServices({ root: fileURLToPath(new URL('..', import.meta.url)) });
-        for (const [name, status] of Object.entries(optional)) {
-          if (name !== 'elapsedMs' && !['READY', 'STARTED', 'DEFERRED_SECURITY_BOUNDARY'].includes(status)) {
-            process.stderr.write(`Phi optional ${name}: ${status}\n`);
-          }
-        }
+        for (const warning of optionalStartupWarnings(optional)) process.stderr.write(`${warning}\n`);
       }
     } catch {
       process.stderr.write('Phi optional startup: classification unavailable; services not started.\n');

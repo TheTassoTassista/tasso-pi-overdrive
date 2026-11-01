@@ -101,6 +101,7 @@ def run_once(home, width, timeout=12, action=None):
         "providerError": "provider_registry_selector_too_broad" in plain,
         "selectorNotFound": "provider_registry_selector_not_found" in plain,
         "optionalDegraded": "Phi optional" in plain,
+        "optionalLines": [line[:100] for line in plain.splitlines() if line.startswith("Phi optional ")][:4],
         "statusBar": bool(re.search(r"[0-9.]+%/[0-9]+[kM]? \(auto\)", plain)),
         "sample": [line[:100] for line in plain.splitlines() if "Phi 1.0.0" in line or "Second Brain" in line or "MCP 0/1" in line or "gpt-6-sol" in line][:6],
         "failureLines": [line[:120] for line in plain.splitlines() if line.strip()][:5] if prompt_ms is None else [],
@@ -123,7 +124,7 @@ def main():
         error_result = run_once(home, 100, action="/models --capabilities --provider nonexistent-fixture")
         print(json.dumps({"isolation": "bwrap_readonly_source_private_home_no_network_no_host_bus",
                           "results": results, "errorProbe": error_result}, indent=2))
-        if (any(item["promptMs"] is None or item["exit"] != -15 or not all(item[key] for key in ("phiHeader", "modelLabel", "violetAnsi", "statusBar")) for item in results)
+        if (any(item["promptMs"] is None or item["exit"] != -15 or any("omniroute" in line for line in item["optionalLines"]) or not all(item[key] for key in ("phiHeader", "modelLabel", "violetAnsi", "statusBar")) for item in results)
                 or not error_result["selectorNotFound"] or not error_result["errorRedAnsi"]):
             raise SystemExit(1)
 
