@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { EditEngine, editRecoveryGuidance, snapshotFooter, validateEditEnginePolicy } from "../lib/edit-engine.mjs";
 
 const policy = Object.freeze({
@@ -164,6 +165,43 @@ test("receipt-boundary revalidation detects and preserves an external post-renam
   assert.equal(fs.readFileSync(target, "utf8"), "external after atomic rename\n");
   assert.equal(engine.status().stats.rollbacks, 0);
   assert.equal(fs.readdirSync(engine.receiptDirectory).filter((name) => name.endsWith(".json")).length, 0);
+});
+
+test("fresh process after SIGKILL does not adopt an interrupted edit or issue a success receipt", { skip: process.platform !== "linux" }, (t) => {
+  const moduleUrl = new URL("../lib/edit-engine.mjs", import.meta.url).href;
+  for (const phase of ["before-rename", "after-rename"]) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-edit-crash-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    fs.writeFileSync(path.join(root, "source.txt"), "anchor old\n");
+    const receiptRoot = path.join(root, "receipts");
+    const childSource = `import fs from 'node:fs'; import path from 'node:path'; import { EditEngine } from ${JSON.stringify(moduleUrl)};
+      const root = process.argv[1], phase = process.argv[2];
+      const die = () => process.kill(process.pid, 'SIGKILL');
+      const engine = new EditEngine({ cwd: root, receiptRoot: path.join(root, 'receipts'), sessionIdentity: 'crash-fixture',
+        beforeRename: phase === 'before-rename' ? die : undefined,
+        beforeReceipt: phase === 'after-rename' ? die : undefined });
+      const snapshot = engine.capture({ source: 'source.txt', seenAll: true });
+      const preview = engine.preview({ snapshotId: snapshot.id, edits: [{ oldText: 'anchor old', newText: 'anchor new' }] });
+      fs.writeFileSync(path.join(root, 'transaction-id'), preview.transactionId);
+      engine.apply({ transactionId: preview.transactionId });`;
+    const killed = spawnSync(process.execPath, ["--input-type=module", "-e", childSource, root, phase], { encoding: "utf8", timeout: 10000 });
+    assert.equal(killed.signal, "SIGKILL");
+    assert.equal(killed.stderr, "");
+    assert.equal(fs.readFileSync(path.join(root, "source.txt"), "utf8"), phase === "before-rename" ? "anchor old\n" : "anchor new\n");
+    assert.equal(fs.readdirSync(root).filter((name) => name.startsWith(".pi-overdrive-edit-")).length, phase === "before-rename" ? 1 : 0);
+    const inspectSource = `import fs from 'node:fs'; import path from 'node:path'; import { EditEngine } from ${JSON.stringify(moduleUrl)};
+      const root = process.argv[1]; const engine = new EditEngine({ cwd: root, receiptRoot: path.join(root, 'receipts'), sessionIdentity: 'crash-fixture' });
+      const id = fs.readFileSync(path.join(root, 'transaction-id'), 'utf8');
+      try { engine.apply({ transactionId: id }); process.exit(9); } catch (error) { if (error.code !== 'EDIT_TRANSACTION_MISSING') process.exit(8); }
+      const snapshot = engine.capture({ source: 'source.txt', seenAll: true });
+      if (!snapshot.id) process.exit(7);`;
+    const fresh = spawnSync(process.execPath, ["--input-type=module", "-e", inspectSource, root], { encoding: "utf8", timeout: 10000 });
+    assert.equal(fresh.status, 0, fresh.stderr);
+    const receiptEntries = fs.readdirSync(path.join(receiptRoot, fs.readdirSync(receiptRoot)[0]));
+    assert.equal(receiptEntries.filter((name) => name.startsWith(".receipt-")).length, 1);
+    const receipts = receiptEntries.filter((name) => name.endsWith(".json"));
+    assert.deepEqual(receipts, []);
+  }
 });
 
 test("protected, symlinked, and multiply-linked targets never become snapshots", (t) => {

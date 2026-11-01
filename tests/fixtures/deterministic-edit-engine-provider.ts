@@ -106,6 +106,10 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				emitToolCall(stream, output, 3, mode === "ast" ? "transactional_ast_edit" : "transactional_edit", { action: "apply", transactionId });
 				return;
 			}
+			if ((scenario === "verify" || scenario === "verify-fail") && completed === 3) {
+				emitToolCall(stream, output, 4, "verification_gate", { mode: "full" });
+				return;
+			}
 			const previewText = textOf(results[1]);
 			const applyText = textOf(results[2]);
 			emitText(stream, output, JSON.stringify({
@@ -117,6 +121,7 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				applyIsError: (results[2] as any)?.isError === true,
 				applyStatus: /APPLIED(?: AST)? transaction/u.test(applyText) ? "APPLIED" : /STALE_EDIT/u.test(applyText) ? "STALE_EDIT" : "UNKNOWN",
 				applyGuidancePresent: scenario !== "stale" ? null : applyText.includes("Read the exact range again") && applyText.includes("never retry the old transaction"),
+				...((scenario === "verify" || scenario === "verify-fail") ? (() => { let summary: any; try { summary = JSON.parse(textOf(results[3])); } catch {} return { verificationIsError: (results[3] as any)?.isError === true, verificationStatus: summary?.status ?? "INVALID", verificationTest: summary?.results?.find((entry: any) => entry.name === "test")?.status ?? "MISSING", verificationSandboxed: summary?.results?.find((entry: any) => entry.name === "test")?.sandboxed === true }; })() : {}),
 				finalDigest: digestFile(target),
 			}));
 		} catch (error) {

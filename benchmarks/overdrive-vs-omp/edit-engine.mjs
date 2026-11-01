@@ -10,6 +10,7 @@ const benchmarkRoot = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(benchmarkRoot, "../..");
 const provider = path.join(packageRoot, "tests", "fixtures", "deterministic-edit-engine-provider.ts");
 const editEngine = path.join(packageRoot, "extensions", "edit-engine.ts");
+const verificationGate = path.join(packageRoot, "extensions", "verification-gate.ts");
 const pi = process.env.PI_BIN ?? "pi";
 const writeResults = process.argv.includes("--write-results");
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "pi-overdrive-edit-engine-"));
@@ -47,12 +48,19 @@ async function runScenario(scenario) {
   fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
   fs.writeFileSync(fixture, "header\nanchor old\ntail\n", { mode: 0o600 });
+  if (scenario === "verify" || scenario === "verify-fail") {
+    fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({ private: true, scripts: { test: "node test.cjs" } })}\n`, { mode: 0o600 });
+    const expected = scenario === "verify" ? "anchor new" : "anchor fixed";
+    fs.writeFileSync(path.join(root, "test.cjs"), `const a=require('node:assert/strict'),f=require('node:fs');a.match(f.readFileSync('edit-fixture.txt','utf8'),/${expected}/);\n`, { mode: 0o600 });
+  }
+  const initialTestExitCode = scenario === "verify" || scenario === "verify-fail"
+    ? spawnSync(process.execPath, ["test.cjs"], { cwd: root, encoding: "utf8", timeout: 10000 }).status : null;
   fs.writeFileSync(auditReceipt, "", { mode: 0o600 });
   const child = spawn(pi, [
     "--offline", "--approve", "--no-session", "--mode", "rpc",
-    "--extension", provider, "--extension", editEngine,
+    "--extension", provider, "--extension", editEngine, "--extension", verificationGate,
     "--provider", "pi-overdrive-edit-audit", "--api-key", "audit-only", "--model", "edit-driver", "--thinking", "low",
-    "--tools", "read,transactional_edit",
+    "--tools", "read,transactional_edit,verification_gate",
   ], {
     cwd: root,
     env: {
@@ -109,7 +117,7 @@ async function runScenario(scenario) {
   const receiptRecords = receiptFiles.map((file) => ({ file, text: fs.readFileSync(file, "utf8"), mode: fs.lstatSync(file).mode & 0o777 }));
   return {
     status: !timedOut && exitCode === 0 && finalPayload ? "COMPLETE" : "FAILED",
-    elapsedMs: Number((performance.now() - started).toFixed(3)), timedOut, exitCode,
+    elapsedMs: Number((performance.now() - started).toFixed(3)), timedOut, exitCode, initialTestExitCode,
     providerTurns: audit.filter((entry) => entry.kind === "provider_turn").length,
     editMetadata: audit.filter((entry) => entry.auditKind === "edit_metadata").map(({ auditKind: _auditKind, ...entry }) => entry),
     finalPayload: finalPayload ?? null,
@@ -147,8 +155,10 @@ let report;
 try {
   const recovery = await runScenario("recovery");
   const stale = await runScenario("stale");
+  const verify = await runScenario("verify");
+  const verifyFail = await runScenario("verify-fail");
   const command = inspectCommand();
-  const metadataSafe = [...recovery.editMetadata, ...stale.editMetadata].every((entry) => !JSON.stringify(entry).includes(temporary) && !/anchor old|anchor new|external prefix/iu.test(JSON.stringify(entry)));
+  const metadataSafe = [...recovery.editMetadata, ...stale.editMetadata, ...verify.editMetadata, ...verifyFail.editMetadata].every((entry) => !JSON.stringify(entry).includes(temporary) && !/anchor old|anchor new|external prefix/iu.test(JSON.stringify(entry)));
   const assertions = {
     realPiRecoveryCompleted: recovery.status === "COMPLETE" && recovery.providerTurns === 4 && recovery.finalPayload?.toolResults === 3,
     snapshotBoundAndPreviewed: recovery.finalPayload?.snapshotBound === true && recovery.finalPayload?.previewNonMutating === true && recovery.finalPayload?.previewStatus === "SAFE_RECOVERY",
@@ -156,15 +166,17 @@ try {
     immutableMetadataReceipt: recovery.receipts.length === 1 && recovery.receipts[0].mode === 0o400 && recovery.receipts[0].containsRawData === false,
     staleRunCompleted: stale.status === "COMPLETE" && stale.providerTurns === 4 && stale.finalPayload?.previewNonMutating === true,
     staleApplyFailedClosed: stale.finalPayload?.applyIsError === true && stale.finalPayload?.applyStatus === "STALE_EDIT" && stale.finalPayload?.applyGuidancePresent === true && stale.finalContents === "external after preview\n" && stale.receipts.length === 0,
-    noStagedResidue: recovery.stagedFiles === 0 && stale.stagedFiles === 0,
+    editedProjectVerified: verify.status === "COMPLETE" && verify.initialTestExitCode === 1 && verify.finalPayload?.applyStatus === "APPLIED" && verify.finalPayload?.verificationStatus === "PASS" && verify.finalPayload?.verificationTest === "PASS" && verify.finalPayload?.verificationSandboxed === true && verify.finalContents === "header\nanchor new\ntail\n",
+    failingProjectNeverVerified: verifyFail.status === "COMPLETE" && verifyFail.finalPayload?.applyStatus === "APPLIED" && verifyFail.finalPayload?.verificationIsError === true && verifyFail.finalPayload?.verificationStatus === "FAIL" && verifyFail.finalPayload?.verificationTest === "FAIL" && verifyFail.finalPayload?.verificationSandboxed === true,
+    noStagedResidue: recovery.stagedFiles === 0 && stale.stagedFiles === 0 && verify.stagedFiles === 0 && verifyFail.stagedFiles === 0,
     metadataOnly: metadataSafe && recovery.editMetadata.length >= 3 && stale.editMetadata.length >= 3,
     commandRegisteredWithoutProviderCall: command.status === "PASS" && command.providerTurns === 0,
   };
   report = {
     version: 1, recordedAt: new Date().toISOString(), status: Object.values(assertions).every(Boolean) ? "PASS" : "FAIL",
     measurementMode: "real-pi-process-deterministic-local-provider", piVersion: spawnSync(pi, ["--version"], { encoding: "utf8" }).stdout.trim(),
-    overdriveUltra: { recovery, stale, command, assertions },
-    accounting: { deterministicLocalProviderTurns: recovery.providerTurns + stale.providerTurns, paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
+    overdriveUltra: { recovery, stale, verify, verifyFail, command, assertions },
+    accounting: { deterministicLocalProviderTurns: recovery.providerTurns + stale.providerTurns + verify.providerTurns + verifyFail.providerTurns, paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
     ompReference: { commit: "4267074ac91456866e95ed8de0b6353388f08502", version: "18.1.21", executableStatus: "NOT_RUN", reason: "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence." },
   };
 } catch (error) {
