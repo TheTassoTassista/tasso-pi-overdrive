@@ -45,15 +45,17 @@ async function runScenario(scenario) {
   const agentDir = path.join(root, "agent");
   const fixture = path.join(root, "edit-fixture.txt");
   const auditReceipt = path.join(root, "audit.jsonl");
+  const receiptFaultPhase = { "receipt-write-fail": "write", "receipt-sync-fail": "sync", "receipt-publish-fail": "publish", "receipt-dir-sync-fail": "dir-sync" }[scenario];
   fs.mkdirSync(agentDir, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, "settings.json"), "{}\n", { mode: 0o600 });
   fs.writeFileSync(fixture, "header\nanchor old\ntail\n", { mode: 0o600 });
-  if (scenario === "verify" || scenario === "verify-fail") {
+  if (["verify", "verify-fail", "verify-error", "verify-invalid-manifest"].includes(scenario)) {
     fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({ private: true, scripts: { test: "node test.cjs" } })}\n`, { mode: 0o600 });
     const expected = scenario === "verify" ? "anchor new" : "anchor fixed";
     fs.writeFileSync(path.join(root, "test.cjs"), `const a=require('node:assert/strict'),f=require('node:fs');a.match(f.readFileSync('edit-fixture.txt','utf8'),/${expected}/);\n`, { mode: 0o600 });
   }
-  const initialTestExitCode = scenario === "verify" || scenario === "verify-fail"
+  if (scenario === "verify-no-checks") fs.writeFileSync(path.join(root, "package.json"), `${JSON.stringify({ private: true })}\n`, { mode: 0o600 });
+  const initialTestExitCode = ["verify", "verify-fail", "verify-error", "verify-invalid-manifest"].includes(scenario)
     ? spawnSync(process.execPath, ["test.cjs"], { cwd: root, encoding: "utf8", timeout: 10000 }).status : null;
   fs.writeFileSync(auditReceipt, "", { mode: 0o600 });
   const child = spawn(pi, [
@@ -67,6 +69,8 @@ async function runScenario(scenario) {
       ...process.env, XDG_STATE_HOME: stateHome, PI_CODING_AGENT_DIR: agentDir,
       PI_OVERDRIVE_EDIT_AUDIT_KEY: "audit-only", PI_OVERDRIVE_EDIT_AUDIT_FIXTURE: "edit-fixture.txt",
       PI_OVERDRIVE_EDIT_AUDIT_SCENARIO: scenario, PI_OVERDRIVE_EDIT_AUDIT_RECEIPT: auditReceipt,
+      ...(scenario === "verify-error" ? { PI_OVERDRIVE_VERIFY_PROCESS_FAULT: "1", NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require ${path.join(packageRoot, "tests", "fixtures", "verification-process-fault.cjs")}`.trim() } : {}),
+      ...(receiptFaultPhase ? { PI_OVERDRIVE_RECEIPT_FAULT: receiptFaultPhase, PI_OVERDRIVE_RECEIPT_FAULT_MARKER: path.join(root, "receipt-fault-active"), PI_OVERDRIVE_RECEIPT_FAULT_OBSERVED: path.join(root, "receipt-fault-observed"), NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require ${path.join(packageRoot, "tests", "fixtures", "edit-receipt-fault.cjs")}`.trim() } : {}),
     },
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -106,6 +110,10 @@ async function runScenario(scenario) {
     await closed;
     clearTimeout(timeout);
   }
+  if (scenario === "receipt-create-fail") {
+    const receiptRoot = path.join(stateHome, "pi-overdrive", "edit-receipts");
+    for (const entry of fs.readdirSync(receiptRoot)) fs.chmodSync(path.join(receiptRoot, entry), 0o700);
+  }
   const ended = [...events].reverse().find((event) => event.type === "agent_end");
   const messages = ended?.messages ?? [];
   const finalText = textOf([...messages].reverse().find((message) => message.role === "assistant"));
@@ -118,6 +126,7 @@ async function runScenario(scenario) {
   return {
     status: !timedOut && exitCode === 0 && finalPayload ? "COMPLETE" : "FAILED",
     elapsedMs: Number((performance.now() - started).toFixed(3)), timedOut, exitCode, initialTestExitCode,
+    receiptFaultObserved: receiptFaultPhase ? fs.readFileSync(path.join(root, "receipt-fault-observed"), "utf8").trim() : null,
     providerTurns: audit.filter((entry) => entry.kind === "provider_turn").length,
     editMetadata: audit.filter((entry) => entry.auditKind === "edit_metadata").map(({ auditKind: _auditKind, ...entry }) => entry),
     finalPayload: finalPayload ?? null,
@@ -157,8 +166,13 @@ try {
   const stale = await runScenario("stale");
   const verify = await runScenario("verify");
   const verifyFail = await runScenario("verify-fail");
+  const verifyError = await runScenario("verify-error");
+  const verifyNoChecks = await runScenario("verify-no-checks");
+  const verifyInvalidManifest = await runScenario("verify-invalid-manifest");
+  const receiptCreateFail = await runScenario("receipt-create-fail");
+  const receiptFailures = await Promise.all(["receipt-write-fail", "receipt-sync-fail", "receipt-publish-fail", "receipt-dir-sync-fail"].map(runScenario));
   const command = inspectCommand();
-  const metadataSafe = [...recovery.editMetadata, ...stale.editMetadata, ...verify.editMetadata, ...verifyFail.editMetadata].every((entry) => !JSON.stringify(entry).includes(temporary) && !/anchor old|anchor new|external prefix/iu.test(JSON.stringify(entry)));
+  const metadataSafe = [...recovery.editMetadata, ...stale.editMetadata, ...verify.editMetadata, ...verifyFail.editMetadata, ...verifyError.editMetadata, ...verifyNoChecks.editMetadata, ...verifyInvalidManifest.editMetadata, ...receiptCreateFail.editMetadata, ...receiptFailures.flatMap((item) => item.editMetadata)].every((entry) => !JSON.stringify(entry).includes(temporary) && !/anchor old|anchor new|external prefix/iu.test(JSON.stringify(entry)));
   const assertions = {
     realPiRecoveryCompleted: recovery.status === "COMPLETE" && recovery.providerTurns === 4 && recovery.finalPayload?.toolResults === 3,
     snapshotBoundAndPreviewed: recovery.finalPayload?.snapshotBound === true && recovery.finalPayload?.previewNonMutating === true && recovery.finalPayload?.previewStatus === "SAFE_RECOVERY",
@@ -168,6 +182,11 @@ try {
     staleApplyFailedClosed: stale.finalPayload?.applyIsError === true && stale.finalPayload?.applyStatus === "STALE_EDIT" && stale.finalPayload?.applyGuidancePresent === true && stale.finalContents === "external after preview\n" && stale.receipts.length === 0,
     editedProjectVerified: verify.status === "COMPLETE" && verify.initialTestExitCode === 1 && verify.finalPayload?.applyStatus === "APPLIED" && verify.finalPayload?.verificationStatus === "PASS" && verify.finalPayload?.verificationTest === "PASS" && verify.finalPayload?.verificationSandboxed === true && verify.finalContents === "header\nanchor new\ntail\n",
     failingProjectNeverVerified: verifyFail.status === "COMPLETE" && verifyFail.finalPayload?.applyStatus === "APPLIED" && verifyFail.finalPayload?.verificationIsError === true && verifyFail.finalPayload?.verificationStatus === "FAIL" && verifyFail.finalPayload?.verificationTest === "FAIL" && verifyFail.finalPayload?.verificationSandboxed === true,
+    verifierProcessErrorNeverPasses: verifyError.status === "COMPLETE" && verifyError.finalPayload?.applyStatus === "APPLIED" && verifyError.finalPayload?.verificationIsError === true && verifyError.finalPayload?.verificationStatus === "INVALID" && verifyError.finalPayload?.verificationProcessFault === true && verifyError.finalContents === "header\nanchor new\ntail\n" && verifyError.receipts.length === 1,
+    missingChecksNeverPasses: verifyNoChecks.status === "COMPLETE" && verifyNoChecks.finalPayload?.applyStatus === "APPLIED" && verifyNoChecks.finalPayload?.verificationIsError === true && verifyNoChecks.finalPayload?.verificationStatus === "NO_CHECKS" && verifyNoChecks.finalContents === "header\nanchor new\ntail\n" && verifyNoChecks.receipts.length === 1,
+    invalidManifestNeverPasses: verifyInvalidManifest.status === "COMPLETE" && verifyInvalidManifest.finalPayload?.applyStatus === "APPLIED" && verifyInvalidManifest.finalPayload?.verificationIsError === true && verifyInvalidManifest.finalPayload?.verificationStatus === "FAIL" && verifyInvalidManifest.finalPayload?.verificationError === "PACKAGE_JSON_INVALID" && verifyInvalidManifest.finalContents === "header\nanchor new\ntail\n" && verifyInvalidManifest.receipts.length === 1,
+    receiptCreationFailClosed: receiptCreateFail.status === "COMPLETE" && receiptCreateFail.finalPayload?.applyIsError === true && receiptCreateFail.finalContents === "header\nanchor old\ntail\n" && receiptCreateFail.receipts.length === 0 && receiptCreateFail.stagedFiles === 0,
+    receiptWriteSyncPublishFailClosed: receiptFailures.every((item, index) => item.status === "COMPLETE" && item.receiptFaultObserved === ["write", "sync", "publish", "dir-sync"][index] && item.finalPayload?.applyIsError === true && item.finalContents === "header\nanchor old\ntail\n" && item.receipts.length === 0 && item.stagedFiles === 0),
     noStagedResidue: recovery.stagedFiles === 0 && stale.stagedFiles === 0 && verify.stagedFiles === 0 && verifyFail.stagedFiles === 0,
     metadataOnly: metadataSafe && recovery.editMetadata.length >= 3 && stale.editMetadata.length >= 3,
     commandRegisteredWithoutProviderCall: command.status === "PASS" && command.providerTurns === 0,
@@ -175,8 +194,8 @@ try {
   report = {
     version: 1, recordedAt: new Date().toISOString(), status: Object.values(assertions).every(Boolean) ? "PASS" : "FAIL",
     measurementMode: "real-pi-process-deterministic-local-provider", piVersion: spawnSync(pi, ["--version"], { encoding: "utf8" }).stdout.trim(),
-    overdriveUltra: { recovery, stale, verify, verifyFail, command, assertions },
-    accounting: { deterministicLocalProviderTurns: recovery.providerTurns + stale.providerTurns + verify.providerTurns + verifyFail.providerTurns, paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
+    overdriveUltra: { recovery, stale, verify, verifyFail, verifyError, verifyNoChecks, verifyInvalidManifest, receiptCreateFail, receiptFailures, command, assertions },
+    accounting: { deterministicLocalProviderTurns: recovery.providerTurns + stale.providerTurns + verify.providerTurns + verifyFail.providerTurns + verifyError.providerTurns + verifyNoChecks.providerTurns + verifyInvalidManifest.providerTurns + receiptCreateFail.providerTurns + receiptFailures.reduce((sum, item) => sum + item.providerTurns, 0), paidModelCalls: 0, externalProviderCalls: 0, networkCalls: 0, cost: 0 },
     ompReference: { commit: "4267074ac91456866e95ed8de0b6353388f08502", version: "18.1.21", executableStatus: "NOT_RUN", reason: "Bun >=1.4 is unavailable; source inspection is not numeric benchmark evidence." },
   };
 } catch (error) {

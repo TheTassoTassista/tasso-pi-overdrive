@@ -103,10 +103,20 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				const current = fs.readFileSync(target, "utf8");
 				previewNonMutating = mode === "ast" ? current.includes("legacy(value)") && !current.includes("modern(value)") : scenario === "lsp-success" ? current.includes("'safe'") && !current.includes("'safer'") : current.includes("anchor old") && !current.includes("anchor new");
 				if (scenario === "stale") fs.writeFileSync(target, "external after preview\n");
+				if (scenario === "receipt-create-fail") {
+					const receiptRoot = path.join(process.env.XDG_STATE_HOME ?? "", "pi-overdrive", "edit-receipts");
+					for (const entry of fs.readdirSync(receiptRoot)) fs.chmodSync(path.join(receiptRoot, entry), 0o500);
+				}
+				if (["receipt-write-fail", "receipt-sync-fail", "receipt-publish-fail", "receipt-dir-sync-fail"].includes(scenario)) {
+					const marker = process.env.PI_OVERDRIVE_RECEIPT_FAULT_MARKER;
+					if (!marker) throw new Error("edit_audit_fault_marker_missing");
+					fs.writeFileSync(marker, "active", { flag: "wx", mode: 0o600 });
+				}
 				emitToolCall(stream, output, 3, mode === "ast" ? "transactional_ast_edit" : "transactional_edit", { action: "apply", transactionId });
 				return;
 			}
-			if ((scenario === "verify" || scenario === "verify-fail") && completed === 3) {
+			if (["verify", "verify-fail", "verify-error", "verify-no-checks", "verify-invalid-manifest"].includes(scenario) && completed === 3) {
+				if (scenario === "verify-invalid-manifest") fs.writeFileSync(path.join(process.cwd(), "package.json"), '{"scripts":');
 				emitToolCall(stream, output, 4, "verification_gate", { mode: "full" });
 				return;
 			}
@@ -121,7 +131,7 @@ function streamEditAudit(model: Model<any>, context: Context, options?: SimpleSt
 				applyIsError: (results[2] as any)?.isError === true,
 				applyStatus: /APPLIED(?: AST)? transaction/u.test(applyText) ? "APPLIED" : /STALE_EDIT/u.test(applyText) ? "STALE_EDIT" : "UNKNOWN",
 				applyGuidancePresent: scenario !== "stale" ? null : applyText.includes("Read the exact range again") && applyText.includes("never retry the old transaction"),
-				...((scenario === "verify" || scenario === "verify-fail") ? (() => { let summary: any; try { summary = JSON.parse(textOf(results[3])); } catch {} return { verificationIsError: (results[3] as any)?.isError === true, verificationStatus: summary?.status ?? "INVALID", verificationTest: summary?.results?.find((entry: any) => entry.name === "test")?.status ?? "MISSING", verificationSandboxed: summary?.results?.find((entry: any) => entry.name === "test")?.sandboxed === true }; })() : {}),
+				...(["verify", "verify-fail", "verify-error", "verify-no-checks", "verify-invalid-manifest"].includes(scenario) ? (() => { let summary: any; try { summary = JSON.parse(textOf(results[3])); } catch {} return { verificationIsError: (results[3] as any)?.isError === true, verificationStatus: summary?.status ?? "INVALID", verificationError: summary?.error ?? null, verificationTest: summary?.results?.find((entry: any) => entry.name === "test")?.status ?? "MISSING", verificationSandboxed: summary?.results?.find((entry: any) => entry.name === "test")?.sandboxed === true, verificationProcessFault: textOf(results[3]).includes("verification process exited 76") }; })() : {}),
 				finalDigest: digestFile(target),
 			}));
 		} catch (error) {

@@ -204,6 +204,32 @@ test("fresh process after SIGKILL does not adopt an interrupted edit or issue a 
   }
 });
 
+test("missing or discordant receipt never restores transaction authority in a new process", { skip: process.platform !== "linux" }, (t) => {
+  const { root, engine } = fixture(t);
+  const file = path.join(root, "receipt-source.txt");
+  fs.writeFileSync(file, "anchor old\n");
+  const snapshot = engine.capture({ source: "receipt-source.txt", seenAll: true });
+  const preview = engine.preview({ snapshotId: snapshot.id, edits: [{ oldText: "anchor old", newText: "anchor new" }] });
+  engine.apply({ transactionId: preview.transactionId });
+  const receipt = path.join(engine.receiptDirectory, `${preview.transactionId}.json`);
+  const originalReceipt = fs.readFileSync(receipt);
+  const newProcess = `import fs from 'node:fs'; import { EditEngine } from ${JSON.stringify(new URL("../lib/edit-engine.mjs", import.meta.url).href)};
+    const engine = new EditEngine({ cwd: process.argv[1], receiptRoot: process.argv[2], sessionIdentity: 'test-session' });
+    try { engine.apply({ transactionId: process.argv[3] }); process.exit(9); }
+    catch (error) { if (error.code !== 'EDIT_TRANSACTION_MISSING') process.exit(8); }
+    if (fs.readFileSync(process.argv[4], 'utf8') !== 'anchor new\\n') process.exit(7);`;
+  for (const kind of ["missing", "incomplete", "discordant"]) {
+    if (kind === "missing") fs.unlinkSync(receipt);
+    else {
+      fs.writeFileSync(receipt, kind === "incomplete" ? "{" : `${JSON.stringify({ status: "APPLIED", afterDigest: "0".repeat(64) })}\n`, { mode: 0o600 });
+    }
+    const inspected = spawnSync(process.execPath, ["--input-type=module", "-e", newProcess, root, path.join(root, "state", "receipts"), preview.transactionId, file], { encoding: "utf8", timeout: 10000 });
+    assert.equal(inspected.status, 0, `${kind}: ${inspected.stderr}`);
+  }
+  assert.equal(fs.readFileSync(file, "utf8"), "anchor new\n");
+  assert.notDeepEqual(originalReceipt, fs.existsSync(receipt) ? fs.readFileSync(receipt) : null);
+});
+
 test("protected, symlinked, and multiply-linked targets never become snapshots", (t) => {
   const { root, engine } = fixture(t);
   fs.writeFileSync(path.join(root, "safe.txt"), "safe\n");
