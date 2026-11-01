@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRODUCT, THEMES, renderSplash, terminalCapabilities, themeName } from '../branding/terminal.mjs';
+import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+import fs from 'node:fs';
 
 test('Phi has an independent portable product identity', () => {
   assert.equal(PRODUCT.name, 'Phi'); assert.equal(PRODUCT.command, 'phi');
@@ -36,4 +40,13 @@ test('untrusted startup state cannot inject terminal escapes or line breaks', ()
 });
 test('theme names cannot be paths or dynamically evaluated', () => {
   for (const name of ['../aurora', 'toString', 'constructor', '\x1b', 'unknown']) assert.throws(() => themeName(name), /PHI_UNKNOWN_THEME/u);
+});
+test('Midnight Violet is the candidate default and validates against the installed Pi theme contract', async () => {
+  assert.equal(PRODUCT.defaultTheme, 'midnight-violet');
+  assert.ok(THEMES['midnight-violet']);
+  const runtime = discoverPiRuntime();
+  assert.ok(runtime?.root);
+  const { validateThemeJson } = await import(pathToFileURL(path.join(runtime.root, 'dist', 'modes', 'interactive', 'theme', 'theme-json.js')).href);
+  const theme = JSON.parse(fs.readFileSync(new URL('../themes/midnight-violet.json', import.meta.url), 'utf8'));
+  assert.equal(validateThemeJson('Midnight Violet', theme).name, 'midnight-violet');
 });

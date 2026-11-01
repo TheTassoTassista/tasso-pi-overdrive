@@ -215,7 +215,18 @@ export default function modelPolicyExtension(pi: ExtensionAPI): void {
         const registry = buildProviderCapabilityRegistry({ registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable(), catalogSnapshot: localCatalog.snapshot, catalogStatus: localCatalog.status });
         const selected = provider || callable || selector ? registry.models.filter((record: any) => (!provider || record.provider === provider) && (!callable || record.availability.selectable) && (!selector || (selector.includes("/") ? record.identity === selector : record.provider === selector || record.identity.toLowerCase().includes(selector.toLowerCase())))) : [];
         if ((provider || selector) && selected.length === 0) throw new Error("provider_registry_selector_not_found");
-        if (selected.length > 50) throw new Error("provider_registry_selector_too_broad");
+        if (selected.length > 50) {
+          // A provider name can legitimately match a large dynamic catalog.
+          // Report only a bounded summary; never dump the full registry or
+          // silently treat broad evidence as an authorized model route.
+          if (provider && !selector && !callable) {
+            ctx.ui.notify(json
+              ? JSON.stringify({ version: registry.version, kind: registry.kind, digest: registry.digest, provider, matchedModels: selected.length, selectedModels: [], detail: "exact_model_required", decisionModelCalls: 0, catalogFetches: 0, routingMutations: 0 })
+              : `Provider capabilities: ${selected.length}/${registry.models.length} for ${provider}; detail requires an exact provider/model selector (50-record display limit).`, "info");
+            return;
+          }
+          throw new Error("provider_registry_selector_too_broad: use an exact provider/model selector");
+        }
         if (json) {
           ctx.ui.notify(JSON.stringify({ version: registry.version, kind: registry.kind, digest: registry.digest, totalModels: registry.models.length, catalog: registry.catalog, selectedModels: selected, decisionModelCalls: registry.decisionModelCalls, catalogFetches: registry.catalogFetches, routingMutations: registry.routingMutations }, null, 2), "info");
           return;

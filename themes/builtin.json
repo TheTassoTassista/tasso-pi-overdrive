@@ -3,5 +3,6 @@
   "cyber": { "colors": ["#22d3ee", "#a78bfa", "#f472b6"] },
   "gold": { "colors": ["#ffe8a1", "#fcc419", "#ff922b"] },
   "gothic": { "colors": ["#ced4da", "#9775fa", "#e599f7"] },
-  "mono": { "colors": [] }
+  "mono": { "colors": [] },
+  "midnight-violet": { "colors": ["#a78bfa", "#67e8f9", "#c4b5fd"] }
 }

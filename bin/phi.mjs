@@ -79,7 +79,10 @@ async function main(args) {
       process.stderr.write('Phi optional startup: classification unavailable; services not started.\n');
     }
   }
-  await launchEngine(runtime.node, [runtime.entry, ...args], { ...process.env, PHI_LAUNCH: '1', PHI_THEME: theme });
+  const piArgs = process.stdin.isTTY && process.stdout.isTTY && theme === 'midnight-violet' && !args.some((arg) => ['--theme', '--use-theme', '--no-themes'].includes(arg))
+    ? [runtime.entry, '--theme', fileURLToPath(new URL('../themes/midnight-violet.json', import.meta.url)), '--use-theme', 'midnight-violet', ...args]
+    : [runtime.entry, ...args];
+  await launchEngine(runtime.node, piArgs, { ...process.env, PI_SKIP_VERSION_CHECK: '1', PHI_LAUNCH: '1', PHI_THEME: theme });
 }
 
 main(process.argv.slice(2)).catch((error) => {

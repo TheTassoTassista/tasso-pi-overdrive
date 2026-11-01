@@ -22,11 +22,11 @@ const omniIds = [
   "openrouter/qwen/qwen3-coder-next", "groq/qwen/qwen3-32b", "auto/best-fast", "auto/best-reasoning", "auto/best-coding",
 ].map((id) => `omniroute/${id}`);
 
-function run(message) {
+function run(message, { broad = false } = {}) {
   const messages = Array.isArray(message) ? message : [message];
   const child = spawnSync(pi, ["--extension", provider, "--extension", extension, "--offline", "--approve", "--no-session", "--mode", "rpc", "--provider", "pi-overdrive-routing-audit", "--model", "driver", "--api-key", "audit-only", "--no-tools"], {
     cwd: root,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile, PI_OVERDRIVE_OMNIROUTE_CATALOG_CACHE: catalogFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only" },
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OVERDRIVE_MODEL_POLICY: policyFile, PI_OVERDRIVE_MODEL_CALLABILITY: callabilityFile, PI_OVERDRIVE_OMNIROUTE_CATALOG_CACHE: catalogFile, PI_OVERDRIVE_ROUTING_AUDIT_KEY: "audit-only", PI_OVERDRIVE_BROAD_FIXTURE: broad ? "1" : "0" },
     input: `${messages.map((entry) => JSON.stringify(entry)).join("\n")}\n`,
     encoding: "utf8",
     timeout: 30_000,
@@ -97,7 +97,15 @@ try {
   const summaryText = notifications(providerSummary);
   check("provider-capability-registry-default-output-bounded", providerSummary.code === 0 && noModelCall(providerSummary) && summaryText.includes("Provider capabilities: 0/") && summaryText.includes("local catalog STALE") && summaryText.length < 500, { characters: summaryText.length, modelCalls: 0 });
 
-  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile), notifications(providerRegistry), summaryText].join("\n");
+  const broadProvider = run({ id: "broad-provider", type: "prompt", message: "/models --capabilities --json --provider omniroute" }, { broad: true });
+  let broadSummary;
+  try { broadSummary = JSON.parse(notifications(broadProvider)); } catch {}
+  check("large-provider-summary-is-bounded-and-never-authorizes-a-route", broadProvider.code === 0 && noModelCall(broadProvider) && broadSummary?.provider === "omniroute" && broadSummary?.matchedModels >= 59 && broadSummary?.selectedModels?.length === 0 && broadSummary?.detail === "exact_model_required" && !notifications(broadProvider).includes("fixture/model-0"), broadSummary ?? notifications(broadProvider));
+  const unsafeBroad = run({ id: "unsafe-broad", type: "prompt", message: "/models --capabilities fixture" }, { broad: true });
+  const invalidSelector = run({ id: "invalid-selector", type: "prompt", message: "/models --capabilities --provider ../omniroute" }, { broad: true });
+  check("broad-free-text-and-invalid-selectors-still-fail-closed", unsafeBroad.code === 0 && noModelCall(unsafeBroad) && notifications(unsafeBroad).includes("provider_registry_selector_too_broad") && invalidSelector.code === 0 && noModelCall(invalidSelector) && notifications(invalidSelector).includes("provider_registry_selector_invalid"), { broad: notifications(unsafeBroad), invalid: notifications(invalidSelector) });
+
+  const secretScan = [notifications(initial), notifications(saver), notifications(alias), notifications(quality), notifications(freshQuality), treeText, notifications(treeJson), taskPolicyText, notifications(modelProfile), notifications(providerRegistry), summaryText, notifications(broadProvider), notifications(unsafeBroad), notifications(invalidSelector)].join("\n");
   check("routing-command-output-secret-free", !/bearer\s+|api[_ -]?key\s*[:=]|cookie\s*[:=]|credential\s*[:=]/iu.test(secretScan), "metadata-only command output");
 } catch (error) {
   check("routing-smoke-harness", false, error instanceof Error ? error.message : String(error));
@@ -105,6 +113,6 @@ try {
   fs.rmSync(temporary, { recursive: true, force: true });
 }
 
-const status = results.length === 13 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
+const status = results.length === 15 && results.every((entry) => entry.status === "PASS") ? "PASS" : "FAIL";
 process.stdout.write(`${JSON.stringify({ status, modelInferenceCalls: 0, providerExecution: "NONE_COMMAND_HANDLERS_ONLY", results }, null, 2)}\n`);
 process.exit(status === "PASS" ? 0 : 1);
