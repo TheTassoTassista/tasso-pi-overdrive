@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { phiDoctor } from '../lib/phi-doctor.mjs';
-import { discoverPiRuntime } from '../lib/phi-runtime.mjs';
+import { discoverPiRuntime, bundledPiModel } from '../lib/phi-runtime.mjs';
 
 const source = path.resolve(import.meta.dirname, '..');
 const cli = path.join(source, 'bin', 'phi.mjs');
@@ -40,6 +40,34 @@ test('runtime discovery refuses unreviewed Pi versions and package traversal', (
     fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '0.87.1', bin: { pi: '../escape.mjs' } }));
     assert.equal(discoverPiRuntime({ PHI_PI_ROOT: root }), null);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('bundled model lookup accepts nested and npm-hoisted pi-ai but rejects missing or mismatched packages', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-pi-catalog-layout-'));
+  try {
+    const root = path.join(temp, 'node_modules', '@earendil-works', 'pi-coding-agent');
+    const nested = path.join(root, 'node_modules', '@earendil-works', 'pi-ai');
+    const hoisted = path.join(root, '..', 'pi-ai');
+    const env = { PHI_PI_ROOT: root };
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-coding-agent', version: '0.87.1', bin: { pi: 'cli.mjs' } }));
+    fs.writeFileSync(path.join(root, 'cli.mjs'), '');
+    const writeCatalog = (directory, name = '@earendil-works/pi-ai', version = '0.87.1') => {
+      fs.mkdirSync(path.join(directory, 'dist', 'providers', 'data'), { recursive: true });
+      fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ name, version }));
+      fs.writeFileSync(path.join(directory, 'dist', 'providers', 'data', 'anthropic.json'), JSON.stringify({ api: { 'chat:fixture': { provider: 'anthropic', id: 'fixture', cost: { input: 1, output: 2 } } } }));
+    };
+    assert.equal(bundledPiModel('anthropic', 'fixture', env), null);
+    writeCatalog(hoisted);
+    assert.deepEqual(bundledPiModel('anthropic', 'fixture', env)?.cost, { input: 1, output: 2 });
+    writeCatalog(nested);
+    assert.deepEqual(bundledPiModel('anthropic', 'fixture', env)?.cost, { input: 1, output: 2 });
+    fs.writeFileSync(path.join(nested, 'package.json'), JSON.stringify({ name: 'wrong-package', version: '0.87.1' }));
+    assert.equal(bundledPiModel('anthropic', 'fixture', env), null);
+    fs.rmSync(nested, { recursive: true });
+    fs.writeFileSync(path.join(hoisted, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-ai', version: '1.5.0' }));
+    assert.equal(bundledPiModel('anthropic', 'fixture', env), null);
+  } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
 test('Doctor accepts a bundled non-Codex default without claiming authentication or live callability', async () => {
