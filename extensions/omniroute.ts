@@ -12,8 +12,27 @@ type CatalogModel = {
   pricing?: { input: number; output: number; cacheRead: number; cacheWrite: number } | null;
 };
 
+export function createOmniRouteSelectionGate(argv: string[]) {
+  const providerIndex = argv.indexOf("--provider");
+  const modelIndex = argv.indexOf("--model");
+  let explicitlySelected = (providerIndex >= 0 && argv[providerIndex + 1] === "omniroute") || argv.includes("--provider=omniroute") ||
+    (modelIndex >= 0 && argv[modelIndex + 1]?.startsWith("omniroute/")) || argv.some((arg) => arg.startsWith("--model=omniroute/"));
+  return {
+    selected(event: { model: { provider: string }; source: string }) {
+      explicitlySelected = event.model.provider === "omniroute" && (event.source === "set" || event.source === "cycle");
+    },
+    assertAuthorized() {
+      if (!explicitlySelected) throw new Error("OMNIROUTE_EXPLICIT_SELECTION_REQUIRED");
+    },
+  };
+}
+
 export default function omnirouteProvider(pi: ExtensionAPI): void {
   const streamSimple = loadPiOpenAiCompletionsStreamSimple();
+  const secureStream = createOmniRouteStream(streamSimple);
+  // A configured token is not consent to use OmniRoute as Pi's fallback.
+  const selection = createOmniRouteSelectionGate(process.argv);
+  pi.on("model_select", (event) => selection.selected(event));
   const models = Object.values(routingPolicy.models as Record<string, CatalogModel>)
     .filter((model) => model.source === "OmniRoute" && model.catalogId)
     .map((model) => ({
@@ -33,7 +52,10 @@ export default function omnirouteProvider(pi: ExtensionAPI): void {
     apiKey: "$OMNIROUTER_API_KEY",
     authHeader: true,
     api: "openai-completions",
-    streamSimple: createOmniRouteStream(streamSimple),
+    streamSimple: (model, context, options) => {
+      selection.assertAuthorized();
+      return secureStream(model, context, options);
+    },
     models,
   });
 }

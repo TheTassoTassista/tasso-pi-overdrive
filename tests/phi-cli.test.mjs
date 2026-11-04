@@ -87,13 +87,14 @@ test('Doctor accepts a bundled non-Codex default without claiming authentication
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 
-test('candidate Phi RPC starts with Anthropic alone and refuses an unauthenticated model without fallback', { skip: !discoverPiRuntime() }, () => {
+test('candidate Phi RPC retains the selected default without silently falling back to an authenticated provider', { skip: !discoverPiRuntime() }, () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-anthropic-rpc-'));
   try {
     const agent = path.join(temp, 'agent');
     fs.mkdirSync(agent, { mode: 0o700 });
     fs.writeFileSync(path.join(agent, 'settings.json'), JSON.stringify({ packages: [source], defaultProvider: 'anthropic', defaultModel: 'claude-opus-5', defaultThinkingLevel: 'medium' }), { mode: 0o600 });
-    const requests = [{ id: 'state', type: 'get_state' }, { id: 'models', type: 'get_available_models' }];
+    const requests = [{ id: 'state', type: 'get_state' }, { id: 'models', type: 'get_available_models' },
+      { id: 'select', type: 'set_model', provider: 'anthropic', modelId: 'claude-opus-5' }];
     for (const authenticated of [false, true]) {
       const result = spawnSync(process.execPath, [cli, '--offline', '--no-session', '--no-context-files', '--no-tools', '--mode', 'rpc'], {
         cwd: temp, encoding: 'utf8', timeout: 15000,
@@ -104,10 +105,12 @@ test('candidate Phi RPC starts with Anthropic alone and refuses an unauthenticat
       const events = result.stdout.split(/\r?\n/u).filter(Boolean).flatMap((line) => { try { return [JSON.parse(line)]; } catch { return []; } });
       const state = events.find((event) => event.type === 'response' && event.id === 'state');
       const models = events.find((event) => event.type === 'response' && event.id === 'models');
+      const select = events.find((event) => event.type === 'response' && event.id === 'select');
       assert.equal(state?.success, true);
-      assert.equal(state.data?.model?.provider, authenticated ? 'anthropic' : 'unknown');
-      assert.equal(state.data?.model?.id, authenticated ? 'claude-opus-5' : 'unknown');
+      assert.equal(state.data?.model?.provider, 'anthropic');
+      assert.equal(state.data?.model?.id, 'claude-opus-5');
       assert.equal(models?.data?.models?.some((model) => model.provider === 'anthropic' && model.id === 'claude-opus-5'), authenticated);
+      assert.equal(select?.success, authenticated);
       assert.equal(events.filter((event) => ['agent_start', 'message_start', 'message_update', 'message_end'].includes(event.type)).length, 0);
     }
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }

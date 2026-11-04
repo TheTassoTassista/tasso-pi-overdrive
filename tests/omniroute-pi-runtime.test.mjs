@@ -41,7 +41,8 @@ test("Pi RPC registers OmniRoute, selects it, and restores the preceding model w
 		}), { mode: 0o600 });
 	}
 
-	const child = spawn(phi || pi, [
+	const child = spawn(phi ? process.execPath : pi, [
+		...(phi ? [phi] : []),
 		"--offline", "--no-session", "--no-context-files", "--no-tools", "--mode", "rpc",
 		...(!phi ? ["--extension", extension] : []),
 	], {
@@ -66,7 +67,7 @@ test("Pi RPC registers OmniRoute, selects it, and restores the preceding model w
 	const responses = new Map();
 	let sendNext;
 	const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, 20_000);
-	const requests = [{ id: "models", type: "get_available_models" }];
+	const requests = [{ id: "models", type: "get_available_models" }, ...(phi ? [{ id: "initial_state", type: "get_state" }] : [])];
 	let nextRequest = 0;
 	const send = () => {
 		if (nextRequest >= requests.length) return;
@@ -119,6 +120,7 @@ test("Pi RPC registers OmniRoute, selects it, and restores the preceding model w
 	assert.equal(spawnError, undefined, `Pi RPC could not start: ${spawnError}`);
 	assert.equal(exit.code, 0, `Pi RPC exited ${exit.code} (${exit.signal}); stdout=${stdout.slice(-3000)} stderr=${stderr.slice(-3000)}`);
 	assert.equal(responses.get("models")?.success, true, `model catalog request failed: ${stderr.slice(-3000)}`);
+	if (phi) assert.equal(responses.get("initial_state")?.data?.model?.provider, "openai-codex", "Phi must not implicitly select an authenticated OmniRoute fallback");
 	const models = responses.get("models")?.data?.models ?? [];
 	assert.ok(models.some((model) => model.provider === "omniroute" && model.id === selected.catalogId), "Pi RPC catalog must contain the extension-registered fixture model");
 	const preceding = models.find((model) => model.provider && model.id && (model.provider !== "omniroute" || model.id !== selected.catalogId));

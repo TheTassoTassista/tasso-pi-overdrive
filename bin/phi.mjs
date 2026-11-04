@@ -2,7 +2,9 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PRODUCT, THEMES, renderSplash, themeName } from '../branding/terminal.mjs';
-import { requireAutonomousBackend } from '../platform/index.mjs';
+import { requireAutonomousBackend, localDirectories } from '../platform/index.mjs';
+import { readLocalJson } from '../platform/shared/filesystem.mjs';
+import { pinFreshSessionDefault } from '../lib/phi-initial-model.mjs';
 import { launchEngine, runOwnedEngine } from '../platform/shared/process.mjs';
 import { readPhiConfig, setPhiTheme } from '../lib/phi-config.mjs';
 import { phiDoctor } from '../lib/phi-doctor.mjs';
@@ -75,9 +77,10 @@ async function main(args) {
       process.stderr.write('Phi optional startup: classification unavailable; services not started.\n');
     }
   }
-  const piArgs = process.stdin.isTTY && process.stdout.isTTY && theme === 'midnight-violet' && !args.some((arg) => ['--theme', '--use-theme', '--no-themes'].includes(arg))
-    ? [runtime.entry, '--theme', fileURLToPath(new URL('../themes/midnight-violet.json', import.meta.url)), '--use-theme', 'midnight-violet', ...args]
-    : [runtime.entry, ...args];
+  const selectedArgs = pinFreshSessionDefault(args, readLocalJson(path.join(localDirectories().agent, 'settings.json')));
+  const piArgs = process.stdin.isTTY && process.stdout.isTTY && theme === 'midnight-violet' && !selectedArgs.some((arg) => ['--theme', '--use-theme', '--no-themes'].includes(arg))
+    ? [runtime.entry, '--theme', fileURLToPath(new URL('../themes/midnight-violet.json', import.meta.url)), '--use-theme', 'midnight-violet', ...selectedArgs]
+    : [runtime.entry, ...selectedArgs];
   await launchEngine(runtime.node, piArgs, { ...process.env, PI_SKIP_VERSION_CHECK: '1', PHI_LAUNCH: '1', PHI_THEME: theme });
 }
 
