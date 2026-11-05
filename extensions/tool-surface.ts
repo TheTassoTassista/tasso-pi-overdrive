@@ -29,6 +29,20 @@ export function selectInitialToolSurface(active: string[], available: string[], 
   return CORE_TOOLS.filter((name) => known.has(name));
 }
 
+export function hasExplicitBackgroundWorkerSafeExec(input: {
+  active: string[];
+  available: string[];
+  systemPrompt: string;
+  environment: NodeJS.ProcessEnv;
+  pid: number;
+}): boolean {
+  return input.environment.PI_SUBAGENT_CHILD === "1"
+    && input.environment.PI_SUBAGENT_RUNNER_PID === String(input.pid)
+    && input.systemPrompt.startsWith('<active_agent name="worker"/>')
+    && input.available.includes("safe_exec")
+    && input.active.includes("safe_exec");
+}
+
 function presetAndQuality(): { preset: string; quality: string } {
   const stored = readModelPolicy();
   return { preset: stored.preset === "custom" ? stored.basePreset : stored.preset, quality: getSessionQuality() };
@@ -60,11 +74,14 @@ export default function toolSurface(pi: ExtensionAPI): void {
   let mode = cliPolicy ? "explicit-cli" : "auto";
   let lastPolicy: any;
   let lastTaskPolicy: any;
+  let explicitBackgroundWorkerSafeExec = false;
 
-  pi.on("session_start", () => {
+  pi.on("session_start", (_event, ctx) => {
     const active = pi.getActiveTools();
     const available = pi.getAllTools().map((tool) => tool.name);
-    pi.setActiveTools(selectInitialToolSurface(active, available, process.argv.slice(2)));
+    explicitBackgroundWorkerSafeExec = hasExplicitBackgroundWorkerSafeExec({ active, available, systemPrompt: ctx.getSystemPrompt(), environment: process.env, pid: process.pid });
+    const selected = selectInitialToolSurface(active, available, process.argv.slice(2));
+    pi.setActiveTools(explicitBackgroundWorkerSafeExec ? [...new Set([...selected, "safe_exec"])] : selected);
   });
 
   pi.on("before_agent_start", (event, ctx) => {
@@ -80,7 +97,8 @@ export default function toolSurface(pi: ExtensionAPI): void {
       const policy = resolveToolPolicy({ taskPolicy, availableTools });
       const profile = resolveModelHarnessProfile({ model: ctx.model, registeredModels: ctx.modelRegistry.getAll(), authenticatedModels: ctx.modelRegistry.getAvailable() });
       const selection = constrainToolsForModelProfile(policy.activeTools, profile, { structural: taskPolicy.classification.signals.structuralEdit === true });
-      pi.setActiveTools([...selection.activeTools]);
+      const explicitSafeExecAllowed = explicitBackgroundWorkerSafeExec && !profile.toolConstraints.deniedTools.includes("safe_exec") && availableTools.includes("safe_exec");
+      pi.setActiveTools(explicitSafeExecAllowed ? [...new Set([...selection.activeTools, "safe_exec"])] : [...selection.activeTools]);
       lastTaskPolicy = taskPolicy;
       lastPolicy = policy;
       pi.events.emit("pi-overdrive:tool-metadata", toolPolicyMetadata(policy, taskPolicy));
