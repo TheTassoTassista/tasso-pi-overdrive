@@ -72,6 +72,7 @@ Durable writes are narrow:
 - `/memory remember TEXT` records an explicit user decision;
 - `/memory learn PROCEDURE` records an explicit reusable ACE lesson;
 - `/memory sync` reads only Obsidian notes marked `memory: true`;
+- `/memory-last` summarizes the last automatic retrieval decision for this session without showing retrieved text or source paths; it cannot tell whether the model used the attached context;
 - reviewed deterministic producers may submit a structured verified event through the Curator API.
 
 Ordinary model turns and workflow task prompts are not retained. Raw transcripts, short scratch fragments, invalid types, and secret-bearing values are rejected. Accepted entries preserve `id`, type, project/scope, timestamps, source/source type, trust, confidence, verification, importance, expiry, tags, reason, canonical hash, and superseding links.
@@ -148,6 +149,7 @@ The memory enrichment router is separate from normal Pi routing and cannot fan o
 ```text
 /memory
 /memory-status
+/memory-last
 /memory-search project architecture
 /memory-recent
 /memory-why mem-0123456789abcdef

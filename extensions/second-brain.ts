@@ -4,8 +4,10 @@ import { readModelPolicy } from "../lib/model-policy.mjs";
 import { availableContextFromPiUsage, resolveTaskPolicy } from "../lib/task-governor.mjs";
 import { createSecondBrainRuntime, secondBrainHealth } from "../lib/second-brain-runtime.mjs";
 import { syncObsidianVault } from "../lib/obsidian-sync.mjs";
+import { createMemorySessionSummaryStore } from "../lib/memory-session-summary.mjs";
 
 const MEMORY_MESSAGE = "tasso-pi-overdrive.second-brain";
+const retrievalSummary = createMemorySessionSummaryStore();
 let runtime: any;
 let runtimeCwd = "";
 
@@ -46,6 +48,7 @@ function renderSearch(pack: any): string {
 
 export default function secondBrainExtension(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
+    retrievalSummary.reset();
     ctx.ui.setStatus("second-brain", "memory: lazy");
   });
 
@@ -60,14 +63,24 @@ export default function secondBrainExtension(pi: ExtensionAPI): void {
         availableContext: availableContextFromPiUsage(ctx.getContextUsage()),
       });
       if (!taskPolicy.needs.secondBrain) {
+        retrievalSummary.record({ outcome: "SKIPPED", reason: "task-policy-current-context-sufficient" });
+        ctx.ui.setStatus("second-brain", "memory: skipped (context sufficient)");
         pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_policy_skip", reason: "task_policy_current_context_sufficient", taskPolicyDigest: taskPolicy.digest });
         return undefined;
       }
       const active = runtimeFor(ctx, pi);
       const pack = await active.controller.build(event.prompt);
-      if (!pack.text) return undefined;
+      if (!pack.text) {
+        retrievalSummary.record({ pack, outcome: "EMPTY" });
+        ctx.ui.setStatus("second-brain", `memory: empty (${pack.metadata.status.toLowerCase()})`);
+        return undefined;
+      }
+      retrievalSummary.record({ pack, outcome: "ATTACHED" });
+      ctx.ui.setStatus("second-brain", `memory: attached (${pack.metadata.itemCount})`);
       return { message: { customType: MEMORY_MESSAGE, content: pack.text, display: false, details: { id: pack.id, route: pack.route.decision, itemCount: pack.metadata.itemCount, approximateTokens: pack.metadata.approximateTokens } } };
     } catch {
+      retrievalSummary.record({ outcome: "UNAVAILABLE", reason: "retrieval-error" });
+      ctx.ui.setStatus("second-brain", "memory: unavailable");
       pi.events.emit("pi-overdrive:memory-metadata", { kind: "memory_degradation_event", backend: "controller", reason: "unavailable" });
       return undefined;
     }
@@ -109,6 +122,10 @@ export default function secondBrainExtension(pi: ExtensionAPI): void {
   pi.registerCommand("memory-status", {
     description: "Show detailed zero-model-call Second Brain health and policy",
     handler: async (_args, ctx) => { try { ctx.ui.notify(detailedStatus(await secondBrainHealth(runtimeFor(ctx, pi))), "info"); } catch (error) { ctx.ui.notify(`Second Brain degraded: ${error instanceof Error ? error.message : String(error)}`, "warning"); } },
+  });
+  pi.registerCommand("memory-last", {
+    description: "Summarize the last automatic memory-context decision in this session",
+    handler: async (_args, ctx) => { ctx.ui.notify(retrievalSummary.render(), "info"); },
   });
   pi.registerCommand("memory-search", {
     description: "Search curated/OpenViking/Hindsight/ACE memory without a Pi model call",

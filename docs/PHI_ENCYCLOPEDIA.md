@@ -18,7 +18,7 @@ Gli argomenti Pi non intercettati da Phi passano al runtime Pi installato. `phi 
 
 ## Comandi interattivi
 
-I seguenti **42** nomi sono registrazioni statiche `pi.registerCommand` nelle estensioni del candidato; la registrazione effettiva dipende dal pacchetto caricato. Digitare `/<nome>` nella REPL e chiedere aiuto prima di un'azione mutante. Il test di completezza documentale confronta questi nomi con il codice, ma non prova ciascun handler in un host reale.
+I seguenti **43** nomi sono registrazioni statiche `pi.registerCommand` nelle estensioni del candidato; la registrazione effettiva dipende dal pacchetto caricato. Digitare `/<nome>` nella REPL e chiedere aiuto prima di un'azione mutante. Il test di completezza documentale confronta questi nomi con il codice, ma non prova ciascun handler in un host reale.
 
 | Area | Comandi | Sorgente/guida |
 |---|---|---|
@@ -26,7 +26,7 @@ I seguenti **42** nomi sono registrazioni statiche `pi.registerCommand` nelle es
 | Modelli e governance | `/models`, `/model-profile`, `/model-role`, `/model-preset`, `/model-routing`, `/preset`, `/quality`, `/task-policy`, `/ai-tree`, `/council`, `/council-status` | [model routing](model-routing.md) |
 | Contesto e output | `/context-fit`, `/context-health`, `/rules`, `/output-stats`, `/tools`, `/trace-path` | [architecture](architecture.md), [observability](observability.md) |
 | File/coding | `/resources`, `/commit-plan`, `/edit-engine`, `/ast-edit`, `/lsp-write`, `/smart-read`, `/lsp-status`, `/debug-engine`, `/eval-engine`, `/artifacts` | [security](security.md), [LSP](lsp.md) |
-| Ricerca e memoria | `/web-status`, `/memory`, `/memory-status`, `/memory-search`, `/memory-recent`, `/memory-why` | [web](browser-and-web.md), [Second Brain](second-brain.md) |
+| Ricerca e memoria | `/web-status`, `/memory`, `/memory-status`, `/memory-last`, `/memory-search`, `/memory-recent`, `/memory-why` | [web](browser-and-web.md), [Second Brain](second-brain.md) |
 | Protezione runtime | `/sentinel`, `/stream-guard`, `/watchdog` | [security](security.md), [observability](observability.md) |
 
 Prompt registrati separatamente in [`prompts/`](../prompts): `/feature`, `/security`, `/review`, `/research`, `/docs`, `/doc-garden`, `/release`, `/code-gc`, `/refactor`, `/phi-bug-report`, `/perf`, `/migrate`. Sono template che inviano testo al modello selezionato; **possono consumare token o usare il provider configurato**. `/phi-bug-report <sintomo>` richiede ora un report read-only con fatti separati da ipotesi; la prova CLI offline è nel ledger. Il `/bug` integrato di Pi resta un altro comando. Nessun template è garanzia deterministica che un modello rispetti sempre l'istruzione: verificare output e consenso prima di condividere diagnostica.
@@ -45,7 +45,7 @@ Il tool pubblico è `web_research`; `safe_web_fetch` è distinto. [Web routing](
 
 ## Second Brain
 
-[`extensions/second-brain.ts`](../extensions/second-brain.ts) espone memoria, stato, ricerca, recenti e spiegazione; [guida Second Brain](second-brain.md) documenta OpenViking, Hindsight, embeddings locali, Memory Router, ACE, playbook/pack e persistenza. Il manager esistente è [`scripts/pi-overdrive-memory-services.sh`](../scripts/pi-overdrive-memory-services.sh); la CLI interattiva Linux lo prepara solo quando configurazione e unità fidate sono eleggibili. Stato `READY` non equivale a prova di scrittura/recupero dopo una nuova sessione. Test personale: usare un fatto innocuo univoco, leggere `/memory-status`, salvare e cercare tramite i comandi documentati, riaprire la REPL, verificare pertinenza e non condividere segreti. Non fermare servizi condivisi per simulare l'avvio a freddo.
+[`extensions/second-brain.ts`](../extensions/second-brain.ts) espone memoria, stato, riepilogo dell'ultimo recupero automatico (`/memory-last`), ricerca, recenti e spiegazione; il riepilogo conserva solo metadati della sessione e non può attestare l'uso semantico da parte del modello. [Guida Second Brain](second-brain.md) documenta OpenViking, Hindsight, embeddings locali, Memory Router, ACE, playbook/pack e persistenza. Il manager esistente è [`scripts/pi-overdrive-memory-services.sh`](../scripts/pi-overdrive-memory-services.sh); la CLI interattiva Linux lo prepara solo quando configurazione e unità fidate sono eleggibili. Stato `READY` non equivale a prova di scrittura/recupero dopo una nuova sessione. Test personale: usare un fatto innocuo univoco, leggere `/memory-status`, salvare e cercare tramite i comandi documentati, riaprire la REPL, verificare pertinenza e non condividere segreti. Non fermare servizi condivisi per simulare l'avvio a freddo.
 
 ## Servizi opzionali
 
@@ -63,7 +63,7 @@ Linux e Windows **non sono equivalenti**: consultare [platform matrix](phi-platf
 
 ## Copertura e limiti dell'inventario
 
-Snapshot del candidato: 33 file `extensions/*.ts`, 42 registrazioni statiche di slash command, 12 prompt template, 142 file `tests/*.test.mjs`. I moduli `lib/`, script `scripts/` e skill non sono tutti funzioni pubbliche: sono censiti tramite [`package.json`](../package.json), [architecture](architecture.md) e le guide collegate, non venduti come comandi. I comandi Pi built-in dipendono dalla versione installata e non sono duplicati qui. Questa è **copertura dell'interfaccia statica**, non un'attestazione completa di ogni test, script, host o provider. UNKNOWN: callability/costi dei provider, inferenza OmniRoute, salute futura dei servizi, ogni handler non provato nativamente, corrispondenza di un'installazione stabile diversa dal candidato. Per un problema concreto usare `/phi-bug-report`, poi [troubleshooting](troubleshooting.md).
+Snapshot del candidato: 33 file `extensions/*.ts`, 43 registrazioni statiche di slash command, 12 prompt template, 153 file `tests/*.test.mjs`. I moduli `lib/`, script `scripts/` e skill non sono tutti funzioni pubbliche: sono censiti tramite [`package.json`](../package.json), [architecture](architecture.md) e le guide collegate, non venduti come comandi. I comandi Pi built-in dipendono dalla versione installata e non sono duplicati qui. Questa è **copertura dell'interfaccia statica**, non un'attestazione completa di ogni test, script, host o provider. UNKNOWN: callability/costi dei provider, inferenza OmniRoute, salute futura dei servizi, ogni handler non provato nativamente, corrispondenza di un'installazione stabile diversa dal candidato. Per un problema concreto usare `/phi-bug-report`, poi [troubleshooting](troubleshooting.md).
 
 ## PHI — COMPLETE FEATURE TEST CHECKLIST
 
