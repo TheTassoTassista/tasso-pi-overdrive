@@ -18,9 +18,15 @@ import { ownedWindowsHelper } from '../platform/windows/process.mjs';
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
 const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.homedir(), '.pi', 'agent', 'npm', 'node_modules', 'pi-subagents');
-if (!runtimeRoot || !fs.existsSync(path.join(subagentRoot, 'index.ts'))) throw new Error('PHI_BOUNDED_TEST_RUNTIME_MISSING');
+const subagentManifestPath = path.join(subagentRoot, 'package.json');
+const subagentManifest = fs.existsSync(subagentManifestPath) ? JSON.parse(fs.readFileSync(subagentManifestPath, 'utf8')) : null;
+const subagentExport = subagentManifest?.exports?.['.'];
+const subagentEntryRelative = typeof subagentExport === 'string' ? subagentExport
+  : typeof subagentExport?.default === 'string' ? subagentExport.default
+    : typeof subagentManifest?.main === 'string' ? subagentManifest.main : 'index.js';
+const subagentEntry = path.resolve(subagentRoot, subagentEntryRelative);
+if (!runtimeRoot || !fs.existsSync(subagentEntry)) throw new Error('PHI_BOUNDED_TEST_RUNTIME_MISSING');
 const piManifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'package.json'), 'utf8'));
-const subagentManifest = JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'), 'utf8'));
 assert.equal(piManifest.version, '1.5.0');
 assert.equal(subagentManifest.version, '0.84.0');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-bounded-normal-pi-'));
@@ -148,7 +154,7 @@ try {
   }
   const piEntry = path.join(runtimeRoot, piManifest.bin.pi);
   const args = [piEntry, '-ne', '--offline', '--approve', '--no-session', '--mode', 'rpc',
-    '--extension', fixtureProvider, '--extension', path.join(subagentRoot, 'index.ts'),
+    '--extension', fixtureProvider, '--extension', subagentEntry,
     '--extension', path.join(sourceRoot, 'extensions', 'secure-workflow.ts'),
     '--provider', 'openai-codex', '--model', 'gpt-6-luna', '--api-key', 'offline-fixture-not-a-credential',
     '--tools', 'secure_coding_workflow'];

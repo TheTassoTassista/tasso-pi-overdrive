@@ -33,7 +33,7 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
     pi.events.emit("pi-overdrive:artifact-metadata", { kind: "artifact_retention", status: pruned.status, scannedArtifacts: pruned.scannedArtifacts, removedArtifacts: pruned.removedArtifacts, scannedOrphans: pruned.scannedOrphans, removedOrphans: pruned.removedOrphans, skipped: pruned.skipped, capped: pruned.capped });
   });
 
-  pi.on("before_agent_start", (event) => { taskDigest = event.messageType === "user" ? digest(event.prompt) : ""; });
+  pi.on("before_agent_start", (event) => { taskDigest = digest(event.prompt); });
 
   pi.on("tool_result", async (event) => {
     if (event.toolName === "resource_fs" && /^artifact:\/\//iu.test(String(event.input?.uri ?? ""))) return undefined;
