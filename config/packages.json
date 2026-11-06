@@ -1,9 +1,9 @@
 {
-  "piVersion": "0.87.1",
+  "piVersion": "1.5.0",
   "selected": [
     "npm:@ff-labs/pi-fff@0.10.6",
     "npm:@juvio15/pi-ast-grep@0.4.2",
-    "npm:pi-subagents@0.66.0",
+    "npm:pi-subagents@0.84.0",
     "npm:@juicesharp/rpiv-web-tools@2.9.0",
     "npm:pi-agent-browser-native@0.6.6",
     "npm:@juicesharp/rpiv-ask-user-question@2.9.0",

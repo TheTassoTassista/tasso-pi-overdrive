@@ -58,6 +58,11 @@ export default function directorMode(pi: ExtensionAPI): void {
 
   pi.on("before_agent_start", (event, ctx) => {
     if (!state) return undefined;
+    if (event.messageType !== "user") {
+      pi.setActiveTools(pi.getAllTools().some((tool) => tool.name === "read") ? ["read"] : []);
+      publish("POLICY_MISMATCH", "TASK_POLICY_MISMATCH", pi.getActiveTools().length);
+      return { systemPrompt: `${event.systemPrompt}\n\nPolicy binding failed. Do not act; report DIRECTOR_TASK_POLICY_MISMATCH.` };
+    }
     try {
       const stored = readModelPolicy();
       const preset = stored.preset === "custom" ? stored.basePreset : stored.preset;

@@ -8,9 +8,21 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmRoot = path.resolve(path.dirname(process.execPath), '..', 'lib', 'node_modules');
 const piRoot = process.env.PI_PACKAGE_ROOT || path.join(npmRoot, '@earendil-works', 'pi-coding-agent');
 const piModules = path.join(piRoot, 'node_modules');
+const hoistedModules = path.resolve(piRoot, '..', '..');
 const tsc = process.env.PI_OVERDRIVE_TSC || path.join(root, 'runtime', 'lsp', 'node_modules', '.bin', 'tsc');
-for (const required of [piRoot, piModules, tsc]) {
+for (const required of [piRoot, tsc]) {
   if (!existsSync(required)) throw new Error(`typecheck dependency missing: ${required}`);
+}
+const piVersion = JSON.parse(readFileSync(path.join(piRoot, 'package.json'), 'utf8')).version;
+function piDependency(name, version) {
+  const candidates = [path.join(piModules, name), path.join(hoistedModules, name)];
+  for (const candidate of candidates) {
+    if (!existsSync(path.join(candidate, 'package.json'))) continue;
+    const manifest = JSON.parse(readFileSync(path.join(candidate, 'package.json'), 'utf8'));
+    if (manifest.name !== name || (version && manifest.version !== version)) throw new Error(`typecheck dependency mismatch: ${name}`);
+    return candidate;
+  }
+  throw new Error(`typecheck dependency missing: ${name}`);
 }
 
 const temp = mkdtempSync(path.join(tmpdir(), 'pi-overdrive-typecheck-'));
@@ -23,11 +35,11 @@ try {
   mkdirSync(path.join(modules, '@earendil-works'), { recursive: true });
   symlinkSync(piRoot, path.join(modules, '@earendil-works', 'pi-coding-agent'), 'dir');
   for (const name of ['pi-ai', 'pi-agent-core', 'pi-tui']) {
-    symlinkSync(path.join(piModules, '@earendil-works', name), path.join(modules, '@earendil-works', name), 'dir');
+    symlinkSync(piDependency(`@earendil-works/${name}`, piVersion), path.join(modules, '@earendil-works', name), 'dir');
   }
   for (const name of ['typebox', '@types']) {
-    const source = path.join(piModules, name);
-    if (existsSync(source)) symlinkSync(source, path.join(modules, name), 'dir');
+    const source = [path.join(piModules, name), path.join(hoistedModules, name)].find(existsSync);
+    if (source) symlinkSync(source, path.join(modules, name), 'dir');
   }
   const config = JSON.parse(readFileSync(path.join(project, 'tsconfig.json'), 'utf8'));
   config.compilerOptions.typeRoots = [path.join(modules, '@types')];

@@ -50,6 +50,7 @@ export default function secondBrainExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    if (event.messageType !== "user") return undefined;
     try {
       const stored = readModelPolicy();
       const taskPolicy = resolveTaskPolicy({

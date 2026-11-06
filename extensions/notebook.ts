@@ -4,6 +4,10 @@ import { Type } from "typebox";
 
 const ENTRY_TYPE = "tasso-pi-overdrive.notebook";
 const MAX_NOTEBOOK_CHARS = 12000;
+const NOTEBOOK_SECTIONS = ["decisions", "constraints", "evidence", "next"] as const;
+function isNotebookSection(value: unknown): value is (typeof NOTEBOOK_SECTIONS)[number] {
+  return typeof value === "string" && NOTEBOOK_SECTIONS.some((section) => section === value);
+}
 
 interface NotebookState {
   topic?: string;
@@ -69,11 +73,11 @@ export default function (pi: ExtensionAPI) {
         state.goal = params.text.trim();
         message = "Goal updated";
       } else if (params.action === "add") {
-        if (!params.section || !params.text?.trim()) throw new Error("section and text are required");
+        if (!isNotebookSection(params.section) || !params.text?.trim()) throw new Error("section and text are required");
         state[params.section].push(params.text.trim());
         message = `Added ${params.section} item`;
       } else if (params.action === "remove") {
-        if (!params.section || params.index === undefined) throw new Error("section and index are required");
+        if (!isNotebookSection(params.section) || params.index === undefined) throw new Error("section and index are required");
         const removed = state[params.section].splice(params.index - 1, 1);
         if (removed.length === 0) throw new Error("index is out of range");
         message = `Removed ${params.section} item`;

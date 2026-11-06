@@ -28,8 +28,8 @@ const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.h
 if (!piRoot || !fs.existsSync(path.join(subagentRoot, 'index.ts'))) throw new Error('PHI_D_WIDE_RUNTIME_MISSING');
 const piManifest = JSON.parse(fs.readFileSync(path.join(piRoot, 'package.json'), 'utf8'));
 const subagentManifest = JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'), 'utf8'));
-assert.equal(piManifest.version, '0.87.1');
-assert.equal(subagentManifest.version, '0.66.0');
+assert.equal(piManifest.version, '1.5.0');
+assert.equal(subagentManifest.version, '0.84.0');
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), autonomyCrashMode ? 'phi-e3-crash-' : restartMode ? 'phi-d-restart-' : 'phi-d-wide-'));
 const project = path.join(temp, 'project');

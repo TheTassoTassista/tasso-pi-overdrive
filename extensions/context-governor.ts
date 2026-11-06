@@ -53,6 +53,7 @@ export default function contextGovernorExtension(pi: ExtensionAPI): void {
   };
 
   pi.on("before_agent_start", (event, ctx) => {
+    if (event.messageType !== "user") return undefined;
     try {
       const pack = rulesFor(ctx.cwd).buildPack({ task: event.prompt });
       const metadata = rulePackMetadata(pack);

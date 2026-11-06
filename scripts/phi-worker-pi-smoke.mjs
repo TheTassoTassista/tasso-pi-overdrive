@@ -21,8 +21,8 @@ if (revokedControl && lspControl) throw new Error('PHI_WORKER_TEST_USAGE');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
 const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.homedir(), '.pi', 'agent', 'npm', 'node_modules', 'pi-subagents');
 if (!runtimeRoot) throw new Error('PHI_WORKER_TEST_PI_REQUIRED');
-assert.equal(JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'package.json'))).version, '0.87.1');
-assert.equal(JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'))).version, '0.66.0');
+assert.equal(JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'package.json'))).version, '1.5.0');
+assert.equal(JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'))).version, '0.84.0');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-worker-real-pi-'));
 const project = path.join(temporary, 'project'), agentDir = path.join(temporary, 'agent');
 const savedAgentDir = process.env.PI_CODING_AGENT_DIR, savedFetch = globalThis.fetch;
@@ -53,7 +53,7 @@ try {
     const directory = runtimeRequire.resolve.paths(name).map(base => path.join(base, name)).find(candidate => fs.existsSync(path.join(candidate, 'package.json')));
     assert.ok(directory, 'Required installed Pi module missing');
     const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'package.json')));
-    assert.equal(metadata.version, '0.87.1');
+    assert.equal(metadata.version, '1.5.0');
     return path.join(directory, metadata.main);
   };
   const aliases = Object.fromEntries(['pi-coding-agent', 'pi-ai', 'pi-agent-core', 'pi-tui'].map(name => {
@@ -188,7 +188,7 @@ try {
   await child.dispose(); child = undefined; await factory.dispose(); factory = undefined;
   assert.throws(() => windowsWorkerAuthority(sessionId), /AUTHORITY_UNAVAILABLE/u);
   assert.equal(externalRequests, 0);
-  report = { status: 'PASS', platform: process.platform, piVersion: '0.87.1', subagentsVersion: '0.66.0',
+  report = { status: 'PASS', platform: process.platform, piVersion: '1.5.0', subagentsVersion: '0.84.0',
     proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? lspControl ? 'REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB' : 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
     foregroundExitCode: foregroundResult.exitCode,
     boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts,

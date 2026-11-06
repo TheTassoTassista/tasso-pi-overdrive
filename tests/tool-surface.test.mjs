@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CORE_TOOLS, hasExplicitBackgroundWorkerSafeExec, selectInitialToolSurface } from "../extensions/tool-surface.ts";
+import toolSurface, { CORE_TOOLS, hasExplicitBackgroundWorkerSafeExec, selectInitialToolSurface } from "../extensions/tool-surface.ts";
 
 test("default surface is reduced to the compact core plus one MCP proxy", () => {
   const all = [...CORE_TOOLS, "edit", "bash", "fffind", "agent_browser", "subagent"];
@@ -30,4 +30,21 @@ test("only an explicit background Worker SDK surface can preserve safe_exec", ()
   assert.equal(hasExplicitBackgroundWorkerSafeExec({ ...base, systemPrompt: '<active_agent name="tester"/>' }), false);
   assert.equal(hasExplicitBackgroundWorkerSafeExec({ ...base, environment: { PI_SUBAGENT_CHILD: "1", PI_SUBAGENT_RUNNER_PID: "9999" } }), false);
   assert.equal(hasExplicitBackgroundWorkerSafeExec({ ...base, environment: {} }), false);
+});
+
+test("Pi 1.5 custom start events cannot retain mutating tools", () => {
+  const hooks = new Map();
+  let active = ["read", "write", "safe_exec"];
+  const pi = {
+    on: (event, handler) => hooks.set(event, handler),
+    getActiveTools: () => [...active],
+    getAllTools: () => active.map((name) => ({ name })),
+    setActiveTools: (tools) => { active = [...tools]; },
+    registerCommand: () => {},
+  };
+  toolSurface(pi);
+  const status = [];
+  hooks.get("before_agent_start")({ messageType: "custom", systemPrompt: "fixture" }, { ui: { setStatus: (...args) => status.push(args) } });
+  assert.deepEqual(active, ["read"]);
+  assert.deepEqual(status, [["tool-governor", "tools: custom event read-only"]]);
 });

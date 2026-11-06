@@ -73,7 +73,7 @@ export function requiredExecutableInventory(root = '/') {
     ['npm', '/usr/bin/npm', ['--version'], 'Pi and managed-runtime package validation'],
     ['tar', '/usr/bin/tar', ['--version'], 'fixture and package extraction'],
     ['pi-cli', '/opt/phi/pi/npm/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js',
-      ['--version'], 'Pi 0.87.1 ordinary agent runtime'],
+      ['--version'], 'Pi 1.5.0 ordinary agent runtime'],
     ['ast-grep', '/opt/phi/pi/npm/node_modules/@ast-grep/cli-linux-x64-gnu/ast-grep',
       ['--version'], 'agent AST edit and search', ast.binarySha256],
     ['tsc', '/opt/phi/runtime/lsp/node_modules/.bin/tsc', ['--version'],
@@ -99,7 +99,7 @@ export function requiredExecutableInventory(root = '/') {
     prlimit: '2.42.4', cmp: '3.12', rustc: '1.98.1', cargo: '1.98.1',
     'ld.lld': '22.1.8', clangd: '22.1.8', 'agent-browser': '0.36.0',
     chrome: '152.0.7977.82', 'rust-analyzer': managed.rustAnalyzer.version,
-    gopls: managed.gopls.version, go: managed.go.version, 'pi-cli': '0.87.1',
+    gopls: managed.gopls.version, go: managed.go.version, 'pi-cli': '1.5.0',
     'ast-grep': '0.45.3', tsc: '6.0.3' };
   return entries.map(([id, binary, versionArgs, reason, expectedSha256]) => ({
     id, path: binary, expectedPath: binary, versionArgs, reason,

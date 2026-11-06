@@ -42,6 +42,7 @@ export default function smartReadExtension(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => { currentCwd = ctx.cwd; });
 
   pi.on("before_agent_start", (event, ctx) => {
+    if (event.messageType !== "user") { taskContext = ""; taskPolicyDigest = ""; return; }
     currentCwd = ctx.cwd;
     taskContext = event.prompt;
     try {

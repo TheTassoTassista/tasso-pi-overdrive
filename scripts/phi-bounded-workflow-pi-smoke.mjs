@@ -21,8 +21,8 @@ const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.h
 if (!runtimeRoot || !fs.existsSync(path.join(subagentRoot, 'index.ts'))) throw new Error('PHI_BOUNDED_TEST_RUNTIME_MISSING');
 const piManifest = JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'package.json'), 'utf8'));
 const subagentManifest = JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'), 'utf8'));
-assert.equal(piManifest.version, '0.87.1');
-assert.equal(subagentManifest.version, '0.66.0');
+assert.equal(piManifest.version, '1.5.0');
+assert.equal(subagentManifest.version, '0.84.0');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-bounded-normal-pi-'));
 const project = path.join(temp, 'project');
 const agentDir = path.join(temp, 'agent');

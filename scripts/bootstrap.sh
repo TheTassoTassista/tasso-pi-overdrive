@@ -32,7 +32,7 @@ web_manifest="$agent_dir/tasso-pi-overdrive-web-install.json"
 model_policy_root=${XDG_CONFIG_HOME:-"$HOME/.config"}
 model_policy="$model_policy_root/pi-overdrive/model-policy.json"
 model_callability="$model_policy_root/pi-overdrive/model-callability.json"
-required_pi=0.87.1
+required_pi=1.5.0
 
 installed_pi=$($pi_bin --version | tr -d '[:space:]')
 if [[ "$installed_pi" != "$required_pi" ]]; then

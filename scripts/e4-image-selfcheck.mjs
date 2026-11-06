@@ -329,13 +329,13 @@ if (trustedSmokeMode) {
   command('/opt/phi/browser/agent-browser-0.36.0/agent-browser', ['--version'], /agent-browser 0\.36\.0/u);
   command('/opt/phi/browser/chrome-152.0.7977.82/chrome', ['--version'], /Chrome for Testing 152\.0\.7977\.82/u);
 
-  const pi = packageVersion('@earendil-works/pi-coding-agent', '0.87.1');
-  const subagents = packageVersion('pi-subagents', '0.66.0');
+  const pi = packageVersion('@earendil-works/pi-coding-agent', '1.5.0');
+  const subagents = packageVersion('pi-subagents', '0.84.0');
   const jiti = packageVersion('jiti', '2.7.0');
   const lock = read('pi-package-lock.json');
   for (const [name, folder, version] of [
-    ['@earendil-works/pi-coding-agent', pi, '0.87.1'],
-    ['pi-subagents', subagents, '0.66.0'],
+    ['@earendil-works/pi-coding-agent', pi, '1.5.0'],
+    ['pi-subagents', subagents, '0.84.0'],
     ['jiti', jiti, '2.7.0'],
   ]) {
     const relative = path.relative(path.join(root, 'pi', 'npm'), folder).replaceAll(path.sep, '/');

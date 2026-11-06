@@ -2,7 +2,7 @@
   "version": 1,
   "enabled": true,
   "protocolVersion": 1,
-  "expectedPiVersion": "0.87.1",
+  "expectedPiVersion": "1.5.0",
   "maxSessions": 1,
   "maxConcurrentPrompts": 1,
   "maxFrameBytes": 65536,

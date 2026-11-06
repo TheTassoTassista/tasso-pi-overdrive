@@ -85,6 +85,11 @@ export default function toolSurface(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", (event, ctx) => {
+    if (event.messageType !== "user") {
+      pi.setActiveTools(pi.getAllTools().some((tool) => tool.name === "read") ? ["read"] : []);
+      ctx.ui.setStatus("tool-governor", "tools: custom event read-only");
+      return undefined;
+    }
     if (mode !== "auto") {
       ctx.ui.setStatus("tool-governor", `tools: ${mode} (${pi.getActiveTools().length})`);
       return undefined;

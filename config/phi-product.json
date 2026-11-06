@@ -3,7 +3,7 @@
   "symbol": "Φ",
   "command": "phi",
   "version": "1.0.0",
-  "piVersion": "0.87.1",
+  "piVersion": "1.5.0",
   "nodeMinimum": "22.19.0",
   "defaultTheme": "midnight-violet",
   "phase": "portable-foundation",
