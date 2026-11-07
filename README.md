@@ -1,5 +1,7 @@
 # Φ Phi
 
+Per la storia del progetto, lo stato dei gate e le istruzioni per continuarlo, vedere [Phi: storia e guida alla continuazione](docs/PHI_PUBLIC_HANDOFF.md).
+
 An intelligent coding system powered by the Pi runtime. Phi combines efficient GPT-6 routing, governed tools and delegated roles, isolated coding worktrees, verifiable reviews, and a local-first Second Brain.
 
 The product is **Phi**. The command is **`phi`**. Pi is the underlying runtime, not a second application you need to configure independently.
@@ -8,7 +10,7 @@ The product is **Phi**. The command is **`phi`**. Pi is the underlying runtime, 
 
 The complete coding engine is verified on Linux x86_64. Native Windows portability is being implemented in this same repository; **Windows autonomous execution is currently blocked**, not run unsandboxed. No WSL is required or proposed. See [platform status](docs/phi-platform-matrix.md) and [progress](docs/phi-progress.md) for the exact checkpoint.
 
-Phi 1.0.0 development candidate uses pinned Pi 1.5.0 and Node >=22.19.0. It is private/unpublished; this is not a published cross-platform release.
+Phi 1.0.0 development candidate uses pinned Pi 1.5.0 and Node >=22.19.0. This is not a published cross-platform release.
 
 ## Start and customize
 

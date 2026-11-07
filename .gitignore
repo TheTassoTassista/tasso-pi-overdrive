@@ -10,3 +10,6 @@ runtime/dap/.install-*/
 /.phi-cache/
 .env
 .env.*
+**/__pycache__/
+/certification/pi/node_modules/
+/logs/
