@@ -16,6 +16,7 @@ import {
 export const CORE_TOOLS = Object.freeze([
   "read",
   "transactional_edit",
+  "create_file",
   "write",
   "secure_coding_workflow",
   "mcp",

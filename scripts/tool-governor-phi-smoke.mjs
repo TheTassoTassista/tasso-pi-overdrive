@@ -88,6 +88,19 @@ async function invoke({ name, cwd, message, sequence, extraArgs = [] }) {
 
 const result = { status: "FAIL", piVersion: piPackage.version, providerCalls: 0, scenarios: [] };
 try {
+	const createDir = path.join(temp, "allowed-create");
+	fs.mkdirSync(createDir, { mode: 0o700 });
+	const createEvents = await invoke({ name: "allowed-create", cwd: createDir, message: "Crea un file index.html per il progetto.", sequence: [{ name: "create_file", args: { path: "index.html", content: "<h1>Offline fixture</h1>\n" } }] });
+	const createSurface = readAudit().findLast((row) => row.kind === "tool_governor_surface");
+	const created = createEvents.find((event) => event.type === "tool_execution_end" && event.toolName === "create_file");
+	assert.ok(createSurface?.activeTools.includes("create_file"), "creation intent must activate the guarded creation tool");
+	assert.equal(created?.isError, false);
+	assert.equal(fs.readFileSync(path.join(createDir, "index.html"), "utf8"), "<h1>Offline fixture</h1>\n");
+	const overwriteEvents = await invoke({ name: "overwrite-denied", cwd: createDir, message: "Crea un file index.html per il progetto.", sequence: [{ name: "create_file", args: { path: "index.html", content: "overwrite" } }] });
+	assert.equal(overwriteEvents.find((event) => event.type === "tool_execution_end" && event.toolName === "create_file")?.isError, true);
+	assert.equal(fs.readFileSync(path.join(createDir, "index.html"), "utf8"), "<h1>Offline fixture</h1>\n");
+	result.scenarios.push({ name: "create-file-allowed-no-overwrite", status: "PASS", active: true, creation: true, overwriteDenied: true });
+
 	const editDir = path.join(temp, "allowed-edit");
 	fs.mkdirSync(editDir, { mode: 0o700 });
 	fs.writeFileSync(path.join(editDir, "sample.ts"), "const value = 1;\n", { mode: 0o600 });
@@ -169,7 +182,7 @@ try {
 	result.scenarios.push({ name: "mutating-tool-invalid-transaction-denied", status: "PASS", invocable: true, invalidAuthorityRejected: staleEnd?.isError === true, fileUnchanged: true });
 
 	result.providerCalls = readAudit().filter((row) => row.kind === "fixture_provider_turn").length;
-	assert.equal(result.providerCalls, editEnds.length + 1 + 2 + 2, "all model turns came from the local deterministic stream fixture");
+	assert.equal(result.providerCalls, 10, "all model turns came from the local deterministic stream fixture");
 	result.status = "PASS";
 } catch (error) {
 	result.failure = error instanceof Error ? error.message : "PHI_G1_SMOKE_FAILED";

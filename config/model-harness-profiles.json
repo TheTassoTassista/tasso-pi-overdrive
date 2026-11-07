@@ -5,6 +5,7 @@
     "toolConstraints": {
       "deniedTools": [
         "transactional_edit",
+        "create_file",
         "edit",
         "write",
         "transactional_ast_edit",

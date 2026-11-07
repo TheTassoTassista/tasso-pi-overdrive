@@ -1,5 +1,9 @@
 # Phi implementation ledger
 
+## 2026-11-07 — Candidate creation and passive memory
+
+Natural-language creation requests no longer fall through to a read-only surface: `create_file` creates a workspace file without overwriting, while `transactional_edit` remains the existing-file path. The isolated Phi→Pi RPC fixture passed creation, overwrite denial and existing edit. Second Brain records bounded direct preferences in the private ledger automatically, and a new-session fixture retrieved one; the splash now says `auto (conditional)`. No automatic full-transcript storage or remote memory publication. Candidate only; stable Phi and the Undici release gate unchanged.
+
 ## 2026-11-06 — Pi upstream security freeze (single registry check)
 
 The official npm `latest` metadata for `@earendil-works/pi-coding-agent` still identifies **1.5.0**, tarball integrity `sha512-xNDZ5kqowO6Z03FS2gwAkPEGk1ssxVcYKQ6qZId84mFEvwACvvyc2l0vAMOS+c5zvxLRMLBE9r4y44IGYkMJaQ==`; no newer official Pi artifact was found in this check. The candidate remains at Pi 1.5.0 / pi-subagents 0.84.0, HEAD `91a6d38adcb0b2e237aa808b5be8327b24c8c5d1`. Undici 8.12.3 in the distributed bundle remains inside the six November advisory ranges, so **RELEASE_BLOCKED**. Independent gates not closed by this freeze: fresh candidate production-equivalent conditional Worker tools, native Windows validation, and separate stable-promotion authority. No tests, product changes, installation or promotion in this checkpoint.

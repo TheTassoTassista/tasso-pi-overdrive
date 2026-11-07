@@ -1,5 +1,9 @@
 # Phi — Session Continuation
 
+## 2026-11-07 — Candidate file creation and bounded passive memory
+
+Reproduced read-only tool selection for “creare un file index.html” and “Scrivi index.html”. The existing transactional editor needs an existing read snapshot; the model profile suppresses raw `write`. The candidate now uses a no-overwrite `create_file` tool under workspace/protected-path policy and keeps existing-file edits transactional. Real isolated Phi→Pi 1.5 RPC fixture created `index.html`, rejected overwrite, preserved existing edit and negative tool gates: PASS, 10 offline fixture turns. Second Brain now displays `auto (conditional)` and its prompt hook saves only bounded direct user declarations to the private local ledger without `/memory`; a new-session ledger→pack fixture retrieved the preference. It does not record arbitrary conversation or publish automatic captures to OpenViking/Hindsight. Stable Phi unchanged; Pi/Undici release block unchanged. G1 delegated Worker authority remains partial.
+
 ## 2026-11-06 — Frozen Pi 1.5 candidate; wait for official upstream fix
 
 At branch `feature/phi-optional-services-startup`, HEAD `91a6d38adcb0b2e237aa808b5be8327b24c8c5d1`, index clean. Existing unstaged ledgers and untracked logs/caches preserved. One official npm `latest` check returned Pi 1.5.0 with tarball integrity `sha512-xNDZ5kqowO6Z03FS2gwAkPEGk1ssxVcYKQ6qZId84mFEvwACvvyc2l0vAMOS+c5zvxLRMLBE9r4y44IGYkMJaQ==`; there is no newer artifact to validate now. Undici 8.12.3 remains within six 2026-11-05 advisory ranges requiring 8.12.4. **WAITING_FOR_UPSTREAM_SECURITY_FIX**; no repeated tests or candidate-code changes.

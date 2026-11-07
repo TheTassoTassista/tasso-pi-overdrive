@@ -5,6 +5,7 @@ import { availableContextFromPiUsage, resolveTaskPolicy } from "../lib/task-gove
 import { createSecondBrainRuntime, secondBrainHealth } from "../lib/second-brain-runtime.mjs";
 import { syncObsidianVault } from "../lib/obsidian-sync.mjs";
 import { createMemorySessionSummaryStore } from "../lib/memory-session-summary.mjs";
+import { extractPassiveUserMemory } from "../lib/passive-memory.mjs";
 
 const MEMORY_MESSAGE = "tasso-pi-overdrive.second-brain";
 const retrievalSummary = createMemorySessionSummaryStore();
@@ -53,6 +54,18 @@ export default function secondBrainExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
+    try {
+      const candidate = extractPassiveUserMemory(event.prompt);
+      if (candidate) {
+        const active = runtimeFor(ctx, pi);
+        const result = active.ledger.accept({ ...candidate, project: active.projectId, source: "direct user declaration" });
+        pi.events.emit("pi-overdrive:memory-metadata", { kind: "passive_memory_capture", accepted: result.status === "ACCEPTED", reason: result.reason ?? null });
+        // The private ledger is the durable local source. Automatic capture
+        // must not trigger a network publication or delay the coding turn.
+      }
+    } catch {
+      pi.events.emit("pi-overdrive:memory-metadata", { kind: "passive_memory_capture", accepted: false, reason: "unavailable" });
+    }
     try {
       const stored = readModelPolicy();
       const taskPolicy = resolveTaskPolicy({

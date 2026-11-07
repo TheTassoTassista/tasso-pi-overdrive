@@ -7,6 +7,7 @@ import { Type } from "typebox";
 import { readAstEditPolicy, TransactionalAstEdit } from "../lib/ast-edit-engine.mjs";
 import { AST_EDIT_CONTRACT, EDIT_CONTRACT, EditEngine, editRecoveryGuidance, type EditEngineError, snapshotFooter } from "../lib/edit-engine.mjs";
 import { LspWriteGuard } from "../lib/lsp-write-guard.mjs";
+import { createWorkspaceFile } from "../lib/create-file.mjs";
 
 const Action = Type.Union([Type.Literal("preview"), Type.Literal("apply")]);
 const Replacement = Type.Object({
@@ -83,6 +84,21 @@ function evidenceFor(event: any) {
 }
 
 export default function editEngineExtension(pi: ExtensionAPI): void {
+  pi.registerTool({
+    name: "create_file",
+    label: "Create file",
+    description: "Create a new workspace file without overwriting an existing path. Parent directory must already exist; protected paths and symlinks are refused.",
+    parameters: Type.Object({ path: Type.String({ minLength: 1 }), content: Type.String({ maxLength: 524288 }) }),
+    execute: async (_toolCallId, parameters, signal, _update, ctx) => {
+      try {
+        if (signal?.aborted) throw new Error("CREATE_FILE_ABORTED");
+        const result = createWorkspaceFile(ctx.cwd, parameters.path, parameters.content);
+        return { content: [{ type: "text" as const, text: `File created (${result.bytes} bytes).` }], details: result };
+      } catch (error) {
+        return { content: [{ type: "text" as const, text: safeCode(error) }], details: { status: "DENIED" }, isError: true };
+      }
+    },
+  });
   let engine: EditEngine | undefined;
   let astEngine: TransactionalAstEdit | undefined;
   let writeGuard: LspWriteGuard | undefined;
