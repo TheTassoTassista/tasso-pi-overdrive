@@ -14,10 +14,11 @@ import { resolveTaskPolicy } from '../lib/task-governor.mjs';
 import { reserveWindowsWorker, registerWindowsWorkerBoundary, windowsWorkerAuthority } from '../lib/phi-worker-authority.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-if (process.argv.slice(2).some(argument => !['--revocation','--lsp'].includes(argument))) throw new Error('PHI_WORKER_TEST_USAGE');
+if (process.argv.slice(2).some(argument => !['--revocation','--lsp','--conditional-tools'].includes(argument))) throw new Error('PHI_WORKER_TEST_USAGE');
 const revokedControl = process.argv.includes('--revocation');
 const lspControl = process.argv.includes('--lsp');
-if (revokedControl && lspControl) throw new Error('PHI_WORKER_TEST_USAGE');
+const conditionalControl = process.argv.includes('--conditional-tools');
+if ([revokedControl, lspControl, conditionalControl].filter(Boolean).length > 1) throw new Error('PHI_WORKER_TEST_USAGE');
 const runtimeRoot = process.env.PHI_WORKER_TEST_PI_ROOT ?? discoverPiRuntime()?.root;
 const subagentRoot = process.env.PHI_WORKER_TEST_SUBAGENT_ROOT ?? path.join(os.homedir(), '.pi', 'agent', 'npm', 'node_modules', 'pi-subagents');
 if (!runtimeRoot) throw new Error('PHI_WORKER_TEST_PI_REQUIRED');
@@ -25,7 +26,7 @@ assert.equal(JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'package.json')))
 assert.equal(JSON.parse(fs.readFileSync(path.join(subagentRoot, 'package.json'))).version, '0.84.0');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'phi-worker-real-pi-'));
 const project = path.join(temporary, 'project'), agentDir = path.join(temporary, 'agent');
-const savedAgentDir = process.env.PI_CODING_AGENT_DIR, savedFetch = globalThis.fetch;
+const savedAgentDir = process.env.PI_CODING_AGENT_DIR, savedModelPolicy = process.env.PI_OVERDRIVE_MODEL_POLICY, savedFetch = globalThis.fetch;
 let externalRequests = 0, factory, child, reservation, sessionId;
 let revocationBefore;
 let report = { status: 'FAIL', platform: process.platform, externalProviderCalls: 0 };
@@ -33,6 +34,7 @@ try {
   fs.mkdirSync(project); fs.mkdirSync(agentDir, { mode: 0o700 });
   fs.writeFileSync(path.join(agentDir, 'settings.json'), '{}');
   fs.writeFileSync(path.join(project, 'input.txt'), 'source');
+  if (conditionalControl) fs.writeFileSync(path.join(project, '.env'), 'FIXTURE_ONLY=not-a-secret\n', { mode: 0o600 });
   fs.writeFileSync(path.join(project, 'run.cjs'), "const f=require('node:fs'),p=require('node:path'),a=require('node:assert/strict');f.writeFileSync('input.txt','snapshot-edit');a.equal(f.readFileSync('input.txt','utf8'),'snapshot-edit');a.throws(()=>f.readFileSync(p.join(p.dirname(process.cwd()),'private','control.txt')),e=>['EACCES','EPERM'].includes(e.code));console.log(JSON.stringify({edited:true,denied:true,pid:process.pid}));");
   fs.writeFileSync(path.join(project, 'read.cjs'), "require('node:assert/strict').equal(require('node:fs').readFileSync('input.txt','utf8'),'snapshot-edit');console.log(JSON.stringify({persisted:true,pid:process.pid}));");
   fs.writeFileSync(path.join(project, 'fail.cjs'), "require('node:fs').writeFileSync('input.txt','corrupt');console.error('FATAL discard partial draft');process.exit(73);");
@@ -44,6 +46,11 @@ try {
   }
   assert.equal(spawnSync('git', ['init', '--quiet', project], { shell: false }).status, 0);
   process.env.PI_CODING_AGENT_DIR = agentDir;
+  if (conditionalControl) {
+    const policyPath = path.join(temporary, 'model-policy.json');
+    fs.writeFileSync(policyPath, `${JSON.stringify({ version: 2, preset: 'normal', basePreset: 'normal', overrides: {} })}\n`, { mode: 0o600 });
+    process.env.PI_OVERDRIVE_MODEL_POLICY = policyPath;
+  }
   globalThis.fetch = async () => { externalRequests++; throw new Error('PHI_WORKER_TEST_EXTERNAL_REQUEST_DENIED'); };
   const pi = await import(pathToFileURL(path.join(runtimeRoot, 'dist', 'index.js')).href);
   const require = createRequire(path.join(subagentRoot, 'package.json'));
@@ -67,12 +74,19 @@ try {
     '@earendil-works/pi-agent-core/node': path.join(path.dirname(aliases['@earendil-works/pi-agent-core']), 'node.js'),
     ...aliases,
   } });
-  const { createDefaultChildSessionFactory } = await jiti.import(path.join(subagentRoot, 'src', 'runs', 'shared', 'child-session.ts'));
-  const { runSync } = await jiti.import(path.join(subagentRoot, 'src', 'runs', 'foreground', 'execution.ts'));
+  const installedModule = (relative) => {
+    const base = path.join(subagentRoot, 'src', 'runs', relative);
+    const candidate = fs.existsSync(`${base}.js`) ? `${base}.js` : `${base}.ts`;
+    assert.ok(fs.existsSync(candidate), `Installed subagent module unavailable: ${relative}`);
+    return candidate;
+  };
+  const { createDefaultChildSessionFactory } = await jiti.import(installedModule('shared/child-session'));
+  const { runSync } = await jiti.import(installedModule('foreground/execution'));
   const ai = await import(pathToFileURL(runtimeModule('@earendil-works/pi-ai')).href);
   const errors = [], receipts = [];
   let turns = 0, boundEvents = 0;
-  const task = 'Run run.cjs in the approved snapshot only and report its result; do not modify or publish host files';
+  const conditionalSurface = [];
+  const task = conditionalControl ? 'Debug the fixture race in queue.ts, evaluate a simple calculation, and do not change protected files' : 'Run run.cjs in the approved snapshot only and report its result; do not modify or publish host files';
   const parentSessionId = randomUUID(), executionId = randomUUID();
   reservation = reserveWindowsWorker({ executionId, parentSessionId, cwd: project, task,
     taskPolicy: resolveTaskPolicy({ task: 'Fix and test a bounded function in module.cjs' }) });
@@ -83,16 +97,19 @@ try {
   }) });
   const localProvider = { name: 'phi-worker-local-provider', factory: (api) => {
     if (process.platform !== 'win32') registerWindowsWorkerBoundary(api); // Linux proves binding only, never Windows execution.
+    if (conditionalControl) api.events.on('pi-overdrive:tool-metadata', row => { if (['tool_governor_failure', 'tool_governor_surface', 'model_harness_profile'].includes(row?.kind)) conditionalSurface.push({ metadataKind: row.kind, activeTools: row.activeTools, deniedTools: row.deniedTools }); });
     api.on('before_agent_start', (_event, ctx) => {
       assert.ok(windowsWorkerAuthority(ctx.sessionManager.getSessionId())); boundEvents++;
+      if (conditionalControl) conditionalSurface.push({ available: api.getAllTools().map(tool => tool.name), active: api.getActiveTools() });
     });
     api.events.on('pi-overdrive:execution-metadata', row => receipts.push(row));
-    api.registerProvider('phi-worker-local', { api: 'phi-worker-local-api', baseUrl: 'http://127.0.0.1.invalid',
-      apiKey: 'offline-fixture-not-a-credential', models: [{ id: 'worker', name: 'Offline Worker fixture', reasoning: false,
+    api.registerProvider(conditionalControl ? 'openai-codex' : 'phi-worker-local', { api: 'phi-worker-local-api', baseUrl: 'http://127.0.0.1.invalid',
+      apiKey: 'offline-fixture-not-a-credential', models: [{ id: conditionalControl ? 'gpt-6-sol' : 'worker', name: 'Offline Worker fixture', reasoning: false,
         input: ['text'], contextWindow: 32768, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
       streamSimple: (model, context) => {
+        if (conditionalControl) conditionalSurface.push({ atModel: true, active: api.getActiveTools() });
         const results = context.messages.filter(message => message.role === 'toolResult');
-        const plan = process.platform === 'win32' ? revokedControl ? ['run.cjs', 'REVOKED_WRITE'] : lspControl ? ['run.cjs','LSP'] : ['run.cjs', 'read.cjs', 'fail.cjs', 'read.cjs', 'VERIFY']
+        const plan = conditionalControl ? ['EVAL', 'DEBUG_DENIED', 'WRITE_DENIED'] : process.platform === 'win32' ? revokedControl ? ['run.cjs', 'REVOKED_WRITE'] : lspControl ? ['run.cjs','LSP'] : ['run.cjs', 'read.cjs', 'fail.cjs', 'read.cjs', 'VERIFY']
           : revokedControl ? ['REVOKED_WRITE'] : [];
         const step = plan[results.length];
         if (step === 'REVOKED_WRITE') { revocationBefore = reservation.status(); reservation.revoke(); }
@@ -102,8 +119,8 @@ try {
         const nativeTool = step && step !== 'REVOKED_WRITE';
         const revokedWrite = step === 'REVOKED_WRITE';
         const message = { role: 'assistant', content: revokedWrite ? [{ type: 'toolCall', id: 'revoked-host-write', name: 'write', arguments: { path: 'input.txt', content: 'unauthorized-host-edit' } }]
-          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool-' + results.length, name: step === 'LSP' ? 'semantic_nav' : step === 'VERIFY' ? 'verification_gate' : 'safe_exec',
-            arguments: step === 'LSP' ? {operation:'diagnostics',path:'config.json'} : step === 'VERIFY' ? { mode: 'quick' } : { program: 'node', args: [step] } }]
+          : nativeTool ? [{ type: 'toolCall', id: 'worker-native-tool-' + results.length, name: step === 'LSP' ? 'semantic_nav' : step === 'VERIFY' ? 'verification_gate' : step === 'EVAL' ? 'persistent_javascript' : step === 'DEBUG_DENIED' ? 'debug_engine' : step === 'WRITE_DENIED' ? 'write' : 'safe_exec',
+            arguments: step === 'LSP' ? {operation:'diagnostics',path:'config.json'} : step === 'VERIFY' ? { mode: 'quick' } : step === 'EVAL' ? { action: 'execute', code: 'console.log(2 + 2)' } : step === 'DEBUG_DENIED' ? { action: 'set_breakpoint', file: '.env', line: 1 } : step === 'WRITE_DENIED' ? { path: '.env', content: 'forbidden' } : { program: 'node', args: [step] } }]
           : [{ type: 'text', text: 'SNAPSHOT_ONLY_NO_PROJECT_PUBLICATION' }], api: model.api, provider: model.provider, model: model.id,
           usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
           stopReason: nativeTool || revokedWrite ? 'toolUse' : 'stop', timestamp: Date.now() };
@@ -116,9 +133,9 @@ try {
   // depth/tool-budget hooks and session. Only model output is deterministic.
   const worker = { name: 'worker', description: 'Bounded Worker transport', source: 'runtime', filePath: path.join(root, 'agents/worker.md'),
     acceptanceRole: 'writer', completionGuard: true, systemPromptMode: 'replace', inheritGlobalContext: false,
-    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: process.platform === 'win32' ? revokedControl ? ['safe_exec', 'write'] : lspControl ? ['safe_exec','semantic_nav'] : ['safe_exec', 'verification_gate'] : revokedControl ? ['write'] : [],
-    model: 'phi-worker-local/worker', thinking: 'off', systemPrompt: 'Deterministic Worker transport validation. Snapshot only.',
-    subagentOnlyExtensions: process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts'), path.join(root, 'extensions/verification-gate.ts'), ...(lspControl?[path.join(root,'extensions/lsp.ts')]:[])] : [],
+    inheritProjectContext: false, inheritSkills: false, allowNestedSubagents: false, tools: conditionalControl ? ['read', 'debug_engine', 'persistent_javascript', 'write'] : process.platform === 'win32' ? revokedControl ? ['safe_exec', 'write'] : lspControl ? ['safe_exec','semantic_nav'] : ['safe_exec', 'verification_gate'] : revokedControl ? ['write'] : [],
+    model: conditionalControl ? 'openai-codex/gpt-6-sol' : 'phi-worker-local/worker', thinking: 'off', systemPrompt: 'Deterministic Worker transport validation. Snapshot only.',
+    subagentOnlyExtensions: conditionalControl ? ['safety.ts', 'debug-engine.ts', 'persistent-eval.ts', 'tool-surface.ts'].map(name => path.join(root, 'extensions', name)) : process.platform === 'win32' ? [path.join(root, 'extensions/windows-worker.ts'), path.join(root, 'extensions/safe-exec.ts'), path.join(root, 'extensions/verification-gate.ts'), ...(lspControl?[path.join(root,'extensions/lsp.ts')]:[])] : [],
   };
   const deterministicFactory = { create: async launch => {
     assert.equal(launch.ambientExtensions, false);
@@ -135,9 +152,19 @@ try {
   assert.ok(sessionId); assert.notEqual(sessionId, parentSessionId);
   assert.equal(foregroundResult.exitCode, 0, foregroundResult.error);
   assert.deepEqual(errors, []); assert.equal(boundEvents, 1);
-  assert.equal(turns, process.platform === 'win32' ? revokedControl || lspControl ? 3 : 6 : revokedControl ? 2 : 1);
+  assert.equal(turns, conditionalControl ? 4 : process.platform === 'win32' ? revokedControl || lspControl ? 3 : 6 : revokedControl ? 2 : 1);
   assert.equal(child.messages.at(-1).stopReason, 'stop');
-  if (revokedControl) {
+  if (conditionalControl) {
+    const results = child.messages.filter(message => message.role === 'toolResult');
+    report.conditionalDiagnostics = { results: results.map(result => ({ tool: result.toolName, isError: result.isError })), activeAtModel: conditionalSurface.findLast(row => row.atModel)?.active ?? [], extensionErrorCount: errors.length };
+    assert.deepEqual(results.map(result => result.toolName), ['persistent_javascript', 'debug_engine', 'write']);
+    assert.equal(results[0].isError, true, 'ungoverned Worker evaluation must remain denied');
+    assert.match(results[0].content[0].text, /PHI_WORKER_TOOL_DENIED/u);
+    assert.equal(results[1].isError, true, 'protected breakpoint must be rejected');
+    assert.equal(results[2].isError, true, 'protected write must be rejected');
+    assert.equal(conditionalSurface.findLast(row => row.atModel)?.active.includes('write'), false);
+    assert.equal(fs.readFileSync(path.join(project, '.env'), 'utf8'), 'FIXTURE_ONLY=not-a-secret\n');
+  } else if (revokedControl) {
     const result = child.messages.filter(message => message.role === 'toolResult').at(-1);
     assert.equal(result.isError, true, 'revoked Worker must not run a host write even when its tool is present');
     assert.match(result.content[0].text, /PHI_WORKER_TOOL_DENIED|PHI_WORKER_AUTHORITY_UNAVAILABLE/u);
@@ -189,7 +216,7 @@ try {
   assert.throws(() => windowsWorkerAuthority(sessionId), /AUTHORITY_UNAVAILABLE/u);
   assert.equal(externalRequests, 0);
   report = { status: 'PASS', platform: process.platform, piVersion: '1.5.0', subagentsVersion: '0.84.0',
-    proof: revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? lspControl ? 'REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB' : 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
+    proof: conditionalControl ? 'REAL_FOREGROUND_PI_WORKER_CONDITIONAL_DENIAL' : revokedControl ? 'REAL_FOREGROUND_PI_REVOKED_HOST_WRITE_DENIED' : process.platform === 'win32' ? lspControl ? 'REAL_FOREGROUND_PI_SAME_DRAFT_LSP_ON_WRITE_LPAC_JOB' : 'REAL_FOREGROUND_PI_SAME_DRAFT_EDIT_READ_FAIL_VERIFY_LPAC_JOB' : 'REAL_FOREGROUND_PI_CHILD_BINDING_ONLY_NOT_WINDOWS_SECURITY',
     foregroundExitCode: foregroundResult.exitCode,
     boundEvents, localDeterministicTurns: turns, externalProviderCalls: 0, sourceUnchanged: true, receipts,
     ...(revokedControl ? { revocationBefore, revocationAfter: reservation.status() } : {}) };
@@ -199,6 +226,7 @@ try {
   try { await child?.dispose(); await factory?.dispose(); } catch { report.status = 'FAIL'; report.dispose = 'FAIL'; }
   reservation?.revoke(); globalThis.fetch = savedFetch;
   if (savedAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = savedAgentDir;
+  if (savedModelPolicy === undefined) delete process.env.PI_OVERDRIVE_MODEL_POLICY; else process.env.PI_OVERDRIVE_MODEL_POLICY = savedModelPolicy;
   fs.rmSync(temporary, { recursive: true, force: true });
   report.cleanup = { temporaryRemoved: !fs.existsSync(temporary), authorityRevoked: sessionId ? (() => { try { windowsWorkerAuthority(sessionId); return false; } catch { return true; } })() : null,
     draftPayloadCleared: reservation?.status().draft?.payloadCleared ?? null };
