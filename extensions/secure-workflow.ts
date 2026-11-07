@@ -520,14 +520,7 @@ export default function (pi: ExtensionAPI) {
         };
         let resumable: ReturnType<typeof findResumableWorkflow> | undefined;
         const explicitRunId = process.env.PI_OVERDRIVE_EVIDENCE_RUN_ID;
-        if (explicitRunId) {
-          try {
-            const explicitRun = openEvidenceRun({ runId: explicitRunId });
-            const explicitJournal = readWorkflowJournal(explicitRun);
-            if (explicitJournal.status === "INTERRUPTED" && explicitJournal.task_id === digest && explicitJournal.source_repository === sourceRepository && !fs.existsSync(explicitRun.receiptFile)) resumable = { run: explicitRun, journal: explicitJournal, updated: Date.parse(explicitJournal.timestamps?.updated_at ?? "") || 0 };
-          } catch {}
-        }
-        resumable ??= findResumableWorkflow({ taskDigest: digest, sourceRepository });
+        resumable = findResumableWorkflow({ taskDigest: digest, sourceRepository, ...(explicitRunId ? { runId: explicitRunId } : {}) });
         if (resumable) {
           evidenceRun = resumable.run;
           journal = resumable.journal;

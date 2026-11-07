@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { checkpointWorkflowJournal, createEvidenceRun, initialWorkflowJournal, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
+import { checkpointWorkflowJournal, createEvidenceRun, findResumableWorkflow, initialWorkflowJournal, readEvidenceReceipt, readWorkflowJournal, recoverInterruptedWorkflowRuns, taskDigest, writeEvidenceExecution, writeEvidenceReceipt, writeWorkflowJournal } from "../lib/workflow-evidence.mjs";
 import { assertProtectedArtifact, createProtectedFile, ensureProtectedDirectory } from "../lib/protected-artifact.mjs";
 
 function privateFixtureFile(file, content) {
@@ -115,5 +115,41 @@ test("an unsupported durable process identity cannot trigger workflow recovery m
     assert.equal(result.recovered.length, 0);
     assert.equal(result.unknown.length + result.inconsistent.length, 1);
     assert.equal(fs.readFileSync(run.stateFile, "utf8"), content);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a newer completed run prevents replay of an older interrupted run for the same task", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-workflow-newer-"));
+  const evidenceRoot = path.join(root, "evidence");
+  const digest = taskDigest("same task");
+  const sourceRepository = path.join(root, "source");
+  try {
+    const older = createEvidenceRun({ root: evidenceRoot });
+    const olderJournal = initialWorkflowJournal(older, { taskDigest: digest, workflowVersion: 5, sourceRepository, ownerRunId: "older" });
+    olderJournal.status = "INTERRUPTED";
+    olderJournal.timestamps.started_at = "2026-01-01T00:00:00.000Z";
+    olderJournal.timestamps.updated_at = "2026-01-03T00:00:00.000Z";
+    writeWorkflowJournal(older, olderJournal);
+    const newer = createEvidenceRun({ root: evidenceRoot });
+    const newerJournal = initialWorkflowJournal(newer, { taskDigest: digest, workflowVersion: 5, sourceRepository, ownerRunId: "newer" });
+    newerJournal.status = "COMPLETED";
+    newerJournal.timestamps.started_at = "2026-01-02T00:00:00.000Z";
+    newerJournal.timestamps.updated_at = "2026-01-02T00:00:01.000Z";
+    writeWorkflowJournal(newer, newerJournal);
+    writeRun(newer, digest);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository }), undefined);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository, runId: older.runId }), undefined);
+    const latest = createEvidenceRun({ root: evidenceRoot });
+    const latestJournal = initialWorkflowJournal(latest, { taskDigest: digest, workflowVersion: 5, sourceRepository, ownerRunId: "latest" });
+    latestJournal.status = "INTERRUPTED";
+    latestJournal.timestamps.started_at = "2026-01-04T00:00:00.000Z";
+    latestJournal.timestamps.updated_at = "2026-01-04T00:00:01.000Z";
+    writeWorkflowJournal(latest, latestJournal);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository })?.run.runId, latest.runId);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository, runId: older.runId }), undefined);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository, runId: latest.runId })?.run.runId, latest.runId);
+    latestJournal.timestamps.started_at = newerJournal.timestamps.started_at;
+    writeWorkflowJournal(latest, latestJournal);
+    assert.equal(findResumableWorkflow({ root: evidenceRoot, taskDigest: digest, sourceRepository }), undefined);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
