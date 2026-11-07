@@ -2,7 +2,7 @@
   "name": "phi-coding-system",
   "version": "1.0.0",
   "private": true,
-  "description": "Phi: a governed, local-first coding system powered by the Pi runtime",
+  "description": "Φ Phi harness-INCOMPLETE: a governed, local-first coding system powered by the Pi runtime",
   "license": "UNLICENSED",
   "keywords": [
     "pi-package"

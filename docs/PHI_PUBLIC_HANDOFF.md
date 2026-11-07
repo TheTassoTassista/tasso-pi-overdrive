@@ -1,4 +1,4 @@
-# Phi — storia e guida alla continuazione
+# Φ Phi harness-INCOMPLETE — storia e guida alla continuazione
 
 Questo documento è il punto d'ingresso pubblico per chi vuole continuare Phi. Riassume gli ordini del proprietario, le decisioni, le prove e i limiti fino al 7 novembre 2026. Non sostituisce i ledger: per lo stato di ciascun gate usare anzitutto [`harness/MASTER_COMPLETION_MATRIX.md`](../harness/MASTER_COMPLETION_MATRIX.md), poi [`harness/CONTINUATION.md`](../harness/CONTINUATION.md), [`docs/phi-progress.md`](phi-progress.md), [`harness/DECISIONS.md`](../harness/DECISIONS.md) e [`harness/TEST_BASELINE.md`](../harness/TEST_BASELINE.md). Un PASS storico non attesta automaticamente l'host o il candidato di oggi.
 

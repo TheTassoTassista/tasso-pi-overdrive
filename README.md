@@ -1,4 +1,6 @@
-# Φ Phi
+# Φ Phi harness-INCOMPLETE
+
+**Stato:** harness di sviluppo incompleto; non è una release stabile certificata.
 
 Per la storia del progetto, lo stato dei gate e le istruzioni per continuarlo, vedere [Phi: storia e guida alla continuazione](docs/PHI_PUBLIC_HANDOFF.md).
 
